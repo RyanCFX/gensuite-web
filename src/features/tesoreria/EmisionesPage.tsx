@@ -15,6 +15,16 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'fecha', width: 100 },
+  { key: 'tipo', width: 100 },
+  { key: 'cuentaBancaria', width: 160 },
+  { key: 'beneficiario', width: 200 },
+  { key: 'monto', width: 120 },
+  { key: 'estado', width: 100 },
+]
 
 const STATUS_BADGE: Record<TesoreriaEstado, string> = {
   draft: 'badge-draft',
@@ -37,6 +47,7 @@ export default function EmisionesPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data: tiposData } = useQuery({
     queryKey: ['tesoreria-tipos-documento-select', 'Cheque,Transferencia,Otro'],
@@ -112,15 +123,39 @@ export default function EmisionesPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="Fecha" sortKey="fecha" orderBy={orderBy} onSort={sort} />
-                <th>Tipo</th>
-                <th>Cuenta Bancaria</th>
-                <th>Beneficiario</th>
-                <th style={{ textAlign: 'right' }}>Monto</th>
-                <th>Estado</th>
+                <SortableTh
+                  label="Fecha"
+                  sortKey="fecha"
+                  orderBy={orderBy}
+                  onSort={sort}
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />}
+                />
+                <th>
+                  Tipo
+                  <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                </th>
+                <th>
+                  Cuenta Bancaria
+                  <span className="col-resize-handle" onMouseDown={startResize('cuentaBancaria')} />
+                </th>
+                <th>
+                  Beneficiario
+                  <span className="col-resize-handle" onMouseDown={startResize('beneficiario')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Monto
+                  <span className="col-resize-handle" onMouseDown={startResize('monto')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
               </tr>
             </thead>
             <tbody>

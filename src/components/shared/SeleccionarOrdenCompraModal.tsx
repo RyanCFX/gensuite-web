@@ -14,6 +14,14 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
 import { AlertTriangle } from 'lucide-react'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const LINES_COLUMNS = [
+  { key: 'checked', width: 32 },
+  { key: 'articulo', width: 220 },
+  { key: 'remanente', width: 110 },
+  { key: 'cantidad', width: 130 },
+]
 
 export interface OrdenCompraImportLine {
   itemCode: string
@@ -51,6 +59,7 @@ export function SeleccionarOrdenCompraModal({ open, onClose, mode, onImport }: P
   const [ordenId, setOrdenId] = useState('')
   const [ordenSearch, setOrdenSearch] = useState('')
   const [lines, setLines] = useState<RemanenteLine[]>([])
+  const { widths: colWidths, startResize } = useResizableColumns(LINES_COLUMNS)
 
   const { data: ordenesData, isLoading: ordenesLoading } = useQuery({
     queryKey: ['ordenes-compra-para-enlazar', mode, ordenSearch],
@@ -193,13 +202,16 @@ export function SeleccionarOrdenCompraModal({ open, onClose, mode, onImport }: P
               )}
 
               {!bloqueadaPorRecepcion && lines.length > 0 && (
-                <table className="items-table">
+                <table className="items-table items-table-resizable">
+                  <colgroup>
+                    {LINES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ width: 32 }} />
-                      <th>Artículo</th>
-                      <th style={{ width: '16%', textAlign: 'right' }}>Remanente</th>
-                      <th style={{ width: '18%', textAlign: 'right' }}>Cantidad</th>
+                      <th />
+                      <th>Artículo<span className="col-resize-handle" onMouseDown={startResize('articulo')} /></th>
+                      <th style={{ textAlign: 'right' }}>Remanente<span className="col-resize-handle" onMouseDown={startResize('remanente')} /></th>
+                      <th style={{ textAlign: 'right' }}>Cantidad<span className="col-resize-handle" onMouseDown={startResize('cantidad')} /></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -210,7 +222,7 @@ export function SeleccionarOrdenCompraModal({ open, onClose, mode, onImport }: P
                         </td>
                         <td>
                           <div style={{ fontWeight: 500 }}>{line.itemName ?? line.itemCode}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{line.itemCode}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontFamily: 'var(--font-body)' }}>{line.itemCode}</div>
                         </td>
                         <td style={{ textAlign: 'right' }}>{line.remanente} {line.uom}</td>
                         <td>

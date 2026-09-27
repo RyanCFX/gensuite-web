@@ -10,6 +10,15 @@ import { getCargaInicial, cancelarCargaInicial } from '@/shared/api/cargaInicial
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate, formatMoney, formatNumber } from '@/lib/formatters'
 import { ConfirmModal } from '@/shared/ui/Modal'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_COLUMNS = [
+  { key: 'articulo', width: 200 },
+  { key: 'almacen', width: 140 },
+  { key: 'cantidad', width: 100 },
+  { key: 'costo', width: 120 },
+  { key: 'importe', width: 120 },
+]
 
 const ESTADO_BADGE: Record<string, string> = { submitted: 'badge-submitted', cancelled: 'badge-cancelled' }
 const ESTADO_LABEL: Record<string, string> = { submitted: 'Confirmada', cancelled: 'Anulada' }
@@ -20,6 +29,7 @@ export default function CargaInicialDetail() {
   const queryClient = useQueryClient()
   const puedeAnular = usePuede('inventario.carga-inicial.anular')
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const { widths: itemsColWidths, startResize: itemsStartResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const { data: doc, isLoading, isError } = useQuery({
     queryKey: ['carga-inicial', id],
@@ -113,14 +123,32 @@ export default function CargaInicialDetail() {
       <div className="card">
         <div className="card-header"><h2 className="card-title">Artículos ({doc.items.length})</h2></div>
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Artículo</th>
-                <th>Almacén</th>
-                <th style={{ textAlign: 'right' }}>Cantidad</th>
-                <th style={{ textAlign: 'right' }}>Costo unitario</th>
-                <th style={{ textAlign: 'right' }}>Importe</th>
+                <th>
+                  Artículo
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('articulo')} />
+                </th>
+                <th>
+                  Almacén
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('almacen')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Cantidad
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('cantidad')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Costo unitario
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('costo')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Importe
+                  <span className="col-resize-handle" onMouseDown={itemsStartResize('importe')} />
+                </th>
               </tr>
             </thead>
             <tbody>

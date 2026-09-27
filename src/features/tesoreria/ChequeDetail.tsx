@@ -7,6 +7,12 @@ import { getCheque, anularCheque, getChequePdfBlobUrl, getEmision } from '@/shar
 import { getPago } from '@/shared/api/pagos'
 import type { ChequeEstado } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const FACTURAS_COLUMNS = [
+  { key: 'factura', width: 200 },
+  { key: 'montoAplicado', width: 130 },
+]
 
 const STATUS_BADGE: Record<ChequeEstado, string> = {
   Reservado: 'badge-draft',
@@ -23,6 +29,7 @@ export default function ChequeDetail() {
   const [confirmAnular, setConfirmAnular] = useState(false)
   const [motivo, setMotivo] = useState('')
   const [printError, setPrintError] = useState<string | null>(null)
+  const { widths: facturasColWidths, startResize: startFacturasResize } = useResizableColumns(FACTURAS_COLUMNS)
 
   const { data: cheque, isLoading, isError } = useQuery({
     queryKey: ['tesoreria-cheque', id],
@@ -215,17 +222,20 @@ export default function ChequeDetail() {
         <div className="card">
           <div className="card-header"><h2 className="card-title">Facturas donde se utilizó</h2></div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {FACTURAS_COLUMNS.map((c) => <col key={c.key} style={{ width: facturasColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Factura</th>
-                  <th style={{ textAlign: 'right' }}>Monto aplicado</th>
+                  <th>Factura<span className="col-resize-handle" onMouseDown={startFacturasResize('factura')} /></th>
+                  <th style={{ textAlign: 'right' }}>Monto aplicado<span className="col-resize-handle" onMouseDown={startFacturasResize('montoAplicado')} /></th>
                 </tr>
               </thead>
               <tbody>
                 {cheque.facturas.map((f, i) => (
                   <tr key={i} className="data-table-row-link" onClick={() => navigate(`/compras/${encodeURIComponent(f.invoiceId)}`)}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{f.invoiceId}</td>
+                    <td style={{ fontFamily: 'var(--font-body)', fontWeight: 500 }}>{f.invoiceId}</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(f.allocatedAmount)}</td>
                   </tr>
                 ))}

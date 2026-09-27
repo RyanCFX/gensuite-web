@@ -21,8 +21,19 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { formatDateTime, formatDate } from '@/lib/formatters'
 import { useTabActiva } from '@/shared/hooks/useTabActiva'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const COLUMNS = [
+  { key: 'articulo', width: 120 },
+  { key: 'almacen', width: 120 },
+  { key: 'estado', width: 110 },
+  { key: 'progreso', width: 100 },
+  { key: 'desde', width: 100 },
+  { key: 'encolado', width: 130 },
+  { key: 'actions', width: 120 },
+]
 
 const STATUS_BADGE: Record<RepostValuacionStatus, string> = {
   Queued: 'badge-neutral',
@@ -89,6 +100,7 @@ export default function RepostValuacionPage() {
   // ── Seguimiento ──────────────────────────────────────────────────────────
   const [page, setPage] = useState(1)
   const offset = (page - 1) * PAGE_SIZE
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['repost-valuacion', offset],
@@ -205,16 +217,37 @@ export default function RepostValuacionPage() {
             </button>
           </div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Artículo</th>
-                  <th>Almacén</th>
-                  <th>Estado</th>
-                  <th>Progreso</th>
-                  <th>Desde</th>
-                  <th>Encolado</th>
-                  <th style={{ width: 120 }} />
+                  <th>
+                    Artículo
+                    <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                  </th>
+                  <th>
+                    Almacén
+                    <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                  </th>
+                  <th>
+                    Estado
+                    <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                  </th>
+                  <th>
+                    Progreso
+                    <span className="col-resize-handle" onMouseDown={startResize('progreso')} />
+                  </th>
+                  <th>
+                    Desde
+                    <span className="col-resize-handle" onMouseDown={startResize('desde')} />
+                  </th>
+                  <th>
+                    Encolado
+                    <span className="col-resize-handle" onMouseDown={startResize('encolado')} />
+                  </th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -239,7 +272,7 @@ export default function RepostValuacionPage() {
                       )
                     : items.map((r: RepostValuacionItem) => (
                         <tr key={r.id}>
-                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{r.itemCode}</td>
+                          <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{r.itemCode}</td>
                           <td className="td-muted">{r.warehouse ?? 'Todos'}</td>
                           <td><span className={`badge ${STATUS_BADGE[r.status]}`}>{STATUS_LABEL[r.status]}</span></td>
                           <td className="td-muted" style={{ fontSize: 12 }}>

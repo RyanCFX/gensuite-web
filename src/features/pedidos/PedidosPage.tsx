@@ -19,6 +19,17 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { ESTADO_FLUJO_BADGE, ESTADO_FLUJO_LABEL } from './estadoFlujo'
 import type { PedidoEstadoFlujo } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'id', width: 100 },
+  { key: 'cliente', width: 220 },
+  { key: 'fecha', width: 110 },
+  { key: 'entrega', width: 110 },
+  { key: 'total', width: 120 },
+  { key: 'estado', width: 140 },
+  { key: 'actions', width: 48 },
+]
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -47,6 +58,7 @@ export default function PedidosPage() {
   // servidor, se filtra en el cliente sobre la página ya traída.
   const [estadoFlujoFilter, setEstadoFlujoFilter] = useState<PedidoEstadoFlujo | 'all'>('all')
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data: sucursalesData } = useQuery({
     queryKey: ['sucursales-all'],
@@ -179,16 +191,25 @@ export default function PedidosPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
-              <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
-              <SortableTh label="Fecha" sortKey="transactionDate" orderBy={orderBy} onSort={sort} />
-              <th>Entrega</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
-              <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
-              <th style={{ width: 48 }} />
+              <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('id')} />} />
+              <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('cliente')} />} />
+              <SortableTh label="Fecha" sortKey="transactionDate" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />} />
+              <th>
+                Entrega
+                <span className="col-resize-handle" onMouseDown={startResize('entrega')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Total
+                <span className="col-resize-handle" onMouseDown={startResize('total')} />
+              </th>
+              <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('estado')} />} />
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -221,7 +242,7 @@ export default function PedidosPage() {
                     className="table-row-clickable"
                     onClick={() => navigate(`/pedidos/${p.id}`)}
                   >
-                    <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{displayId(p.id, p.sequence)}</td>
+                    <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{displayId(p.id, p.sequence)}</td>
                     <td style={{ fontWeight: 500 }}>{p.customerName}</td>
                     <td>{formatDate(p.transactionDate)}</td>
                     <td>{p.deliveryDate ? formatDate(p.deliveryDate) : <span className="td-dim">—</span>}</td>

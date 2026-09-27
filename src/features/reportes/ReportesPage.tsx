@@ -51,6 +51,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { GlLedgerTable } from '@/shared/ui/GlLedgerTable'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 // ─── Branch / Department filter ──────────────────────────────────────────────
 
@@ -186,6 +187,14 @@ function ReportTable({
   data: Record<string, unknown>[]
   columns?: ColumnDef[]
 }) {
+  // Usa los fieldnames de `columns` si vienen del backend; si no, infiere de la primera fila
+  const colDefs: ColumnDef[] = data && data.length > 0
+    ? (columns && columns.length > 0
+        ? columns
+        : Object.keys(data[0]).map((k) => ({ fieldname: k, label: k.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim() })))
+    : []
+  const REPORT_TABLE_COLUMNS = colDefs.map((c) => ({ key: c.fieldname, width: 140 }))
+  const { widths: colWidths, startResize } = useResizableColumns(REPORT_TABLE_COLUMNS)
 
   if (!data || data.length === 0) {
     return (
@@ -197,18 +206,19 @@ function ReportTable({
     )
   }
 
-  // Usa los fieldnames de `columns` si vienen del backend; si no, infiere de la primera fila
-  const colDefs: ColumnDef[] = columns && columns.length > 0
-    ? columns
-    : Object.keys(data[0]).map((k) => ({ fieldname: k, label: k.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim() }))
-
   return (
     <div className="table-scroll">
-      <table className="data-table navy-table">
+      <table className="data-table navy-table items-table-resizable">
+        <colgroup>
+          {REPORT_TABLE_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+        </colgroup>
         <thead>
           <tr>
             {colDefs.map((c) => (
-              <th key={c.fieldname}>{c.label}</th>
+              <th key={c.fieldname}>
+                {c.label}
+                <span className="col-resize-handle" onMouseDown={startResize(c.fieldname)} />
+              </th>
             ))}
           </tr>
         </thead>
@@ -713,10 +723,16 @@ function CxpAgingReport() {
   )
 }
 
+const METODO_PAGO_COLUMNS = [
+  { key: 'metodo', width: 200 },
+  { key: 'total', width: 130 },
+]
+
 function CajaCuadreReport() {
   const [date, setDate] = useState(today())
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
+  const { widths: metodoPagoColWidths, startResize: startMetodoPagoResize } = useResizableColumns(METODO_PAGO_COLUMNS)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-caja', date, branch, department],
     queryFn: () => getCajaCuadre({ date, branch: branch || undefined, department: department || undefined }),
@@ -816,11 +832,14 @@ function CajaCuadreReport() {
                 )
                 : (
                   <div className="table-scroll">
-                    <table className="data-table navy-table">
+                    <table className="data-table navy-table items-table-resizable">
+                      <colgroup>
+                        {METODO_PAGO_COLUMNS.map((c) => <col key={c.key} style={{ width: metodoPagoColWidths[c.key] }} />)}
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th>Método de pago</th>
-                          <th style={{ textAlign: 'right' }}>Total</th>
+                          <th>Método de pago<span className="col-resize-handle" onMouseDown={startMetodoPagoResize('metodo')} /></th>
+                          <th style={{ textAlign: 'right' }}>Total<span className="col-resize-handle" onMouseDown={startMetodoPagoResize('total')} /></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -853,11 +872,14 @@ function CajaCuadreReport() {
                 )
                 : (
                   <div className="table-scroll">
-                    <table className="data-table navy-table">
+                    <table className="data-table navy-table items-table-resizable">
+                      <colgroup>
+                        {METODO_PAGO_COLUMNS.map((c) => <col key={c.key} style={{ width: metodoPagoColWidths[c.key] }} />)}
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th>Método de pago</th>
-                          <th style={{ textAlign: 'right' }}>Total</th>
+                          <th>Método de pago<span className="col-resize-handle" onMouseDown={startMetodoPagoResize('metodo')} /></th>
+                          <th style={{ textAlign: 'right' }}>Total<span className="col-resize-handle" onMouseDown={startMetodoPagoResize('total')} /></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -925,6 +947,18 @@ function CuadreTurnoReport() {
   // Ver docs/tasks/64_multimoneda_completo.md §6.4.
   const monedasEnRango = Array.from(new Set(rows.map((r) => r.moneda ?? 'DOP')))
   const monedaUnica = monedasEnRango.length <= 1 ? monedasEnRango[0] : undefined
+
+  const CUADRE_TURNO_COLUMNS = [
+    { key: 'turno', width: 140 },
+    { key: 'cajero', width: 160 },
+    ...(monedaUnica === undefined ? [{ key: 'moneda', width: 90 }] : []),
+    { key: 'modoPago', width: 140 },
+    { key: 'apertura', width: 120 },
+    { key: 'esperado', width: 120 },
+    { key: 'contado', width: 120 },
+    { key: 'diferencia', width: 120 },
+  ]
+  const { widths: cuadreTurnoColWidths, startResize: startCuadreTurnoResize } = useResizableColumns(CUADRE_TURNO_COLUMNS)
 
   const resumen = rows.reduce(
     (acc, r) => {
@@ -1039,36 +1073,39 @@ function CuadreTurnoReport() {
         )}
         {!isLoading && !error && rows.length > 0 && (
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {CUADRE_TURNO_COLUMNS.map((c) => <col key={c.key} style={{ width: cuadreTurnoColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Turno</th>
-                  <th>Cajero</th>
-                  {monedaUnica === undefined && <th>Moneda</th>}
-                  <th>Modo de Pago</th>
-                  <th style={{ textAlign: 'right' }}>Apertura</th>
-                  <th style={{ textAlign: 'right' }}>Esperado</th>
-                  <th style={{ textAlign: 'right' }}>Contado</th>
-                  <th style={{ textAlign: 'right' }}>Diferencia</th>
+                  <th>Turno<span className="col-resize-handle" onMouseDown={startCuadreTurnoResize('turno')} /></th>
+                  <th>Cajero<span className="col-resize-handle" onMouseDown={startCuadreTurnoResize('cajero')} /></th>
+                  {monedaUnica === undefined && <th>Moneda<span className="col-resize-handle" onMouseDown={startCuadreTurnoResize('moneda')} /></th>}
+                  <th>Modo de Pago<span className="col-resize-handle" onMouseDown={startCuadreTurnoResize('modoPago')} /></th>
+                  <th style={{ textAlign: 'right' }}>Apertura<span className="col-resize-handle" onMouseDown={startCuadreTurnoResize('apertura')} /></th>
+                  <th style={{ textAlign: 'right' }}>Esperado<span className="col-resize-handle" onMouseDown={startCuadreTurnoResize('esperado')} /></th>
+                  <th style={{ textAlign: 'right' }}>Contado<span className="col-resize-handle" onMouseDown={startCuadreTurnoResize('contado')} /></th>
+                  <th style={{ textAlign: 'right' }}>Diferencia<span className="col-resize-handle" onMouseDown={startCuadreTurnoResize('diferencia')} /></th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r, i) => (
                   <tr key={`${r.closingEntryId}-${r.modeOfPayment}-${i}`}>
-                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                       {r.closingEntryId}
                       <div className="td-muted" style={{ fontSize: 11 }}>{formatDateTime(r.periodStartDate)}</div>
                     </td>
                     <td>{r.cajero}</td>
                     {monedaUnica === undefined && <td>{r.moneda ?? 'DOP'}</td>}
                     <td>{r.modeOfPayment}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatMoney(r.openingAmount, r.moneda)}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatMoney(r.expectedAmount, r.moneda)}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatMoney(r.closingAmount, r.moneda)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatMoney(r.openingAmount, r.moneda)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatMoney(r.expectedAmount, r.moneda)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatMoney(r.closingAmount, r.moneda)}</td>
                     <td
                       style={{
                         textAlign: 'right',
-                        fontFamily: 'monospace',
+                        fontFamily: 'var(--font-body)',
                         fontWeight: 600,
                         color: diferenciaColor(r.difference),
                       }}
@@ -1112,6 +1149,18 @@ function CorteCajaDiaReport() {
   const consolidadoPorMoneda = result?.consolidadoPorMoneda ?? []
   const diaSegmentado = consolidadoPorMoneda.length > 1
   const monedaUnicaDelDia = turnos.length > 0 ? (new Set(turnos.map((t) => t.moneda ?? 'DOP')).size <= 1 ? (turnos[0].moneda ?? 'DOP') : undefined) : undefined
+
+  const CORTE_CAJA_DIA_COLUMNS = [
+    { key: 'turno', width: 140 },
+    { key: 'cajero', width: 160 },
+    ...(monedaUnicaDelDia === undefined ? [{ key: 'moneda', width: 90 }] : []),
+    { key: 'apertura', width: 110 },
+    { key: 'cierre', width: 110 },
+    { key: 'ventasDelDia', width: 130 },
+    { key: 'egresos', width: 120 },
+    { key: 'importeAEntregar', width: 140 },
+  ]
+  const { widths: corteCajaDiaColWidths, startResize: startCorteCajaDiaResize } = useResizableColumns(CORTE_CAJA_DIA_COLUMNS)
 
   async function handleDownloadPdf() {
     setDownloadingPdf(true)
@@ -1196,30 +1245,33 @@ function CorteCajaDiaReport() {
                   <span className="card-title">Turnos del día</span>
                 </div>
                 <div className="table-scroll">
-                  <table className="data-table navy-table">
+                  <table className="data-table navy-table items-table-resizable">
+                    <colgroup>
+                      {CORTE_CAJA_DIA_COLUMNS.map((c) => <col key={c.key} style={{ width: corteCajaDiaColWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th>Turno</th>
-                        <th>Cajero</th>
-                        {monedaUnicaDelDia === undefined && <th>Moneda</th>}
-                        <th>Apertura</th>
-                        <th>Cierre</th>
-                        <th style={{ textAlign: 'right' }}>Ventas del Día</th>
-                        <th style={{ textAlign: 'right' }}>Egresos</th>
-                        <th style={{ textAlign: 'right' }}>Importe a Entregar</th>
+                        <th>Turno<span className="col-resize-handle" onMouseDown={startCorteCajaDiaResize('turno')} /></th>
+                        <th>Cajero<span className="col-resize-handle" onMouseDown={startCorteCajaDiaResize('cajero')} /></th>
+                        {monedaUnicaDelDia === undefined && <th>Moneda<span className="col-resize-handle" onMouseDown={startCorteCajaDiaResize('moneda')} /></th>}
+                        <th>Apertura<span className="col-resize-handle" onMouseDown={startCorteCajaDiaResize('apertura')} /></th>
+                        <th>Cierre<span className="col-resize-handle" onMouseDown={startCorteCajaDiaResize('cierre')} /></th>
+                        <th style={{ textAlign: 'right' }}>Ventas del Día<span className="col-resize-handle" onMouseDown={startCorteCajaDiaResize('ventasDelDia')} /></th>
+                        <th style={{ textAlign: 'right' }}>Egresos<span className="col-resize-handle" onMouseDown={startCorteCajaDiaResize('egresos')} /></th>
+                        <th style={{ textAlign: 'right' }}>Importe a Entregar<span className="col-resize-handle" onMouseDown={startCorteCajaDiaResize('importeAEntregar')} /></th>
                       </tr>
                     </thead>
                     <tbody>
                       {turnos.map((t) => (
                         <tr key={t.id}>
-                          <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{t.id}</td>
+                          <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{t.id}</td>
                           <td>{t.cajero}</td>
                           {monedaUnicaDelDia === undefined && <td>{t.moneda ?? 'DOP'}</td>}
                           <td style={{ fontSize: 12 }}>{formatDateTime(t.periodStartDate)}</td>
                           <td style={{ fontSize: 12 }}>{formatDateTime(t.periodEndDate)}</td>
-                          <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatMoney(t.corteCaja.ventasDelDia.total, t.moneda)}</td>
-                          <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{formatMoney(t.corteCaja.egresos.total, t.moneda)}</td>
-                          <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{formatMoney(t.corteCaja.importeAEntregar, t.moneda)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatMoney(t.corteCaja.ventasDelDia.total, t.moneda)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatMoney(t.corteCaja.egresos.total, t.moneda)}</td>
+                          <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontWeight: 600 }}>{formatMoney(t.corteCaja.importeAEntregar, t.moneda)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1234,16 +1286,27 @@ function CorteCajaDiaReport() {
   )
 }
 
+const BY_DIMENSION_COLUMNS = [
+  { key: 'dimension', width: 200 },
+  { key: 'totalDebito', width: 130 },
+  { key: 'totalCredito', width: 130 },
+  { key: 'cantidad', width: 100 },
+]
+
 function ByDimensionTable({ rows }: { rows: LibroDiarioByDimension[] }) {
+  const { widths: colWidths, startResize } = useResizableColumns(BY_DIMENSION_COLUMNS)
   return (
     <div className="table-scroll">
-      <table className="data-table navy-table">
+      <table className="data-table navy-table items-table-resizable">
+        <colgroup>
+          {BY_DIMENSION_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+        </colgroup>
         <thead>
           <tr>
-            <th>Dimensión</th>
-            <th style={{ textAlign: 'right' }}>Total Débito</th>
-            <th style={{ textAlign: 'right' }}>Total Crédito</th>
-            <th style={{ textAlign: 'right' }}>Cantidad</th>
+            <th>Dimensión<span className="col-resize-handle" onMouseDown={startResize('dimension')} /></th>
+            <th style={{ textAlign: 'right' }}>Total Débito<span className="col-resize-handle" onMouseDown={startResize('totalDebito')} /></th>
+            <th style={{ textAlign: 'right' }}>Total Crédito<span className="col-resize-handle" onMouseDown={startResize('totalCredito')} /></th>
+            <th style={{ textAlign: 'right' }}>Cantidad<span className="col-resize-handle" onMouseDown={startResize('cantidad')} /></th>
           </tr>
         </thead>
         <tbody>
@@ -1587,12 +1650,20 @@ const FACTURACION_FISCAL_NOTA_PRORRATEO =
   'En ventas con pago mixto, el total por forma de pago conserva el monto realmente cobrado; ' +
   'subtotal e ITBIS se distribuyen proporcionalmente entre las formas de pago para fines de presentación.'
 
+const COMPROBANTE_FORMA_PAGO_COLUMNS = [
+  { key: 'formaDePago', width: 180 },
+  { key: 'subtotal', width: 120 },
+  { key: 'itbis', width: 110 },
+  { key: 'total', width: 120 },
+]
+
 function FacturacionFiscalReport() {
   const [fromDate, setFromDate] = useState(monthStart())
   const [toDate, setToDate] = useState(today())
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
   const puedeImprimir = usePermissionsStore((s) => s.acciones['reportes.dgii.facturacion-fiscal.imprimir'] === true)
+  const { widths: comprobanteColWidths, startResize: startComprobanteResize } = useResizableColumns(COMPROBANTE_FORMA_PAGO_COLUMNS)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-facturacion-fiscal', fromDate, toDate, branch, department],
@@ -1663,13 +1734,16 @@ function FacturacionFiscalReport() {
                 )
                 : (
                   <div className="table-scroll">
-                    <table className="data-table navy-table">
+                    <table className="data-table navy-table items-table-resizable">
+                      <colgroup>
+                        {COMPROBANTE_FORMA_PAGO_COLUMNS.map((c) => <col key={c.key} style={{ width: comprobanteColWidths[c.key] }} />)}
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th>Forma de pago</th>
-                          <th style={{ textAlign: 'right' }}>Subtotal</th>
-                          <th style={{ textAlign: 'right' }}>ITBIS</th>
-                          <th style={{ textAlign: 'right' }}>Total</th>
+                          <th>Forma de pago<span className="col-resize-handle" onMouseDown={startComprobanteResize('formaDePago')} /></th>
+                          <th style={{ textAlign: 'right' }}>Subtotal<span className="col-resize-handle" onMouseDown={startComprobanteResize('subtotal')} /></th>
+                          <th style={{ textAlign: 'right' }}>ITBIS<span className="col-resize-handle" onMouseDown={startComprobanteResize('itbis')} /></th>
+                          <th style={{ textAlign: 'right' }}>Total<span className="col-resize-handle" onMouseDown={startComprobanteResize('total')} /></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2652,9 +2726,18 @@ function SolicitudDetalle({ solicitudId }: { solicitudId: string }) {
   return <ReportTable data={data.report.rows} columns={data.report.columns} />
 }
 
+const SOLICITUDES_COLUMNS = [
+  { key: 'reporte', width: 220 },
+  { key: 'estado', width: 110 },
+  { key: 'solicitado', width: 140 },
+  { key: 'completado', width: 140 },
+  { key: 'acciones', width: 60 },
+]
+
 function SolicitudesReport() {
   const [limit, setLimit] = useState(20)
   const [viewingId, setViewingId] = useState<string | null>(null)
+  const { widths: solicitudesColWidths, startResize: startSolicitudesResize } = useResizableColumns(SOLICITUDES_COLUMNS)
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['reporte-solicitudes', limit],
@@ -2709,13 +2792,16 @@ function SolicitudesReport() {
         )}
         {!isLoading && !error && solicitudes.length > 0 && (
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {SOLICITUDES_COLUMNS.map((c) => <col key={c.key} style={{ width: solicitudesColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Reporte</th>
-                  <th>Estado</th>
-                  <th>Solicitado</th>
-                  <th>Completado</th>
+                  <th>Reporte<span className="col-resize-handle" onMouseDown={startSolicitudesResize('reporte')} /></th>
+                  <th>Estado<span className="col-resize-handle" onMouseDown={startSolicitudesResize('estado')} /></th>
+                  <th>Solicitado<span className="col-resize-handle" onMouseDown={startSolicitudesResize('solicitado')} /></th>
+                  <th>Completado<span className="col-resize-handle" onMouseDown={startSolicitudesResize('completado')} /></th>
                   <th />
                 </tr>
               </thead>

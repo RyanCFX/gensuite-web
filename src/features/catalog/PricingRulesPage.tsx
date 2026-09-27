@@ -28,8 +28,18 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const COLUMNS = [
+  { key: 'titulo', width: 200 },
+  { key: 'aplicaA', width: 200 },
+  { key: 'descuento', width: 110 },
+  { key: 'vigencia', width: 180 },
+  { key: 'estado', width: 100 },
+  { key: 'actions', width: 48 },
+]
 
 const applyOnOptions = [
   { value: 'Item Code', label: 'Código de Artículo' },
@@ -383,6 +393,7 @@ export default function PricingRulesPage() {
   }
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   return (
     <div className="page-container">
@@ -440,15 +451,36 @@ export default function PricingRulesPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="Título" sortKey="title" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                <th>Aplica a</th>
-                <th>Descuento</th>
-                <th>Vigencia</th>
-                <th>Estado</th>
-                <th style={{ width: 48 }} />
+                <SortableTh
+                  label="Título"
+                  sortKey="title"
+                  orderBy={orderBy}
+                  onSort={(k) => { sort(k); setPage(1) }}
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('titulo')} />}
+                />
+                <th>
+                  Aplica a
+                  <span className="col-resize-handle" onMouseDown={startResize('aplicaA')} />
+                </th>
+                <th>
+                  Descuento
+                  <span className="col-resize-handle" onMouseDown={startResize('descuento')} />
+                </th>
+                <th>
+                  Vigencia
+                  <span className="col-resize-handle" onMouseDown={startResize('vigencia')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>

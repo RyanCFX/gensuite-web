@@ -21,8 +21,17 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const COLUMNS = [
+  { key: 'nombre', width: 220 },
+  { key: 'categoriaPadre', width: 160 },
+  { key: 'tipo', width: 110 },
+  { key: 'prefijo', width: 100 },
+  { key: 'actions', width: 48 },
+]
 
 const categorySchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -91,7 +100,7 @@ function TreeNode({ category, depth, onEdit, onDelete }: { category: Category; d
           <span className="badge badge-brand" style={{ fontSize: 11 }}>Categoría</span>
         )}
         {category.itemCodePrefix && (
-          <span className="badge" style={{ fontSize: 11, background: 'var(--surface-sunken)', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+          <span className="badge" style={{ fontSize: 11, background: 'var(--surface-sunken)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}>
             {category.itemCodePrefix}
           </span>
         )}
@@ -306,6 +315,7 @@ export default function CategoriesPage() {
   const categories = data?.items ?? []
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
   const treeData = Array.isArray(tree?.items) ? tree.items : []
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   return (
     <div className="page-container">
@@ -362,14 +372,32 @@ export default function CategoriesPage() {
 
           <div className="card navy-table-card">
             <div className="table-scroll">
-              <table className="data-table navy-table">
+              <table className="data-table navy-table items-table-resizable">
+                <colgroup>
+                  {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <SortableTh label="Nombre" sortKey="name" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                    <th>Categoría Padre</th>
-                    <th>Tipo</th>
-                    <th>Prefijo</th>
-                    <th style={{ width: 48 }} />
+                    <SortableTh
+                      label="Nombre"
+                      sortKey="name"
+                      orderBy={orderBy}
+                      onSort={(k) => { sort(k); setPage(1) }}
+                      resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('nombre')} />}
+                    />
+                    <th>
+                      Categoría Padre
+                      <span className="col-resize-handle" onMouseDown={startResize('categoriaPadre')} />
+                    </th>
+                    <th>
+                      Tipo
+                      <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                    </th>
+                    <th>
+                      Prefijo
+                      <span className="col-resize-handle" onMouseDown={startResize('prefijo')} />
+                    </th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
@@ -415,7 +443,7 @@ export default function CategoriesPage() {
                                   ? <span className="badge badge-neutral" style={{ fontSize: 11 }}>Grupo</span>
                                   : <span className="badge badge-brand" style={{ fontSize: 11 }}>Categoría</span>}
                               </td>
-                              <td className="td-muted" style={{ fontFamily: 'monospace' }}>{cat.itemCodePrefix ?? '—'}</td>
+                              <td className="td-muted" style={{ fontFamily: 'var(--font-body)' }}>{cat.itemCodePrefix ?? '—'}</td>
                               <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                                 <ActionsMenu>
                                   <ActionsMenuItem onClick={() => openEdit(cat)}>

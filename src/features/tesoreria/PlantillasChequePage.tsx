@@ -5,9 +5,18 @@ import { listChequePrintTemplates } from '@/shared/api/tesoreria'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { PlantillasTabs } from '@/shared/ui/PlantillasTabs'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'nombre', width: 200 },
+  { key: 'tamano', width: 110 },
+  { key: 'printFormat', width: 160 },
+  { key: 'actions', width: 48 },
+]
 
 export default function PlantillasChequePage() {
   const navigate = useNavigate()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['tesoreria-cheque-print-templates'],
@@ -44,13 +53,25 @@ export default function PlantillasChequePage() {
 
       <div className="card">
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Nombre</th>
-                <th>Tamaño</th>
-                <th>Print Format</th>
-                <th style={{ width: 48 }} />
+                <th>
+                  Nombre
+                  <span className="col-resize-handle" onMouseDown={startResize('nombre')} />
+                </th>
+                <th>
+                  Tamaño
+                  <span className="col-resize-handle" onMouseDown={startResize('tamano')} />
+                </th>
+                <th>
+                  Print Format
+                  <span className="col-resize-handle" onMouseDown={startResize('printFormat')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>

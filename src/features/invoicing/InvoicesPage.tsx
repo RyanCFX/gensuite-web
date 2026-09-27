@@ -20,6 +20,7 @@ import { usePermissionsStore } from '@/stores/permissions.store'
 import { listAseguradoras, nombreAseguradora } from '@/shared/api/aseguradoras'
 import { EstadoArsBadge } from './EstadoArsBadge'
 import type { EstadoArs } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
 type EstadoArsFilter = EstadoArs | 'all' | 'sinLote'
@@ -133,6 +134,20 @@ export default function InvoicesPage() {
   const invoices = data?.items ?? []
   /** 9 columnas base + "Estado ARS" en tenants de farmacia. */
   const columnCount = esFarmacia ? 10 : 9
+
+  const COLUMNS = [
+    { key: 'id', width: 100 },
+    { key: 'cliente', width: 180 },
+    { key: 'fecha', width: 100 },
+    { key: 'vence', width: 100 },
+    { key: 'ncf', width: 120 },
+    { key: 'total', width: 120 },
+    { key: 'pendiente', width: 120 },
+    { key: 'estado', width: 120 },
+    ...(esFarmacia ? [{ key: 'estadoArs', width: 120 }] : []),
+    { key: 'ver', width: 64 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const activeMoreFiltersCount = [ncfType, fromDate, toDate, ncf, grandTotalMin, grandTotalMax].filter((v) => v !== '').length
 
@@ -263,19 +278,67 @@ export default function InvoicesPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={sort} />
-              <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={sort} />
-              <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} />
-              <th>Vence</th>
-              <th>NCF</th>
-              <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={sort} align="right" />
-              <th style={{ textAlign: 'right' }}>Pendiente</th>
-              <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
-              {esFarmacia && <th>Estado ARS</th>}
-              <th style={{ textAlign: 'right', width: 64 }}>Ver</th>
+              <SortableTh
+                label="#"
+                sortKey="id"
+                orderBy={orderBy}
+                onSort={sort}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('id')} />}
+              />
+              <SortableTh
+                label="Cliente"
+                sortKey="customerName"
+                orderBy={orderBy}
+                onSort={sort}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('cliente')} />}
+              />
+              <SortableTh
+                label="Fecha"
+                sortKey="postingDate"
+                orderBy={orderBy}
+                onSort={sort}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />}
+              />
+              <th>
+                Vence
+                <span className="col-resize-handle" onMouseDown={startResize('vence')} />
+              </th>
+              <th>
+                NCF
+                <span className="col-resize-handle" onMouseDown={startResize('ncf')} />
+              </th>
+              <SortableTh
+                label="Total"
+                sortKey="grandTotal"
+                orderBy={orderBy}
+                onSort={sort}
+                align="right"
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('total')} />}
+              />
+              <th style={{ textAlign: 'right' }}>
+                Pendiente
+                <span className="col-resize-handle" onMouseDown={startResize('pendiente')} />
+              </th>
+              <SortableTh
+                label="Estado"
+                sortKey="status"
+                orderBy={orderBy}
+                onSort={sort}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('estado')} />}
+              />
+              {esFarmacia && (
+                <th>
+                  Estado ARS
+                  <span className="col-resize-handle" onMouseDown={startResize('estadoArs')} />
+                </th>
+              )}
+              <th style={{ textAlign: 'right' }}>Ver</th>
             </tr>
           </thead>
           <tbody>
@@ -306,7 +369,7 @@ export default function InvoicesPage() {
                   className="table-row-clickable"
                   onClick={() => navigate(`/facturas/${inv.id}`)}
                 >
-                  <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                  <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                     {inv.amendedFrom && <GitBranch size={12} style={{ verticalAlign: 'middle', marginRight: 4, color: 'var(--text-tertiary)' }} />}
                     {displayId(inv.id, inv.sequence)}
                   </td>
@@ -315,7 +378,7 @@ export default function InvoicesPage() {
                   <td>{formatDate(inv.dueDate)}</td>
                   <td>
                     {inv.ncf
-                      ? <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{inv.ncf}</span>
+                      ? <span style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{inv.ncf}</span>
                       : inv.ncfType
                         ? <span className="badge badge-neutral" style={{ fontSize: 11 }}>{inv.ncfType}</span>
                         : <span className="td-dim">—</span>}

@@ -23,12 +23,34 @@ import { Modal, ConfirmModal } from '@/shared/ui/Modal'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { DESPACHO_STATUS_BADGE, DESPACHO_STATUS_LABEL, DELIVERY_STATUS_LABEL, extractInvoiceId } from './lib'
+
+const DESPACHO_ITEMS_COLUMNS = [
+  { key: 'articulo', width: 240 },
+  { key: 'cantidad', width: 110 },
+  { key: 'almacen', width: 140 },
+  { key: 'origen', width: 140 },
+]
+
+const CONFIRMAR_STOCK_COLUMNS = [
+  { key: 'articulo', width: 240 },
+  { key: 'pendiente', width: 100 },
+  { key: 'almacenDestino', width: 160 },
+  { key: 'traerDesde', width: 260 },
+]
+
+const EDIT_DESPACHO_COLUMNS = [
+  { key: 'articulo', width: 240 },
+  { key: 'cantidad', width: 140 },
+  { key: 'almacen', width: 260 },
+]
 
 export default function DespachoDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { widths: itemsColWidths, startResize: startItemsResize } = useResizableColumns(DESPACHO_ITEMS_COLUMNS)
 
   const puedeEditar = usePuede('despachos.editar')
   const puedeSometer = usePuede('despachos.someter')
@@ -350,15 +372,29 @@ export default function DespachoDetail() {
       </div>
 
       <div className="card">
-        <div className="card-header"><h2 className="card-title">Artículos</h2></div>
         <div className="table-scroll">
-          <table className="data-table">
+          <table className="data-table items-table-resizable">
+            <colgroup>
+              {DESPACHO_ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Artículo</th>
-                <th style={{ textAlign: 'right' }}>Cantidad</th>
-                <th>Almacén</th>
-                <th>Origen</th>
+                <th>
+                  Artículo
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('articulo')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Cantidad
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('cantidad')} />
+                </th>
+                <th>
+                  Almacén
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('almacen')} />
+                </th>
+                <th>
+                  Origen
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('origen')} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -529,6 +565,7 @@ function ConfirmarStockModal({
 }) {
   const [sources, setSources] = useState<Record<number, string>>({})
   const [warehouseSearch, setWarehouseSearch] = useState('')
+  const { widths: colWidths, startResize } = useResizableColumns(CONFIRMAR_STOCK_COLUMNS)
 
   const { data: almacenesData } = useQuery({
     queryKey: ['almacenes-confirmar-stock'],
@@ -564,13 +601,28 @@ function ConfirmarStockModal({
       }
     >
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table items-table-resizable">
+          <colgroup>
+            {CONFIRMAR_STOCK_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>Artículo</th>
-              <th style={{ textAlign: 'right' }}>Pendiente</th>
-              <th>Almacén destino</th>
-              <th style={{ width: 260 }}>Traer faltante desde</th>
+              <th>
+                Artículo
+                <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Pendiente
+                <span className="col-resize-handle" onMouseDown={startResize('pendiente')} />
+              </th>
+              <th>
+                Almacén destino
+                <span className="col-resize-handle" onMouseDown={startResize('almacenDestino')} />
+              </th>
+              <th>
+                Traer faltante desde
+                <span className="col-resize-handle" onMouseDown={startResize('traerDesde')} />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -634,6 +686,7 @@ function EditDespachoModal({
     itemDimensionesDeclaradas: undefined as ItemDimensionDeclarada[] | undefined,
   })))
   const [warehouseSearch, setWarehouseSearch] = useState('')
+  const { widths: colWidths, startResize } = useResizableColumns(EDIT_DESPACHO_COLUMNS)
 
   const { data: warehousesData } = useQuery({
     queryKey: ['warehouses'],
@@ -693,13 +746,24 @@ function EditDespachoModal({
       }
     >
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table items-table-resizable">
+          <colgroup>
+            {EDIT_DESPACHO_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>Artículo</th>
-              <th style={{ width: 140 }}>Cantidad</th>
-              <th style={{ width: 260 }}>Almacén</th>
-              <th style={{ width: 200 }}>Combinación</th>
+              <th>
+                Artículo
+                <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+              </th>
+              <th>
+                Cantidad
+                <span className="col-resize-handle" onMouseDown={startResize('cantidad')} />
+              </th>
+              <th>
+                Almacén
+                <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+              </th>
             </tr>
           </thead>
           <tbody>

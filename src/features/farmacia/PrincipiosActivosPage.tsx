@@ -27,6 +27,16 @@ import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { usePuede } from '@/shared/permissions/can'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'nombre', width: 220 },
+  { key: 'sinonimos', width: 200 },
+  { key: 'codigoAtc', width: 110 },
+  { key: 'articulos', width: 100 },
+  { key: 'estado', width: 110 },
+  { key: 'actions', width: 120 },
+]
 
 const principioSchema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido').max(140, 'Máximo 140 caracteres'),
@@ -63,6 +73,7 @@ export default function PrincipiosActivosPage() {
   const [fusionDestinoSearch, setFusionDestinoSearch] = useState('')
   const [fusionConfirmado, setFusionConfirmado] = useState(false)
   const [duplicado, setDuplicado] = useState<PrincipioActivo | null>(null)
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: [
@@ -255,15 +266,36 @@ export default function PrincipiosActivosPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="Nombre" sortKey="nombre" orderBy={orderBy} onSort={sort} />
-                <th>Sinónimos</th>
-                <th>Código ATC</th>
-                <th>Artículos</th>
-                <th>Estado</th>
-                <th style={{ width: 120 }} />
+                <SortableTh
+                  label="Nombre"
+                  sortKey="nombre"
+                  orderBy={orderBy}
+                  onSort={sort}
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('nombre')} />}
+                />
+                <th>
+                  Sinónimos
+                  <span className="col-resize-handle" onMouseDown={startResize('sinonimos')} />
+                </th>
+                <th>
+                  Código ATC
+                  <span className="col-resize-handle" onMouseDown={startResize('codigoAtc')} />
+                </th>
+                <th>
+                  Artículos
+                  <span className="col-resize-handle" onMouseDown={startResize('articulos')} />
+                </th>
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -314,7 +346,7 @@ export default function PrincipiosActivosPage() {
                             )}
                           </td>
                           <td className="td-muted">{(p.sinonimos ?? []).join(', ') || '—'}</td>
-                          <td className="td-muted" style={{ fontFamily: 'monospace' }}>{p.codigoAtc ?? '—'}</td>
+                          <td className="td-muted" style={{ fontFamily: 'var(--font-body)' }}>{p.codigoAtc ?? '—'}</td>
                           <td className="td-muted">{p.cantidadArticulos ?? '—'}</td>
                           <td>
                             {p.deshabilitado

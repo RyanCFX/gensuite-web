@@ -2,6 +2,7 @@ import { Plus, Trash2, AlertTriangle } from 'lucide-react'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { formatDOP } from '@/lib/formatters'
 import type { TesoreriaLinea } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 interface DistribucionCuentasEditorProps {
   value: TesoreriaLinea[]
@@ -31,6 +32,15 @@ function round2(n: number): number {
  * los 3 submódulos); cuando no, es una lista libre de comisiones/retenciones sin validación de suma.
  */
 export function DistribucionCuentasEditor({ value, onChange, monto, sumaExacta = false, label, helpText, addLabel = 'Agregar línea', disabled, showTasa }: DistribucionCuentasEditorProps) {
+  const COLUMNS = [
+    { key: 'cuenta', width: 200 },
+    { key: 'monto', width: 140 },
+    { key: 'descripcion', width: 200 },
+    ...(showTasa ? [{ key: 'tasa', width: 130 }] : []),
+    { key: 'actions', width: 36 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
+
   function addLinea() {
     onChange([...value, { cuenta: '', monto: 0, descripcion: '' }])
   }
@@ -62,14 +72,31 @@ export function DistribucionCuentasEditor({ value, onChange, monto, sumaExacta =
         <p style={{ fontSize: 12, color: 'var(--text-tertiary)', margin: 0 }}>Sin líneas agregadas.</p>
       ) : (
         <div className="table-scroll">
-          <table className="items-table">
+          <table className="items-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Cuenta</th>
-                <th style={{ width: 140, textAlign: 'right' }}>Monto</th>
-                <th>Descripción</th>
-                {showTasa && <th style={{ width: 130 }}>Tasa de cambio</th>}
-                <th style={{ width: 36 }} />
+                <th>
+                  Cuenta
+                  <span className="col-resize-handle" onMouseDown={startResize('cuenta')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Monto
+                  <span className="col-resize-handle" onMouseDown={startResize('monto')} />
+                </th>
+                <th>
+                  Descripción
+                  <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                </th>
+                {showTasa && (
+                  <th>
+                    Tasa de cambio
+                    <span className="col-resize-handle" onMouseDown={startResize('tasa')} />
+                  </th>
+                )}
+                <th />
               </tr>
             </thead>
             <tbody>

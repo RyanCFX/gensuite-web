@@ -16,8 +16,8 @@ import { getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateCompraDto, Supplier, DistribucionCuentaDto } from '@/shared/api/types'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
+import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { SupplierQuickCreateModal } from '@/features/suppliers/SupplierQuickCreateModal'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -49,6 +49,7 @@ import { AccountSelect } from '@/components/shared/AccountSelect'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 interface ItemRow {
   itemCode: string
@@ -590,6 +591,18 @@ export default function CompraForm() {
   const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0])
   const [dueDate, setDueDate] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem(defaultWh)])
+  const ITEMS_COLUMNS = [
+    { key: 'articulo', width: 220 },
+    { key: 'descripcion', width: 220 },
+    { key: 'cant', width: 80 },
+    { key: 'precio', width: 120 },
+    { key: 'impuesto', width: 100 },
+    { key: 'almacen', width: 160 },
+    { key: 'udm', width: 120 },
+    { key: 'combination', width: 160 },
+    { key: 'actions', width: 70 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
   const [branch, setBranch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
@@ -1114,6 +1127,24 @@ export default function CompraForm() {
     }
     if (hasTrackingError) return
 
+    // Dimensiones (§5/§11 del doc): toda línea cuyo artículo USE dimensiones exige la combinación
+    // completa antes de someter — si falta, el servidor rechaza la compra con un 400 por línea.
+    let hasDimensionError = false
+    items.forEach((item, itemIdx) => {
+      const declaradas = item.itemDimensionesDeclaradas ?? []
+      if (declaradas.length > 0 && !combinacionCompleta(declaradas, item.dimensiones ?? {})) {
+        hasDimensionError = true
+        const faltantes = declaradas.filter((d) => !(item.dimensiones ?? {})[d.dimension]).map((d) => d.dimension).join(', ')
+        setItems((prev) => prev.map((r, rIdx) =>
+          rIdx === itemIdx ? { ...r, lineError: `Fila ${itemIdx + 1}: indique la combinación completa${faltantes ? ` (falta: ${faltantes})` : ''}` } : r,
+        ))
+      }
+    })
+    if (hasDimensionError) {
+      toast.error('Hay líneas con combinación de dimensión incompleta — revíselas en la columna Combinación.')
+      return
+    }
+
     const dto: CreateCompraDto = {
       ...(esProveedorOcasional
         ? {
@@ -1226,6 +1257,20 @@ export default function CompraForm() {
         return newRow
       })
     })
+    // El picker (`listItems`) puede no traer `usaDimensiones`/`dimensiones` del artículo — solo
+    // el detalle (`GET /catalog/items/:id`, §4.3 del doc) los garantiza. Si faltan, se completan
+    // con el detalle para habilitar la columna Combinación; si el picker ya los trajo, no se
+    // dispara ninguna llamada extra.
+    if (!catalogItem.dimensiones || catalogItem.dimensiones.length === 0) {
+      getItem(catalogItem.id).then((detail) => {
+        if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
+        setItems((prev) => prev.map((row, i) =>
+          i === idx && row.itemCode === catalogItem.id && !(row.itemDimensionesDeclaradas?.length)
+            ? { ...row, itemDimensionesDeclaradas: detail.dimensiones }
+            : row,
+        ))
+      }).catch(() => {})
+    }
     if (autoAddRow && wasLastRow) setItems((prev) => [...prev, emptyItem(defaultWh)])
   }, [defaultWh])
 
@@ -1585,18 +1630,45 @@ export default function CompraForm() {
           <div className="card">
             <div className="card-body" style={{ padding: 0 }}>
               <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
-                <table className="items-table navy-table">
+                <table className="items-table navy-table items-table-resizable">
+                  <colgroup>
+                    {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ minWidth: 180 }}>Artículo</th>
-                      <th>Descripción</th>
-                      <th style={{ width: '8%', textAlign: 'right' }}>Qty</th>
-                      <th style={{ width: '12%', textAlign: 'right' }}>Precio</th>
-                      <th style={{ width: '10%', textAlign: 'right' }}>Impuesto</th>
-                      <th style={{ width: '14%' }}>Almacén</th>
-                      <th style={{ width: '7%' }}>UOM</th>
-                      <th style={{ width: '12%' }}>Combinación</th>
-                      <th style={{ width: '40px' }} />
+                      <th>
+                        Artículo
+                        <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                      </th>
+                      <th>
+                        Descripción
+                        <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Qty
+                        <span className="col-resize-handle" onMouseDown={startResize('cant')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Precio
+                        <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Impuesto
+                        <span className="col-resize-handle" onMouseDown={startResize('impuesto')} />
+                      </th>
+                      <th>
+                        Almacén
+                        <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                      </th>
+                      <th>
+                        UOM
+                        <span className="col-resize-handle" onMouseDown={startResize('udm')} />
+                      </th>
+                      <th>
+                        Combinación
+                        <span className="col-resize-handle" onMouseDown={startResize('combination')} />
+                      </th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
@@ -1622,30 +1694,30 @@ export default function CompraForm() {
                     ))}
                   </tbody>
                 </table>
-                <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-size-sm"
-                    onClick={() => setItems((prev) => [...prev, emptyItem(defaultWh)])}
-                  >
-                    <Plus size={14} /> Agregar artículo
-                  </button>
+              </div>
+              <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-size-sm"
+                  onClick={() => setItems((prev) => [...prev, emptyItem(defaultWh)])}
+                >
+                  <Plus size={14} /> Agregar artículo
+                </button>
+              </div>
+              <div className="items-total-row navy-totals">
+                <div className="items-total-line">
+                  <span>Subtotal</span>
+                  <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(subtotal)}</span>
                 </div>
-                <div className="items-total-row navy-totals">
-                  <div className="items-total-line">
-                    <span>Subtotal</span>
-                    <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(subtotal)}</span>
+                {taxTotal > 0 && (
+                  <div className="items-total-line" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                    <span>Impuesto</span>
+                    <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(taxTotal)}</span>
                   </div>
-                  {taxTotal > 0 && (
-                    <div className="items-total-line" style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
-                      <span>Impuesto</span>
-                      <span>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(taxTotal)}</span>
-                    </div>
-                  )}
-                  <div className="items-total-line total-row-highlight">
-                    <span>Total</span>
-                    <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(grandTotal)}</strong>
-                  </div>
+                )}
+                <div className="items-total-line total-row-highlight">
+                  <span>Total</span>
+                  <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(grandTotal)}</strong>
                 </div>
               </div>
             </div>

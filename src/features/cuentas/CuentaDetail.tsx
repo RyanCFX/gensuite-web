@@ -98,7 +98,7 @@ export default function CuentaDetail() {
             )}
           </h1>
           {cuenta.accountNumber && (
-            <p className="page-sub" style={{ fontFamily: 'monospace' }}>{cuenta.accountNumber}</p>
+            <p className="page-sub" style={{ fontFamily: 'var(--font-body)' }}>{cuenta.accountNumber}</p>
           )}
         </div>
         <button
@@ -188,7 +188,7 @@ export default function CuentaDetail() {
             </div>
             <div className="detail-field">
               <span className="detail-label">Código</span>
-              <span className="detail-value" style={{ fontFamily: 'monospace' }}>
+              <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>
                 {cuenta.accountNumber ?? '—'}
               </span>
             </div>

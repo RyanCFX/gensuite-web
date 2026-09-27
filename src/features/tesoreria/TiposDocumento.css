@@ -106,7 +106,7 @@
 /* ── Código mono + preview del modal ── */
 .tdoc-code {
   font-weight: 700;
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   letter-spacing: 0.02em;
 }
 
@@ -122,7 +122,7 @@
 }
 
 .tdoc-preview-code {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-weight: 700;
   font-size: 15px;
   letter-spacing: 0.03em;

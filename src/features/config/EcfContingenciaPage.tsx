@@ -23,6 +23,14 @@ import type { ApiError, FlushContingenciaResult } from '@/shared/api/types'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { formatDateTime } from '@/lib/formatters'
 import { ecfTipoLabel, ecfDiferidoUrgencia } from '@/lib/dgii'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const CONTINGENCIA_COLUMNS = [
+  { key: 'ncf', width: 130 },
+  { key: 'tipo', width: 150 },
+  { key: 'emitido', width: 150 },
+  { key: 'enDiferido', width: 130 },
+]
 
 function toIsoLocalPlus72h(): string {
   const d = new Date(Date.now() + 72 * 60 * 60 * 1000)
@@ -53,6 +61,7 @@ function ContingenciaContent({ company }: { company: string }) {
 
   const pendientesCount = pendientes?.length ?? 0
   const invalidate = () => qc.invalidateQueries({ queryKey: ['ecf-contingencia-pendientes', company] })
+  const { widths: colWidths, startResize } = useResizableColumns(CONTINGENCIA_COLUMNS)
 
   const flushMutation = useMutation({
     mutationFn: () => flushContingencia(company),
@@ -126,13 +135,28 @@ function ContingenciaContent({ company }: { company: string }) {
           <p className="ff-hint" style={{ margin: 16 }}>No hay comprobantes en contingencia.</p>
         ) : (
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {CONTINGENCIA_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>NCF</th>
-                  <th>Tipo</th>
-                  <th>Emitido</th>
-                  <th>En diferido</th>
+                  <th>
+                    NCF
+                    <span className="col-resize-handle" onMouseDown={startResize('ncf')} />
+                  </th>
+                  <th>
+                    Tipo
+                    <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                  </th>
+                  <th>
+                    Emitido
+                    <span className="col-resize-handle" onMouseDown={startResize('emitido')} />
+                  </th>
+                  <th>
+                    En diferido
+                    <span className="col-resize-handle" onMouseDown={startResize('enDiferido')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -140,7 +164,7 @@ function ContingenciaContent({ company }: { company: string }) {
                   const u = ecfDiferidoUrgencia(d.horasEnDiferido)
                   return (
                     <tr key={d.voucherId}>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{d.ncf}</td>
+                      <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{d.ncf}</td>
                       <td style={{ fontSize: 12 }}>{ecfTipoLabel(d.typeId)}</td>
                       <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{formatDateTime(d.issuedAt)}</td>
                       <td>

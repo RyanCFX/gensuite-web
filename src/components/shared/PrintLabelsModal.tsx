@@ -7,6 +7,7 @@ import { flushSync } from 'react-dom'
 import { toast } from 'sonner'
 import { X, Printer } from 'lucide-react'
 import { Modal } from '@/shared/ui/Modal'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { getRenderDataLabels } from '@/shared/api/plantillas'
 import { printDocument } from '@/features/invoice-template-editor/printUtils'
@@ -28,7 +29,14 @@ interface Props {
   initialItems?: PrintLabelsRow[]
 }
 
+const LABELS_COLUMNS = [
+  { key: 'articulo', width: 220 },
+  { key: 'copias', width: 100 },
+  { key: 'actions', width: 32 },
+]
+
 export function PrintLabelsModal({ open, onClose, initialItems }: Props) {
+  const { widths: colWidths, startResize } = useResizableColumns(LABELS_COLUMNS)
   const [rows, setRows] = useState<PrintLabelsRow[]>([])
   const [addQuery, setAddQuery] = useState('')
   const [printing, setPrinting] = useState(false)
@@ -118,12 +126,21 @@ export function PrintLabelsModal({ open, onClose, initialItems }: Props) {
         </div>
 
         {rows.length > 0 && (
-          <table className="table" style={{ marginTop: 16 }}>
+          <table className="table items-table-resizable" style={{ marginTop: 16 }}>
+            <colgroup>
+              {LABELS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Artículo</th>
-                <th style={{ width: 100, textAlign: 'right' }}>Copias</th>
-                <th style={{ width: 32 }} />
+                <th>
+                  Artículo
+                  <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Copias
+                  <span className="col-resize-handle" onMouseDown={startResize('copias')} />
+                </th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -131,7 +148,7 @@ export function PrintLabelsModal({ open, onClose, initialItems }: Props) {
                 <tr key={row.itemCode}>
                   <td>
                     <div style={{ fontWeight: 500 }}>{row.itemName}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-tertiary)', fontFamily: 'monospace' }}>{row.itemCode}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-tertiary)', fontFamily: 'var(--font-body)' }}>{row.itemCode}</div>
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <input

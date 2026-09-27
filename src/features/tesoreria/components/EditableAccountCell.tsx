@@ -28,7 +28,7 @@ export function EditableAccountCell({ row, onCommit, rootType }: Props) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span
         className="td-muted"
-        style={{ fontFamily: 'var(--font-mono)', fontSize: 12, flexShrink: 0, whiteSpace: 'nowrap' }}
+        style={{ fontFamily: 'var(--font-body)', fontSize: 12, flexShrink: 0, whiteSpace: 'nowrap' }}
       >
         {extractAccountNumber(value)}
       </span>

@@ -21,6 +21,29 @@ import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import { ApplyToCxpModal } from './ApplyToCxpModal'
 import type { FormatoImpresion } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_DEVUELTOS_COLUMNS = [
+  { key: 'codigo', width: 110 },
+  { key: 'descripcion', width: 220 },
+  { key: 'qty', width: 90 },
+  { key: 'precio', width: 110 },
+  { key: 'subtotal', width: 110 },
+]
+
+const APLICADO_CXP_COLUMNS = [
+  { key: 'factura', width: 120 },
+  { key: 'ncfProveedor', width: 150 },
+  { key: 'tipoComprobante', width: 130 },
+  { key: 'fecha', width: 100 },
+  { key: 'estadoFactura', width: 110 },
+  { key: 'totalFactura', width: 120 },
+  { key: 'pendienteFactura', width: 130 },
+  { key: 'montoAplicado', width: 120 },
+  { key: 'estado', width: 100 },
+  { key: 'asiento', width: 110 },
+  { key: 'acciones', width: 100 },
+]
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'delete' | null
 
@@ -31,6 +54,8 @@ export default function DevolucionDetail() {
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [applyTarget, setApplyTarget] = useState<{ invoiceId: string } | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const { widths: itemsColWidths, startResize: startItemsResize } = useResizableColumns(ITEMS_DEVUELTOS_COLUMNS)
+  const { widths: aplicadoColWidths, startResize: startAplicadoResize } = useResizableColumns(APLICADO_CXP_COLUMNS)
 
   const { data: devolucion, isLoading, isError } = useQuery({
     queryKey: ['devolucion', id],
@@ -195,9 +220,9 @@ export default function DevolucionDetail() {
           <div className="card-header"><span className="card-title">Información General</span></div>
           <div className="fields-grid fields-grid-3">
             <div className="detail-field"><span className="detail-label">Proveedor</span><span className="detail-value">{devolucion.supplierName ?? devolucion.supplier}</span></div>
-            <div className="detail-field"><span className="detail-label">Factura origen</span><span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{devolucion.originalInvoice}</span></div>
+            <div className="detail-field"><span className="detail-label">Factura origen</span><span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{devolucion.originalInvoice}</span></div>
             <div className="detail-field"><span className="detail-label">Fecha</span><span className="detail-value">{formatDate(devolucion.postingDate)}</span></div>
-            <div className="detail-field"><span className="detail-label">NCF</span><span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{devolucion.ncf ?? '—'}</span></div>
+            <div className="detail-field"><span className="detail-label">NCF</span><span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{devolucion.ncf ?? '—'}</span></div>
             <div className="detail-field"><span className="detail-label">Motivo</span><span className="detail-value">{devolucion.reason ?? '—'}</span></div>
             <div className="detail-field"><span className="detail-label">Total</span><span className="detail-value" style={{ fontSize: 18, fontWeight: 700 }}>{formatDOP(devolucion.grandTotal)}</span></div>
             {!!devolucion.taxAmount && (
@@ -216,20 +241,38 @@ export default function DevolucionDetail() {
         <div className="card">
           <div className="card-header"><span className="card-title">Artículos devueltos</span></div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {ITEMS_DEVUELTOS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Código</th>
-                  <th>Descripción</th>
-                  <th style={{ textAlign: 'right' }}>Qty</th>
-                  <th style={{ textAlign: 'right' }}>Precio</th>
-                  <th style={{ textAlign: 'right' }}>Subtotal</th>
+                  <th>
+                    Código
+                    <span className="col-resize-handle" onMouseDown={startItemsResize('codigo')} />
+                  </th>
+                  <th>
+                    Descripción
+                    <span className="col-resize-handle" onMouseDown={startItemsResize('descripcion')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Qty
+                    <span className="col-resize-handle" onMouseDown={startItemsResize('qty')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Precio
+                    <span className="col-resize-handle" onMouseDown={startItemsResize('precio')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Subtotal
+                    <span className="col-resize-handle" onMouseDown={startItemsResize('subtotal')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {devolucion.items.map((item, i) => (
                   <tr key={i}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{item.itemCode}</td>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode}</td>
                     <td>{item.description ?? '—'}</td>
                     <td style={{ textAlign: 'right' }}>{item.qty}</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
@@ -249,20 +292,56 @@ export default function DevolucionDetail() {
           <div className="card">
             <div className="card-header"><span className="card-title">Aplicado a Cuentas por Pagar</span></div>
             <div className="table-scroll">
-              <table className="data-table">
+              <table className="data-table items-table-resizable">
+                <colgroup>
+                  {APLICADO_CXP_COLUMNS.map((c) => <col key={c.key} style={{ width: aplicadoColWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Factura (CxP)</th>
-                    <th>NCF/N° Factura Proveedor</th>
-                    <th>Tipo Comprobante</th>
-                    <th>Fecha</th>
-                    <th>Estado Factura</th>
-                    <th style={{ textAlign: 'right' }}>Total Factura</th>
-                    <th style={{ textAlign: 'right' }}>Pendiente Factura</th>
-                    <th style={{ textAlign: 'right' }}>Monto Aplicado</th>
-                    <th>Estado</th>
-                    <th>Asiento</th>
-                    <th>Acciones</th>
+                    <th>
+                      Factura (CxP)
+                      <span className="col-resize-handle" onMouseDown={startAplicadoResize('factura')} />
+                    </th>
+                    <th>
+                      NCF/N° Factura Proveedor
+                      <span className="col-resize-handle" onMouseDown={startAplicadoResize('ncfProveedor')} />
+                    </th>
+                    <th>
+                      Tipo Comprobante
+                      <span className="col-resize-handle" onMouseDown={startAplicadoResize('tipoComprobante')} />
+                    </th>
+                    <th>
+                      Fecha
+                      <span className="col-resize-handle" onMouseDown={startAplicadoResize('fecha')} />
+                    </th>
+                    <th>
+                      Estado Factura
+                      <span className="col-resize-handle" onMouseDown={startAplicadoResize('estadoFactura')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Total Factura
+                      <span className="col-resize-handle" onMouseDown={startAplicadoResize('totalFactura')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Pendiente Factura
+                      <span className="col-resize-handle" onMouseDown={startAplicadoResize('pendienteFactura')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Monto Aplicado
+                      <span className="col-resize-handle" onMouseDown={startAplicadoResize('montoAplicado')} />
+                    </th>
+                    <th>
+                      Estado
+                      <span className="col-resize-handle" onMouseDown={startAplicadoResize('estado')} />
+                    </th>
+                    <th>
+                      Asiento
+                      <span className="col-resize-handle" onMouseDown={startAplicadoResize('asiento')} />
+                    </th>
+                    <th>
+                      Acciones
+                      <span className="col-resize-handle" onMouseDown={startAplicadoResize('acciones')} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -271,28 +350,28 @@ export default function DevolucionDetail() {
                       <td>
                         <button
                           className="btn btn-link btn-size-sm"
-                          style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}
+                          style={{ fontFamily: 'var(--font-body)', fontSize: 13 }}
                           onClick={() => navigate(`/compras/${a.invoiceId}`)}
                           title="Ver factura de compra"
                         >
                           {a.invoiceId}
                         </button>
                       </td>
-                      <td className="td-muted" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                      <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                         {a.ncfProveedor || a.billNo || '—'}
                       </td>
                       <td className="td-muted">{a.tipoComprobante || '—'}</td>
                       <td className="td-muted">{a.postingDate ? formatDate(a.postingDate) : '—'}</td>
                       <td>{a.invoiceStatus ? <StatusBadge status={a.invoiceStatus} /> : '—'}</td>
-                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>
                         {a.grandTotal != null ? formatDOP(a.grandTotal) : '—'}
                       </td>
-                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>
                         {a.outstandingAmount != null ? formatDOP(a.outstandingAmount) : '—'}
                       </td>
-                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{formatDOP(a.amount)}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatDOP(a.amount)}</td>
                       <td><StatusBadge status={a.status} /></td>
-                      <td className="td-muted" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                      <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                         {a.status === 'reconciled' ? a.journalEntryId ?? '—' : '—'}
                       </td>
                       <td>

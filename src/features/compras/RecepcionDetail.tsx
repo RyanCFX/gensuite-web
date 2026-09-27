@@ -18,6 +18,17 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import type { FacturarPurchaseReceiptDto } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_COLUMNS = [
+  { key: 'codigo', width: 100 },
+  { key: 'descripcion', width: 200 },
+  { key: 'almacen', width: 130 },
+  { key: 'qty', width: 90 },
+  { key: 'costo', width: 110 },
+  { key: 'subtotal', width: 120 },
+  { key: 'facturado', width: 110 },
+]
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | null
 
@@ -41,6 +52,7 @@ export default function RecepcionDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { widths: itemsColWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [showFacturar, setShowFacturar] = useState(false)
@@ -302,26 +314,47 @@ export default function RecepcionDetail() {
 
         {/* Items */}
         <div className="card">
-          <div className="card-header">
-            <span className="card-title">Artículos</span>
-          </div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Código</th>
-                  <th>Descripción</th>
-                  <th>Almacén</th>
-                  <th style={{ textAlign: 'right' }}>Qty</th>
-                  <th style={{ textAlign: 'right' }}>Costo</th>
-                  <th style={{ textAlign: 'right' }}>Subtotal</th>
-                  <th style={{ textAlign: 'right' }}>Facturado</th>
+                  <th>
+                    Código
+                    <span className="col-resize-handle" onMouseDown={startResize('codigo')} />
+                  </th>
+                  <th>
+                    Descripción
+                    <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                  </th>
+                  <th>
+                    Almacén
+                    <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Qty
+                    <span className="col-resize-handle" onMouseDown={startResize('qty')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Costo
+                    <span className="col-resize-handle" onMouseDown={startResize('costo')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Subtotal
+                    <span className="col-resize-handle" onMouseDown={startResize('subtotal')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Facturado
+                    <span className="col-resize-handle" onMouseDown={startResize('facturado')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {receipt.items.map((item, i) => (
                   <tr key={i}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{item.itemCode}</td>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode}</td>
                     <td>{item.itemName}</td>
                     <td className="td-muted">{item.warehouse ?? '—'}</td>
                     <td style={{ textAlign: 'right' }}>{item.qty}</td>

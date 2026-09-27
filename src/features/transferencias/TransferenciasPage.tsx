@@ -17,6 +17,21 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FilterField } from '@/shared/ui/FilterField'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'origen', width: 160 },
+  { key: 'destino', width: 160 },
+  { key: 'articulos', width: 100 },
+  { key: 'estado', width: 120 },
+  { key: 'fecha', width: 110 },
+  { key: 'actions', width: 180 },
+]
+
+const MODAL_COLUMNS = [
+  { key: 'articulo', width: 200 },
+  { key: 'cantidad', width: 110 },
+]
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-neutral',
@@ -39,6 +54,8 @@ export default function TransferenciasPage() {
   const [branch, setBranch] = useState('')
   const [toConfirm, setToConfirm] = useState<Transferencia | null>(null)
   const [toCancel, setToCancel] = useState<Transferencia | null>(null)
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
+  const { widths: modalColWidths, startResize: startModalResize } = useResizableColumns(MODAL_COLUMNS)
 
   const currentUserEmail = getCachedUser()?.email
 
@@ -172,15 +189,33 @@ export default function TransferenciasPage() {
       </div>
 
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table items-table-resizable">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>Origen</th>
-              <th>Destino</th>
-              <th style={{ textAlign: 'right' }}>Artículos</th>
-              <th>Estado</th>
-              <th>Fecha</th>
-              <th style={{ textAlign: 'right', width: 180 }} />
+              <th>
+                Origen
+                <span className="col-resize-handle" onMouseDown={startResize('origen')} />
+              </th>
+              <th>
+                Destino
+                <span className="col-resize-handle" onMouseDown={startResize('destino')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Artículos
+                <span className="col-resize-handle" onMouseDown={startResize('articulos')} />
+              </th>
+              <th>
+                Estado
+                <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+              </th>
+              <th>
+                Fecha
+                <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+              </th>
+              <th style={{ textAlign: 'right' }} />
             </tr>
           </thead>
           <tbody>
@@ -275,9 +310,21 @@ export default function TransferenciasPage() {
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
                 Vas a recibir en <strong>{toConfirm.toWarehouse}</strong> los siguientes artículos, provenientes de <strong>{toConfirm.fromWarehouse}</strong>:
               </p>
-              <table className="data-table" style={{ marginTop: 12 }}>
+              <table className="data-table items-table-resizable" style={{ marginTop: 12 }}>
+                <colgroup>
+                  {MODAL_COLUMNS.map((c) => <col key={c.key} style={{ width: modalColWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
-                  <tr><th>Artículo</th><th style={{ textAlign: 'right' }}>Cantidad</th></tr>
+                  <tr>
+                    <th>
+                      Artículo
+                      <span className="col-resize-handle" onMouseDown={startModalResize('articulo')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Cantidad
+                      <span className="col-resize-handle" onMouseDown={startModalResize('cantidad')} />
+                    </th>
+                  </tr>
                 </thead>
                 <tbody>
                   {toConfirm.items.map((i, idx) => (

@@ -18,8 +18,20 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { Select, SelectItem } from '@/components/ui/select'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const COLUMNS = [
+  { key: 'id', width: 100 },
+  { key: 'ncf', width: 120 },
+  { key: 'ncfAfectado', width: 120 },
+  { key: 'facturaOriginal', width: 120 },
+  { key: 'cliente', width: 180 },
+  { key: 'fecha', width: 100 },
+  { key: 'total', width: 120 },
+  { key: 'estado', width: 110 },
+]
 
 // El shape real de la API (igual que /credit-notes) usa `returnAgainst`, no `originalInvoice`
 // como dice el tipo genérico `DevolucionListItem` — ver el mismo comentario en CreditNotesPage.tsx.
@@ -75,6 +87,7 @@ export default function DevolucionesPage() {
   const [refundedAmountMax, setRefundedAmountMax] = useState('')
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   // ── Filtro por cliente (autocomplete real, mismo patrón que CreditNotesPage) ──
   const [customerId, setCustomerId] = useState('')
@@ -267,17 +280,60 @@ export default function DevolucionesPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <SortableTh label="#" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-              <th>NCF</th>
-              <th>NCF Afectado</th>
-              <th>Factura Original</th>
-              <SortableTh label="Cliente" sortKey="customerName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-              <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-              <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} align="right" />
-              <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
+              <SortableTh
+                label="#"
+                sortKey="id"
+                orderBy={orderBy}
+                onSort={(k) => { sort(k); setPage(1) }}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('id')} />}
+              />
+              <th>
+                NCF
+                <span className="col-resize-handle" onMouseDown={startResize('ncf')} />
+              </th>
+              <th>
+                NCF Afectado
+                <span className="col-resize-handle" onMouseDown={startResize('ncfAfectado')} />
+              </th>
+              <th>
+                Factura Original
+                <span className="col-resize-handle" onMouseDown={startResize('facturaOriginal')} />
+              </th>
+              <SortableTh
+                label="Cliente"
+                sortKey="customerName"
+                orderBy={orderBy}
+                onSort={(k) => { sort(k); setPage(1) }}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('cliente')} />}
+              />
+              <SortableTh
+                label="Fecha"
+                sortKey="postingDate"
+                orderBy={orderBy}
+                onSort={(k) => { sort(k); setPage(1) }}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />}
+              />
+              <SortableTh
+                label="Total"
+                sortKey="grandTotal"
+                orderBy={orderBy}
+                onSort={(k) => { sort(k); setPage(1) }}
+                align="right"
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('total')} />}
+              />
+              <SortableTh
+                label="Estado"
+                sortKey="status"
+                orderBy={orderBy}
+                onSort={(k) => { sort(k); setPage(1) }}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('estado')} />}
+              />
             </tr>
           </thead>
           <tbody>
@@ -313,16 +369,16 @@ export default function DevolucionesPage() {
                     className="table-row-clickable"
                     onClick={() => navigate(`/devoluciones/${devolucion.id}`)}
                   >
-                    <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                       {devolucion.id}
                     </td>
-                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                       {devolucion.ncf ?? <span className="td-dim">Pendiente</span>}
                     </td>
-                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                       {devolucion.ncfAfectado ?? <span className="td-dim">—</span>}
                     </td>
-                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{devolucion.returnAgainst}</td>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{devolucion.returnAgainst}</td>
                     <td>{devolucion.customerName ?? '—'}</td>
                     <td>{formatDate(devolucion.postingDate)}</td>
                     <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(Math.abs(devolucion.grandTotal ?? 0))}</td>

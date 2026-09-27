@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Clock, Lock } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import { getFacturacionConfig } from '@/shared/api/config'
 import { listCajas } from '@/shared/api/cajas'
 import {
@@ -90,27 +90,22 @@ export function TurnoCajaIndicator() {
   return (
     <>
       {turno ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span
-            className="badge badge-success"
-            title={`Perfil: ${turno.posProfile}`}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <Clock size={12} /> Turno abierto —{' '}
-            {formatDateTime(turno.periodStartDate).split(' ')[1]}
-          </span>
-          <button
-            className="btn btn-ghost btn-size-sm"
-            onClick={() => setCierreModalOpen(true)}
-          >
-            <Lock size={14} /> Cerrar turno
-          </button>
-        </div>
+        <button
+          className="badge badge-success"
+          title={`Perfil: ${turno.posProfile} — clic para cerrar turno`}
+          onClick={() => setCierreModalOpen(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            whiteSpace: 'nowrap',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          <Clock size={12} /> Turno abierto —{' '}
+          {formatDateTime(turno.periodStartDate).split(' ')[1]}
+        </button>
       ) : (
         <button className="btn btn-secondary btn-size-sm" onClick={openModal}>
           <Clock size={14} /> Abrir turno

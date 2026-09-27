@@ -13,8 +13,17 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Permitido } from '@/components/shared/Permitido'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const COLUMNS = [
+  { key: 'nombre', width: 220 },
+  { key: 'rnc', width: 140 },
+  { key: 'credito', width: 110 },
+  { key: 'estado', width: 100 },
+  { key: 'actions', width: 48 },
+]
 
 export default function AseguradorasPage() {
   const navigate = useNavigate()
@@ -58,6 +67,7 @@ export default function AseguradorasPage() {
   })
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   return (
     <div className="page-container">
@@ -115,14 +125,32 @@ export default function AseguradorasPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <SortableTh label="Nombre" sortKey="nombre" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-              <th>RNC</th>
-              <th>Tiene Crédito</th>
-              <th>Estado</th>
-              <th style={{ width: 48 }} />
+              <SortableTh
+                label="Nombre"
+                sortKey="nombre"
+                orderBy={orderBy}
+                onSort={(k) => { sort(k); setPage(1) }}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('nombre')} />}
+              />
+              <th>
+                RNC
+                <span className="col-resize-handle" onMouseDown={startResize('rnc')} />
+              </th>
+              <th>
+                Tiene Crédito
+                <span className="col-resize-handle" onMouseDown={startResize('credito')} />
+              </th>
+              <th>
+                Estado
+                <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+              </th>
+              <th />
             </tr>
           </thead>
           <tbody>

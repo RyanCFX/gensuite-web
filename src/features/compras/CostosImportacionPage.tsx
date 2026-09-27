@@ -19,8 +19,30 @@ import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, ChevronLeft, ChevronRight, Search, Trash2 } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const LIST_COLUMNS = [
+  { key: 'id', width: 100 },
+  { key: 'fecha', width: 100 },
+  { key: 'totalImpuestos', width: 160 },
+  { key: 'estado', width: 110 },
+  { key: 'acciones', width: 70 },
+]
+
+const RECEIPTS_FORM_COLUMNS = [
+  { key: 'tipo', width: 200 },
+  { key: 'documento', width: 220 },
+  { key: 'acciones', width: 48 },
+]
+
+const TAXES_FORM_COLUMNS = [
+  { key: 'descripcion', width: 200 },
+  { key: 'monto', width: 130 },
+  { key: 'cuenta', width: 200 },
+  { key: 'acciones', width: 48 },
+]
 
 const DISTRIBUTE_OPTIONS = ['Qty', 'Amount', 'Distribute Manually'] as const
 
@@ -126,6 +148,9 @@ export default function CostosImportacionPage() {
   const [status, setStatus] = useState<string>('all')
   const [page, setPage] = useState(1)
   const [showCreate, setShowCreate] = useState(false)
+  const { widths: listColWidths, startResize: startResizeList } = useResizableColumns(LIST_COLUMNS)
+  const { widths: receiptsFormColWidths, startResize: startResizeReceiptsForm } = useResizableColumns(RECEIPTS_FORM_COLUMNS)
+  const { widths: taxesFormColWidths, startResize: startResizeTaxesForm } = useResizableColumns(TAXES_FORM_COLUMNS)
 
   const offset = (page - 1) * PAGE_SIZE
 
@@ -247,13 +272,28 @@ export default function CostosImportacionPage() {
 
         <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {LIST_COLUMNS.map((c) => <col key={c.key} style={{ width: listColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Fecha</th>
-                  <th style={{ textAlign: 'right' }}>Total Impuestos/Cargos</th>
-                  <th>Estado</th>
+                  <th>
+                    #
+                    <span className="col-resize-handle" onMouseDown={startResizeList('id')} />
+                  </th>
+                  <th>
+                    Fecha
+                    <span className="col-resize-handle" onMouseDown={startResizeList('fecha')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Total Impuestos/Cargos
+                    <span className="col-resize-handle" onMouseDown={startResizeList('totalImpuestos')} />
+                  </th>
+                  <th>
+                    Estado
+                    <span className="col-resize-handle" onMouseDown={startResizeList('estado')} />
+                  </th>
                   <th>Acciones</th>
                 </tr>
               </thead>
@@ -293,7 +333,7 @@ export default function CostosImportacionPage() {
                         )
                       : filteredItems.map((c) => (
                           <tr key={c.id} className="table-row-clickable" onClick={() => navigate(`/compras/costos-importacion/${c.id}`)}>
-                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{c.id}</td>
+                            <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{c.id}</td>
                             <td>{formatDate(c.postingDate)}</td>
                             <td style={{ textAlign: 'right' }}>{c.totalTaxesAndCharges != null ? formatDOP(c.totalTaxesAndCharges) : '—'}</td>
                             <td><StatusBadge status={c.status} /></td>
@@ -376,11 +416,20 @@ export default function CostosImportacionPage() {
                     </button>
                   </div>
                   <div className="table-scroll">
-                    <table className="data-table">
+                    <table className="data-table items-table-resizable">
+                      <colgroup>
+                        {RECEIPTS_FORM_COLUMNS.map((c) => <col key={c.key} style={{ width: receiptsFormColWidths[c.key] }} />)}
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th>Tipo de Documento</th>
-                          <th>ID del Documento</th>
+                          <th>
+                            Tipo de Documento
+                            <span className="col-resize-handle" onMouseDown={startResizeReceiptsForm('tipo')} />
+                          </th>
+                          <th>
+                            ID del Documento
+                            <span className="col-resize-handle" onMouseDown={startResizeReceiptsForm('documento')} />
+                          </th>
                           <th></th>
                         </tr>
                       </thead>
@@ -433,12 +482,24 @@ export default function CostosImportacionPage() {
                     </button>
                   </div>
                   <div className="table-scroll">
-                    <table className="data-table">
+                    <table className="data-table items-table-resizable">
+                      <colgroup>
+                        {TAXES_FORM_COLUMNS.map((c) => <col key={c.key} style={{ width: taxesFormColWidths[c.key] }} />)}
+                      </colgroup>
                       <thead>
                         <tr>
-                          <th>Descripción</th>
-                          <th style={{ textAlign: 'right' }}>Monto</th>
-                          <th>Cuenta de Gasto</th>
+                          <th>
+                            Descripción
+                            <span className="col-resize-handle" onMouseDown={startResizeTaxesForm('descripcion')} />
+                          </th>
+                          <th style={{ textAlign: 'right' }}>
+                            Monto
+                            <span className="col-resize-handle" onMouseDown={startResizeTaxesForm('monto')} />
+                          </th>
+                          <th>
+                            Cuenta de Gasto
+                            <span className="col-resize-handle" onMouseDown={startResizeTaxesForm('cuenta')} />
+                          </th>
                           <th></th>
                         </tr>
                       </thead>

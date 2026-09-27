@@ -21,8 +21,20 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { ApplyToCxpModal } from './ApplyToCxpModal'
 import type { DevolucionCompra } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const DEVOLUCIONES_COLUMNS = [
+  { key: 'id', width: 110 },
+  { key: 'proveedor', width: 200 },
+  { key: 'fecha', width: 100 },
+  { key: 'ncf', width: 140 },
+  { key: 'total', width: 120 },
+  { key: 'disponible', width: 120 },
+  { key: 'estado', width: 100 },
+  { key: 'acciones', width: 130 },
+]
 
 export default function DevolucionesPage() {
   const navigate = useNavigate()
@@ -40,6 +52,7 @@ export default function DevolucionesPage() {
 
   const [applyOpen, setApplyOpen] = useState(false)
   const [applyTarget, setApplyTarget] = useState<DevolucionCompra | null>(null)
+  const { widths: colWidths, startResize } = useResizableColumns(DEVOLUCIONES_COLUMNS)
 
   const offset = (page - 1) * PAGE_SIZE
 
@@ -150,17 +163,29 @@ export default function DevolucionesPage() {
 
         <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {DEVOLUCIONES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <SortableTh label="Id" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <th>NCF</th>
-                  <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} align="right" />
-                  <th style={{ textAlign: 'right' }}>Disponible</th>
-                  <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <th>Acciones</th>
+                  <SortableTh label="Id" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('id')} />} />
+                  <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('proveedor')} />} />
+                  <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />} />
+                  <th>
+                    NCF
+                    <span className="col-resize-handle" onMouseDown={startResize('ncf')} />
+                  </th>
+                  <SortableTh label="Total" sortKey="grandTotal" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} align="right" resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('total')} />} />
+                  <th style={{ textAlign: 'right' }}>
+                    Disponible
+                    <span className="col-resize-handle" onMouseDown={startResize('disponible')} />
+                  </th>
+                  <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('estado')} />} />
+                  <th>
+                    Acciones
+                    <span className="col-resize-handle" onMouseDown={startResize('acciones')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -205,10 +230,10 @@ export default function DevolucionesPage() {
           const canApply = disponible > 0
           return (
                             <tr key={d.id} className="table-row-clickable" onClick={() => navigate(`/devoluciones-compras/${d.id}`)}>
-                              <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{d.id}</td>
+                              <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{d.id}</td>
                               <td style={{ fontWeight: 500 }}>{d.supplierName ?? '—'}</td>
                               <td>{formatDate(d.postingDate)}</td>
-                              <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{d.ncf ?? '—'}</td>
+                              <td className="td-muted" style={{ fontFamily: 'var(--font-body)' }}>{d.ncf ?? '—'}</td>
                               <td style={{ textAlign: 'right' }}>{formatDOP(d.grandTotal)}</td>
                               <td style={{ textAlign: 'right' }}>{canApply ? formatDOP(disponible) : '—'}</td>
                               <td><StatusBadge status={d.status} /></td>

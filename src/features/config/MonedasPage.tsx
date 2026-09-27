@@ -28,6 +28,24 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate, formatNumber } from '@/lib/formatters'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const CATALOGO_COLUMNS = [
+  { key: 'codigo', width: 100 },
+  { key: 'nombre', width: 200 },
+  { key: 'simbolo', width: 100 },
+  { key: 'habilitada', width: 140 },
+]
+
+const TASAS_COLUMNS = [
+  { key: 'fecha', width: 110 },
+  { key: 'de', width: 90 },
+  { key: 'a', width: 90 },
+  { key: 'tasa', width: 110 },
+  { key: 'compra', width: 90 },
+  { key: 'venta', width: 90 },
+  { key: 'actions', width: 96 },
+]
 
 const MONEDA_OPTIONS: MonedaCode[] = ['DOP', 'USD', 'EUR']
 
@@ -44,6 +62,8 @@ function CatalogoMonedasSection() {
   // Moneda recién habilitada sin ninguna cuenta de Caja/Banco todavía — dispara el modal opcional
   // de docs/tasks/78_validar_cuenta_caja_al_habilitar_moneda.md. `null` = no mostrar nada.
   const [promptCuentaFor, setPromptCuentaFor] = useState<MonedaCode | null>(null)
+
+  const { widths: colWidths, startResize } = useResizableColumns(CATALOGO_COLUMNS)
 
   const { data, isLoading } = useQuery({ queryKey: ['monedas'], queryFn: listMonedas })
 
@@ -92,13 +112,28 @@ function CatalogoMonedasSection() {
         <span className="card-title">Monedas</span>
       </div>
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {CATALOGO_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>Código</th>
-              <th>Nombre</th>
-              <th>Símbolo</th>
-              <th style={{ width: 140 }}>Habilitada</th>
+              <th>
+                Código
+                <span className="col-resize-handle" onMouseDown={startResize('codigo')} />
+              </th>
+              <th>
+                Nombre
+                <span className="col-resize-handle" onMouseDown={startResize('nombre')} />
+              </th>
+              <th>
+                Símbolo
+                <span className="col-resize-handle" onMouseDown={startResize('simbolo')} />
+              </th>
+              <th>
+                Habilitada
+                <span className="col-resize-handle" onMouseDown={startResize('habilitada')} />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -112,7 +147,7 @@ function CatalogoMonedasSection() {
                 ))
               : (data ?? []).map((m) => (
                   <tr key={m.code}>
-                    <td style={{ fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{m.code}</td>
+                    <td style={{ fontWeight: 600, fontFamily: 'var(--font-body)' }}>{m.code}</td>
                     <td>{m.nombre}</td>
                     <td className="td-muted">{m.simbolo}</td>
                     <td>
@@ -303,6 +338,8 @@ function TasasCambioSection() {
   const [offset, setOffset] = useState(0)
   const limit = 20
 
+  const { widths: colWidths, startResize } = useResizableColumns(TASAS_COLUMNS)
+
   // Reusa la misma query key que CatalogoMonedasSection — normalmente ya está en caché, no
   // dispara una llamada de red extra. Solo se usa para no ofrecer cargar una tasa nueva contra
   // una moneda deshabilitada (el filtro de fecha/histórico de abajo sí sigue mostrando las 3,
@@ -457,16 +494,37 @@ function TasasCambioSection() {
       </div>
 
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {TASAS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>Fecha</th>
-              <th>De</th>
-              <th>A</th>
-              <th style={{ textAlign: 'right' }}>Tasa</th>
-              <th>Compra</th>
-              <th>Venta</th>
-              <th style={{ width: 96 }} />
+              <th>
+                Fecha
+                <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+              </th>
+              <th>
+                De
+                <span className="col-resize-handle" onMouseDown={startResize('de')} />
+              </th>
+              <th>
+                A
+                <span className="col-resize-handle" onMouseDown={startResize('a')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Tasa
+                <span className="col-resize-handle" onMouseDown={startResize('tasa')} />
+              </th>
+              <th>
+                Compra
+                <span className="col-resize-handle" onMouseDown={startResize('compra')} />
+              </th>
+              <th>
+                Venta
+                <span className="col-resize-handle" onMouseDown={startResize('venta')} />
+              </th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -494,7 +552,7 @@ function TasasCambioSection() {
                       <td>{formatDate(t.fecha)}</td>
                       <td style={{ fontWeight: 600 }}>{t.from}</td>
                       <td style={{ fontWeight: 600 }}>{t.to}</td>
-                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{t.tasa}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{t.tasa}</td>
                       <td className="td-muted">{t.forBuying ? 'Sí' : 'No'}</td>
                       <td className="td-muted">{t.forSelling ? 'Sí' : 'No'}</td>
                       <td className="actions-cell">

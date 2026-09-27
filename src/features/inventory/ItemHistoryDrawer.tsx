@@ -16,8 +16,19 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { STOCK_VOUCHER_TYPES } from '@/lib/constants'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 15
+
+const COLUMNS = [
+  { key: 'almacen', width: 120 },
+  { key: 'movimiento', width: 100 },
+  { key: 'stock', width: 110 },
+  { key: 'valoracion', width: 110 },
+  { key: 'tipoDoc', width: 100 },
+  { key: 'numDoc', width: 110 },
+  { key: 'fecha', width: 110 },
+]
 
 interface ItemHistoryDrawerProps {
   itemCode: string
@@ -35,6 +46,7 @@ export function ItemHistoryDrawer({ itemCode, itemName, initialWarehouse, onClos
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
   const offset = (page - 1) * PAGE_SIZE
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data: warehouses } = useQuery({
     queryKey: ['warehouses'],
@@ -99,16 +111,40 @@ export function ItemHistoryDrawer({ itemCode, itemName, initialWarehouse, onClos
         </div>
 
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Almacén</th>
-                <th style={{ textAlign: 'right' }}>Movimiento</th>
-                <th style={{ textAlign: 'right' }}>Stock Resultante</th>
-                <th style={{ textAlign: 'right' }}>Valoración</th>
-                <th>Tipo Doc</th>
-                <th># Doc</th>
-                <th>Fecha</th>
+                <th>
+                  Almacén
+                  <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Movimiento
+                  <span className="col-resize-handle" onMouseDown={startResize('movimiento')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Stock Resultante
+                  <span className="col-resize-handle" onMouseDown={startResize('stock')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Valoración
+                  <span className="col-resize-handle" onMouseDown={startResize('valoracion')} />
+                </th>
+                <th>
+                  Tipo Doc
+                  <span className="col-resize-handle" onMouseDown={startResize('tipoDoc')} />
+                </th>
+                <th>
+                  # Doc
+                  <span className="col-resize-handle" onMouseDown={startResize('numDoc')} />
+                </th>
+                <th>
+                  Fecha
+                  <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -144,19 +180,19 @@ export function ItemHistoryDrawer({ itemCode, itemName, initialWarehouse, onClos
                           <td className="td-muted">{entry.warehouse}</td>
                           <td style={{
                             textAlign: 'right',
-                            fontFamily: 'monospace',
+                            fontFamily: 'var(--font-body)',
                             fontWeight: 600,
                             color: entry.movementQty >= 0 ? 'oklch(62.7% 0.194 149.214)' : 'oklch(51.4% 0.222 16.935)',
                           }}
                           >
                             {formatNumber(entry.movementQty)}
                           </td>
-                          <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
+                          <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>
                             {formatNumber(entry.stockAfter)}
                           </td>
                           <td style={{ textAlign: 'right' }}>{formatDOP(entry.valuationRate)}</td>
                           <td className="td-muted">{entry.voucherType}</td>
-                          <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{entry.voucherNo}</td>
+                          <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{entry.voucherNo}</td>
                           <td>
                             {formatDate(entry.postingDate)}
                             {entry.postingTime && (

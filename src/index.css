@@ -2,7 +2,7 @@
  * Login reverted to its original asymmetric photo-split at user request (2026-08-04) — see .hallmark/log.json.
  * theme: existing-brand, extended · accent: brand-red oklch(66.3% 0.224 28.7) · secondary: brand-blue oklch(50.9% 0.128 249.1)
  * new: ink-deep navy oklch(16% 0.030 228) (from logo navy, dashboard hero tile only) · teal-accent oklch(60% 0.090 203)
- * fonts: DM Sans (display 800 / body 400-500, now actually loaded — see index.html) + JetBrains Mono (numeric-data outlier)
+ * fonts: DM Sans (display 800 / body 400-500, now actually loaded — see index.html)
  * scope: Dashboard screen only · Login is back to its pre-existing design · rest of app design system untouched
  */
 /* ─── FLUX DESIGN SYSTEM — ERP RD ─── */
@@ -52,7 +52,7 @@
   --info-text: #1a69ab;
 
   --font-body: 'DM Sans', 'Geist', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Geist Mono', monospace;
+  --font-mono: 'DM Sans', Arial, sans-serif;
 
   --radius-xs: 2px;
   --radius-sm: 4px;
@@ -255,7 +255,7 @@ button {
   grid-area: topbar;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   padding: 0 16px;
   background: var(--surface-page);
   position: sticky;
@@ -272,7 +272,14 @@ button {
   gap: 6px;
   flex-shrink: 0;
   text-decoration: none;
+  margin-right: 6px;
+  /* Ancho fijo para que el divider-v caiga justo sobre el borde del sidebar:
+     16 (padding topbar) + 32 (botón menú) + 6 (gap) + 180 (logo) + 6 (gap) = 240. */
+  width: calc(var(--sidebar-width) - 60px);
 }
+
+/* Con el sidebar colapsado el logo no puede mantener ese ancho — vuelve a auto. */
+.app-shell.collapsed .logo { width: auto; }
 
 .logo-mark {
   width: 28px;
@@ -398,7 +405,7 @@ button {
 }
 
 .dd-logo {
-    width: 110px;
+    width: 155px;
     object-fit: contain;
 }
 
@@ -1112,7 +1119,7 @@ button {
   opacity: 0.25;
 }
 
-/* Hallmark · component: turno-strip · genre: modern-minimal · branding: preserved (brand-red, JetBrains Mono)
+/* Hallmark · component: turno-strip · genre: modern-minimal · branding: preserved (brand-red)
  * states: default · hover · focus · active · disabled · loading · error · success
  * contrast: pass
  * Deliberately NOT a right-aligned button cluster (that pattern belongs to .topbar-right) —
@@ -1164,7 +1171,7 @@ button {
 }
 
 .turno-strip-time {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 12px;
   color: var(--text-tertiary);
   white-space: nowrap;
@@ -2001,6 +2008,7 @@ button {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  overflow-x: auto;
 }
 
 .items-table {
@@ -2010,7 +2018,7 @@ button {
 
 .items-table th {
   padding: 0 12px;
-  height: 34px;
+  height: 38px;
   font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
@@ -2079,6 +2087,7 @@ button {
   background: var(--surface-sunken);
   border-right: 1px solid var(--border-default);
   flex-shrink: 0;
+  width: 58px;
 }
 
 .disc-combo-select {
@@ -2087,6 +2096,7 @@ button {
   background: transparent;
   border: none;
   height: 32px;
+  width: 100%;
   padding: 0 20px 0 10px;
   font-family: var(--font-body);
   font-size: 13px;
@@ -2343,6 +2353,30 @@ button {
   opacity: 0.25;
 }
 
+/* ─── Columnas redimensionables (ver useResizableColumns) ───
+   `table-layout: fixed` + <colgroup> hace que el ancho declarado en cada <col> mande siempre —
+   la tabla ya no se encoge/expande sola según el contenido (vacía vs. con filas), y arrastrar el
+   divisor cambia el ancho real de la columna de forma predecible. */
+.items-table-resizable { table-layout: fixed; }
+.items-table-resizable th { position: relative; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.items-table-resizable td { overflow: hidden; }
+
+.col-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Adentro del borde del `<th>`, nunca sobresaliendo — un `<th>` de esta tabla tiene
+     `overflow: hidden` (para el ellipsis del texto), y una manija que sobresaliera (ej.
+     `right: -4px`) quedaría recortada ahí y jamás recibiría el mousedown. */
+  right: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 3;
+  touch-action: none;
+}
+.col-resize-handle:hover,
+.col-resize-handle:active { background: var(--brand-primary); opacity: 0.35; }
+
 .items-total-row.navy-totals {
   background: var(--color-navy);
   border-top: none;
@@ -2353,7 +2387,7 @@ button {
 
 .items-total-row.navy-totals .total-row-highlight,
 .items-total-row.navy-totals .total-row-highlight > span:last-child {
-  color: var(--sidebar-label);
+  color: #FCB124;
   font-size: 18px;
   font-weight: 700;
 }
@@ -2399,8 +2433,8 @@ button {
   border: none;
   font-family: var(--font-body);
   font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-weight: 400;
+  color: #0E3D51;
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -2410,7 +2444,7 @@ button {
 }
 
 .tab-btn:hover { color: var(--text-primary); }
-.tab-btn.on { color: var(--brand-primary); border-bottom-color: var(--brand-primary); }
+.tab-btn.on { color: var(--brand-primary); border-bottom-color: var(--brand-primary); font-weight: 500; }
 
 /* ─── TOAST ─── */
 .toast-stack {
@@ -2571,7 +2605,7 @@ button {
 
 /* ─── 606 DGII SECTION ─── */
 .dgii-section {
-  background: var(--info-bg);
+  /*background: var(--info-bg);*/
   border: 1px solid var(--info-border);
   border-radius: var(--radius-lg);
   padding: 16px 18px;
@@ -3038,9 +3072,13 @@ button {
 .search-wrap input {
   width: 100%;
   height: 32px;
-  padding: 0 60px 0 32px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-default);
+  padding: 0 12px 0 32px;
+  /*background: var(--surface-sunken);*/
+  background-color: #f3faf8;
+  border: 1px solid var(--info-border);
+  /*border-color: #BDD0D2;*/
+  border: 1px solid rgba(32, 133, 145, 0.50);
+  /*border: 1px solid var(--border-default);*/
   border-radius: var(--radius-md);
   font-family: var(--font-body);
   font-size: 13px;
@@ -3066,7 +3104,7 @@ button {
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--icon-muted);
+  color: #208591;
   pointer-events: none;
   display: flex;
   align-items: center;
@@ -3089,7 +3127,7 @@ button {
   justify-content: center;
   height: 18px;
   padding: 0 5px;
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 10px;
   color: var(--text-tertiary);
   background: var(--surface-page);
@@ -3909,7 +3947,7 @@ tbody .badge {
 .tpl-field-item:hover { background: var(--surface-hover); border-color: var(--border-subtle); }
 .tpl-field-item:active { cursor: grabbing; opacity: 0.7; }
 .tpl-field-label { font-size: 12px; font-weight: 500; color: var(--text-primary); }
-.tpl-field-sample { font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono); }
+.tpl-field-sample { font-size: 11px; color: var(--text-tertiary); font-family: var(--font-body); }
 
 .tpl-palette-grid {
   display: grid;
@@ -4071,7 +4109,7 @@ tbody .badge {
   top: 2px;
   font-size: 9px;
   color: #9ca3af;
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
 }
 
 .tpl-el { box-sizing: border-box; cursor: move; }
@@ -4391,7 +4429,7 @@ tbody .badge {
   position: absolute;
   color: var(--text-secondary);
   font-size: 9px;
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   pointer-events: none;
 }
 .chq-ruler-h { top: 0; left: 20px; height: 18px; border-bottom: 1px solid var(--border-strong); }
@@ -4444,7 +4482,7 @@ tbody .badge {
   color: #111827;
   white-space: nowrap;
   overflow: hidden;
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
 }
 .chq-el-text-multiline { flex-direction: column; align-items: flex-start; justify-content: center; white-space: normal; }
 

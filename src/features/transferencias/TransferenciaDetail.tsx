@@ -8,6 +8,17 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDate } from '@/lib/formatters'
 import { ArrowLeft, Check, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_COLUMNS = [
+  { key: 'articulo', width: 240 },
+  { key: 'cantidad', width: 120 },
+]
+
+const MODAL_COLUMNS = [
+  { key: 'articulo', width: 200 },
+  { key: 'cantidad', width: 110 },
+]
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-neutral',
@@ -30,6 +41,8 @@ export default function TransferenciaDetail() {
 
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const { widths: itemsColWidths, startResize: startItemsResize } = useResizableColumns(ITEMS_COLUMNS)
+  const { widths: modalColWidths, startResize: startModalResize } = useResizableColumns(MODAL_COLUMNS)
 
   const { data: t, isLoading } = useQuery({
     queryKey: ['transferencia', id],
@@ -132,20 +145,28 @@ export default function TransferenciaDetail() {
           </div>
           {t.confirmationId && (
             <div className="inline-alert" style={{ marginTop: 16 }}>
-              Recepción confirmada — Stock Entry: <span style={{ fontFamily: 'var(--font-mono)' }}>{t.confirmationId}</span>
+              Recepción confirmada — Stock Entry: <span style={{ fontFamily: 'var(--font-body)' }}>{t.confirmationId}</span>
             </div>
           )}
         </div>
       </div>
 
       <div className="card" style={{ marginTop: 20 }}>
-        <div className="card-header"><h2 className="card-title">Artículos</h2></div>
         <div className="items-table-wrap">
-          <table className="items-table">
+          <table className="items-table items-table-resizable">
+            <colgroup>
+              {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Artículo</th>
-                <th style={{ textAlign: 'right', width: 120 }}>Cantidad</th>
+                <th>
+                  Artículo
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('articulo')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Cantidad
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('cantidad')} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -180,9 +201,21 @@ export default function TransferenciaDetail() {
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
                 Vas a recibir en <strong>{t.toWarehouse}</strong> los siguientes artículos, provenientes de <strong>{t.fromWarehouse}</strong>:
               </p>
-              <table className="data-table" style={{ marginTop: 12 }}>
+              <table className="data-table items-table-resizable" style={{ marginTop: 12 }}>
+                <colgroup>
+                  {MODAL_COLUMNS.map((c) => <col key={c.key} style={{ width: modalColWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
-                  <tr><th>Artículo</th><th style={{ textAlign: 'right' }}>Cantidad</th></tr>
+                  <tr>
+                    <th>
+                      Artículo
+                      <span className="col-resize-handle" onMouseDown={startModalResize('articulo')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Cantidad
+                      <span className="col-resize-handle" onMouseDown={startModalResize('cantidad')} />
+                    </th>
+                  </tr>
                 </thead>
                 <tbody>
                   {t.items.map((i, idx) => (

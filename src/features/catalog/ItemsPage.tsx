@@ -20,6 +20,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { listPrincipiosActivos } from '@/shared/api/principios-activos'
 import { usePermissionsStore } from '@/stores/permissions.store'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
 
@@ -205,6 +206,20 @@ export default function ItemsPage() {
     + (esFarmacia && principioActivoFilter ? 1 : 0)
     + (esFarmacia && esMedicamentoFilter ? 1 : 0)
 
+  const ITEMS_COLUMNS = [
+    { key: 'codigo', width: 110 },
+    { key: 'nombre', width: 220 },
+    ...(isProduct ? [{ key: 'rol', width: 100 }] : []),
+    { key: 'categoria', width: 160 },
+    { key: 'marca', width: 140 },
+    { key: 'precio', width: 110 },
+    ...(isProduct ? [{ key: 'stock', width: 90 }] : []),
+    { key: 'estado', width: 100 },
+    { key: 'descuento', width: 110 },
+    { key: 'actions', width: 48 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
+
   function clearMoreFilters() {
     setStockUomFilter('')
     setHasWarrantyFilter('all')
@@ -314,19 +329,66 @@ export default function ItemsPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <SortableTh label="Código" sortKey="id" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-              <SortableTh label="Nombre" sortKey="itemName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-              {isProduct && <th>Rol</th>}
-              <th>Categoría</th>
-              <th>Marca</th>
-              <SortableTh label="Precio" sortKey="standardRate" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} align="right" />
-              {isProduct && <SortableTh label="Stock" sortKey="currentStock" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />}
-                <th>Estado</th>
-                <th>Descuento</th>
-                <th style={{ width: 48 }} />
+              <SortableTh
+                label="Código"
+                sortKey="id"
+                orderBy={orderBy}
+                onSort={(k) => { sort(k); setPage(1) }}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('codigo')} />}
+              />
+              <SortableTh
+                label="Nombre"
+                sortKey="itemName"
+                orderBy={orderBy}
+                onSort={(k) => { sort(k); setPage(1) }}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('nombre')} />}
+              />
+              {isProduct && (
+                <th>
+                  Rol
+                  <span className="col-resize-handle" onMouseDown={startResize('rol')} />
+                </th>
+              )}
+              <th>
+                Categoría
+                <span className="col-resize-handle" onMouseDown={startResize('categoria')} />
+              </th>
+              <th>
+                Marca
+                <span className="col-resize-handle" onMouseDown={startResize('marca')} />
+              </th>
+              <SortableTh
+                label="Precio"
+                sortKey="standardRate"
+                orderBy={orderBy}
+                onSort={(k) => { sort(k); setPage(1) }}
+                align="right"
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('precio')} />}
+              />
+              {isProduct && (
+                <SortableTh
+                  label="Stock"
+                  sortKey="currentStock"
+                  orderBy={orderBy}
+                  onSort={(k) => { sort(k); setPage(1) }}
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('stock')} />}
+                />
+              )}
+                <th>
+                  Estado
+                  <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                </th>
+                <th>
+                  Descuento
+                  <span className="col-resize-handle" onMouseDown={startResize('descuento')} />
+                </th>
+                <th />
             </tr>
           </thead>
           <tbody>
@@ -363,7 +425,7 @@ export default function ItemsPage() {
                         className="table-row-clickable"
                         onClick={() => navigate(`${basePath}/${item.id}`)}
                       >
-                        <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.id}</td>
+                        <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.id}</td>
                         <td style={{ fontWeight: 500 }}>{item.itemName}</td>
                         {isProduct && <td><ItemTypeBadge item={item} /></td>}
                         <td className="td-muted">

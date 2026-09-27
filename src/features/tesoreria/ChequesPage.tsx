@@ -18,6 +18,18 @@ import { SortableTh } from '@/shared/ui/SortableTh'
 import { Drawer } from '@/shared/ui/Drawer'
 import { Printer, SlidersHorizontal } from 'lucide-react'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'fecha', width: 100 },
+  { key: 'numero', width: 110 },
+  { key: 'cuentaBancaria', width: 160 },
+  { key: 'beneficiario', width: 200 },
+  { key: 'monto', width: 120 },
+  { key: 'estado', width: 110 },
+  { key: 'impreso', width: 100 },
+  { key: 'documentoOrigen', width: 200 },
+]
 
 const STATUS_BADGE: Record<ChequeEstado, string> = {
   Reservado: 'badge-draft',
@@ -41,6 +53,7 @@ export default function ChequesPage() {
   const [impreso, setImpreso] = useState<'all' | 'yes' | 'no'>('all')
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
     queryKey: ['cheques-beneficiario-search', beneficiarioQuery],
@@ -137,17 +150,26 @@ export default function ChequesPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="Fecha" sortKey="fecha" orderBy={orderBy} onSort={sort} />
-                <th>Número</th>
-                <th>Cuenta Bancaria</th>
-                <th>Beneficiario</th>
-                <th style={{ textAlign: 'right' }}>Monto</th>
-                <th>Estado</th>
-                <th>Impreso</th>
-                <th>Documento origen</th>
+                <SortableTh
+                  label="Fecha"
+                  sortKey="fecha"
+                  orderBy={orderBy}
+                  onSort={sort}
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />}
+                />
+                <th>Número<span className="col-resize-handle" onMouseDown={startResize('numero')} /></th>
+                <th>Cuenta Bancaria<span className="col-resize-handle" onMouseDown={startResize('cuentaBancaria')} /></th>
+                <th>Beneficiario<span className="col-resize-handle" onMouseDown={startResize('beneficiario')} /></th>
+                <th style={{ textAlign: 'right' }}>Monto<span className="col-resize-handle" onMouseDown={startResize('monto')} /></th>
+                <th>Estado<span className="col-resize-handle" onMouseDown={startResize('estado')} /></th>
+                <th>Impreso<span className="col-resize-handle" onMouseDown={startResize('impreso')} /></th>
+                <th>Documento origen<span className="col-resize-handle" onMouseDown={startResize('documentoOrigen')} /></th>
               </tr>
             </thead>
             <tbody>
@@ -173,7 +195,7 @@ export default function ChequesPage() {
                   : cheques.map((c) => (
                       <tr key={c.id} className="data-table-row-link" onClick={() => navigate(`/tesoreria/cheques/${c.id}`)}>
                         <td className="td-muted">{formatDate(c.fecha)}</td>
-                        <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{c.chequeNo}</td>
+                        <td style={{ fontFamily: 'var(--font-body)', fontWeight: 500 }}>{c.chequeNo}</td>
                         <td className="td-muted">{c.cuentaBancaria}</td>
                         <td>{c.beneficiario?.id ?? '—'}</td>
                         <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatDOP(c.monto)}</td>

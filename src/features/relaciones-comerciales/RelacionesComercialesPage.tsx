@@ -10,6 +10,7 @@ import { usePuede } from '@/shared/permissions/can'
 import { Badge } from '@/shared/ui/Badge'
 import { Modal, ConfirmModal } from '@/shared/ui/Modal'
 import { formatDate, formatDateTime } from '@/lib/formatters'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import {
   listRelacionesComerciales,
   listInvitacionesRelacion,
@@ -119,6 +120,15 @@ function SociosTab() {
     },
   })
 
+  const SOCIOS_COLUMNS = [
+    { key: 'contraparte', width: 220 },
+    { key: 'estado', width: 110 },
+    { key: 'activadaEl', width: 100 },
+    { key: 'creadaEl', width: 100 },
+    { key: 'acciones', width: 90 },
+  ]
+  const { widths: sociosColWidths, startResize: startSociosResize } = useResizableColumns(SOCIOS_COLUMNS)
+
   if (!puedeListar) {
     return <EmptyPermiso texto="No tienes permiso para ver los socios comerciales." />
   }
@@ -128,14 +138,17 @@ function SociosTab() {
   return (
     <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {SOCIOS_COLUMNS.map((c) => <col key={c.key} style={{ width: sociosColWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>Contraparte</th>
-              <th>Estado</th>
-              <th>Activada el</th>
-              <th>Creada el</th>
-              <th style={{ width: 90 }}>Acciones</th>
+              <th>Contraparte<span className="col-resize-handle" onMouseDown={startSociosResize('contraparte')} /></th>
+              <th>Estado<span className="col-resize-handle" onMouseDown={startSociosResize('estado')} /></th>
+              <th>Activada el<span className="col-resize-handle" onMouseDown={startSociosResize('activadaEl')} /></th>
+              <th>Creada el<span className="col-resize-handle" onMouseDown={startSociosResize('creadaEl')} /></th>
+              <th style={{ width: 90 }}>Acciones<span className="col-resize-handle" onMouseDown={startSociosResize('acciones')} /></th>
             </tr>
           </thead>
           <tbody>
@@ -262,6 +275,15 @@ function InvitacionesTab() {
 
   const items = data ?? []
 
+  const INVITACIONES_COLUMNS = [
+    { key: 'contraparte', width: 200 },
+    { key: 'mensaje', width: 240 },
+    { key: 'estado', width: 110 },
+    { key: 'expira', width: 110 },
+    { key: 'acciones', width: 180 },
+  ]
+  const { widths: invitacionesColWidths, startResize: startInvitacionesResize } = useResizableColumns(INVITACIONES_COLUMNS)
+
   return (
     <>
       <div className="tabs-bar" style={{ marginBottom: 16 }}>
@@ -275,14 +297,17 @@ function InvitacionesTab() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {INVITACIONES_COLUMNS.map((c) => <col key={c.key} style={{ width: invitacionesColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Contraparte</th>
-                <th>Mensaje</th>
-                <th>Estado</th>
-                <th>Expira</th>
-                <th style={{ width: 180 }}>Acciones</th>
+                <th>Contraparte<span className="col-resize-handle" onMouseDown={startInvitacionesResize('contraparte')} /></th>
+                <th>Mensaje<span className="col-resize-handle" onMouseDown={startInvitacionesResize('mensaje')} /></th>
+                <th>Estado<span className="col-resize-handle" onMouseDown={startInvitacionesResize('estado')} /></th>
+                <th>Expira<span className="col-resize-handle" onMouseDown={startInvitacionesResize('expira')} /></th>
+                <th style={{ width: 180 }}>Acciones<span className="col-resize-handle" onMouseDown={startInvitacionesResize('acciones')} /></th>
               </tr>
             </thead>
             <tbody>
@@ -516,19 +541,32 @@ function BloqueadasTab() {
 
   const bloqueos = data ?? []
 
+  const BLOQUEADAS_COLUMNS = [
+    { key: 'empresa', width: 200 },
+    { key: 'rnc', width: 120 },
+    { key: 'motivo', width: 220 },
+    { key: 'estado', width: 100 },
+    { key: 'creado', width: 100 },
+    { key: 'acciones', width: 110 },
+  ]
+  const { widths: bloqueadasColWidths, startResize: startBloqueadasResize } = useResizableColumns(BLOQUEADAS_COLUMNS)
+
   return (
     <>
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {BLOQUEADAS_COLUMNS.map((c) => <col key={c.key} style={{ width: bloqueadasColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Empresa</th>
-                <th>RNC</th>
-                <th>Motivo</th>
-                <th>Estado</th>
-                <th>Creado</th>
-                <th style={{ width: 110 }}>Acciones</th>
+                <th>Empresa<span className="col-resize-handle" onMouseDown={startBloqueadasResize('empresa')} /></th>
+                <th>RNC<span className="col-resize-handle" onMouseDown={startBloqueadasResize('rnc')} /></th>
+                <th>Motivo<span className="col-resize-handle" onMouseDown={startBloqueadasResize('motivo')} /></th>
+                <th>Estado<span className="col-resize-handle" onMouseDown={startBloqueadasResize('estado')} /></th>
+                <th>Creado<span className="col-resize-handle" onMouseDown={startBloqueadasResize('creado')} /></th>
+                <th style={{ width: 110 }}>Acciones<span className="col-resize-handle" onMouseDown={startBloqueadasResize('acciones')} /></th>
               </tr>
             </thead>
             <tbody>
@@ -558,7 +596,7 @@ function BloqueadasTab() {
                 bloqueos.map((b) => (
                   <tr key={b.id} style={b.levantado ? { opacity: 0.55 } : undefined}>
                     <td style={{ fontWeight: 500 }}>{b.nombreBloqueado ?? '—'}</td>
-                    <td className="td-muted" style={{ fontFamily: 'var(--font-mono)' }}>{b.rncBloqueado ?? '—'}</td>
+                    <td className="td-muted" style={{ fontFamily: 'var(--font-body)' }}>{b.rncBloqueado ?? '—'}</td>
                     <td className="td-muted">{b.motivo ?? '—'}</td>
                     <td><Badge variant={b.levantado ? 'neutral' : 'error'}>{b.levantado ? 'Levantado' : 'Activo'}</Badge></td>
                     <td>{formatDate(b.createdAt)}</td>

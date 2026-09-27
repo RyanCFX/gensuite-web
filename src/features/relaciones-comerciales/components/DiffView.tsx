@@ -6,6 +6,7 @@ import { Badge } from '@/shared/ui/Badge'
 import type { BadgeVariant } from '@/shared/ui/Badge'
 import type { DiffTransaccion, EstadoLineaDiff } from '@/shared/api/types'
 import { formatDOP, formatPct } from '@/lib/formatters'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const ESTADO_LINEA_BADGE: Record<EstadoLineaDiff, { label: string; variant: BadgeVariant }> = {
   igual: { label: 'Igual', variant: 'neutral' },
@@ -24,8 +25,23 @@ export interface DiffViewProps {
   diff: DiffTransaccion
 }
 
+const CABECERA_COLUMNS = [
+  { key: 'campo', width: 160 },
+  { key: 'origen', width: 200 },
+  { key: 'destino', width: 200 },
+]
+
+const LINEAS_COLUMNS = [
+  { key: 'origen', width: 220 },
+  { key: 'destino', width: 220 },
+  { key: 'estado', width: 110 },
+  { key: 'cambios', width: 240 },
+]
+
 export function DiffView({ diff }: DiffViewProps) {
   const lineasVisibles = diff.lineas.filter((l) => l.estado !== 'igual')
+  const { widths: cabeceraColWidths, startResize: startCabeceraResize } = useResizableColumns(CABECERA_COLUMNS)
+  const { widths: lineasColWidths, startResize: startLineasResize } = useResizableColumns(LINEAS_COLUMNS)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -41,8 +57,15 @@ export function DiffView({ diff }: DiffViewProps) {
       {diff.cabecera.length > 0 && (
         <div className="card">
           <div className="card-body" style={{ padding: 0 }}>
-            <table className="data-table">
-              <thead><tr><th>Campo</th><th>Origen (socio)</th><th>Usted</th></tr></thead>
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {CABECERA_COLUMNS.map((c) => <col key={c.key} style={{ width: cabeceraColWidths[c.key] }} />)}
+              </colgroup>
+              <thead><tr>
+                <th>Campo<span className="col-resize-handle" onMouseDown={startCabeceraResize('campo')} /></th>
+                <th>Origen (socio)<span className="col-resize-handle" onMouseDown={startCabeceraResize('origen')} /></th>
+                <th>Usted<span className="col-resize-handle" onMouseDown={startCabeceraResize('destino')} /></th>
+              </tr></thead>
               <tbody>
                 {diff.cabecera.map((c) => (
                   <tr key={c.campo}>
@@ -59,13 +82,16 @@ export function DiffView({ diff }: DiffViewProps) {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {LINEAS_COLUMNS.map((c) => <col key={c.key} style={{ width: lineasColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Lo que envió/tiene el socio</th>
-                <th>Lo que tiene usted</th>
-                <th>Estado</th>
-                <th>Cambios</th>
+                <th>Lo que envió/tiene el socio<span className="col-resize-handle" onMouseDown={startLineasResize('origen')} /></th>
+                <th>Lo que tiene usted<span className="col-resize-handle" onMouseDown={startLineasResize('destino')} /></th>
+                <th>Estado<span className="col-resize-handle" onMouseDown={startLineasResize('estado')} /></th>
+                <th>Cambios<span className="col-resize-handle" onMouseDown={startLineasResize('cambios')} /></th>
               </tr>
             </thead>
             <tbody>

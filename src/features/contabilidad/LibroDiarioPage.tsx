@@ -16,6 +16,19 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const LIBRO_DIARIO_COLUMNS = [
+  { key: 'identificador', width: 110 },
+  { key: 'fecha', width: 100 },
+  { key: 'cuenta', width: 220 },
+  { key: 'tipo', width: 130 },
+  { key: 'voucher', width: 130 },
+  { key: 'debito', width: 110 },
+  { key: 'credito', width: 110 },
+  { key: 'saldo', width: 110 },
+  { key: 'parte', width: 160 },
+]
 
 function firstOfMonth(): string {
   const d = new Date()
@@ -61,6 +74,7 @@ export default function LibroDiarioPage() {
   const [groupBy, setGroupBy] = useState<GroupBy>('Group by Voucher (Consolidated)')
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
+  const { widths: colWidths, startResize } = useResizableColumns(LIBRO_DIARIO_COLUMNS)
 
   const [branchQuery, setBranchQuery] = useState('')
   const { data: sucursalesData } = useQuery({
@@ -286,17 +300,44 @@ export default function LibroDiarioPage() {
       {/* Table */}
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {LIBRO_DIARIO_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Identificador</th>
-                <th>Fecha</th>
-                <th>Cuenta</th>
-                <th>Tipo</th>
-                <th>Voucher</th>
-                <th style={{ textAlign: 'right' }}>Débito</th>
-                <th style={{ textAlign: 'right' }}>Crédito</th>
-                <th style={{ textAlign: 'right' }}>Saldo</th>
+                <th>
+                  Identificador
+                  <span className="col-resize-handle" onMouseDown={startResize('identificador')} />
+                </th>
+                <th>
+                  Fecha
+                  <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+                </th>
+                <th>
+                  Cuenta
+                  <span className="col-resize-handle" onMouseDown={startResize('cuenta')} />
+                </th>
+                <th>
+                  Tipo
+                  <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                </th>
+                <th>
+                  Voucher
+                  <span className="col-resize-handle" onMouseDown={startResize('voucher')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Débito
+                  <span className="col-resize-handle" onMouseDown={startResize('debito')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Crédito
+                  <span className="col-resize-handle" onMouseDown={startResize('credito')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Saldo
+                  <span className="col-resize-handle" onMouseDown={startResize('saldo')} />
+                </th>
                 <th>Parte</th>
               </tr>
             </thead>
@@ -343,9 +384,9 @@ export default function LibroDiarioPage() {
                           return (
                             <tr key={i} style={{ fontWeight: 700, background: 'var(--surface-sunken)' }}>
                               <td colSpan={5} style={{ fontSize: 13 }}>{String(row.account)}</td>
-                              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>{debit ? formatDOP(debit) : '—'}</td>
-                              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>{credit ? formatDOP(credit) : '—'}</td>
-                              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>{balance != null ? formatDOP(balance) : '—'}</td>
+                              <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>{debit ? formatDOP(debit) : '—'}</td>
+                              <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>{credit ? formatDOP(credit) : '—'}</td>
+                              <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>{balance != null ? formatDOP(balance) : '—'}</td>
                               <td />
                             </tr>
                           )
@@ -356,7 +397,7 @@ export default function LibroDiarioPage() {
                         const link = voucherLink(rowVoucherType, rowVoucherNo)
                         return (
                           <tr key={i}>
-                            <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{String(row.gl_entry ?? '—')}</td>
+                            <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{String(row.gl_entry ?? '—')}</td>
                             <td className="td-muted">{row.posting_date ? formatDate(String(row.posting_date)) : '—'}</td>
                             <td style={{ fontSize: 12 }}>{String(row.account ?? '—')}</td>
                             <td className="td-muted" style={{ fontSize: 12 }}>{String(row.voucher_subtype ?? rowVoucherType ?? '—')}</td>
@@ -373,13 +414,13 @@ export default function LibroDiarioPage() {
                                   )
                                 : <span style={{ fontSize: 12 }}>{rowVoucherNo || '—'}</span>}
                             </td>
-                            <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 12 }}>
                               {debit ? formatDOP(debit) : '—'}
                             </td>
-                            <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 12 }}>
                               {credit ? formatDOP(credit) : '—'}
                             </td>
-                            <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 12 }}>
                               {balance != null ? formatDOP(balance) : '—'}
                             </td>
                             <td className="td-muted" style={{ fontSize: 12 }}>

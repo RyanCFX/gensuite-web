@@ -1,5 +1,5 @@
 import { ChevronsUpDown, ChevronUp, ChevronDown } from 'lucide-react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
 interface SortableThProps {
   label: string
@@ -8,15 +8,20 @@ interface SortableThProps {
   onSort: (key: string) => void
   style?: CSSProperties
   align?: 'left' | 'right' | 'center'
+  /** Manija de `useResizableColumns` (ej. `startResize('nombre')`) — se pinta como hijo directo
+   *  del `<th>`, igual que en una columna no ordenable, para que `.col-resize-handle` se posicione
+   *  contra el borde del `<th>` y no del `<button>` interno. */
+  resizeHandle?: ReactNode
 }
 
-export function SortableTh({ label, sortKey, orderBy, onSort, style, align = 'left' }: SortableThProps) {
+export function SortableTh({ label, sortKey, orderBy, onSort, style, align = 'left', resizeHandle }: SortableThProps) {
   const isAsc = orderBy === sortKey
   const isDesc = orderBy === `-${sortKey}`
   const isActive = isAsc || isDesc
 
   return (
     <th style={{ textAlign: align, padding: 0, ...style }}>
+      {resizeHandle}
       <button
         type="button"
         onClick={() => onSort(sortKey)}

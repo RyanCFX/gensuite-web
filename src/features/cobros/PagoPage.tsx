@@ -21,6 +21,23 @@ import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const FACTURAS_COLUMNS = [
+  { key: 'checked', width: 36 },
+  { key: 'factura', width: 220 },
+  { key: 'total', width: 110 },
+  { key: 'pendiente', width: 110 },
+  { key: 'monto', width: 140 },
+]
+
+const APARTADOS_COLUMNS = [
+  { key: 'checked', width: 36 },
+  { key: 'pedido', width: 220 },
+  { key: 'total', width: 110 },
+  { key: 'minimo', width: 130 },
+  { key: 'monto', width: 140 },
+]
 
 interface ReferenciaRow {
   invoiceId: string
@@ -43,6 +60,9 @@ interface PedidoReferenciaRow {
 export default function PagoPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+
+  const { widths: facturasColWidths, startResize: startResizeFacturas } = useResizableColumns(FACTURAS_COLUMNS)
+  const { widths: apartadosColWidths, startResize: startResizeApartados } = useResizableColumns(APARTADOS_COLUMNS)
 
   const [customerId, setCustomerId] = useState('')
   const [customerQuery, setCustomerQuery] = useState('')
@@ -649,14 +669,29 @@ export default function PagoPage() {
             ) : (
               <>
                 <div style={{ overflowX: 'auto' }}>
-                  <table className="items-table">
+                  <table className="items-table items-table-resizable">
+                    <colgroup>
+                      {FACTURAS_COLUMNS.map((c) => <col key={c.key} style={{ width: facturasColWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr>
                         <th style={{ width: 36 }} />
-                        <th>Factura</th>
-                        <th style={{ textAlign: 'right' }}>Total</th>
-                        <th style={{ textAlign: 'right' }}>Pendiente</th>
-                        <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
+                        <th>
+                          Factura
+                          <span className="col-resize-handle" onMouseDown={startResizeFacturas('factura')} />
+                        </th>
+                        <th style={{ textAlign: 'right' }}>
+                          Total
+                          <span className="col-resize-handle" onMouseDown={startResizeFacturas('total')} />
+                        </th>
+                        <th style={{ textAlign: 'right' }}>
+                          Pendiente
+                          <span className="col-resize-handle" onMouseDown={startResizeFacturas('pendiente')} />
+                        </th>
+                        <th style={{ textAlign: 'right', width: 140 }}>
+                          Monto a aplicar
+                          <span className="col-resize-handle" onMouseDown={startResizeFacturas('monto')} />
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -671,7 +706,7 @@ export default function PagoPage() {
                             />
                           </td>
                           <td>
-                            <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                            <span style={{ fontWeight: 500, fontFamily: 'var(--font-body)', fontSize: 13 }}>
                               {ref.invoiceId}
                             </span>
                             <br />
@@ -758,14 +793,29 @@ export default function PagoPage() {
                 </div>
               ) : (
                 <div style={{ overflowX: 'auto' }}>
-                  <table className="items-table">
+                  <table className="items-table items-table-resizable">
+                    <colgroup>
+                      {APARTADOS_COLUMNS.map((c) => <col key={c.key} style={{ width: apartadosColWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr>
                         <th style={{ width: 36 }} />
-                        <th>Pedido</th>
-                        <th style={{ textAlign: 'right' }}>Total</th>
-                        <th style={{ textAlign: 'right' }}>Mínimo requerido</th>
-                        <th style={{ textAlign: 'right', width: 140 }}>Monto a aplicar</th>
+                        <th>
+                          Pedido
+                          <span className="col-resize-handle" onMouseDown={startResizeApartados('pedido')} />
+                        </th>
+                        <th style={{ textAlign: 'right' }}>
+                          Total
+                          <span className="col-resize-handle" onMouseDown={startResizeApartados('total')} />
+                        </th>
+                        <th style={{ textAlign: 'right' }}>
+                          Mínimo requerido
+                          <span className="col-resize-handle" onMouseDown={startResizeApartados('minimo')} />
+                        </th>
+                        <th style={{ textAlign: 'right', width: 140 }}>
+                          Monto a aplicar
+                          <span className="col-resize-handle" onMouseDown={startResizeApartados('monto')} />
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -780,7 +830,7 @@ export default function PagoPage() {
                             />
                           </td>
                           <td>
-                            <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
+                            <span style={{ fontWeight: 500, fontFamily: 'var(--font-body)', fontSize: 13 }}>
                               {ref.pedidoId}
                             </span>
                             <br />

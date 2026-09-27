@@ -20,6 +20,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { CombinacionDimensionSelector } from '@/components/shared/CombinacionDimensionSelector'
 
 // ─── Banner "doctype no instalado" ─────────────────────────────────────────
@@ -55,6 +56,16 @@ function ZonasSection({
   const [formName, setFormName] = useState('')
   const [formCode, setFormCode] = useState('')
   const [formDescripcion, setFormDescripcion] = useState('')
+
+  const ZONAS_COLUMNS = [
+    { key: 'nombre', width: 200 },
+    { key: 'codigo', width: 110 },
+    { key: 'descripcion', width: 220 },
+    { key: 'ubicaciones', width: 130 },
+    { key: 'estado', width: 110 },
+    { key: 'actions', width: 96 },
+  ]
+  const { widths: zonasColWidths, startResize: zonasStartResize } = useResizableColumns(ZONAS_COLUMNS)
 
   const { data, isLoading } = useQuery({
     queryKey: ['zonas', warehouse, includeDisabled],
@@ -175,15 +186,33 @@ function ZonasSection({
         </div>
       ) : (
         <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {ZONAS_COLUMNS.map((c) => <col key={c.key} style={{ width: zonasColWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>Nombre</th>
-              <th>Código</th>
-              <th>Descripción</th>
-              <th>Ubicaciones</th>
-              <th>Estado</th>
-              <th style={{ width: 96 }} />
+              <th>
+                Nombre
+                <span className="col-resize-handle" onMouseDown={zonasStartResize('nombre')} />
+              </th>
+              <th>
+                Código
+                <span className="col-resize-handle" onMouseDown={zonasStartResize('codigo')} />
+              </th>
+              <th>
+                Descripción
+                <span className="col-resize-handle" onMouseDown={zonasStartResize('descripcion')} />
+              </th>
+              <th>
+                Ubicaciones
+                <span className="col-resize-handle" onMouseDown={zonasStartResize('ubicaciones')} />
+              </th>
+              <th>
+                Estado
+                <span className="col-resize-handle" onMouseDown={zonasStartResize('estado')} />
+              </th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -197,7 +226,7 @@ function ZonasSection({
                 <td style={{ fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
                   <MapPin size={13} style={{ color: 'var(--text-tertiary)' }} /> {z.zonaName}
                 </td>
-                <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{z.code ?? '—'}</td>
+                <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{z.code ?? '—'}</td>
                 <td className="td-muted">{z.descripcion ?? '—'}</td>
                 <td>
                   <span className="badge badge-neutral">
@@ -322,6 +351,15 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
   const [formCode, setFormCode] = useState('')
   const [formDescripcion, setFormDescripcion] = useState('')
 
+  const UBICACIONES_COLUMNS = [
+    { key: 'nombre', width: 200 },
+    { key: 'codigo', width: 110 },
+    { key: 'descripcion', width: 220 },
+    { key: 'estado', width: 110 },
+    { key: 'actions', width: 96 },
+  ]
+  const { widths: ubicacionesColWidths, startResize: ubicacionesStartResize } = useResizableColumns(UBICACIONES_COLUMNS)
+
   const { data, isLoading } = useQuery({
     queryKey: ['ubicaciones', zona.id, includeDisabled],
     queryFn: () => listUbicaciones({ zona: zona.id, includeDisabled }),
@@ -426,21 +464,36 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
         </div>
       ) : (
         <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {UBICACIONES_COLUMNS.map((c) => <col key={c.key} style={{ width: ubicacionesColWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>Nombre</th>
-              <th>Código</th>
-              <th>Descripción</th>
-              <th>Estado</th>
-              <th style={{ width: 96 }} />
+              <th>
+                Nombre
+                <span className="col-resize-handle" onMouseDown={ubicacionesStartResize('nombre')} />
+              </th>
+              <th>
+                Código
+                <span className="col-resize-handle" onMouseDown={ubicacionesStartResize('codigo')} />
+              </th>
+              <th>
+                Descripción
+                <span className="col-resize-handle" onMouseDown={ubicacionesStartResize('descripcion')} />
+              </th>
+              <th>
+                Estado
+                <span className="col-resize-handle" onMouseDown={ubicacionesStartResize('estado')} />
+              </th>
+              <th />
             </tr>
           </thead>
           <tbody>
             {ubicaciones.map((u) => (
               <tr key={u.id}>
                 <td style={{ fontWeight: 500 }}>{u.ubicacionName}</td>
-                <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{u.code ?? '—'}</td>
+                <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{u.code ?? '—'}</td>
                 <td className="td-muted">{u.descripcion ?? '—'}</td>
                 <td>
                   {u.disabled
@@ -626,6 +679,15 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
   const queryClient = useQueryClient()
   const [rows, setRows] = useState<Record<string, { ubicacion: string; cantidad: number; esPrincipal: boolean; dimensiones: DimensionesLinea }>>({})
 
+  const PENDIENTES_COLUMNS = [
+    { key: 'articulo', width: 220 },
+    { key: 'sinUbicar', width: 100 },
+    { key: 'ubicacionDestino', width: 240 },
+    { key: 'cantidad', width: 110 },
+    { key: 'principal', width: 90 },
+  ]
+  const { widths: pendientesColWidths, startResize: pendientesStartResize } = useResizableColumns(PENDIENTES_COLUMNS)
+
   useEffect(() => {
     setRows({})
   }, [warehouse])
@@ -721,15 +783,32 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
       ) : (
         <>
           <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {PENDIENTES_COLUMNS.map((c) => <col key={c.key} style={{ width: pendientesColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Artículo</th>
-                <th style={{ textAlign: 'right', width: 100 }}>Sin ubicar</th>
-                <th style={{ width: 240 }}>Ubicación destino</th>
-                <th style={{ width: 110 }}>Cantidad</th>
-                <th style={{ minWidth: 200 }}>Combinación</th>
-                <th style={{ width: 90 }}>Principal</th>
+                <th>
+                  Artículo
+                  <span className="col-resize-handle" onMouseDown={pendientesStartResize('articulo')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Sin ubicar
+                  <span className="col-resize-handle" onMouseDown={pendientesStartResize('sinUbicar')} />
+                </th>
+                <th>
+                  Ubicación destino
+                  <span className="col-resize-handle" onMouseDown={pendientesStartResize('ubicacionDestino')} />
+                </th>
+                <th>
+                  Cantidad
+                  <span className="col-resize-handle" onMouseDown={pendientesStartResize('cantidad')} />
+                </th>
+                <th>
+                  Principal
+                  <span className="col-resize-handle" onMouseDown={pendientesStartResize('principal')} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -739,7 +818,7 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
                   <tr key={p.itemCode}>
                     <td style={{ fontWeight: 500 }}>
                       {p.itemName}
-                      <span className="td-muted" style={{ display: 'block', fontSize: 11, fontFamily: 'monospace' }}>{p.itemCode}</span>
+                      <span className="td-muted" style={{ display: 'block', fontSize: 11, fontFamily: 'var(--font-body)' }}>{p.itemCode}</span>
                     </td>
                     <td style={{ textAlign: 'right' }}>{p.actualQty}</td>
                     <td>
@@ -813,6 +892,18 @@ function HistorialMovimientosSection({ warehouse }: { warehouse: string }) {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [offset, setOffset] = useState(0)
+
+  const MOVIMIENTOS_COLUMNS = [
+    { key: 'fecha', width: 100 },
+    { key: 'tipo', width: 110 },
+    { key: 'articulo', width: 130 },
+    { key: 'cantidad', width: 100 },
+    { key: 'almacen', width: 120 },
+    { key: 'origen', width: 140 },
+    { key: 'destino', width: 140 },
+    { key: 'notas', width: 180 },
+  ]
+  const { widths: movimientosColWidths, startResize: movimientosStartResize } = useResizableColumns(MOVIMIENTOS_COLUMNS)
 
   useEffect(() => {
     setOffset(0)
@@ -894,17 +985,44 @@ function HistorialMovimientosSection({ warehouse }: { warehouse: string }) {
       ) : (
         <>
           <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {MOVIMIENTOS_COLUMNS.map((c) => <col key={c.key} style={{ width: movimientosColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Tipo</th>
-                <th>Artículo</th>
-                <th style={{ textAlign: 'right' }}>Cantidad</th>
-                <th>Almacén</th>
-                <th>Origen</th>
-                <th>Destino</th>
-                <th>Notas</th>
+                <th>
+                  Fecha
+                  <span className="col-resize-handle" onMouseDown={movimientosStartResize('fecha')} />
+                </th>
+                <th>
+                  Tipo
+                  <span className="col-resize-handle" onMouseDown={movimientosStartResize('tipo')} />
+                </th>
+                <th>
+                  Artículo
+                  <span className="col-resize-handle" onMouseDown={movimientosStartResize('articulo')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Cantidad
+                  <span className="col-resize-handle" onMouseDown={movimientosStartResize('cantidad')} />
+                </th>
+                <th>
+                  Almacén
+                  <span className="col-resize-handle" onMouseDown={movimientosStartResize('almacen')} />
+                </th>
+                <th>
+                  Origen
+                  <span className="col-resize-handle" onMouseDown={movimientosStartResize('origen')} />
+                </th>
+                <th>
+                  Destino
+                  <span className="col-resize-handle" onMouseDown={movimientosStartResize('destino')} />
+                </th>
+                <th>
+                  Notas
+                  <span className="col-resize-handle" onMouseDown={movimientosStartResize('notas')} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -916,7 +1034,7 @@ function HistorialMovimientosSection({ warehouse }: { warehouse: string }) {
                       {m.tipo === 'distribuir' ? 'Distribución' : 'Movimiento'}
                     </span>
                   </td>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{m.itemCode}</td>
+                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{m.itemCode}</td>
                   <td style={{ textAlign: 'right' }}>{m.qty}</td>
                   <td className="td-muted">{m.almacen}</td>
                   <td className="td-muted">{m.ubicacionOrigen ?? '— (almacén general)'}</td>

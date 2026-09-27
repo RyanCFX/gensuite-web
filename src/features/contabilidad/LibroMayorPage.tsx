@@ -13,6 +13,15 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const LIBRO_MAYOR_COLUMNS = [
+  { key: 'fecha', width: 100 },
+  { key: 'documento', width: 160 },
+  { key: 'debito', width: 120 },
+  { key: 'credito', width: 120 },
+  { key: 'saldo', width: 120 },
+]
 
 function firstOfMonth(): string {
   const d = new Date()
@@ -92,6 +101,8 @@ export default function LibroMayorPage() {
   const [account, setAccount] = useState('')
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
+
+  const { widths: colWidths, startResize } = useResizableColumns(LIBRO_MAYOR_COLUMNS)
 
   const [branchQuery, setBranchQuery] = useState('')
   const { data: sucursalesData } = useQuery({
@@ -255,14 +266,32 @@ export default function LibroMayorPage() {
                 </span>
               </div>
               <div className="table-scroll">
-                <table className="data-table navy-table">
+                <table className="data-table navy-table items-table-resizable">
+                  <colgroup>
+                    {LIBRO_MAYOR_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>Fecha</th>
-                      <th>Documento</th>
-                      <th style={{ textAlign: 'right' }}>Débito</th>
-                      <th style={{ textAlign: 'right' }}>Crédito</th>
-                      <th style={{ textAlign: 'right' }}>Saldo</th>
+                      <th>
+                        Fecha
+                        <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+                      </th>
+                      <th>
+                        Documento
+                        <span className="col-resize-handle" onMouseDown={startResize('documento')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Débito
+                        <span className="col-resize-handle" onMouseDown={startResize('debito')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Crédito
+                        <span className="col-resize-handle" onMouseDown={startResize('credito')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Saldo
+                        <span className="col-resize-handle" onMouseDown={startResize('saldo')} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -301,15 +330,15 @@ export default function LibroMayorPage() {
                                   <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{party}</div>
                                 )}
                               </td>
-                              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
+                              <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 12 }}>
                                 {debit > 0 ? formatDOP(debit) : '—'}
                               </td>
-                              <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
+                              <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 12 }}>
                                 {credit > 0 ? formatDOP(credit) : '—'}
                               </td>
                               <td style={{
                                 textAlign: 'right',
-                                fontFamily: 'monospace',
+                                fontFamily: 'var(--font-body)',
                                 fontSize: 12,
                                 color: balance > 0
                                   ? 'var(--success-text)'
@@ -326,11 +355,11 @@ export default function LibroMayorPage() {
                   <tfoot>
                     <tr style={{ fontWeight: 600, borderTop: '2px solid var(--border-strong)' }}>
                       <td colSpan={2} style={{ fontSize: 13 }}>Total período</td>
-                      <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>{formatDOP(cuenta.periodDebit)}</td>
-                      <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>{formatDOP(cuenta.periodCredit)}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>{formatDOP(cuenta.periodDebit)}</td>
+                      <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>{formatDOP(cuenta.periodCredit)}</td>
                       <td style={{
                         textAlign: 'right',
-                        fontFamily: 'monospace',
+                        fontFamily: 'var(--font-body)',
                         fontSize: 13,
                         color: cuenta.closingBalance > 0
                           ? 'var(--success-text)'

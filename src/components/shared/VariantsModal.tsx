@@ -4,6 +4,7 @@ import { listItemVariants } from '@/shared/api/catalog'
 import type { Item } from '@/shared/api/types'
 import { X, Loader2 } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 
@@ -18,7 +19,15 @@ interface VariantsModalProps {
   onClose: () => void
 }
 
+const VARIANTS_COLUMNS = [
+  { key: 'check', width: 32 },
+  { key: 'variante', width: 220 },
+  { key: 'stock', width: 80 },
+  { key: 'cantidad', width: 100 },
+]
+
 export function VariantsModal({ templateItem, onConfirm, onClose }: VariantsModalProps) {
+  const { widths: colWidths, startResize } = useResizableColumns(VARIANTS_COLUMNS)
   const [selections, setSelections] = useState<Map<string, number>>(new Map())
 
   const isDirty = useDirtyCheck(Array.from(selections.entries()), true)
@@ -71,13 +80,22 @@ export function VariantsModal({ templateItem, onConfirm, onClose }: VariantsModa
           ) : !variants?.length ? (
             <p style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 24 }}>Este artículo no tiene variantes configuradas.</p>
           ) : (
-            <table className="table-config" style={{ width: '100%' }}>
+            <table className="table-config items-table-resizable" style={{ width: '100%' }}>
+              <colgroup>
+                {VARIANTS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th style={{ width: 32 }} />
-                  <th>Variante</th>
-                  <th style={{ textAlign: 'right', width: 80 }}>Stock</th>
-                  <th style={{ textAlign: 'right', width: 100 }}>Cantidad</th>
+                  <th />
+                  <th>
+                    Variante
+                    <span className="col-resize-handle" onMouseDown={startResize('variante')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Stock
+                    <span className="col-resize-handle" onMouseDown={startResize('stock')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>Cantidad</th>
                 </tr>
               </thead>
               <tbody>

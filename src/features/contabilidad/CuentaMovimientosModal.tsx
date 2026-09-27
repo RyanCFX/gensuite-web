@@ -5,6 +5,16 @@ import { X, Search } from 'lucide-react'
 import { getCuentaMovimientos, type CuentaMovimientosParams } from '@/shared/api/libroDiario'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { DatePicker } from '@/shared/ui/DatePicker'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const MOVIMIENTOS_COLUMNS = [
+  { key: 'fecha', width: 100 },
+  { key: 'tipo', width: 140 },
+  { key: 'voucher', width: 130 },
+  { key: 'debito', width: 110 },
+  { key: 'credito', width: 110 },
+  { key: 'saldo', width: 130 },
+]
 
 function firstOfMonth(): string {
   const d = new Date()
@@ -37,6 +47,7 @@ export function CuentaMovimientosModal({ accountId, onClose }: Props) {
   const [fromDate, setFromDate] = useState(firstOfMonth())
   const [toDate, setToDate] = useState(today())
   const [queryParams, setQueryParams] = useState<CuentaMovimientosParams>({ fromDate: firstOfMonth(), toDate: today() })
+  const { widths: colWidths, startResize } = useResizableColumns(MOVIMIENTOS_COLUMNS)
 
   const { data, isLoading } = useQuery({
     queryKey: ['cuenta-movimientos', accountId, queryParams],
@@ -90,14 +101,32 @@ export function CuentaMovimientosModal({ accountId, onClose }: Props) {
 
           {/* Table */}
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {MOVIMIENTOS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Fecha</th>
-                  <th>Tipo</th>
-                  <th>Voucher</th>
-                  <th style={{ textAlign: 'right' }}>Débito</th>
-                  <th style={{ textAlign: 'right' }}>Crédito</th>
+                  <th>
+                    Fecha
+                    <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+                  </th>
+                  <th>
+                    Tipo
+                    <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+                  </th>
+                  <th>
+                    Voucher
+                    <span className="col-resize-handle" onMouseDown={startResize('voucher')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Débito
+                    <span className="col-resize-handle" onMouseDown={startResize('debito')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Crédito
+                    <span className="col-resize-handle" onMouseDown={startResize('credito')} />
+                  </th>
                   <th style={{ textAlign: 'right' }}>Saldo acumulado</th>
                 </tr>
               </thead>
@@ -145,13 +174,13 @@ export function CuentaMovimientosModal({ accountId, onClose }: Props) {
                                   )
                                 : <span style={{ fontSize: 12 }}>{row.voucherNo}</span>}
                             </td>
-                            <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 12 }}>
                               {row.debit ? formatDOP(row.debit) : '—'}
                             </td>
-                            <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12 }}>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 12 }}>
                               {row.credit ? formatDOP(row.credit) : '—'}
                             </td>
-                            <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 12, color: balanceColor }}>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 12, color: balanceColor }}>
                               {formatDOP(row.balance)}
                             </td>
                           </tr>
@@ -162,9 +191,9 @@ export function CuentaMovimientosModal({ accountId, onClose }: Props) {
                 <tfoot>
                   <tr style={{ fontWeight: 600, borderTop: '2px solid var(--border-default)' }}>
                     <td colSpan={3} style={{ fontSize: 13 }}>Totales</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>{formatDOP(data.totalDebit)}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>{formatDOP(data.totalCredit)}</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'monospace', fontSize: 13 }}>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>{formatDOP(data.totalDebit)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>{formatDOP(data.totalCredit)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>
                       <span style={{ color: data.closingBalance >= 0 ? 'var(--success-text)' : 'var(--error-text)' }}>
                         {formatDOP(data.closingBalance)}
                       </span>

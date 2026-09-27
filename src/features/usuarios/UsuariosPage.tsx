@@ -29,6 +29,7 @@ import { isApiErrorCode } from '@/shared/api/client'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -88,6 +89,16 @@ export default function UsuariosPage() {
   const [defaultPosProfile, setDefaultPosProfile] = useState('')
   const [defaultPosProfileSearch, setDefaultPosProfileSearch] = useState('')
   const { orderBy, sort } = useSortState()
+
+  const USUARIOS_COLUMNS = [
+    { key: 'email', width: 220 },
+    { key: 'fullName', width: 200 },
+    { key: 'roles', width: 240 },
+    { key: 'lastActive', width: 110 },
+    { key: 'estado', width: 100 },
+    { key: 'actions', width: 48 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(USUARIOS_COLUMNS)
 
   const showForm = inviteOpen || !!editingUser
 
@@ -299,7 +310,7 @@ export default function UsuariosPage() {
       adminCode: adminCode || undefined,
       ...(selectedPerfiles.length > 0 ? { perfiles: selectedPerfiles } : {}),
       branches: isSystemManager ? undefined : selectedBranches,
-      defaultBranch: isSystemManager ? undefined : (defaultBranch || undefined),
+      defaultBranch: defaultBranch || undefined,
       defaultPosProfile: defaultPosProfile || undefined,
     }
     updateMutation.mutate({ email: editingUser.email, data: payload })
@@ -354,15 +365,39 @@ export default function UsuariosPage() {
       <div>
         <div className="card">
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {USUARIOS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <SortableTh label="Email" sortKey="email" orderBy={orderBy} onSort={sort} />
-                  <SortableTh label="Nombre" sortKey="fullName" orderBy={orderBy} onSort={sort} />
-                  <th>Roles</th>
-                  <th>Último acceso</th>
-                  <th>Estado</th>
-                  <th style={{ width: 48 }} />
+                  <SortableTh
+                    label="Email"
+                    sortKey="email"
+                    orderBy={orderBy}
+                    onSort={sort}
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('email')} />}
+                  />
+                  <SortableTh
+                    label="Nombre"
+                    sortKey="fullName"
+                    orderBy={orderBy}
+                    onSort={sort}
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fullName')} />}
+                  />
+                  <th>
+                    Roles
+                    <span className="col-resize-handle" onMouseDown={startResize('roles')} />
+                  </th>
+                  <th>
+                    Último acceso
+                    <span className="col-resize-handle" onMouseDown={startResize('lastActive')} />
+                  </th>
+                  <th>
+                    Estado
+                    <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+                  </th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -399,7 +434,7 @@ export default function UsuariosPage() {
                         )
                       : data?.items.map((u) => (
                           <tr key={u.email}>
-                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{u.email}</td>
+                            <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{u.email}</td>
                             <td style={{ fontWeight: 500 }}>
                               {u.fullName}
                               {u.isDefault && <span className="badge badge-info" style={{ marginLeft: 6, fontSize: 10 }}>Por defecto</span>}
@@ -631,63 +666,66 @@ export default function UsuariosPage() {
                     </label>
                   </div>
                 ) : (
-                  <>
-                    <div className="ff-wrap">
-                      <label className="ff-label">
-                        Sucursales asignadas
-                        <FieldTooltip>El usuario solo podrá crear documentos desde estas sucursales.</FieldTooltip>
-                      </label>
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: 8,
-                        maxHeight: 160,
-                        overflowY: 'auto',
-                        border: '1px solid var(--border-default)',
-                        borderRadius: 'var(--radius-md)',
-                        padding: 12,
-                      }}>
-                        {sucursales.length === 0 ? (
-                          <p style={{ fontSize: 13, color: 'var(--text-tertiary)', gridColumn: '1 / -1' }}>
-                            No hay sucursales configuradas.
-                          </p>
-                        ) : (
-                          sucursales.map((s) => (
-                            <label key={s.id} className="ff-check-wrap">
-                              <input
-                                type="checkbox"
-                                className="ff-check"
-                                checked={selectedBranches.includes(s.name)}
-                                onChange={() =>
-                                  setSelectedBranches((prev) =>
-                                    prev.includes(s.name)
-                                      ? prev.filter((x) => x !== s.name)
-                                      : [...prev, s.name],
-                                  )
-                                }
-                              />
-                              <span style={{ fontSize: 13 }}>{s.name}</span>
-                            </label>
-                          ))
-                        )}
-                      </div>
+                  <div className="ff-wrap">
+                    <label className="ff-label">
+                      Sucursales asignadas
+                      <FieldTooltip>El usuario solo podrá crear documentos desde estas sucursales.</FieldTooltip>
+                    </label>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 8,
+                      maxHeight: 160,
+                      overflowY: 'auto',
+                      border: '1px solid var(--border-default)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: 12,
+                    }}>
+                      {sucursales.length === 0 ? (
+                        <p style={{ fontSize: 13, color: 'var(--text-tertiary)', gridColumn: '1 / -1' }}>
+                          No hay sucursales configuradas.
+                        </p>
+                      ) : (
+                        sucursales.map((s) => (
+                          <label key={s.id} className="ff-check-wrap">
+                            <input
+                              type="checkbox"
+                              className="ff-check"
+                              checked={selectedBranches.includes(s.name)}
+                              onChange={() =>
+                                setSelectedBranches((prev) =>
+                                  prev.includes(s.name)
+                                    ? prev.filter((x) => x !== s.name)
+                                    : [...prev, s.name],
+                                )
+                              }
+                            />
+                            <span style={{ fontSize: 13 }}>{s.name}</span>
+                          </label>
+                        ))
+                      )}
                     </div>
-
-                    <div className="ff-wrap">
-                      <label className="ff-label">Sucursal por defecto</label>
-                      <SearchSelect
-                        value={defaultBranch}
-                        onChange={setDefaultBranch}
-                        options={selectedBranches
-                          .filter((b) => !defaultBranchSearch || b.toLowerCase().includes(defaultBranchSearch.toLowerCase()))
-                          .map((b): SearchSelectOption => ({ value: b, label: b }))}
-                        onSearch={setDefaultBranchSearch}
-                        selectedLabel={defaultBranch}
-                        placeholder="Sin sucursal por defecto"
-                      />
-                    </div>
-                  </>
+                  </div>
                 )}
+
+                <div className="ff-wrap">
+                  <label className="ff-label">
+                    Sucursal por defecto
+                    {isSystemManager && (
+                      <FieldTooltip>Se preselecciona al crear documentos, pero se puede cambiar en cada documento.</FieldTooltip>
+                    )}
+                  </label>
+                  <SearchSelect
+                    value={defaultBranch}
+                    onChange={setDefaultBranch}
+                    options={(isSystemManager ? sucursales.map((s) => s.name) : selectedBranches)
+                      .filter((b) => !defaultBranchSearch || b.toLowerCase().includes(defaultBranchSearch.toLowerCase()))
+                      .map((b): SearchSelectOption => ({ value: b, label: b }))}
+                    onSearch={setDefaultBranchSearch}
+                    selectedLabel={defaultBranch}
+                    placeholder="Sin sucursal por defecto"
+                  />
+                </div>
 
                 <div className="ff-wrap">
                   <label className="ff-label">

@@ -30,6 +30,16 @@ import { PagoContadoModal } from '@/components/shared/PagoContadoModal'
 import { ECF_SUBMIT_UNAVAILABLE_MSG } from '@/shared/api/ecf'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import type { FormatoImpresion, ImpuestoDistribucionDto, EcfSubmitResult, ApiError, PagoContadoDto } from '@/shared/api/types'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_COLUMNS = [
+  { key: 'codigo', width: 100 },
+  { key: 'descripcion', width: 220 },
+  { key: 'almacen', width: 130 },
+  { key: 'qty', width: 90 },
+  { key: 'precio', width: 110 },
+  { key: 'subtotal', width: 120 },
+]
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'delete' | null
 
@@ -38,6 +48,7 @@ export default function CompraDetail() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const isSystemManager = useIsSystemManager()
+  const { widths: itemsColWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [showAsientosPreview, setShowAsientosPreview] = useState(false)
@@ -408,7 +419,7 @@ export default function CompraDetail() {
             {compra.esProveedorOcasional && compra.proveedorOcasionalRnc && (
               <div className="detail-field">
                 <span className="detail-label">RNC/Cédula</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{compra.proveedorOcasionalRnc}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{compra.proveedorOcasionalRnc}</span>
               </div>
             )}
             <div className="detail-field">
@@ -426,13 +437,13 @@ export default function CompraDetail() {
                   {(compra.impuestos ?? []).map((imp, idx) => (
                     <span key={`${imp.id}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
                       <span>{imp.id} ({imp.tasa}%)</span>
-                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{fmtMonto(imp.monto)}</strong>
+                      <strong style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{fmtMonto(imp.monto)}</strong>
                     </span>
                   ))}
                   {compra.taxAmount != null && (
                     <span style={{ display: 'flex', justifyContent: 'space-between', gap: 16, borderTop: '1px solid var(--border-default)', paddingTop: 4 }}>
                       <span style={{ color: 'var(--text-secondary)' }}>Total impuestos</span>
-                      <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{formatDOP(compra.taxAmount)}</strong>
+                      <strong style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{formatDOP(compra.taxAmount)}</strong>
                     </span>
                   )}
                 </span>
@@ -447,13 +458,13 @@ export default function CompraDetail() {
                     return (
                       <span key={r.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
                         <span>{opt?.categoryName ?? r.id} ({r.tasa}%)</span>
-                        <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{fmtMonto(r.monto)}</strong>
+                        <strong style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{fmtMonto(r.monto)}</strong>
                       </span>
                     )
                   })}
                   <span style={{ display: 'flex', justifyContent: 'space-between', gap: 16, borderTop: '1px solid var(--border-default)', paddingTop: 4 }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Total retenciones</span>
-                    <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                    <strong style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
                       {formatDOP((compra.retenciones ?? []).reduce((s, r) => s + (r.monto ?? 0), 0))}
                     </strong>
                   </span>
@@ -493,25 +504,43 @@ export default function CompraDetail() {
 
         {/* Items */}
         <div className="card">
-          <div className="card-header">
-            <span className="card-title">Artículos</span>
-          </div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Código</th>
-                  <th>Descripción</th>
-                  <th>Almacén</th>
-                  <th style={{ textAlign: 'right' }}>Qty</th>
-                  <th style={{ textAlign: 'right' }}>Precio</th>
-                  <th style={{ textAlign: 'right' }}>Subtotal</th>
+                  <th>
+                    Código
+                    <span className="col-resize-handle" onMouseDown={startResize('codigo')} />
+                  </th>
+                  <th>
+                    Descripción
+                    <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                  </th>
+                  <th>
+                    Almacén
+                    <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Qty
+                    <span className="col-resize-handle" onMouseDown={startResize('qty')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Precio
+                    <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Subtotal
+                    <span className="col-resize-handle" onMouseDown={startResize('subtotal')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {compra.items.map((item, i) => (
                   <tr key={i}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{item.itemCode}</td>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode}</td>
                     <td>
                       {item.itemCode}
                       {item.cuentaContable && (
@@ -544,11 +573,11 @@ export default function CompraDetail() {
           <div className="fields-grid fields-grid-3">
             <div className="detail-field">
               <span className="detail-label">NCF Proveedor</span>
-              <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{compra.ncfProveedor ?? '—'}</span>
+              <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{compra.ncfProveedor ?? '—'}</span>
             </div>
             <div className="detail-field">
               <span className="detail-label">N° Factura del Proveedor</span>
-              <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{compra.billNo ?? '—'}</span>
+              <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{compra.billNo ?? '—'}</span>
             </div>
             <div className="detail-field">
               <span className="detail-label">Tipo de Bienes</span>

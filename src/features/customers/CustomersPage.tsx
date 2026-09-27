@@ -16,6 +16,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
 
@@ -39,6 +40,17 @@ export default function CustomersPage() {
   const [toDisable, setToDisable] = useState<Customer | null>(null)
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
+
+  const COLUMNS = [
+    { key: 'nombre', width: 220 },
+    { key: 'identificacion', width: 140 },
+    { key: 'tipo', width: 110 },
+    { key: 'grupo', width: 140 },
+    { key: 'credito', width: 90 },
+    { key: 'estado', width: 100 },
+    { key: 'actions', width: 48 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const debouncedCustomerName = useDebounce(customerName, 300)
   const debouncedIdentificacion = useDebounce(identificacion, 300)
@@ -202,16 +214,40 @@ export default function CustomersPage() {
 
       <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table navy-table">
+        <table className="data-table navy-table items-table-resizable">
+          <colgroup>
+            {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <SortableTh label="Nombre" sortKey="customerName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-              <th>RNC / Cédula</th>
-              <th>Tipo</th>
-              <th>Grupo</th>
-              <th>Crédito</th>
-              <th>Estado</th>
-              <th style={{ width: 48 }} />
+              <SortableTh
+                label="Nombre"
+                sortKey="customerName"
+                orderBy={orderBy}
+                onSort={(k) => { sort(k); setPage(1) }}
+                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('nombre')} />}
+              />
+              <th>
+                RNC / Cédula
+                <span className="col-resize-handle" onMouseDown={startResize('identificacion')} />
+              </th>
+              <th>
+                Tipo
+                <span className="col-resize-handle" onMouseDown={startResize('tipo')} />
+              </th>
+              <th>
+                Grupo
+                <span className="col-resize-handle" onMouseDown={startResize('grupo')} />
+              </th>
+              <th>
+                Crédito
+                <span className="col-resize-handle" onMouseDown={startResize('credito')} />
+              </th>
+              <th>
+                Estado
+                <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+              </th>
+              <th />
             </tr>
           </thead>
           <tbody>

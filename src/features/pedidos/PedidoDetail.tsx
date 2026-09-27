@@ -15,6 +15,19 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ESTADO_FLUJO_BADGE, ESTADO_FLUJO_LABEL } from './estadoFlujo'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_COLUMNS = [
+  { key: 'codigo', width: 100 },
+  { key: 'descripcion', width: 220 },
+  { key: 'notas', width: 160 },
+  { key: 'cantidad', width: 90 },
+  { key: 'precio', width: 110 },
+  { key: 'descuento', width: 72 },
+  { key: 'importe', width: 110 },
+  { key: 'impuesto', width: 100 },
+  { key: 'udm', width: 90 },
+]
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -37,6 +50,7 @@ export default function PedidoDetail() {
   const [apartadoReason, setApartadoReason] = useState('')
   const [apartadoRemanente, setApartadoRemanente] = useState<'' | 'saldo_favor' | 'devolucion'>('')
   const [apartadoModeOfPayment, setApartadoModeOfPayment] = useState('')
+  const { widths: itemsColWidths, startResize: startItemsResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const { data: pedido, isLoading } = useQuery({
     queryKey: ['pedido', id],
@@ -370,7 +384,7 @@ export default function PedidoDetail() {
             {pedido.esClienteOcasional && pedido.clienteOcasionalRnc && (
               <div className="detail-field">
                 <span className="detail-label">RNC / Cédula</span>
-                <span className="detail-value" style={{ fontFamily: 'monospace' }}>{pedido.clienteOcasionalRnc}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{pedido.clienteOcasionalRnc}</span>
               </div>
             )}
             {pedido.esClienteOcasional && pedido.clienteOcasionalDireccion && (
@@ -404,26 +418,55 @@ export default function PedidoDetail() {
       </div>
 
       <div className="card">
-        <div className="card-header"><h2 className="card-title">Artículos</h2></div>
         <div className="items-table-wrap">
-          <table className="items-table">
+          <table className="items-table items-table-resizable">
+            <colgroup>
+              {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <th>Código</th>
-                <th>Descripción</th>
-                <th>Notas</th>
-                <th style={{ textAlign: 'right' }}>Cant.</th>
-                <th style={{ textAlign: 'right' }}>Precio Unit.</th>
-                <th style={{ textAlign: 'right', width: 72 }}>Dto. %</th>
-                <th style={{ textAlign: 'right' }}>Importe</th>
-                <th style={{ textAlign: 'right' }}>Impuesto</th>
-                <th>UDM</th>
+                <th>
+                  Código
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('codigo')} />
+                </th>
+                <th>
+                  Descripción
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('descripcion')} />
+                </th>
+                <th>
+                  Notas
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('notas')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Cant.
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('cantidad')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Precio Unit.
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('precio')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Dto. %
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('descuento')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Importe
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('importe')} />
+                </th>
+                <th style={{ textAlign: 'right' }}>
+                  Impuesto
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('impuesto')} />
+                </th>
+                <th>
+                  UDM
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('udm')} />
+                </th>
               </tr>
             </thead>
             <tbody>
               {pedido.items.map((item, i) => (
                 <tr key={i}>
-                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{item.itemCode || '—'}</td>
+                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode || '—'}</td>
                   <td>{item.description || '—'}</td>
                   <td style={{ fontSize: 12, color: 'var(--text-tertiary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.notes ?? ''}>{item.notes ?? '—'}</td>
                   <td style={{ textAlign: 'right' }}>{item.qty}</td>

@@ -7,8 +7,30 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Send, X } from 'lucide-react'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 type ConfirmAction = 'submit' | 'cancel' | null
+
+const RECEIPTS_COLUMNS = [
+  { key: 'tipo', width: 200 },
+  { key: 'documento', width: 200 },
+]
+
+const TAXES_COLUMNS = [
+  { key: 'descripcion', width: 220 },
+  { key: 'monto', width: 120 },
+  { key: 'cuenta', width: 200 },
+]
+
+const ITEMS_COLUMNS = [
+  { key: 'codigo', width: 100 },
+  { key: 'descripcion', width: 200 },
+  { key: 'documento', width: 200 },
+  { key: 'qty', width: 90 },
+  { key: 'precio', width: 110 },
+  { key: 'monto', width: 110 },
+  { key: 'cargos', width: 140 },
+]
 
 export default function CostoImportacionDetail() {
   const { id } = useParams<{ id: string }>()
@@ -16,6 +38,9 @@ export default function CostoImportacionDetail() {
   const queryClient = useQueryClient()
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
+  const { widths: receiptsColWidths, startResize: startResizeReceipts } = useResizableColumns(RECEIPTS_COLUMNS)
+  const { widths: taxesColWidths, startResize: startResizeTaxes } = useResizableColumns(TAXES_COLUMNS)
+  const { widths: itemsColWidths, startResize: startResizeItems } = useResizableColumns(ITEMS_COLUMNS)
 
   const { data: costo, isLoading, isError } = useQuery({
     queryKey: ['costo-importacion', id],
@@ -135,11 +160,20 @@ export default function CostoImportacionDetail() {
             <span className="card-title">Documentos de Recepción</span>
           </div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {RECEIPTS_COLUMNS.map((c) => <col key={c.key} style={{ width: receiptsColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Tipo de Documento</th>
-                  <th>ID del Documento</th>
+                  <th>
+                    Tipo de Documento
+                    <span className="col-resize-handle" onMouseDown={startResizeReceipts('tipo')} />
+                  </th>
+                  <th>
+                    ID del Documento
+                    <span className="col-resize-handle" onMouseDown={startResizeReceipts('documento')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -153,7 +187,7 @@ export default function CostoImportacionDetail() {
                   costo.purchaseReceipts.map((r, i) => (
                     <tr key={i}>
                       <td>{r.receiptDocumentType}</td>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{r.receiptDocument}</td>
+                      <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{r.receiptDocument}</td>
                     </tr>
                   ))
                 )}
@@ -168,12 +202,24 @@ export default function CostoImportacionDetail() {
             <span className="card-title">Impuestos y Cargos</span>
           </div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {TAXES_COLUMNS.map((c) => <col key={c.key} style={{ width: taxesColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Descripción</th>
-                  <th style={{ textAlign: 'right' }}>Monto</th>
-                  <th>Cuenta de Gasto</th>
+                  <th>
+                    Descripción
+                    <span className="col-resize-handle" onMouseDown={startResizeTaxes('descripcion')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Monto
+                    <span className="col-resize-handle" onMouseDown={startResizeTaxes('monto')} />
+                  </th>
+                  <th>
+                    Cuenta de Gasto
+                    <span className="col-resize-handle" onMouseDown={startResizeTaxes('cuenta')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -201,22 +247,46 @@ export default function CostoImportacionDetail() {
               <span className="card-title">Artículos Prorrateados</span>
             </div>
             <div className="table-scroll">
-              <table className="data-table">
+              <table className="data-table items-table-resizable">
+                <colgroup>
+                  {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Código</th>
-                    <th>Descripción</th>
-                    <th>Documento de Recepción</th>
-                    <th style={{ textAlign: 'right' }}>Qty</th>
-                    <th style={{ textAlign: 'right' }}>Precio</th>
-                    <th style={{ textAlign: 'right' }}>Monto</th>
-                    <th style={{ textAlign: 'right' }}>Cargos Aplicables</th>
+                    <th>
+                      Código
+                      <span className="col-resize-handle" onMouseDown={startResizeItems('codigo')} />
+                    </th>
+                    <th>
+                      Descripción
+                      <span className="col-resize-handle" onMouseDown={startResizeItems('descripcion')} />
+                    </th>
+                    <th>
+                      Documento de Recepción
+                      <span className="col-resize-handle" onMouseDown={startResizeItems('documento')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Qty
+                      <span className="col-resize-handle" onMouseDown={startResizeItems('qty')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Precio
+                      <span className="col-resize-handle" onMouseDown={startResizeItems('precio')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Monto
+                      <span className="col-resize-handle" onMouseDown={startResizeItems('monto')} />
+                    </th>
+                    <th style={{ textAlign: 'right' }}>
+                      Cargos Aplicables
+                      <span className="col-resize-handle" onMouseDown={startResizeItems('cargos')} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {costo.items.map((item, i) => (
                     <tr key={i}>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{item.itemCode}</td>
+                      <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode}</td>
                       <td>{item.description ?? item.itemCode}</td>
                       <td className="td-muted" style={{ fontSize: 12 }}>
                         {item.receiptDocumentType} · {item.receiptDocument}

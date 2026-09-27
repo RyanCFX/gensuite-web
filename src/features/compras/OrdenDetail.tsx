@@ -21,6 +21,18 @@ import { QtyInput } from '@/shared/ui/QtyInput'
 import type { CreateInvoiceFromOrdenDto, ReceiptFromOrdenItemOverrideDto, DimensionesLinea } from '@/shared/api/types'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const ITEMS_COLUMNS = [
+  { key: 'codigo', width: 110 },
+  { key: 'qty', width: 100 },
+  { key: 'precio', width: 110 },
+  { key: 'subtotal', width: 120 },
+  { key: 'recibido', width: 100 },
+  { key: 'facturado', width: 110 },
+  { key: 'almacen', width: 130 },
+  { key: 'origen', width: 130 },
+]
 
 type ConfirmAction = 'submit' | 'cancel' | 'amend' | 'cerrar' | 'reabrir' | 'enEspera' | null
 
@@ -44,6 +56,7 @@ export default function OrdenDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { widths: itemsColWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [showRecibir, setShowRecibir] = useState(false)
@@ -362,27 +375,51 @@ export default function OrdenDetail() {
         </div>
 
         <div className="card">
-          <div className="card-header">
-            <span className="card-title">Artículos</span>
-          </div>
           <div className="table-scroll">
-            <table className="data-table">
+            <table className="data-table items-table-resizable">
+              <colgroup>
+                {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Código</th>
-                  <th style={{ textAlign: 'right' }}>Qty</th>
-                  <th style={{ textAlign: 'right' }}>Precio</th>
-                  <th style={{ textAlign: 'right' }}>Subtotal</th>
-                  <th style={{ textAlign: 'right' }}>Recibido</th>
-                  <th style={{ textAlign: 'right' }}>Facturado</th>
-                  <th>Almacén</th>
-                  <th>Origen</th>
+                  <th>
+                    Código
+                    <span className="col-resize-handle" onMouseDown={startResize('codigo')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Qty
+                    <span className="col-resize-handle" onMouseDown={startResize('qty')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Precio
+                    <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Subtotal
+                    <span className="col-resize-handle" onMouseDown={startResize('subtotal')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Recibido
+                    <span className="col-resize-handle" onMouseDown={startResize('recibido')} />
+                  </th>
+                  <th style={{ textAlign: 'right' }}>
+                    Facturado
+                    <span className="col-resize-handle" onMouseDown={startResize('facturado')} />
+                  </th>
+                  <th>
+                    Almacén
+                    <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                  </th>
+                  <th>
+                    Origen
+                    <span className="col-resize-handle" onMouseDown={startResize('origen')} />
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {orden.items.map((item) => (
                   <tr key={item.id}>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{item.itemCode}</td>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode}</td>
                     <td style={{ textAlign: 'right' }}>{item.qty} {item.uom}</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
                     <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(item.amount)}</td>
@@ -691,7 +728,7 @@ function RecibirModal({ items, loading, onClose, onConfirm }: RecibirModalProps)
                 <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
                     <div style={{ flex: 1 }}>
-                      <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)', fontSize: 13 }}>{line.itemCode}</span>
+                      <span style={{ fontWeight: 500, fontFamily: 'var(--font-body)', fontSize: 13 }}>{line.itemCode}</span>
                       <p style={{ fontSize: 11, color: 'var(--text-tertiary)', margin: 0 }}>Remanente: {line.remanente} {line.uom}</p>
                     </div>
                     <div className="ff-wrap" style={{ width: 140, margin: 0 }}>

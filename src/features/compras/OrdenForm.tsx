@@ -27,6 +27,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -104,6 +105,18 @@ export default function OrdenForm() {
   const [taxesTemplate, setTaxesTemplate] = useState('')
   const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem(defaultWh)])
+  const ITEMS_COLUMNS = [
+    { key: 'articulo', width: 220 },
+    { key: 'descripcion', width: 220 },
+    { key: 'cant', width: 80 },
+    { key: 'precio', width: 120 },
+    { key: 'descuento', width: 80 },
+    { key: 'almacen', width: 160 },
+    { key: 'udm', width: 120 },
+    { key: 'combination', width: 160 },
+    { key: 'actions', width: 40 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
   const [branch, setBranch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
@@ -317,6 +330,22 @@ export default function OrdenForm() {
     }
     if (hasError) return
 
+    // Dimensiones (§5/§11 del doc): toda línea cuyo artículo USE dimensiones exige la combinación
+    // completa antes de guardar — si falta, el servidor rechaza con un 400 por línea.
+    let hasDimensionError = false
+    items.forEach((item, itemIdx) => {
+      const declaradas = item.itemDimensionesDeclaradas ?? []
+      if (item.itemCode && declaradas.length > 0 && !combinacionCompleta(declaradas, item.dimensiones ?? {})) {
+        hasDimensionError = true
+        const faltantes = declaradas.filter((d) => !(item.dimensiones ?? {})[d.dimension]).map((d) => d.dimension).join(', ')
+        setItems((prev) => prev.map((r, i) => i === itemIdx ? { ...r, lineError: `Fila ${itemIdx + 1}: indique la combinación completa${faltantes ? ` (falta: ${faltantes})` : ''}` } : r))
+      }
+    })
+    if (hasDimensionError) {
+      toast.error('Hay líneas con combinación de dimensión incompleta — revíselas en la columna de dimensión.')
+      return
+    }
+
     const dto: CreateOrdenCompraDto = {
       supplier: supplierId,
       transactionDate,
@@ -362,6 +391,18 @@ export default function OrdenForm() {
         dimensiones: undefined,
       }
     }))
+    // El picker puede no traer `dimensiones` — solo el detalle las garantiza (§4.3). Si faltan,
+    // se completan para habilitar la columna de dimensión.
+    if (!catalogItem.dimensiones || catalogItem.dimensiones.length === 0) {
+      getItem(catalogItem.id).then((detail) => {
+        if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
+        setItems((prev) => prev.map((row, i) =>
+          i === idx && row.itemCode === catalogItem.id && !(row.itemDimensionesDeclaradas?.length)
+            ? { ...row, itemDimensionesDeclaradas: detail.dimensiones }
+            : row,
+        ))
+      }).catch(() => {})
+    }
   }, [])
 
   const clearCatalogItem = useCallback((idx: number) => {
@@ -501,18 +542,45 @@ export default function OrdenForm() {
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
-                <table className="items-table">
+                <table className="items-table items-table-resizable">
+                  <colgroup>
+                    {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ minWidth: 180 }}>Artículo</th>
-                      <th>Descripción</th>
-                      <th style={{ width: '9%', textAlign: 'right' }}>Qty</th>
-                      <th style={{ width: '12%', textAlign: 'right' }}>Precio</th>
-                      <th style={{ width: '8%', textAlign: 'right' }}>Desc. %</th>
-                      <th style={{ width: '14%' }}>Almacén</th>
-                      <th style={{ width: '8%' }}>UOM</th>
-                      <th style={{ width: '12%' }}>Combinación</th>
-                      <th style={{ width: '40px' }} />
+                      <th>
+                        Artículo
+                        <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                      </th>
+                      <th>
+                        Descripción
+                        <span className="col-resize-handle" onMouseDown={startResize('descripcion')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Qty
+                        <span className="col-resize-handle" onMouseDown={startResize('cant')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Precio
+                        <span className="col-resize-handle" onMouseDown={startResize('precio')} />
+                      </th>
+                      <th style={{ textAlign: 'right' }}>
+                        Desc. %
+                        <span className="col-resize-handle" onMouseDown={startResize('descuento')} />
+                      </th>
+                      <th>
+                        Almacén
+                        <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+                      </th>
+                      <th>
+                        UOM
+                        <span className="col-resize-handle" onMouseDown={startResize('udm')} />
+                      </th>
+                      <th>
+                        Combinación
+                        <span className="col-resize-handle" onMouseDown={startResize('combination')} />
+                      </th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
@@ -619,11 +687,11 @@ export default function OrdenForm() {
                     ))}
                   </tbody>
                 </table>
-                <div className="items-total-row">
-                  <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
-                    <span>Total</span>
-                    <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: currency || 'DOP' }).format(grandTotal)}</strong>
-                  </div>
+              </div>
+              <div className="items-total-row">
+                <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
+                  <span>Total</span>
+                  <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: currency || 'DOP' }).format(grandTotal)}</strong>
                 </div>
               </div>
             </div>

@@ -62,7 +62,7 @@ export function ItemDetailModal({ itemCode, onClose }: { itemCode: string; onClo
                   {item.itemName}
                 </h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{item.id}</span>
+                  <span style={{ fontSize: 12, fontFamily: 'var(--font-body)', color: 'var(--text-tertiary)' }}>{item.id}</span>
                   {item.disabled
                     ? <span className="badge badge-neutral">Inactivo</span>
                     : <span className="badge badge-success">Activo</span>}

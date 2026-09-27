@@ -10,6 +10,35 @@ import type { Invoice, EstadoCuentaResponse } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useFeature } from '@/shared/features/can'
 import { Pencil, Ban, Building2, User, ArrowLeft, Wallet, Receipt, X, FileText, Download, Eye, EyeOff } from 'lucide-react'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const CREDIT_NOTES_COLUMNS = [
+  { key: 'ncf', width: 120 },
+  { key: 'fecha', width: 100 },
+  { key: 'total', width: 110 },
+  { key: 'reembolsado', width: 110 },
+  { key: 'disponible', width: 110 },
+  { key: 'aplicadaA', width: 220 },
+]
+
+const RECENT_INVOICES_COLUMNS = [
+  { key: 'estado', width: 100 },
+  { key: 'numero', width: 100 },
+  { key: 'ncf', width: 120 },
+  { key: 'fecha', width: 100 },
+  { key: 'total', width: 110 },
+]
+
+const DOCUMENTOS_PENDIENTES_COLUMNS = [
+  { key: 'fecha', width: 100 },
+  { key: 'numero', width: 110 },
+  { key: 'comprobante', width: 130 },
+  { key: 'vence', width: 100 },
+  { key: 'monto', width: 110 },
+  { key: 'aplicado', width: 110 },
+  { key: 'saldo', width: 110 },
+  { key: 'dias', width: 90 },
+]
 
 function SemaforoIndicator({ customerId }: { customerId: string }) {
   const { data: entry } = useQuery({
@@ -89,6 +118,8 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
     },
   })
 
+  const { widths: colWidths, startResize } = useResizableColumns(CREDIT_NOTES_COLUMNS)
+
   if (!saldo || saldo.entries.length === 0) return null
 
   return (
@@ -109,21 +140,42 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
         </div>
       </div>
       <div className="table-scroll">
-        <table className="data-table">
+        <table className="data-table items-table-resizable">
+          <colgroup>
+            {CREDIT_NOTES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+          </colgroup>
           <thead>
             <tr>
-              <th>NCF</th>
-              <th>Fecha</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
-              <th style={{ textAlign: 'right' }}>Reembolsado</th>
-              <th style={{ textAlign: 'right' }}>Disponible</th>
-              <th>Aplicada a</th>
+              <th>
+                NCF
+                <span className="col-resize-handle" onMouseDown={startResize('ncf')} />
+              </th>
+              <th>
+                Fecha
+                <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Total
+                <span className="col-resize-handle" onMouseDown={startResize('total')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Reembolsado
+                <span className="col-resize-handle" onMouseDown={startResize('reembolsado')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Disponible
+                <span className="col-resize-handle" onMouseDown={startResize('disponible')} />
+              </th>
+              <th>
+                Aplicada a
+                <span className="col-resize-handle" onMouseDown={startResize('aplicadaA')} />
+              </th>
             </tr>
           </thead>
           <tbody>
             {saldo.entries.map((entry) => (
               <tr key={entry.creditNoteId}>
-                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{entry.ncf ?? entry.creditNoteId}</td>
+                <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{entry.ncf ?? entry.creditNoteId}</td>
                 <td className="td-muted">{formatDate(entry.postingDate)}</td>
                 <td style={{ textAlign: 'right' }}>{formatDOP(entry.grandTotal)}</td>
                 <td style={{ textAlign: 'right' }}>{formatDOP(entry.refundedAmount)}</td>
@@ -139,7 +191,7 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
                         <div key={a.invoiceId} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
                           <span>
                             <button
-                              style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
+                              style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
                               onClick={() => navigate(`/facturas/${a.invoiceId}`)}
                             >
                               {a.invoiceId}
@@ -175,6 +227,7 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
 }
 
 function RecentInvoices({ customerId }: { customerId: string }) {
+  const { widths: colWidths, startResize } = useResizableColumns(RECENT_INVOICES_COLUMNS)
   const { data, isLoading } = useQuery({
     queryKey: ['customer-invoices', customerId],
     queryFn: async () => {
@@ -209,22 +262,40 @@ function RecentInvoices({ customerId }: { customerId: string }) {
 
   return (
     <div className="table-scroll">
-      <table className="data-table">
+      <table className="data-table items-table-resizable">
+        <colgroup>
+          {RECENT_INVOICES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+        </colgroup>
         <thead>
           <tr>
-            <th>Estado</th>
-            <th>#</th>
-            <th>NCF</th>
-            <th>Fecha</th>
-            <th style={{ textAlign: 'right' }}>Total</th>
+            <th>
+              Estado
+              <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+            </th>
+            <th>
+              #
+              <span className="col-resize-handle" onMouseDown={startResize('numero')} />
+            </th>
+            <th>
+              NCF
+              <span className="col-resize-handle" onMouseDown={startResize('ncf')} />
+            </th>
+            <th>
+              Fecha
+              <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
+            </th>
+            <th style={{ textAlign: 'right' }}>
+              Total
+              <span className="col-resize-handle" onMouseDown={startResize('total')} />
+            </th>
           </tr>
         </thead>
         <tbody>
           {data.map((inv) => (
             <tr key={inv.id}>
               <td>{statusBadge(inv.status)}</td>
-              <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{inv.id}</td>
-              <td className="td-muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>{inv.ncf ?? '—'}</td>
+              <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{inv.id}</td>
+              <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{inv.ncf ?? '—'}</td>
               <td className="td-muted">{formatDate(inv.postingDate)}</td>
               <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(inv.grandTotal)}</td>
             </tr>
@@ -247,6 +318,12 @@ function EstadoCuentaPreview({
   isLoading: boolean
 }) {
   const [showPreview, setShowPreview] = useState(true)
+  const { widths: docsColWidths, startResize: startDocsResize } = useResizableColumns(DOCUMENTOS_PENDIENTES_COLUMNS)
+  const agingColumns = (data?.aging ?? []).map((bucket) => ({ key: `bucket-${bucket.label}`, width: 100 }))
+  const { widths: agingColWidths, startResize: startAgingResize } = useResizableColumns([
+    ...agingColumns,
+    { key: 'total', width: 110 },
+  ])
 
   const phone = data?.telefono ?? data?.cliente?.telefono ?? 'No especificado'
   const isDataValid = data && typeof data.empresa === 'string' && data.cliente && Array.isArray(data.documentos)
@@ -322,25 +399,52 @@ function EstadoCuentaPreview({
                   Documentos Pendientes
                 </h3>
                 <div className="table-scroll">
-                  <table className="data-table">
+                  <table className="data-table items-table-resizable">
+                    <colgroup>
+                      {DOCUMENTOS_PENDIENTES_COLUMNS.map((c) => <col key={c.key} style={{ width: docsColWidths[c.key] }} />)}
+                    </colgroup>
                     <thead>
                       <tr>
-                        <th>Fecha</th>
-                        <th>Número</th>
-                        <th>Comprobante</th>
-                        <th>Vence</th>
-                        <th style={{ textAlign: 'right' }}>Monto</th>
-                        <th style={{ textAlign: 'right' }}>Aplicado</th>
-                        <th style={{ textAlign: 'right' }}>Saldo</th>
-                        <th style={{ textAlign: 'right' }}>Días</th>
+                        <th>
+                          Fecha
+                          <span className="col-resize-handle" onMouseDown={startDocsResize('fecha')} />
+                        </th>
+                        <th>
+                          Número
+                          <span className="col-resize-handle" onMouseDown={startDocsResize('numero')} />
+                        </th>
+                        <th>
+                          Comprobante
+                          <span className="col-resize-handle" onMouseDown={startDocsResize('comprobante')} />
+                        </th>
+                        <th>
+                          Vence
+                          <span className="col-resize-handle" onMouseDown={startDocsResize('vence')} />
+                        </th>
+                        <th style={{ textAlign: 'right' }}>
+                          Monto
+                          <span className="col-resize-handle" onMouseDown={startDocsResize('monto')} />
+                        </th>
+                        <th style={{ textAlign: 'right' }}>
+                          Aplicado
+                          <span className="col-resize-handle" onMouseDown={startDocsResize('aplicado')} />
+                        </th>
+                        <th style={{ textAlign: 'right' }}>
+                          Saldo
+                          <span className="col-resize-handle" onMouseDown={startDocsResize('saldo')} />
+                        </th>
+                        <th style={{ textAlign: 'right' }}>
+                          Días
+                          <span className="col-resize-handle" onMouseDown={startDocsResize('dias')} />
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.documentos.map((doc, i) => (
                         <tr key={i}>
                           <td>{formatDate(doc.fecha)}</td>
-                          <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{doc.numero}</td>
-                          <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{doc.comprobante}</td>
+                          <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{doc.numero}</td>
+                          <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{doc.comprobante}</td>
                           <td>{formatDate(doc.vence)}</td>
                           <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(doc.monto)}</td>
                           <td style={{ textAlign: 'right' }}>{formatDOP(doc.aplicado)}</td>
@@ -368,13 +472,23 @@ function EstadoCuentaPreview({
                 Antigüedad de Saldos
               </h3>
               <div className="table-scroll">
-                <table className="data-table">
+                <table className="data-table items-table-resizable">
+                  <colgroup>
+                    {agingColumns.map((c) => <col key={c.key} style={{ width: agingColWidths[c.key] }} />)}
+                    <col style={{ width: agingColWidths['total'] }} />
+                  </colgroup>
                   <thead>
                     <tr>
                       {data.aging.map((bucket, i) => (
-                        <th key={i} style={{ textAlign: 'right' }}>{bucket.label}</th>
+                        <th key={i} style={{ textAlign: 'right' }}>
+                          {bucket.label}
+                          <span className="col-resize-handle" onMouseDown={startAgingResize(agingColumns[i].key)} />
+                        </th>
                       ))}
-                      <th style={{ textAlign: 'right', fontWeight: 700 }}>Total</th>
+                      <th style={{ textAlign: 'right', fontWeight: 700 }}>
+                        Total
+                        <span className="col-resize-handle" onMouseDown={startAgingResize('total')} />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>

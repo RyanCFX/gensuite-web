@@ -17,6 +17,16 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+
+const COLUMNS = [
+  { key: 'id', width: 120 },
+  { key: 'proveedor', width: 220 },
+  { key: 'fecha', width: 110 },
+  { key: 'metodo', width: 140 },
+  { key: 'monto', width: 120 },
+  { key: 'estado', width: 110 },
+]
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-draft',
@@ -49,6 +59,7 @@ export default function PagosPage() {
   const [referenceNo, setReferenceNo] = useState('')
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
     queryKey: ['supplierSearch', supplierQuery],
@@ -169,15 +180,21 @@ export default function PagosPage() {
 
       <div className="card navy-table-card">
         <div className="table-scroll">
-          <table className="data-table navy-table">
+          <table className="data-table navy-table items-table-resizable">
+            <colgroup>
+              {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+            </colgroup>
             <thead>
               <tr>
-                <SortableTh label="ID" sortKey="id" orderBy={orderBy} onSort={sort} />
-                <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={sort} />
-                <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} />
-                <th>Método de Pago</th>
-                <SortableTh label="Monto" sortKey="paidAmount" orderBy={orderBy} onSort={sort} align="right" />
-                <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} />
+                <SortableTh label="ID" sortKey="id" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('id')} />} />
+                <SortableTh label="Proveedor" sortKey="supplierName" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('proveedor')} />} />
+                <SortableTh label="Fecha" sortKey="postingDate" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('fecha')} />} />
+                <th>
+                  Método de Pago
+                  <span className="col-resize-handle" onMouseDown={startResize('metodo')} />
+                </th>
+                <SortableTh label="Monto" sortKey="paidAmount" orderBy={orderBy} onSort={sort} align="right" resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('monto')} />} />
+                <SortableTh label="Estado" sortKey="status" orderBy={orderBy} onSort={sort} resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('estado')} />} />
               </tr>
             </thead>
             <tbody>
@@ -206,7 +223,7 @@ export default function PagosPage() {
                       onClick={() => navigate(`/pagos/${pago.id}`)}
                     >
                       <td>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500 }}>
+                        <span style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500 }}>
                           {pago.id}
                         </span>
                       </td>

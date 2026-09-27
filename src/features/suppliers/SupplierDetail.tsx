@@ -90,7 +90,7 @@ function HistorialPagos({ supplierId }: { supplierId: string }) {
                 {pago.paymentType === 'Receive' ? 'Cobro recibido' : 'Pago enviado'}
               </span>
             )}
-            <span style={{ fontWeight: 500, fontFamily: 'var(--font-mono)' }}>{pago.id}</span>
+            <span style={{ fontWeight: 500, fontFamily: 'var(--font-body)' }}>{pago.id}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <span style={{ color: 'var(--text-tertiary)' }}>{formatDate(pago.postingDate)}</span>
@@ -320,11 +320,11 @@ export default function SupplierDetail() {
               </div>
               <div className="detail-field">
                 <span className="detail-label">RNC</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{supplier.rnc ?? '—'}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{supplier.rnc ?? '—'}</span>
               </div>
               <div className="detail-field">
                 <span className="detail-label">Cédula</span>
-                <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{supplier.cedula ?? '—'}</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{supplier.cedula ?? '—'}</span>
               </div>
               <div className="detail-field">
                 <span className="detail-label">Email</span>
@@ -384,11 +384,11 @@ export default function SupplierDetail() {
                 </div>
                 <div className="detail-field">
                   <span className="detail-label">Número de Cuenta</span>
-                  <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{supplier.numeroCuenta ?? '—'}</span>
+                  <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{supplier.numeroCuenta ?? '—'}</span>
                 </div>
                 <div className="detail-field">
                   <span className="detail-label">ABA / SWIFT</span>
-                  <span className="detail-value" style={{ fontFamily: 'var(--font-mono)' }}>{supplier.abaSwift ?? '—'}</span>
+                  <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{supplier.abaSwift ?? '—'}</span>
                 </div>
               </div>
             </div>

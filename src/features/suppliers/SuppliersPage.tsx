@@ -15,8 +15,18 @@ import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const PAGE_SIZE = 20
+
+const COLUMNS = [
+  { key: 'nombre', width: 220 },
+  { key: 'identificacion', width: 140 },
+  { key: 'tipo', width: 110 },
+  { key: 'exterior', width: 110 },
+  { key: 'balance', width: 120 },
+  { key: 'acciones', width: 48 },
+]
 
 export default function SuppliersPage() {
   const navigate = useNavigate()
@@ -32,6 +42,7 @@ export default function SuppliersPage() {
   const [toDisable, setToDisable] = useState<Supplier | null>(null)
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
+  const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const debouncedSearch = useDebounce(search, 300)
   const debouncedRnc = useDebounce(rnc, 300)
@@ -161,14 +172,23 @@ export default function SuppliersPage() {
 
         <div className="card navy-table-card">
           <div className="table-scroll">
-            <table className="data-table navy-table">
+            <table className="data-table navy-table items-table-resizable">
+              <colgroup>
+                {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+              </colgroup>
               <thead>
                 <tr>
-                  <SortableTh label="Nombre" sortKey="supplierName" orderBy={orderBy} onSort={(k) => { sort(k); setPage(1) }} />
-                  <th>RNC / Cédula</th>
-                  <th>Tipo</th>
-                  <th>Exterior</th>
-                  <th>Balance</th>
+                  <SortableTh
+                    label="Nombre"
+                    sortKey="supplierName"
+                    orderBy={orderBy}
+                    onSort={(k) => { sort(k); setPage(1) }}
+                    resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('nombre')} />}
+                  />
+                  <th>RNC / Cédula<span className="col-resize-handle" onMouseDown={startResize('identificacion')} /></th>
+                  <th>Tipo<span className="col-resize-handle" onMouseDown={startResize('tipo')} /></th>
+                  <th>Exterior<span className="col-resize-handle" onMouseDown={startResize('exterior')} /></th>
+                  <th>Balance<span className="col-resize-handle" onMouseDown={startResize('balance')} /></th>
                   <th style={{ width: 48 }} />
                 </tr>
               </thead>
