@@ -951,10 +951,10 @@ export default function CompraForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compraData])
 
-  // GET /compras/:id no ecoa la combinación de dimensión elegida por línea (§10.2) — al editar
-  // solo podemos saber si el artículo de cada línea USA dimensiones (re-consultando el catálogo)
-  // para mostrarle el selector y obligarlo a reingresarla antes de guardar (§10.1/§10.2, opción
-  // (b) de las sugeridas por el documento).
+  // A diferencia de lo que originalmente documentaba §10.2, GET /compras/:id SÍ ecoa la
+  // combinación de dimensión elegida por línea (confirmado en vivo 2026-09-27) — se usa
+  // directamente para poblar la línea, junto con la config de dimensiones del artículo (para
+  // saber qué selectores mostrar y sus valoresPermitidos/reglas).
   useEffect(() => {
     if (!compraData) return
     let cancelled = false
@@ -962,8 +962,9 @@ export default function CompraForm() {
       if (cancelled) return
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
+        const ci = compraData.items[idx]
         return catalogItem?.usaDimensiones
-          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones }
+          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones, dimensiones: ci?.dimensiones ?? row.dimensiones }
           : row
       }))
     })
@@ -1054,9 +1055,11 @@ export default function CompraForm() {
     },
   })
 
-  // Al editar, ninguna línea trae de vuelta su combinación previa (§10.2) — si el artículo la usa
-  // y la fila todavía no tiene una elegida, hay que avisarle al usuario que la reingrese antes de
-  // guardar (si no, el PUT la reenviaría vacía y el servidor rechazaría esa línea, §11).
+  // Red de seguridad: normalmente GET /compras/:id ya trae la combinación de cada línea y el
+  // efecto de arriba la precarga sola. Esto solo dispara si, por alguna razón (línea muy vieja
+  // guardada antes de este cambio, o el artículo cambió su configuración de dimensiones), la
+  // fila queda incompleta — si no se avisa, el PUT la reenviaría vacía y el servidor rechazaría
+  // esa línea (§11).
   const lineasRequierenReingresoDimension = isEdit && items.some(
     (i) => (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
   )
@@ -1365,7 +1368,7 @@ export default function CompraForm() {
       {lineasRequierenReingresoDimension && (
         <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
           <Info size={16} />
-          <span>Esta compra tiene línea(s) con un artículo que usa combinación de dimensión de inventario, pero el sistema no puede recuperar la combinación con la que se guardaron originalmente. Vuelve a seleccionarla en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+          <span>Esta compra tiene línea(s) con un artículo que usa combinación de dimensión de inventario sin una combinación completa. Selecciónala en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
         </div>
       )}
 

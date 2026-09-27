@@ -627,8 +627,9 @@ export default function RecepcionForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [receiptData])
 
-  // GET /compras/purchase-receipt/:id tampoco ecoa la combinación elegida por línea (§10.2) —
-  // ver misma nota en CompraForm.tsx.
+  // A diferencia de lo que originalmente documentaba §10.2, GET /compras/purchase-receipt/:id SÍ
+  // ecoa la combinación elegida por línea (confirmado en vivo 2026-09-27) — ver misma nota en
+  // CompraForm.tsx.
   useEffect(() => {
     if (!receiptData) return
     let cancelled = false
@@ -636,8 +637,9 @@ export default function RecepcionForm() {
       if (cancelled) return
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
+        const ri = receiptData.items[idx]
         return catalogItem?.usaDimensiones
-          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones }
+          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones, dimensiones: ri?.dimensiones ?? row.dimensiones }
           : row
       }))
     })
@@ -710,7 +712,7 @@ export default function RecepcionForm() {
 
   const grandTotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0)
 
-  // Ver misma nota en CompraForm.tsx (§10.2, opción (b)).
+  // Red de seguridad — ver misma nota en CompraForm.tsx.
   const lineasRequierenReingresoDimension = isEdit && items.some(
     (i) => (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
   )
@@ -889,7 +891,7 @@ export default function RecepcionForm() {
       {lineasRequierenReingresoDimension && (
         <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
           <Info size={16} />
-          <span>Esta recepción tiene línea(s) con un artículo que usa combinación de dimensión de inventario, pero el sistema no puede recuperar la combinación con la que se guardaron originalmente. Vuelve a seleccionarla en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+          <span>Esta recepción tiene línea(s) con un artículo que usa combinación de dimensión de inventario sin una combinación completa. Selecciónala en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
         </div>
       )}
 

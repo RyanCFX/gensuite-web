@@ -235,9 +235,8 @@ export default function OrdenForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ordenData])
 
-  // GET /compras/ordenes/:id tampoco ecoa la combinación elegida por línea (§10.2) — al editar
-  // solo podemos saber si el artículo de cada línea USA dimensiones (re-consultando el catálogo)
-  // para mostrarle el selector y obligarlo a reingresarla antes de guardar.
+  // A diferencia de lo que originalmente documentaba §10.2, GET /compras/ordenes/:id SÍ ecoa la
+  // combinación elegida por línea (confirmado en vivo 2026-09-27) — se usa directamente.
   useEffect(() => {
     if (!ordenData) return
     let cancelled = false
@@ -245,8 +244,9 @@ export default function OrdenForm() {
       if (cancelled) return
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
+        const oi = ordenData.items[idx]
         return catalogItem?.usaDimensiones
-          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones }
+          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones, dimensiones: oi?.dimensiones ?? row.dimensiones }
           : row
       }))
     })
@@ -433,7 +433,7 @@ export default function OrdenForm() {
       {lineasRequierenReingresoDimension && (
         <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
           <Info size={16} />
-          <span>Esta orden tiene línea(s) con un artículo que usa combinación de dimensión de inventario, pero el sistema no puede recuperar la combinación con la que se guardaron originalmente. Vuelve a seleccionarla en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+          <span>Esta orden tiene línea(s) con un artículo que usa combinación de dimensión de inventario sin una combinación completa. Selecciónala en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
         </div>
       )}
 
