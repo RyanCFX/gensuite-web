@@ -16,6 +16,7 @@ import { getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateCompraDto, Supplier, DistribucionCuentaDto } from '@/shared/api/types'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { SupplierQuickCreateModal } from '@/features/suppliers/SupplierQuickCreateModal'
@@ -598,6 +599,7 @@ export default function CompraForm() {
     { key: 'impuesto', width: 100 },
     { key: 'almacen', width: 160 },
     { key: 'udm', width: 120 },
+    { key: 'combination', width: 160 },
     { key: 'actions', width: 70 },
   ]
   const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
@@ -1122,6 +1124,24 @@ export default function CompraForm() {
     }
     if (hasTrackingError) return
 
+    // Dimensiones (§5/§11 del doc): toda línea cuyo artículo USE dimensiones exige la combinación
+    // completa antes de someter — si falta, el servidor rechaza la compra con un 400 por línea.
+    let hasDimensionError = false
+    items.forEach((item, itemIdx) => {
+      const declaradas = item.itemDimensionesDeclaradas ?? []
+      if (declaradas.length > 0 && !combinacionCompleta(declaradas, item.dimensiones ?? {})) {
+        hasDimensionError = true
+        const faltantes = declaradas.filter((d) => !(item.dimensiones ?? {})[d.dimension]).map((d) => d.dimension).join(', ')
+        setItems((prev) => prev.map((r, rIdx) =>
+          rIdx === itemIdx ? { ...r, lineError: `Fila ${itemIdx + 1}: indique la combinación completa${faltantes ? ` (falta: ${faltantes})` : ''}` } : r,
+        ))
+      }
+    })
+    if (hasDimensionError) {
+      toast.error('Hay líneas con combinación de dimensión incompleta — revíselas en la columna Combinación.')
+      return
+    }
+
     const dto: CreateCompraDto = {
       ...(esProveedorOcasional
         ? {
@@ -1234,6 +1254,20 @@ export default function CompraForm() {
         return newRow
       })
     })
+    // El picker (`listItems`) puede no traer `usaDimensiones`/`dimensiones` del artículo — solo
+    // el detalle (`GET /catalog/items/:id`, §4.3 del doc) los garantiza. Si faltan, se completan
+    // con el detalle para habilitar la columna Combinación; si el picker ya los trajo, no se
+    // dispara ninguna llamada extra.
+    if (!catalogItem.dimensiones || catalogItem.dimensiones.length === 0) {
+      getItem(catalogItem.id).then((detail) => {
+        if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
+        setItems((prev) => prev.map((row, i) =>
+          i === idx && row.itemCode === catalogItem.id && !(row.itemDimensionesDeclaradas?.length)
+            ? { ...row, itemDimensionesDeclaradas: detail.dimensiones }
+            : row,
+        ))
+      }).catch(() => {})
+    }
     if (autoAddRow && wasLastRow) setItems((prev) => [...prev, emptyItem(defaultWh)])
   }, [defaultWh])
 
@@ -1626,6 +1660,10 @@ export default function CompraForm() {
                       <th>
                         UOM
                         <span className="col-resize-handle" onMouseDown={startResize('udm')} />
+                      </th>
+                      <th>
+                        Combinación
+                        <span className="col-resize-handle" onMouseDown={startResize('combination')} />
                       </th>
                       <th />
                     </tr>

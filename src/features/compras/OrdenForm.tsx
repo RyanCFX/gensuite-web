@@ -113,6 +113,7 @@ export default function OrdenForm() {
     { key: 'descuento', width: 80 },
     { key: 'almacen', width: 160 },
     { key: 'udm', width: 120 },
+    { key: 'combination', width: 160 },
     { key: 'actions', width: 40 },
   ]
   const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
@@ -329,6 +330,22 @@ export default function OrdenForm() {
     }
     if (hasError) return
 
+    // Dimensiones (§5/§11 del doc): toda línea cuyo artículo USE dimensiones exige la combinación
+    // completa antes de guardar — si falta, el servidor rechaza con un 400 por línea.
+    let hasDimensionError = false
+    items.forEach((item, itemIdx) => {
+      const declaradas = item.itemDimensionesDeclaradas ?? []
+      if (item.itemCode && declaradas.length > 0 && !combinacionCompleta(declaradas, item.dimensiones ?? {})) {
+        hasDimensionError = true
+        const faltantes = declaradas.filter((d) => !(item.dimensiones ?? {})[d.dimension]).map((d) => d.dimension).join(', ')
+        setItems((prev) => prev.map((r, i) => i === itemIdx ? { ...r, lineError: `Fila ${itemIdx + 1}: indique la combinación completa${faltantes ? ` (falta: ${faltantes})` : ''}` } : r))
+      }
+    })
+    if (hasDimensionError) {
+      toast.error('Hay líneas con combinación de dimensión incompleta — revíselas en la columna de dimensión.')
+      return
+    }
+
     const dto: CreateOrdenCompraDto = {
       supplier: supplierId,
       transactionDate,
@@ -374,6 +391,18 @@ export default function OrdenForm() {
         dimensiones: undefined,
       }
     }))
+    // El picker puede no traer `dimensiones` — solo el detalle las garantiza (§4.3). Si faltan,
+    // se completan para habilitar la columna de dimensión.
+    if (!catalogItem.dimensiones || catalogItem.dimensiones.length === 0) {
+      getItem(catalogItem.id).then((detail) => {
+        if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
+        setItems((prev) => prev.map((row, i) =>
+          i === idx && row.itemCode === catalogItem.id && !(row.itemDimensionesDeclaradas?.length)
+            ? { ...row, itemDimensionesDeclaradas: detail.dimensiones }
+            : row,
+        ))
+      }).catch(() => {})
+    }
   }, [])
 
   const clearCatalogItem = useCallback((idx: number) => {

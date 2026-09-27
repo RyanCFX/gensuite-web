@@ -1887,44 +1887,38 @@ function AppLayoutInner() {
             />
           </div>
 
-          <span className="divider-v" aria-hidden="true" />
-
-          {/* Search trigger */}
-          <div className="search-wrap" style={{ flex: 1, maxWidth: 280 }}>
-            <span className="search-icon" aria-hidden="true">
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
-            </span>
-            <input
-              placeholder="Buscar…"
-              aria-label="Abrir búsqueda global"
-              readOnly
-              onClick={() => setCmdOpen(true)}
-              style={{ cursor: "pointer" }}
-            />
-            <div className="search-shortcut" aria-hidden="true">
-              <kbd className="kbd">⌘</kbd>
-              <kbd className="kbd">K</kbd>
-            </div>
-          </div>
-
-          {/* Right actions */}
+          {/* Right actions: turno · búsqueda · usuario */}
           <div className="topbar-right">
             {/* En celular el turno de caja se muestra dentro del dropdown de usuario (ver más abajo) —
              * acá solo queda visible en desktop. */}
             <div className="topbar-turno-desktop">
               <TurnoCajaIndicator />
+            </div>
+
+            {/* Search trigger */}
+            <div className="search-wrap" style={{ width: 280, maxWidth: '100%', minWidth: 0 }}>
+              <span className="search-icon" aria-hidden="true">
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.35-4.35" />
+                </svg>
+              </span>
+              <input
+                placeholder="Buscar…"
+                aria-label="Abrir búsqueda global"
+                readOnly
+                onClick={() => setCmdOpen(true)}
+                style={{ cursor: "pointer" }}
+              />
             </div>
 
             {/* Theme toggle — oculto mientras DARK_MODE_ENABLED sea false */}

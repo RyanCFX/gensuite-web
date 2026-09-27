@@ -21,7 +21,7 @@ import { formatMoney, displayId, round2, formatDate } from '@/lib/formatters'
 import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { Select, SelectItem } from '@/components/ui/select'
-import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, UserPlus, ChevronDown, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, UserPlus, ChevronDown, RotateCcw, Info } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { toast } from 'sonner'
@@ -35,6 +35,7 @@ import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { isCostoCompraError } from '@/lib/pinOverride'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { listItems, getItem } from '@/shared/api/catalog'
 import { client } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
@@ -156,6 +157,7 @@ export default function QuotationForm() {
     { key: 'descuento', width: 140 },
     { key: 'itbis', width: 80 },
     { key: 'subtotal', width: 120 },
+    { key: 'combination', width: 160 },
     { key: 'actions', width: 70 },
   ]
   const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
@@ -786,6 +788,18 @@ function buildDto(): CreateQuotationDto {
         }
       })
     })
+    // El picker puede no traer `dimensiones` — solo el detalle las garantiza (§4.3). Si faltan,
+    // se completan para habilitar la columna de dimensión.
+    if (!catalogItem.dimensiones || catalogItem.dimensiones.length === 0) {
+      getItem(catalogItem.id).then((detail) => {
+        if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
+        setItems((prev) => prev.map((row, i) =>
+          i === index && row.itemCode === catalogItem.id && !(row.itemDimensionesDeclaradas?.length)
+            ? { ...row, itemDimensionesDeclaradas: detail.dimensiones }
+            : row,
+        ))
+      }).catch(() => {})
+    }
     if (autoAddRow && wasLastRow) addRow()
   }
 
@@ -1399,16 +1413,6 @@ if (esClienteOcasional) {
                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount, currency || monedaBase, { trimZeros: true })}</td>
 
-                      <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ position: 'relative', verticalAlign: 'middle' }}>
-                        <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-size-icon-xs"
-                          onClick={() => setViewItemCode(item.itemCode)}
-                          disabled={!item.itemCode}
-                        />
-                      </td>
-
                       <td>
                         {item.itemDimensionesDeclaradas && item.itemDimensionesDeclaradas.length > 0 && (
                           <CombinacionDimensionSelector
@@ -1432,20 +1436,6 @@ if (esClienteOcasional) {
                             <Trash2 size={14} /> Eliminar
                           </ActionsMenuItem>
                         </ActionsMenu>
-                          title="Ver detalle"
-                        >
-                          <Eye size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-size-icon-xs"
-                          onClick={() => removeRow(index)}
-                          title="Eliminar"
-                          style={{ color: 'var(--error-text)' }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                        </div>
                       </td>
                     </tr>
                   ))

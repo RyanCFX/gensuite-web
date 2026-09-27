@@ -1016,6 +1016,20 @@ export default function InvoiceForm() {
         }
       })
     })
+    // El picker puede no traer `dimensiones` — solo el detalle las garantiza (§4.3). Si faltan,
+    // se completan para habilitar la columna de dimensión.
+    if (!catalogItem.dimensiones || catalogItem.dimensiones.length === 0) {
+      try {
+        const detail = await getItem(catalogItem.id)
+        if (detail?.usaDimensiones && detail.dimensiones?.length) {
+          setItems((prev) => prev.map((row, i) =>
+            i === index && row.itemCode === catalogItem.id && !(row._itemDimensiones?.length)
+              ? { ...row, _usaDimensiones: true, _itemDimensiones: detail.dimensiones }
+              : row,
+          ))
+        }
+      } catch {}
+    }
     if (autoAddRow && wasLastRow) addRow()
   }
 
@@ -1214,6 +1228,7 @@ export default function InvoiceForm() {
     { key: 'subtotal', width: 120 },
     ...(!almacenVentaSucursal ? [{ key: 'almacen', width: 160 }] : []),
     { key: 'ubicacion', width: 140 },
+    { key: 'combination', width: 160 },
     ...(arsActiva ? [
       { key: 'pctTeorico', width: 100 },
       { key: 'coberturaArs', width: 130 },

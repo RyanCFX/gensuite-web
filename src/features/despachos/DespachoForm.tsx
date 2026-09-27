@@ -19,6 +19,7 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
+import { getItem } from '@/shared/api/catalog'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { mergeLineasIguales } from '@/shared/lib/mergeLineasIguales'
@@ -55,6 +56,7 @@ export default function DespachoForm() {
     { key: 'articulo', width: 240 },
     { key: 'cantidad', width: 100 },
     { key: 'almacen', width: 200 },
+    { key: 'combination', width: 160 },
     { key: 'actions', width: 64 },
   ]
   const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
@@ -122,6 +124,18 @@ export default function DespachoForm() {
           }
         : r))
     })
+    // El picker puede no traer `dimensiones` — solo el detalle las garantiza (§4.3). Si faltan,
+    // se completan para habilitar el selector de combinación.
+    if (!item.dimensiones || item.dimensiones.length === 0) {
+      getItem(item.id).then((detail) => {
+        if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
+        setItems((prev) => prev.map((r, i) =>
+          i === idx && r.itemCode === item.id && !(r.itemDimensiones?.length)
+            ? { ...r, usaDimensiones: true, itemDimensiones: detail.dimensiones }
+            : r,
+        ))
+      }).catch(() => {})
+    }
     if (wasLastRow) setItems((prev) => [...prev, emptyRow()])
   }
 

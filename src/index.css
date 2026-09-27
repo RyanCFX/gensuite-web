@@ -255,7 +255,7 @@ button {
   grid-area: topbar;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   padding: 0 16px;
   background: var(--surface-page);
   position: sticky;
@@ -272,7 +272,14 @@ button {
   gap: 6px;
   flex-shrink: 0;
   text-decoration: none;
+  margin-right: 6px;
+  /* Ancho fijo para que el divider-v caiga justo sobre el borde del sidebar:
+     16 (padding topbar) + 32 (botón menú) + 6 (gap) + 180 (logo) + 6 (gap) = 240. */
+  width: calc(var(--sidebar-width) - 60px);
 }
+
+/* Con el sidebar colapsado el logo no puede mantener ese ancho — vuelve a auto. */
+.app-shell.collapsed .logo { width: auto; }
 
 .logo-mark {
   width: 28px;
@@ -398,7 +405,7 @@ button {
 }
 
 .dd-logo {
-    width: 110px;
+    width: 155px;
     object-fit: contain;
 }
 
@@ -3065,11 +3072,12 @@ button {
 .search-wrap input {
   width: 100%;
   height: 32px;
-  padding: 0 60px 0 32px;
+  padding: 0 12px 0 32px;
   /*background: var(--surface-sunken);*/
   background-color: #f3faf8;
   border: 1px solid var(--info-border);
-  border-color: #BDD0D2;
+  /*border-color: #BDD0D2;*/
+  border: 1px solid rgba(32, 133, 145, 0.50);
   /*border: 1px solid var(--border-default);*/
   border-radius: var(--radius-md);
   font-family: var(--font-body);
@@ -3096,7 +3104,7 @@ button {
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  color: #BDD0D2;
+  color: #208591;
   pointer-events: none;
   display: flex;
   align-items: center;

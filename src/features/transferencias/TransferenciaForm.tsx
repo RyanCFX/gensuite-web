@@ -19,6 +19,7 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
+import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 interface LineItem {
   itemCode: string
@@ -51,6 +52,7 @@ export default function TransferenciaForm() {
   const ITEMS_COLUMNS = [
     { key: 'articulo', width: 240 },
     { key: 'cantidad', width: 120 },
+    { key: 'combination', width: 160 },
     { key: 'actions', width: 40 },
   ]
   const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)

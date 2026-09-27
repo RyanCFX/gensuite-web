@@ -313,13 +313,11 @@ const [customerId, setCustomerId] = useState('')
     setLoaded(true)
     getPedidoDuplicateSource(duplicateId).then(async (src) => {
       setCustomerId(src.customer)
-      setTransactionDate(todayIso())
       // GET /pedidos/:id/duplicate-source tampoco ecoa la combinación de dimensión elegida por línea
       // (§10.2) — se re-consulta el catálogo solo para saber si el artículo USA dimensiones y así
       // mostrar el selector vacío, obligando a reingresar la combinación en este nuevo Pedido.
       const catalogItems = await Promise.all(src.items.map((i) => getItem(i.itemCode).catch(() => null)))
       setItems(src.items.map((i, idx) => {
-      setItems(src.items.map((i) => {
         const discountAmount = i.discountAmount ?? 0
         const discountPct = discountAmount > 0 ? 0 : (i.discountPct ?? 0)
         const discountMode: 'pct' | 'amount' = discountAmount > 0 ? 'amount' : 'pct'
@@ -506,6 +504,7 @@ useEffect(() => {
     { key: 'descuento', width: 140 },
     { key: 'itbis', width: 80 },
     { key: 'subtotal', width: 120 },
+    { key: 'combination', width: 160 },
     { key: 'actions', width: 70 },
   ]
   const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
@@ -670,6 +669,18 @@ useEffect(() => {
         }
       })
     })
+    // El picker puede no traer `dimensiones` — solo el detalle las garantiza (§4.3). Si faltan,
+    // se completan para habilitar la columna de dimensión.
+    if (!catalogItem.dimensiones || catalogItem.dimensiones.length === 0) {
+      getItem(catalogItem.id).then((detail) => {
+        if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
+        setItems((prev) => prev.map((row, i) =>
+          i === index && row.itemCode === catalogItem.id && !(row.itemDimensionesDeclaradas?.length)
+            ? { ...row, itemDimensionesDeclaradas: detail.dimensiones }
+            : row,
+        ))
+      }).catch(() => {})
+    }
     if (autoAddRow && wasLastRow) addRow()
   }
   function selectBundle(index: number, bundle: Bundle) {
@@ -1227,7 +1238,7 @@ try {
               </thead>
               <tbody>
                 {items.length === 0 ? (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos. Agrega uno con el botón de abajo.</td></tr>
+                  <tr><td colSpan={10} style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)', fontSize: 13 }}>No hay artículos. Agrega uno con el botón de abajo.</td></tr>
                 ) : (
                   items.map((item, index) => (
                     <tr
@@ -1339,19 +1350,7 @@ try {
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         )}
                       </td>
-                      {!almacenVentaSucursal && (
-                        <td>
-                          <SearchSelect
-                            value={item.warehouse}
-                            onChange={(val) => updateWarehouse(index, val)}
-                            options={warehouseSelectOptions}
-                            onSearch={setWarehouseSearch}
-                            selectedLabel={branchWarehouses?.find((w) => w.id === item.warehouse)?.name ?? ''}
-                            placeholder="Almacén por defecto"
-                            disabled={!item.itemCode}
-                          />
-                        </td>
-                      )}
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount, currency || monedaBase, { trimZeros: true })}</td>
                       <td>
                         {item.itemDimensionesDeclaradas && item.itemDimensionesDeclaradas.length > 0 && (
                           <CombinacionDimensionSelector
@@ -1362,8 +1361,6 @@ try {
                           />
                         )}
                       </td>
-                      <td onClick={(e) => e.stopPropagation()} className="actions-cell">
-                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount, currency || monedaBase, { trimZeros: true })}</td>
                       <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ position: 'relative', verticalAlign: 'middle' }}>
                         <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
                         <button

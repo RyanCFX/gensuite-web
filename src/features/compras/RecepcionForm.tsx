@@ -492,6 +492,7 @@ export default function RecepcionForm() {
     { key: 'costo', width: 130 },
     { key: 'almacen', width: 160 },
     { key: 'udm', width: 120 },
+    { key: 'combination', width: 160 },
     { key: 'actions', width: 40 },
   ]
   const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
@@ -1016,6 +1017,10 @@ export default function RecepcionForm() {
                       <th>
                         UOM
                         <span className="col-resize-handle" onMouseDown={startResize('udm')} />
+                      </th>
+                      <th>
+                        Combinación
+                        <span className="col-resize-handle" onMouseDown={startResize('combination')} />
                       </th>
                       <th />
                     </tr>
