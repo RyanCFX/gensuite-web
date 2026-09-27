@@ -885,10 +885,11 @@ export default function InvoiceForm() {
             ubicacion: it.ubicacion || undefined,
             _usaDimensiones: cat?.usaDimensiones,
             _itemDimensiones: cat?.dimensiones,
-            // §10.2: GET /invoices/:id no trae la combinación de la línea — se deja vacía y se
-            // marca pendiente de reselección en vez de asumir cualquier valor.
-            dimensiones: undefined,
-            _dimensionesPendientesReseleccion: cat?.usaDimensiones ? true : undefined,
+            // A diferencia de lo que originalmente documentaba §10.2, GET /invoices/:id SÍ trae
+            // la combinación de la línea (confirmado en vivo 2026-09-27) — se usa directamente.
+            // Solo queda "pendiente de reselección" si, por algún motivo, viene incompleta.
+            dimensiones: it.dimensiones,
+            _dimensionesPendientesReseleccion: cat?.usaDimensiones && !combinacionCompleta(cat.dimensiones ?? [], it.dimensiones ?? {}) ? true : undefined,
             porcientoTeoricoArs: it.porcientoTeoricoArs,
             montoAprobadoArs: it.montoAprobadoArs,
             lineaBloqueadaArs: it.lineaBloqueadaArs,

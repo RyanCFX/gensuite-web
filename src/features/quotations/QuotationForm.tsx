@@ -281,10 +281,9 @@ useEffect(() => {
      setInitialized(true)
    }, [existingQuotation, initialized])
 
-  // GET /quotations/:id no ecoa la combinación de dimensión elegida por línea (§10.2) — al editar
-  // solo podemos saber si el artículo de cada línea USA dimensiones (re-consultando el catálogo)
-  // para mostrarle el selector y obligarlo a reingresarla antes de guardar (§10.1/§10.2, opción
-  // (b) de las sugeridas por el documento).
+  // A diferencia de lo que originalmente documentaba §10.2, GET /quotations/:id SÍ ecoa la
+  // combinación de dimensión elegida por línea (confirmado en vivo 2026-09-27) — se usa
+  // directamente para poblar la línea.
   useEffect(() => {
     if (!existingQuotation) return
     let cancelled = false
@@ -292,8 +291,9 @@ useEffect(() => {
       if (cancelled) return
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
+        const ei = existingQuotation.items[idx]
         return catalogItem?.usaDimensiones
-          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones }
+          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones, dimensiones: ei?.dimensiones ?? row.dimensiones }
           : row
       }))
     })
@@ -892,10 +892,9 @@ function buildDto(): CreateQuotationDto {
     })))
   }
 
-  // Al editar (o duplicar), ninguna línea trae de vuelta su combinación previa (§10.2) — si el
-  // artículo la usa y la fila todavía no tiene una elegida, hay que avisarle al usuario que la
-  // reingrese antes de guardar (si no, el PUT/POST la reenviaría vacía y el servidor rechazaría
-  // esa línea, §11).
+  // Al editar, la línea ya se precarga con su combinación real (ver efecto de arriba). Al
+  // duplicar, el endpoint de duplicate-source no está confirmado que la traiga — se le pide al
+  // usuario que la reingrese en ese caso. Red de seguridad para ambos si igual queda incompleta.
   const lineasRequierenReingresoDimension = (isEdit || !!duplicateId) && items.some(
     (i) => (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
   )
@@ -1026,7 +1025,7 @@ if (esClienteOcasional) {
       {lineasRequierenReingresoDimension && (
         <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
           <Info size={16} />
-          <span>Esta cotización tiene línea(s) con un artículo que usa combinación de dimensión de inventario, pero el sistema no puede recuperar la combinación con la que se guardaron originalmente. Vuelve a seleccionarla en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+          <span>Esta cotización tiene línea(s) con un artículo que usa combinación de dimensión de inventario sin una combinación completa. Selecciónala en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
         </div>
       )}
 

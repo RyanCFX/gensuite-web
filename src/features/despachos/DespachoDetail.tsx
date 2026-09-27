@@ -1,6 +1,6 @@
 // Detalle de un Despacho — docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §2.5-§2.13.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -12,7 +12,8 @@ import {
 import { getItem } from '@/shared/api/catalog'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listAlmacenes } from '@/shared/api/config'
-import type { ComponentTracking, DespachoItemDto, ApiError, ConfirmarStockDespachoResult } from '@/shared/api/types'
+import type { ComponentTracking, DespachoItemDto, ApiError, ConfirmarStockDespachoResult, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
+import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatStockInsufficientMessage } from '@/lib/stockAlerts'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
@@ -619,12 +620,19 @@ function ConfirmarStockModal({
 function EditDespachoModal({
   items, onClose, onSave, loading,
 }: {
-  items: { itemCode: string; itemName: string; qty: number; warehouse: string }[]
+  items: { itemCode: string; itemName: string; qty: number; warehouse: string; dimensiones?: DimensionesLinea }[]
   onClose: () => void
   onSave: (items: DespachoItemDto[]) => void
   loading: boolean
 }) {
-  const [rows, setRows] = useState(items.map((i) => ({ itemCode: i.itemCode, itemName: i.itemName, qty: i.qty, warehouse: i.warehouse })))
+  const [rows, setRows] = useState(items.map((i) => ({
+    itemCode: i.itemCode,
+    itemName: i.itemName,
+    qty: i.qty,
+    warehouse: i.warehouse,
+    dimensiones: i.dimensiones,
+    itemDimensionesDeclaradas: undefined as ItemDimensionDeclarada[] | undefined,
+  })))
   const [warehouseSearch, setWarehouseSearch] = useState('')
 
   const { data: warehousesData } = useQuery({
@@ -635,9 +643,29 @@ function EditDespachoModal({
     .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
     .map((w) => ({ value: w.id, label: w.name }))
 
-  function updateRow(idx: number, patch: Partial<{ qty: number; warehouse: string }>) {
+  // GET /despachos/:id ya trae la combinación de cada línea (§10.2, actualizado 2026-09-27) —
+  // solo hace falta consultar el catálogo para saber qué dimensiones declara cada artículo y así
+  // poder mostrar el selector.
+  useEffect(() => {
+    let cancelled = false
+    Promise.all(items.map((i) => getItem(i.itemCode).catch(() => null))).then((catalogItems) => {
+      if (cancelled) return
+      setRows((prev) => prev.map((r, i) => {
+        const catalogItem = catalogItems[i]
+        return catalogItem?.usaDimensiones ? { ...r, itemDimensionesDeclaradas: catalogItem.dimensiones } : r
+      }))
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function updateRow(idx: number, patch: Partial<{ qty: number; warehouse: string; dimensiones: DimensionesLinea }>) {
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)))
   }
+
+  const lineasIncompletas = rows.some(
+    (r) => (r.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(r.itemDimensionesDeclaradas ?? [], r.dimensiones ?? {}),
+  )
 
   return (
     <Modal
@@ -651,8 +679,13 @@ function EditDespachoModal({
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
           <button
             className="btn btn-primary"
-            disabled={loading || rows.some((r) => !r.qty || r.qty <= 0)}
-            onClick={() => onSave(rows.map((r) => ({ itemCode: r.itemCode, qty: r.qty, warehouse: r.warehouse || undefined })))}
+            disabled={loading || lineasIncompletas || rows.some((r) => !r.qty || r.qty <= 0)}
+            onClick={() => onSave(rows.map((r) => ({
+              itemCode: r.itemCode,
+              qty: r.qty,
+              warehouse: r.warehouse || undefined,
+              ...(r.itemDimensionesDeclaradas?.length ? { dimensiones: r.dimensiones } : {}),
+            })))}
           >
             {loading ? 'Guardando…' : 'Guardar'}
           </button>
@@ -666,6 +699,7 @@ function EditDespachoModal({
               <th>Artículo</th>
               <th style={{ width: 140 }}>Cantidad</th>
               <th style={{ width: 260 }}>Almacén</th>
+              <th style={{ width: 200 }}>Combinación</th>
             </tr>
           </thead>
           <tbody>
@@ -690,6 +724,18 @@ function EditDespachoModal({
                     onSearch={setWarehouseSearch}
                     selectedLabel={warehousesData?.find((w) => w.id === r.warehouse)?.name ?? r.warehouse}
                   />
+                </td>
+                <td>
+                  {r.itemDimensionesDeclaradas && r.itemDimensionesDeclaradas.length > 0 ? (
+                    <CombinacionDimensionSelector
+                      itemDimensiones={r.itemDimensionesDeclaradas}
+                      value={r.dimensiones ?? {}}
+                      onChange={(next) => updateRow(i, { dimensiones: next })}
+                      compact
+                    />
+                  ) : (
+                    <span className="td-muted" style={{ fontSize: 12 }}>—</span>
+                  )}
                 </td>
               </tr>
             ))}
