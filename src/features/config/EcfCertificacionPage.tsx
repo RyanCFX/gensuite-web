@@ -6,7 +6,7 @@
 
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Info, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, Check, Circle, Info, ShieldCheck } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { EcfTabs } from '@/shared/ui/EcfTabs'
@@ -21,9 +21,36 @@ function CertificacionContent({ company, activeMode }: { company: string; active
     queryFn: () => getEcfCertificacion(company),
   })
 
-  const certified = data?.certified ?? data?.stage === 'CERTIFIED'
-  const hasProgreso = typeof data?.paso === 'number' && typeof data?.totalPasos === 'number' && data.totalPasos > 0
-  const pct = hasProgreso ? Math.min(100, Math.round((data!.paso! / data!.totalPasos!) * 100)) : 0
+  // El backend no trae `stage`/`certified` planos: el certificado se lee de
+  // `client.certificationStage === 'CERTIFIED'` (con `completedStages` y `canGoLive`
+  // como respaldo).
+  const certified = !!data && !!(
+    data.certified ||
+    data.client?.certificationStage === 'CERTIFIED' ||
+    data.completedStages?.includes('CERTIFIED') ||
+    data.canGoLive ||
+    data.stage === 'CERTIFIED'
+  )
+  const steps = data?.dgiiSteps ?? []
+  const hasProgreso = typeof data?.progress === 'number'
+    || (typeof data?.paso === 'number' && typeof data?.totalPasos === 'number' && data.totalPasos > 0)
+  const pct = typeof data?.progress === 'number'
+    ? Math.min(100, Math.max(0, Math.round(data.progress)))
+    : hasProgreso
+      ? Math.min(100, Math.round((data!.paso! / data!.totalPasos!) * 100))
+      : 0
+  const pasosLabel = typeof data?.progress === 'number' && steps.length > 0
+    ? `${data.dgiiStepsCompleted ?? steps.filter((s) => s.status === 'complete').length}/${steps.length} pasos`
+    : hasProgreso
+      ? `${data!.paso}/${data!.totalPasos}`
+      : null
+  // Etapa en curso: primer paso no completado; si todo está completo, la etapa del cliente.
+  const currentStageLabel = certified
+    ? 'Certificado'
+    : steps.find((s) => s.status !== 'complete')?.title
+      ?? data?.client?.certificationStage
+      ?? data?.stageLabel
+      ?? '—'
 
   return (
     <div className="card">
@@ -55,7 +82,12 @@ function CertificacionContent({ company, activeMode }: { company: string; active
               <p style={{ fontSize: 11, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
                 Estado actual
               </p>
-              <p style={{ fontSize: 15, fontWeight: 600 }}>{data.stageLabel}</p>
+              <p style={{ fontSize: 15, fontWeight: 600 }}>{currentStageLabel}</p>
+              {data.client && (
+                <p className="ff-hint" style={{ margin: '4px 0 0' }}>
+                  {data.client.legalName} · RNC {data.client.rnc}
+                </p>
+              )}
             </div>
             {hasProgreso && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -63,8 +95,30 @@ function CertificacionContent({ company, activeMode }: { company: string; active
                   <div style={{ height: '100%', width: `${pct}%`, background: certified ? 'var(--success-text)' : 'var(--brand-primary)', borderRadius: 'var(--radius-full)' }} />
                 </div>
                 <span style={{ fontSize: 12, color: 'var(--text-tertiary)', flexShrink: 0 }}>
-                  {data.paso}/{data.totalPasos}
+                  {pasosLabel ?? `${pct}%`}
                 </span>
+              </div>
+            )}
+            {steps.length > 0 && (
+              <div>
+                <p style={{ fontSize: 11, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                  Trámite DGII
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {steps.map((s) => {
+                    const doneStep = s.status === 'complete'
+                    return (
+                      <div key={s.step} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                        {doneStep
+                          ? <Check size={14} style={{ flexShrink: 0, color: 'var(--success-text)' }} />
+                          : <Circle size={14} style={{ flexShrink: 0, color: 'var(--text-tertiary)' }} />}
+                        <span style={{ color: doneStep ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                          {s.step}. {s.title}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
             {certified ? (
