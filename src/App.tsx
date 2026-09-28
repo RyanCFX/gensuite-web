@@ -40,6 +40,7 @@ const InvoicesPage    = lazy(() => import('@/features/invoicing/InvoicesPage'))
 const InvoiceDetail   = lazy(() => import('@/features/invoicing/InvoiceDetail'))
 const InvoiceForm     = lazy(() => import('@/features/invoicing/InvoiceForm'))
 const CreditNotesPage = lazy(() => import('@/features/invoicing/CreditNotesPage'))
+const CreditNoteDetail = lazy(() => import('@/features/invoicing/CreditNoteDetail'))
 const DebitNotesPage  = lazy(() => import('@/features/invoicing/DebitNotesPage'))
 const DevolucionesPage = lazy(() => import('@/features/invoicing/DevolucionesPage'))
 // Facturas de Apertura (Migración de Saldos) — docs/tasks/PROMPT_APERTURA_FRONTEND.md
@@ -260,6 +261,7 @@ export default function App() {
             <Route path="/facturas/:id/versions/:version" element={<Suspense fallback={<PageLoader />}><InvoiceDetail /></Suspense>} />
             <Route path="/facturas/:id" element={<Suspense fallback={<PageLoader />}><InvoiceDetail /></Suspense>} />
             <Route path="/notas-credito" element={<Suspense fallback={<PageLoader />}><CreditNotesPage /></Suspense>} />
+            <Route path="/notas-credito/:id" element={<Suspense fallback={<PageLoader />}><CreditNoteDetail /></Suspense>} />
             <Route path="/notas-debito" element={<Suspense fallback={<PageLoader />}><DebitNotesPage /></Suspense>} />
             <Route path="/devoluciones" element={<Suspense fallback={<PageLoader />}><DevolucionesPage /></Suspense>} />
             <Route path="/devoluciones/nueva" element={<Suspense fallback={<PageLoader />}><DevolucionForm /></Suspense>} />

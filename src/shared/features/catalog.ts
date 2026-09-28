@@ -96,7 +96,9 @@ export const RUTAS_FEATURES: readonly RutaFeature[] = [
   // Ventas — Notas de Crédito / Débito: dos claves, una pantalla cada una en este frontend
   // (el spec describe tabs dentro de /invoicing/credit-notes — acá son rutas separadas, se
   // gatea cada ruta por su propia clave, mismo efecto).
+  { pattern: '/notas-credito/*', feature: 'notasCredito' },
   { pattern: '/notas-credito', feature: 'notasCredito' },
+  { pattern: '/notas-debito/*', feature: 'notasDebito' },
   { pattern: '/notas-debito', feature: 'notasDebito' },
   // Ventas — Devoluciones (spec: /devoluciones)
   { pattern: '/devoluciones/*', feature: 'devoluciones' },

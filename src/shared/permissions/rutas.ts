@@ -66,7 +66,9 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   // Facturación
   { pattern: '/facturas/*', accion: 'ventas.factura.listar' },
   { pattern: '/facturas', accion: 'ventas.factura.listar' },
+  { pattern: '/notas-credito/*', accion: 'ventas.nota-credito.listar' },
   { pattern: '/notas-credito', accion: 'ventas.nota-credito.listar' },
+  { pattern: '/notas-debito/*', accion: 'ventas.nota-debito.crear' },
   { pattern: '/notas-debito', accion: 'ventas.nota-debito.crear' },
   { pattern: '/devoluciones/*', accion: 'ventas.devolucion.listar' },
   { pattern: '/devoluciones', accion: 'ventas.devolucion.listar' },

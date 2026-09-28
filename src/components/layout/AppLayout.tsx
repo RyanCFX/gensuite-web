@@ -65,6 +65,7 @@ import { CommandPalette } from "./CommandPalette";
 import { Toaster, toast } from "sonner";
 import { TabsProvider, useTabs } from "@/contexts/TabsContext";
 import { KeepAlive } from "keepalive-for-react";
+import { RefetchOnNavigate } from "@/components/RefetchOnNavigate";
 import { TurnoCajaIndicator } from "@/components/shared/TurnoCajaIndicator";
 
 import logo from "@/assets/logo.png";
@@ -2126,6 +2127,8 @@ function AppLayoutInner() {
             </div>
           )}*/}
           {multiTab && <TabBar />}
+          {/* Re-consulta los GETs al cambiar de pantalla — con y sin pestañas */}
+          <RefetchOnNavigate />
           <div style={{ flex: 1, overflowY: "auto" }}>
             {multiTab ? (
               <KeepAlive
