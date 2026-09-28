@@ -12,6 +12,7 @@ import { FieldTooltip } from "@/shared/ui/FieldTooltip";
 import { Modal } from "@/shared/ui/Modal";
 import {
   getInvoice,
+  getInvoiceVersion,
   submitInvoice,
   cancelInvoice,
   amendInvoice,
@@ -41,7 +42,7 @@ import { esClienteEmisorNoEncontrado } from "@/lib/ecfErrors";
 import { formatStockInsufficientMessage } from "@/lib/stockAlerts";
 import { usePosTicketPrinter } from "@/shared/hooks/usePosTicketPrinter";
 import { useIsSystemManager } from "@/shared/hooks/useIsSystemManager";
-import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion, EcfSubmitResult } from "@/shared/api/types";
+import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion, MonedaPdfImpresion, EcfSubmitResult } from "@/shared/api/types";
 import { esCoberturaCompleta } from "@/shared/api/types";
 import { usePuede } from "@/shared/permissions/can";
 import { CoberturaArsResumen } from "./AseguradoraPanel";
@@ -162,18 +163,18 @@ const RETURN_RESOLUTION_OPTIONS: SearchSelectOption[] = [
 ];
 
 const STATUS_BADGE: Record<string, string> = {
-  Draft: "badge-draft",
-  Submitted: "badge-submitted",
-  Cancelled: "badge-cancelled",
+  draft: "badge-draft",
+  submitted: "badge-submitted",
+  cancelled: "badge-cancelled",
 };
 const STATUS_LABEL: Record<string, string> = {
-  Draft: "Borrador",
-  Submitted: "Sometido",
-  Cancelled: "Cancelado",
+  draft: "Borrador",
+  submitted: "Sometido",
+  cancelled: "Cancelado",
 };
 
 export default function InvoiceDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id, version } = useParams<{ id: string; version?: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isSystemManager = useIsSystemManager();
@@ -271,10 +272,22 @@ export default function InvoiceDetail() {
     setTurnoModalOpen(false),
   );
 
+  // Una entrada del historial con el mismo id que el documento actual es una revisión de borrador
+  // anterior (no un documento amendado aparte) — GET /invoicing/invoices/:id/versions/:sequence
+  // devuelve un snapshot liviano (DraftVersion: id/sequence/savedAt/status/items/grandTotal), no
+  // la factura completa. Viéndola aquí es de solo lectura: no hay acciones ni mutaciones.
+  const isHistoricalVersion = !!version;
+
+  const { data: versionData, isLoading: loadingVersion } = useQuery({
+    queryKey: ["invoice-version", id, version],
+    queryFn: () => getInvoiceVersion(id!, Number(version)),
+    enabled: isHistoricalVersion && !!id,
+  });
+
   const { data: invoice, isLoading } = useQuery({
     queryKey: ["invoice", id],
     queryFn: () => getInvoice(id!),
-    enabled: !!id,
+    enabled: !isHistoricalVersion && !!id,
   });
 
   const { data: customer } = useQuery({
@@ -1113,8 +1126,14 @@ export default function InvoiceDetail() {
     cancelMutation.isPending ||
     amendMutation.isPending;
 
+  // Moneda de impresión del PDF (§3 de docs/tasks/75_multimoneda_cuenta_unica_consumidor_final_pdf.md)
+  // — solo tiene efecto visible cuando la factura está en una moneda distinta a la base del
+  // tenant, y solo para formato a4/carta/a6 (el ticket POS siempre imprime en DOP).
+  const [pdfMoneda, setPdfMoneda] = useState<MonedaPdfImpresion>("dop");
+  const mostrarTogglePdfMoneda = !!invoice?.currency && invoice.currency !== monedaBase;
+
   const downloadMutation = useMutation({
-    mutationFn: (formato?: FormatoImpresion) => downloadInvoicePdf(id!, `factura-${id}.pdf`, formato ?? formatoImpresionDefault),
+    mutationFn: (formato?: FormatoImpresion) => downloadInvoicePdf(id!, `factura-${id}.pdf`, formato ?? formatoImpresionDefault, pdfMoneda),
     onError: (err: { message?: string }) => toast.error(err?.message ?? "No se pudo descargar el PDF"),
   });
 
@@ -1133,7 +1152,7 @@ export default function InvoiceDetail() {
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const previewMutation = useMutation({
-    mutationFn: (formato?: FormatoImpresion) => getInvoicePdfBlobUrl(id!, formato ?? formatoImpresionDefault),
+    mutationFn: (formato?: FormatoImpresion) => getInvoicePdfBlobUrl(id!, formato ?? formatoImpresionDefault, pdfMoneda),
     onSuccess: (url) => setPreviewUrl(url),
     onError: (err: { message?: string }) => toast.error(err?.message ?? "No se pudo generar la vista previa del PDF"),
   });
@@ -1148,6 +1167,89 @@ export default function InvoiceDetail() {
           : err?.message ?? "No se pudo descargar el PDF/A",
       ),
   });
+
+  if (isHistoricalVersion) {
+    if (loadingVersion) {
+      return (
+        <div className="page-container">
+          <div className="skeleton-box" style={{ width: 280, height: 28, marginBottom: 8 }} />
+          <div className="skeleton-box" style={{ width: "100%", height: 256, borderRadius: "var(--radius-lg)" }} />
+        </div>
+      );
+    }
+    if (!versionData) {
+      return (
+        <div className="page-container">
+          <div className="empty-state">
+            <div className="empty-title">Versión no encontrada</div>
+            <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/facturas/${id}`)}>
+              Ver versión actual
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="page-container">
+        <div className="page-header">
+          <div>
+            <a className="page-back-link" onClick={() => navigate(`/facturas/${id}`)}>
+              <ArrowLeft size={14} /> Factura {id}
+            </a>
+            <h1 className="page-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="page-title-dot" />
+              Factura {displayId(versionData.id, versionData.sequence)}
+              <span className={`badge ${STATUS_BADGE[versionData.status] ?? "badge-neutral"}`}>
+                {STATUS_LABEL[versionData.status] ?? versionData.status}
+              </span>
+              <span className="badge badge-neutral" title="Estás viendo una revisión anterior de este borrador, de solo lectura">
+                Histórica · versión {versionData.sequence}
+              </span>
+            </h1>
+            <p className="page-sub">Guardada el {formatDate(versionData.savedAt)}</p>
+          </div>
+        </div>
+
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+          <span>Estás viendo una revisión anterior de este borrador — es solo de lectura.</span>
+          <a className="page-back-link" onClick={() => navigate(`/facturas/${id}`)}>Ver versión actual</a>
+        </div>
+
+        <div className="card">
+          <div className="items-table-wrap">
+            <table className="data-table navy-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Descripción</th>
+                  <th style={{ textAlign: "right" }}>Cant.</th>
+                  <th style={{ textAlign: "right" }}>Precio Unit.</th>
+                  <th style={{ textAlign: "right" }}>Importe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {versionData.items.map((item, i) => (
+                  <tr key={i}>
+                    <td style={{ fontFamily: "var(--font-body)", fontSize: 12 }}>{item.itemCode || "—"}</td>
+                    <td>{item.description || item.itemName || "—"}</td>
+                    <td style={{ textAlign: "right" }}>{item.qty}</td>
+                    <td style={{ textAlign: "right" }}>{formatMoney(item.rate)}</td>
+                    <td style={{ textAlign: "right", fontWeight: 500 }}>{formatMoney(item.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="items-total-row navy-totals">
+              <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: "flex-end", gap: 24 }}>
+                <span style={{ fontSize: 18, color: "#FCB124", textAlign: "right" }}>Total</span>
+                <span style={{ fontSize: 18, color: "#FCB124", textAlign: "left", minWidth: 170 }}>{formatMoney(versionData.grandTotal)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -1230,11 +1332,21 @@ export default function InvoiceDetail() {
           >
             <span className="page-title-dot" />
             Factura {displayId(invoice.id, invoice.sequence)}
-            <span
-              className={`badge ${STATUS_BADGE[invoice.status] ?? "badge-neutral"}`}
-            >
-              {STATUS_LABEL[invoice.status] ?? invoice.status}
-            </span>
+            {invoice.status === "submitted" ? (
+              ps ? (
+                <span className={`badge ${PAYMENT_BADGE[ps] ?? "badge-neutral"}`}>
+                  {PAYMENT_LABEL[ps] ?? ps}
+                </span>
+              ) : (
+                <span className="badge badge-submitted">Sometido</span>
+              )
+            ) : (
+              <span
+                className={`badge ${STATUS_BADGE[invoice.status] ?? "badge-neutral"}`}
+              >
+                {STATUS_LABEL[invoice.status] ?? invoice.status}
+              </span>
+            )}
             <EstadoArsBadge estado={estadoArs} />
             {relacionClienteSocio && (
               <Badge variant="info">Cliente socio</Badge>
@@ -1521,6 +1633,24 @@ export default function InvoiceDetail() {
         )}
         {invoice.status === "submitted" && (
           <>
+            {mostrarTogglePdfMoneda && (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }} title="Moneda en la que se imprimen los montos del PDF (a4/carta/a6) — el ticket POS siempre imprime en DOP">
+                <button
+                  type="button"
+                  className={`btn btn-size-sm ${pdfMoneda === "dop" ? "btn-secondary" : "btn-ghost"}`}
+                  onClick={() => setPdfMoneda("dop")}
+                >
+                  Imprimir en DOP
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-size-sm ${pdfMoneda === "factura" ? "btn-secondary" : "btn-ghost"}`}
+                  onClick={() => setPdfMoneda("factura")}
+                >
+                  Imprimir en {invoice.currency}
+                </button>
+              </div>
+            )}
             <PdfFormatButton
               onSelect={(formato) => previewMutation.mutate(formato)}
               loading={previewMutation.isPending}

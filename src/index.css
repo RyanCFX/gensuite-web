@@ -2007,6 +2007,9 @@ button {
   border-bottom: 1px solid var(--border-default);
 }
 
+.doc-actions-bar .btn { border: 1.457px solid var(--Gris-Forms, #CCDBE2); }
+.doc-actions-bar .btn-secondary { color: #0E3D51; }
+
 /* ─── ITEMS TABLE (Invoice, Quote, etc.) ─── */
 .items-table-wrap {
   border: 1px solid var(--border-default);
@@ -2347,6 +2350,26 @@ button {
 }
 
 .items-table.navy-table th:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 30%;
+  bottom: 30%;
+  right: 0;
+  width: 2px;
+  background: #ffffff;
+  opacity: 0.25;
+}
+
+/* Misma cabecera navy para tablas base `data-table` (detalle de cliente y sub-tablas). */
+.data-table.navy-table thead tr { background: var(--color-navy); border-bottom: none; }
+
+.data-table.navy-table th {
+  position: relative;
+  background: transparent;
+  color: var(--on-dark-ink);
+}
+
+.data-table.navy-table th:not(:last-child)::after {
   content: '';
   position: absolute;
   top: 30%;

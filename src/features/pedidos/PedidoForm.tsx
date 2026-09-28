@@ -288,7 +288,8 @@ const [customerId, setCustomerId] = useState('')
         const catalogItem = catalogItems[idx]
         return {
           itemCode: i.itemCode,
-          description: i.description ?? '',
+          itemLabel: catalogItem?.itemName,
+          description: i.description || catalogItem?.internalDescription || catalogItem?.itemName || '',
           qty: i.qty,
           rate: i.rate,
           baseRate: i.rate,
@@ -325,7 +326,8 @@ const [customerId, setCustomerId] = useState('')
         const catalogItem = catalogItems[idx]
         return {
           itemCode: i.itemCode,
-          description: i.description ?? '',
+          itemLabel: catalogItem?.itemName,
+          description: i.description || catalogItem?.internalDescription || catalogItem?.itemName || '',
           qty: i.qty,
           rate: i.rate,
           baseRate: i.rate,
@@ -372,7 +374,10 @@ useEffect(() => {
        const discountMode: 'pct' | 'amount' = discountAmount > 0 ? 'amount' : 'pct'
        return {
          itemCode: i.itemCode,
-         description: i.description,
+         // GET /pedidos/:id no manda `description` (confirmado en vivo 2026-09-27) — el nombre
+         // del artículo viene en `itemName` en su lugar.
+         itemLabel: i.itemName,
+         description: i.description || i.itemName || '',
          qty: i.qty,
          rate: i.rate,
          baseRate: i.rate,
@@ -398,9 +403,10 @@ useEffect(() => {
      setLoaded(true)
    }, [existing])
 
-  // A diferencia de lo que originalmente documentaba §10.2, GET /pedidos/:id SÍ ecoa la
-  // combinación de dimensión elegida por línea (confirmado en vivo 2026-09-27) — se usa
-  // directamente para poblar la línea.
+  // Se re-consulta el catálogo solo para la config de dimensiones del artículo (usaDimensiones/
+  // valoresPermitidos/reglas) — el nombre ya se pobló arriba desde `itemName`. A diferencia de lo
+  // que originalmente documentaba §10.2, GET /pedidos/:id SÍ ecoa la combinación elegida por línea
+  // (confirmado en vivo 2026-09-27) — se usa directamente para poblar la línea.
   useEffect(() => {
     if (!existing) return
     let cancelled = false
@@ -409,9 +415,12 @@ useEffect(() => {
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
         const ei = existing.items[idx]
-        return catalogItem?.usaDimensiones
-          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones, dimensiones: ei?.dimensiones ?? row.dimensiones }
-          : row
+        if (!catalogItem?.usaDimensiones) return row
+        return {
+          ...row,
+          itemDimensionesDeclaradas: catalogItem.dimensiones,
+          dimensiones: ei?.dimensiones ?? row.dimensiones,
+        }
       }))
     })
     return () => { cancelled = true }
@@ -944,7 +953,7 @@ try {
         // menos claro (§11).
         if (item.itemDimensionesDeclaradas && item.itemDimensionesDeclaradas.length > 0
           && !combinacionCompleta(item.itemDimensionesDeclaradas, item.dimensiones ?? {})) {
-          toast.error(`Línea ${num}: selecciona la combinación completa de dimensión de inventario del artículo`)
+          toast.error(`Línea ${num}: selecciona la dimensión de inventario completa del artículo`)
           return
         }
       }
@@ -969,7 +978,7 @@ try {
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         {lineasRequierenReingresoDimension && (
           <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
-            <span>Este pedido tiene línea(s) con un artículo que usa combinación de dimensión de inventario sin una combinación completa. Selecciónala en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+            <span>Este pedido tiene línea(s) con un artículo que usa dimensión de inventario incompleta. Selecciónala en la columna «Dimensión» antes de guardar, o esa línea será rechazada.</span>
           </div>
         )}
         {submitError && (
@@ -1231,7 +1240,7 @@ try {
                     <span className="col-resize-handle" onMouseDown={startResize('subtotal')} />
                   </th>
                  <th style={{ textAlign: 'right' }}>
-                    Combinación
+                    Dimensión
                     <span className="col-resize-handle" onMouseDown={startResize('combination')} />
                   </th>
                   <th />
@@ -1370,6 +1379,7 @@ try {
                           onClick={() => setViewItemCode(item.itemCode)}
                           disabled={!item.itemCode}
                           title="Ver detalle"
+                          style={{ color: 'var(--text-primary)' }}
                         >
                           <Eye size={14} />
                         </button>
@@ -1400,7 +1410,7 @@ try {
           </div>
           <div className="items-total-row navy-totals">
             <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
-              <span style={{ textAlign: 'right' }}>Subtotal bruto</span>
+              <span style={{ textAlign: 'right' }}>Subtotal</span>
               <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(grossTotal, currency || monedaBase)}</span>
             </div>
             <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>

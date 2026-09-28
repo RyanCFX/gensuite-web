@@ -675,7 +675,7 @@ function RecibirModal({ items, loading, onClose, onConfirm }: RecibirModalProps)
       // Única excepción a "resend siempre" (§6.3): la combinación se arrastra sola de la orden a
       // la recepción — solo se manda si el usuario tildó explícitamente que la está corrigiendo.
       if (line.corrigiendoDimensiones && !combinacionCompleta(itemDimensiones, line.dimensiones)) {
-        toast.error(`${line.itemCode}: complete la combinación de dimensión de inventario antes de confirmar`)
+        toast.error(`${line.itemCode}: complete la dimensión de inventario antes de confirmar`)
         return
       }
       const dimensionesOverride = line.corrigiendoDimensiones ? line.dimensiones : undefined
@@ -794,7 +794,7 @@ function RecibirModal({ items, loading, onClose, onConfirm }: RecibirModalProps)
                           checked={line.corrigiendoDimensiones}
                           onChange={(e) => updateLine(idx, { corrigiendoDimensiones: e.target.checked })}
                         />
-                        Corregir combinación de esta línea
+                        Corregir dimensión de esta línea
                       </label>
                       {line.corrigiendoDimensiones ? (
                         <CombinacionDimensionSelector
@@ -804,7 +804,7 @@ function RecibirModal({ items, loading, onClose, onConfirm }: RecibirModalProps)
                         />
                       ) : (
                         <p style={{ fontSize: 11, color: 'var(--text-tertiary)', margin: 0 }}>
-                          Se recibe con la misma combinación de la orden — no hace falta elegirla de nuevo.
+                          Se recibe con la misma dimensión de la orden — no hace falta elegirla de nuevo.
                         </p>
                       )}
                     </div>

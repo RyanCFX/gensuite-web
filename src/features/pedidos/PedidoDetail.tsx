@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getPedido, submitPedido, cancelPedido, amendPedido, downloadPedidoPdf, facturarApartado, cancelarApartado } from '@/shared/api/pedidos'
+import { getPedido, getPedidoVersion, submitPedido, cancelPedido, amendPedido, downloadPedidoPdf, facturarApartado, cancelarApartado } from '@/shared/api/pedidos'
 import { listMetodosPago, getFacturacionConfig } from '@/shared/api/config'
 import { crearDespachoDesdePedido } from '@/shared/api/despachos'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -41,7 +41,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function PedidoDetail() {
-  const { id } = useParams<{ id: string }>()
+  const { id, version } = useParams<{ id: string; version?: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -52,10 +52,22 @@ export default function PedidoDetail() {
   const [apartadoModeOfPayment, setApartadoModeOfPayment] = useState('')
   const { widths: itemsColWidths, startResize: startItemsResize } = useResizableColumns(ITEMS_COLUMNS)
 
+  // Una entrada del historial con el mismo id que el documento actual es una revisión de borrador
+  // anterior (no un documento amendado aparte) — GET /pedidos/:id/versions/:sequence devuelve un
+  // snapshot liviano (DraftVersion: id/sequence/savedAt/status/items/grandTotal), no el pedido
+  // completo. Viéndola aquí es de solo lectura: no hay acciones ni mutaciones.
+  const isHistoricalVersion = !!version
+
+  const { data: versionData, isLoading: loadingVersion } = useQuery({
+    queryKey: ['pedido-version', id, version],
+    queryFn: () => getPedidoVersion(id!, Number(version)),
+    enabled: isHistoricalVersion && !!id,
+  })
+
   const { data: pedido, isLoading } = useQuery({
     queryKey: ['pedido', id],
     queryFn: () => getPedido(id!),
-    enabled: !!id,
+    enabled: !isHistoricalVersion && !!id,
   })
 
   const { data: facturacionConfig } = useQuery({
@@ -189,6 +201,74 @@ export default function PedidoDetail() {
   const isPending = submitMutation.isPending || cancelMutation.isPending || amendMutation.isPending
     || downloadMutation.isPending || facturarApartadoMutation.isPending || cancelarApartadoMutation.isPending
 
+  if (isHistoricalVersion) {
+    if (loadingVersion) {
+      return <div className="page-container"><div className="skeleton-box" style={{ width: 280, height: 28 }} /><div className="skeleton-box" style={{ width: '100%', height: 128, marginTop: 12 }} /></div>
+    }
+    if (!versionData) {
+      return (
+        <div className="page-container">
+          <div className="empty-state">
+            <p className="empty-title">Versión no encontrada</p>
+            <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/pedidos/${id}`)}>Ver versión actual</button>
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div className="page-container">
+        <PageHeader
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              Pedido {displayId(versionData.id, versionData.sequence)}
+              <span className={`badge ${STATUS_BADGE[versionData.status] ?? 'badge-neutral'}`}>{STATUS_LABEL[versionData.status] ?? versionData.status}</span>
+              <span className="badge badge-neutral" title="Estás viendo una revisión anterior de este borrador, de solo lectura">
+                Histórica · versión {versionData.sequence}
+              </span>
+            </div>
+          }
+          description={`Guardada el ${formatDate(versionData.savedAt)}`}
+          action={<a className="page-back-link" onClick={() => navigate(`/pedidos/${id}`)}><ArrowLeft size={14} /> Pedidos</a>}
+        />
+
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+          <span>Estás viendo una revisión anterior de este borrador — es solo de lectura.</span>
+          <a className="page-back-link" onClick={() => navigate(`/pedidos/${id}`)}>Ver versión actual</a>
+        </div>
+
+        <div className="card">
+          <div className="items-table-wrap">
+            <table className="data-table navy-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Descripción</th>
+                  <th style={{ textAlign: 'right' }}>Cant.</th>
+                  <th style={{ textAlign: 'right' }}>Precio Unit.</th>
+                  <th style={{ textAlign: 'right' }}>Importe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {versionData.items.map((item, i) => (
+                  <tr key={i}>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode || '—'}</td>
+                    <td>{item.description || item.itemName || '—'}</td>
+                    <td style={{ textAlign: 'right' }}>{item.qty}</td>
+                    <td style={{ textAlign: 'right' }}>{formatMoney(item.rate)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="items-total-row">
+              <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}><span>Total</span><span>{formatMoney(versionData.grandTotal)}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (isLoading) return <div className="page-container"><div className="skeleton-box" style={{ width: 280, height: 28 }} /><div className="skeleton-box" style={{ width: '100%', height: 128, marginTop: 12 }} /></div>
   if (!pedido) return <div className="page-container"><div className="empty-state"><p className="empty-title">Pedido no encontrado</p></div></div>
 
@@ -204,9 +284,10 @@ export default function PedidoDetail() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             Pedido {displayId(pedido.id, pedido.sequence)}
-            <span className={`badge ${STATUS_BADGE[pedido.status] ?? 'badge-neutral'}`}>{STATUS_LABEL[pedido.status] ?? pedido.status}</span>
-            {pedido.estadoFlujo && (
+            {pedido.estadoFlujo ? (
               <span className={`badge ${ESTADO_FLUJO_BADGE[pedido.estadoFlujo]}`}>{ESTADO_FLUJO_LABEL[pedido.estadoFlujo]}</span>
+            ) : (
+              <span className={`badge ${STATUS_BADGE[pedido.status] ?? 'badge-neutral'}`}>{STATUS_LABEL[pedido.status] ?? pedido.status}</span>
             )}
             {pedido.sequence > 0 && <span className="badge badge-info">seq {pedido.sequence}</span>}
             {pedido.amendedFrom && <span className="badge badge-neutral">Enmienda</span>}
@@ -467,7 +548,7 @@ export default function PedidoDetail() {
               {pedido.items.map((item, i) => (
                 <tr key={i}>
                   <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode || '—'}</td>
-                  <td>{item.description || '—'}</td>
+                  <td>{item.description || item.itemName || '—'}</td>
                   <td style={{ fontSize: 12, color: 'var(--text-tertiary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.notes ?? ''}>{item.notes ?? '—'}</td>
                   <td style={{ textAlign: 'right' }}>{item.qty}</td>
                   <td style={{ textAlign: 'right' }}>{formatMoney(item.rate, pedido.currency)}</td>

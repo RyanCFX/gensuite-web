@@ -245,13 +245,13 @@ const NAV_OPS: NavEntry[] = [
         // Ajuste de Combinación (Dimensiones de Inventario) — docs/tasks/
         // PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §8.5. Reemplaza al Conteo estándar para
         // artículos con dimensiones (el Conteo/Stock Reconciliation no funciona con ellos).
-        label: "Ajuste de Combinación",
+        label: "Ajuste de Dimensión",
         icon: <FileText size={14} />,
         path: "/inventario/ajustes-dimension",
       },
       {
         // Reclasificación de Combinación — docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §8.6.
-        label: "Reclasificación de Combinación",
+        label: "Reclasificación de Dimensión",
         icon: <ArrowRightLeft size={14} />,
         path: "/inventario/reclasificaciones",
       },
@@ -1887,38 +1887,38 @@ function AppLayoutInner() {
             />
           </div>
 
-          {/* Right actions: turno · búsqueda · usuario */}
+          {/* Search trigger */}
+          <div className="search-wrap" style={{ flex: 1, maxWidth: 280, marginRight: 12 }}>
+            <span className="search-icon" aria-hidden="true">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+            </span>
+            <input
+              placeholder="Buscar…"
+              aria-label="Abrir búsqueda global"
+              readOnly
+              onClick={() => setCmdOpen(true)}
+              style={{ cursor: "pointer" }}
+            />
+          </div>
+
+          {/* Right actions: turno · usuario */}
           <div className="topbar-right">
             {/* En celular el turno de caja se muestra dentro del dropdown de usuario (ver más abajo) —
              * acá solo queda visible en desktop. */}
             <div className="topbar-turno-desktop">
               <TurnoCajaIndicator />
-            </div>
-
-            {/* Search trigger */}
-            <div className="search-wrap" style={{ width: 280, maxWidth: '100%', minWidth: 0 }}>
-              <span className="search-icon" aria-hidden="true">
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.35-4.35" />
-                </svg>
-              </span>
-              <input
-                placeholder="Buscar…"
-                aria-label="Abrir búsqueda global"
-                readOnly
-                onClick={() => setCmdOpen(true)}
-                style={{ cursor: "pointer" }}
-              />
             </div>
 
             {/* Theme toggle — oculto mientras DARK_MODE_ENABLED sea false */}

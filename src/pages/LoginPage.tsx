@@ -140,7 +140,7 @@ export default function LoginPage() {
     return (
       <AuthLayout>
         <div className="auth-logo-wrap">
-          <LogoMark size={38} />
+          <LogoMark width={262} />
         </div>
         <div className="auth-header">
           <h1 className="auth-title">Elige una empresa</h1>
@@ -181,7 +181,7 @@ export default function LoginPage() {
   return (
     <AuthLayout>
       <div className="auth-logo-wrap">
-        <LogoMark size={38} />
+        <LogoMark width={262} />
       </div>
 
       <div className="auth-header">
@@ -250,7 +250,7 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          className="btn btn-primary auth-submit"
+          className="btn btn-navy auth-submit"
           disabled={isSubmitting || isRateLimited}
         >
           {isSubmitting ? (
@@ -344,7 +344,7 @@ function MfaStep({ mfa, tenant, onBack, onSuccess }: {
   return (
     <AuthLayout>
       <div className="auth-logo-wrap">
-        <LogoMark size={38} />
+        <LogoMark width={262} />
       </div>
       <div className="auth-header">
         <h1 className="auth-title" style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>

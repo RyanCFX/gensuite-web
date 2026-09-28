@@ -233,6 +233,14 @@ function CuentasTab() {
               ⚠️ Este campo no puede activarse. El backend rechaza siempre este valor en verdadero; se mantiene deshabilitado.
             </div>
           </div>
+
+          <div className="ff-wrap">
+            <label className="ff-label" style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: 0.7 }}>
+              <input type="checkbox" className="ff-check" checked={!!data?.allowMultiCurrencyInvoicesAgainstSinglePartyAccount} disabled readOnly />
+              Permitir Facturas Multimoneda contra Cuenta Única
+              <FieldTooltip>Ajuste técnico avanzado — no una preferencia operativa. Habilita el modelo de cuenta CxC/CxP única en DOP; no debe desactivarse.</FieldTooltip>
+            </label>
+          </div>
         </div>
       </div>
 

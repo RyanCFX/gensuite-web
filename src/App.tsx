@@ -238,12 +238,14 @@ export default function App() {
             <Route path="/cotizaciones" element={<Suspense fallback={<PageLoader />}><QuotationsPage /></Suspense>} />
             <Route path="/cotizaciones/nueva" element={<Suspense fallback={<PageLoader />}><QuotationForm /></Suspense>} />
             <Route path="/cotizaciones/:id/editar" element={<Suspense fallback={<PageLoader />}><QuotationForm /></Suspense>} />
+            <Route path="/cotizaciones/:id/versions/:version" element={<Suspense fallback={<PageLoader />}><QuotationDetail /></Suspense>} />
             <Route path="/cotizaciones/:id" element={<Suspense fallback={<PageLoader />}><QuotationDetail /></Suspense>} />
 
             {/* Pedidos de Venta */}
             <Route path="/pedidos" element={<Suspense fallback={<PageLoader />}><PedidosPage /></Suspense>} />
             <Route path="/pedidos/nuevo" element={<Suspense fallback={<PageLoader />}><PedidoForm /></Suspense>} />
             <Route path="/pedidos/:id" element={<Suspense fallback={<PageLoader />}><PedidoDetail /></Suspense>} />
+            <Route path="/pedidos/:id/versions/:version" element={<Suspense fallback={<PageLoader />}><PedidoDetail /></Suspense>} />
             <Route path="/pedidos/:id/editar" element={<Suspense fallback={<PageLoader />}><PedidoForm /></Suspense>} />
 
             {/* Transferencias entre almacenes */}
@@ -255,6 +257,7 @@ export default function App() {
             <Route path="/facturas" element={<Suspense fallback={<PageLoader />}><InvoicesPage /></Suspense>} />
             <Route path="/facturas/nueva" element={<Suspense fallback={<PageLoader />}><InvoiceForm /></Suspense>} />
             <Route path="/facturas/:id/editar" element={<Suspense fallback={<PageLoader />}><InvoiceForm /></Suspense>} />
+            <Route path="/facturas/:id/versions/:version" element={<Suspense fallback={<PageLoader />}><InvoiceDetail /></Suspense>} />
             <Route path="/facturas/:id" element={<Suspense fallback={<PageLoader />}><InvoiceDetail /></Suspense>} />
             <Route path="/notas-credito" element={<Suspense fallback={<PageLoader />}><CreditNotesPage /></Suspense>} />
             <Route path="/notas-debito" element={<Suspense fallback={<PageLoader />}><DebitNotesPage /></Suspense>} />

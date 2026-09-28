@@ -129,9 +129,10 @@ export default function DespachoForm() {
     if (!item.dimensiones || item.dimensiones.length === 0) {
       getItem(item.id).then((detail) => {
         if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
+        const dims = detail.dimensiones
         setItems((prev) => prev.map((r, i) =>
           i === idx && r.itemCode === item.id && !(r.itemDimensiones?.length)
-            ? { ...r, usaDimensiones: true, itemDimensiones: detail.dimensiones }
+            ? { ...r, usaDimensiones: true, itemDimensiones: dims }
             : r,
         ))
       }).catch(() => {})
@@ -151,7 +152,7 @@ export default function DespachoForm() {
     // stock — bloqueamos el submit acá para no dejarle al usuario un 400 confuso del servidor.
     const incompleta = validRows.find((r) => r.usaDimensiones && !combinacionCompleta(r.itemDimensiones, r.dimensiones))
     if (incompleta) {
-      toast.error(`Completa la combinación de dimensión del artículo "${incompleta.itemLabel || incompleta.itemCode}" antes de continuar`)
+      toast.error(`Completa la dimensión del artículo "${incompleta.itemLabel || incompleta.itemCode}" antes de continuar`)
       return
     }
 
@@ -256,7 +257,7 @@ export default function DespachoForm() {
                       <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
                     </th>
                      <th>
-                      Combinación
+                      Dimensión
                       <span className="col-resize-handle" onMouseDown={startResize('combination')} />
                     </th>
                     <th />

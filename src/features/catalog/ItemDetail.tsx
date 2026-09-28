@@ -875,7 +875,7 @@ function MoverUbicacionModal({
           </div>
           {usaDimensiones && (
             <div className="ff-wrap">
-              <label className="ff-label ff-required">Combinación</label>
+              <label className="ff-label ff-required">Dimensión</label>
               <CombinacionDimensionSelector
                 itemDimensiones={catalogItem!.dimensiones!}
                 value={dimensiones}
@@ -961,7 +961,7 @@ function StockPorDimensionPanel({ itemCode }: { itemCode: string }) {
         onClick={() => setOpen((v) => !v)}
       >
         <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Layers size={15} style={{ color: 'var(--text-secondary)' }} /> Stock por combinación
+          <Layers size={15} style={{ color: 'var(--text-secondary)' }} /> Stock por dimensión
         </span>
         {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </div>
@@ -984,7 +984,7 @@ function StockPorDimensionPanel({ itemCode }: { itemCode: string }) {
           {isLoading ? (
             <span className="skeleton-box" style={{ height: 100, display: 'block' }} />
           ) : !response || response.items.length === 0 ? (
-            <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: 0 }}>Sin combinaciones registradas.</p>
+            <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: 0 }}>Sin dimensiones registradas.</p>
           ) : (
             <>
               <div className="stats-row" style={{ marginBottom: 16 }}>

@@ -91,16 +91,23 @@ export function TurnoCajaIndicator() {
     <>
       {turno ? (
         <button
-          className="badge badge-success"
+          className="badge"
           title={`Perfil: ${turno.posProfile} — clic para cerrar turno`}
           onClick={() => setCierreModalOpen(true)}
           style={{
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: 4,
+            height: 32,
+            padding: '0 10px',
             whiteSpace: 'nowrap',
             cursor: 'pointer',
             fontFamily: 'inherit',
+            background: 'color-mix(in srgb, #208591 12%, transparent)',
+            color: '#208591',
+            borderColor: 'color-mix(in srgb, #208591 35%, transparent)',
+            borderRadius: 'var(--radius-md)',
           }}
         >
           <Clock size={12} /> Turno abierto —{' '}

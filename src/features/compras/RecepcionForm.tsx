@@ -891,7 +891,7 @@ export default function RecepcionForm() {
       {lineasRequierenReingresoDimension && (
         <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
           <Info size={16} />
-          <span>Esta recepción tiene línea(s) con un artículo que usa combinación de dimensión de inventario sin una combinación completa. Selecciónala en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+          <span>Esta recepción tiene línea(s) con un artículo que usa dimensión de inventario incompleta. Selecciónala en la columna «Dimensión» antes de guardar, o esa línea será rechazada.</span>
         </div>
       )}
 
@@ -1021,7 +1021,7 @@ export default function RecepcionForm() {
                         <span className="col-resize-handle" onMouseDown={startResize('udm')} />
                       </th>
                       <th>
-                        Combinación
+                        Dimensión
                         <span className="col-resize-handle" onMouseDown={startResize('combination')} />
                       </th>
                       <th />

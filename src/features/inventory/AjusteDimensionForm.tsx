@@ -145,7 +145,7 @@ export default function AjusteDimensionForm() {
       setResultado({ tipo: data.tipo, qty: data.qty })
       toast.success(`Ajuste aplicado — ${data.tipo === 'Material Receipt' ? 'se agregaron' : 'se restaron'} ${data.qty} unidades.`)
     },
-    onError: (err: unknown) => mostrarErrorApi(err, 'Error al ajustar la combinación'),
+    onError: (err: unknown) => mostrarErrorApi(err, 'Error al ajustar la dimensión'),
   })
 
   function resetForm() {
@@ -163,9 +163,9 @@ export default function AjusteDimensionForm() {
     e.preventDefault()
     if (!item) { toast.error('Selecciona un artículo'); return }
     if (!warehouse) { toast.error('Selecciona un almacén'); return }
-    if (!combinacionLista) { toast.error('Completa la combinación a ajustar — todas las dimensiones del artículo'); return }
+    if (!combinacionLista) { toast.error('Completa la dimensión a ajustar — todos los valores del artículo'); return }
     if (cantidadFinal === '' || cantidadFinal < 0) { toast.error('Indica la cantidad final deseada (≥ 0)'); return }
-    if (esNoOp) { toast.error(`La combinación ya tiene ${saldoActual} unidades en "${warehouse}" — no hay diferencia que ajustar.`); return }
+    if (esNoOp) { toast.error(`La dimensión ya tiene ${saldoActual} unidades en "${warehouse}" — no hay diferencia que ajustar.`); return }
     ajusteMutation.mutate()
   }
 
@@ -175,7 +175,7 @@ export default function AjusteDimensionForm() {
         <div className="card">
           <div className="empty-state">
             <p className="empty-title">Sin acceso</p>
-            <p className="empty-sub">No tienes permiso para ajustar combinaciones de inventario.</p>
+            <p className="empty-sub">No tienes permiso para ajustar dimensiones de inventario.</p>
           </div>
         </div>
       </div>
@@ -189,8 +189,8 @@ export default function AjusteDimensionForm() {
       </a>
 
       <PageHeader
-        title="Ajuste de Combinación"
-        description="Corrige el saldo de UNA combinación puntual de un artículo con dimensiones de inventario (ej. marca/año) — reemplaza al Conteo estándar, que no funciona con estos artículos."
+        title="Ajuste de Dimensión"
+        description="Corrige el saldo de UNA dimensión puntual de un artículo con dimensiones de inventario (ej. marca/año) — reemplaza al Conteo estándar, que no funciona con estos artículos."
       />
 
       {!loadingCuentas && !cuentaAjusteConfigurada && (
@@ -200,13 +200,13 @@ export default function AjusteDimensionForm() {
           <a onClick={() => navigate('/config/empresa')} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
             configúrela en Empresa
           </a>{' '}
-          antes de ajustar una combinación. El servidor rechazará este formulario.
+          antes de ajustar una dimensión. El servidor rechazará este formulario.
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Artículo y combinación</h2></div>
+          <div className="card-header"><h2 className="card-title">Artículo y dimensión</h2></div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="form-row form-row-3">
               <div className="ff-wrap">
@@ -240,7 +240,7 @@ export default function AjusteDimensionForm() {
 
             {item && itemDimensiones.length > 0 && (
               <div className="ff-wrap">
-                <label className="ff-label ff-required">Combinación a ajustar</label>
+                <label className="ff-label ff-required">Dimensión a ajustar</label>
                 <CombinacionDimensionSelector
                   itemDimensiones={itemDimensiones}
                   value={combinacion}
@@ -256,7 +256,7 @@ export default function AjusteDimensionForm() {
             <div className="card-header"><h2 className="card-title">Saldo actual y ajuste</h2></div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Saldo actual de esta combinación en "{warehouse}"</span>
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Saldo actual de esta dimensión en "{warehouse}"</span>
                 <span className="stat-value" style={{ fontSize: 24 }}>{loadingStock ? '…' : saldoActual}</span>
               </div>
 
@@ -273,7 +273,7 @@ export default function AjusteDimensionForm() {
                     onChange={(e) => setCantidadFinal(e.target.value === '' ? '' : parseFloat(e.target.value))}
                   />
                   <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                    Cantidad final deseada de esta combinación, no la diferencia.
+                    Cantidad final deseada de esta dimensión, no la diferencia.
                   </span>
                 </div>
                 <div className="ff-wrap">
@@ -299,7 +299,7 @@ export default function AjusteDimensionForm() {
                 esNoOp ? (
                   <div className="inline-alert inline-alert-warn" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <AlertTriangle size={16} />
-                    <span>La combinación ya tiene {saldoActual} unidades en "{warehouse}" — no hay diferencia que ajustar.</span>
+                    <span>La dimensión ya tiene {saldoActual} unidades en "{warehouse}" — no hay diferencia que ajustar.</span>
                   </div>
                 ) : (
                   <div className="inline-alert inline-alert-info">

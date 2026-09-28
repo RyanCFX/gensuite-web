@@ -124,9 +124,9 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-header">
+      <div className="card-header navy-card-header">
         <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Receipt size={16} style={{ color: 'var(--success-text)' }} /> Notas de Crédito
+          <Receipt size={16} /> Notas de Crédito
         </h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {saldo.balance > 0 && (
@@ -140,7 +140,7 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
         </div>
       </div>
       <div className="table-scroll">
-        <table className="data-table items-table-resizable">
+        <table className="data-table navy-table items-table-resizable">
           <colgroup>
             {CREDIT_NOTES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
           </colgroup>
@@ -262,7 +262,7 @@ function RecentInvoices({ customerId }: { customerId: string }) {
 
   return (
     <div className="table-scroll">
-      <table className="data-table items-table-resizable">
+      <table className="data-table navy-table items-table-resizable">
         <colgroup>
           {RECENT_INVOICES_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
         </colgroup>
@@ -319,7 +319,10 @@ function EstadoCuentaPreview({
 }) {
   const [showPreview, setShowPreview] = useState(true)
   const { widths: docsColWidths, startResize: startDocsResize } = useResizableColumns(DOCUMENTOS_PENDIENTES_COLUMNS)
-  const agingColumns = (data?.aging ?? []).map((bucket) => ({ key: `bucket-${bucket.label}`, width: 100 }))
+  // El backend puede devolver `aging` en forma no-arreglo para algunos clientes — normalizar
+  // para no romper el render (la sección se oculta si no hay buckets válidos).
+  const agingBuckets = Array.isArray(data?.aging) ? data.aging : []
+  const agingColumns = agingBuckets.map((bucket) => ({ key: `bucket-${bucket.label}`, width: 100 }))
   const { widths: agingColWidths, startResize: startAgingResize } = useResizableColumns([
     ...agingColumns,
     { key: 'total', width: 110 },
@@ -330,13 +333,14 @@ function EstadoCuentaPreview({
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-header">
+      <div className="card-header navy-card-header">
         <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <FileText size={16} /> Estado de Cuenta
         </h2>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             className="btn btn-ghost btn-size-sm"
+            style={{ color: 'var(--on-dark-ink)' }}
             onClick={() => setShowPreview(!showPreview)}
           >
             {showPreview ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -344,6 +348,7 @@ function EstadoCuentaPreview({
           </button>
           <button
             className="btn btn-secondary btn-size-sm"
+            style={{ color: 'var(--on-dark-ink)', borderColor: 'var(--on-dark-ink)' }}
             onClick={() => downloadEstadoCuentaPdf(customerId, `estado-cuenta-${customerName}.pdf`)}
           >
             <Download size={14} />
@@ -399,7 +404,7 @@ function EstadoCuentaPreview({
                   Documentos Pendientes
                 </h3>
                 <div className="table-scroll">
-                  <table className="data-table items-table-resizable">
+                  <table className="data-table navy-table items-table-resizable">
                     <colgroup>
                       {DOCUMENTOS_PENDIENTES_COLUMNS.map((c) => <col key={c.key} style={{ width: docsColWidths[c.key] }} />)}
                     </colgroup>
@@ -466,20 +471,20 @@ function EstadoCuentaPreview({
           </div>
 
           {/* ── Antigüedad de saldos ─────────────────────────── */}
-          {data.aging && data.aging.length > 0 && (
+          {agingBuckets.length > 0 && (
             <div className="card-body" style={{ paddingTop: 16 }}>
               <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
                 Antigüedad de Saldos
               </h3>
               <div className="table-scroll">
-                <table className="data-table items-table-resizable">
+                <table className="data-table navy-table items-table-resizable">
                   <colgroup>
                     {agingColumns.map((c) => <col key={c.key} style={{ width: agingColWidths[c.key] }} />)}
                     <col style={{ width: agingColWidths['total'] }} />
                   </colgroup>
                   <thead>
                     <tr>
-                      {data.aging.map((bucket, i) => (
+                      {agingBuckets.map((bucket, i) => (
                         <th key={i} style={{ textAlign: 'right' }}>
                           {bucket.label}
                           <span className="col-resize-handle" onMouseDown={startAgingResize(agingColumns[i].key)} />
@@ -493,7 +498,7 @@ function EstadoCuentaPreview({
                   </thead>
                   <tbody>
                     <tr>
-                      {data.aging.map((bucket, i) => (
+                      {agingBuckets.map((bucket, i) => (
                         <td key={i} style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(bucket.total)}</td>
                       ))}
                       <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatDOP(data.totalPendiente)}</td>
@@ -587,12 +592,13 @@ export default function CustomerDetail() {
 
   return (
     <div className="page-container">
-      <div className="page-header">
+      <a className="page-back-link" onClick={() => navigate('/clientes')} style={{ marginBottom: 4 }}>
+        <ArrowLeft size={14} /> Clientes
+      </a>
+      <div className="page-header" style={{ alignItems: 'center' }}>
         <div>
-          <a className="page-back-link" onClick={() => navigate('/clientes')}>
-            <ArrowLeft size={14} /> Clientes
-          </a>
-          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#0E3D51' }}>
+            <span className="page-title-dot" />
             {customer.customerType === 'Company'
               ? <Building2 size={20} style={{ color: 'var(--text-secondary)' }} />
               : <User size={20} style={{ color: 'var(--text-secondary)' }} />}
@@ -601,15 +607,15 @@ export default function CustomerDetail() {
             {customer.disabled && <span className="badge badge-error">Inactivo</span>}
           </h1>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {!customer.isSystemManaged && (
-            <button className="btn btn-secondary" onClick={() => navigate(`/clientes/${id}/editar`)}>
+            <button className="btn btn-secondary" style={{ border: '1.457px solid var(--Gris-Forms, #CCDBE2)', color: '#0E3D51' }} onClick={() => navigate(`/clientes/${id}/editar`)}>
               <Pencil size={14} />
               Editar
             </button>
           )}
           {id && tieneCxC && (
-            <button className="btn btn-secondary" onClick={() => setShowEstadoCuenta(!showEstadoCuenta)}>
+            <button className="btn btn-secondary" style={{ border: '1.457px solid var(--Gris-Forms, #CCDBE2)', color: '#0E3D51' }} onClick={() => setShowEstadoCuenta(!showEstadoCuenta)}>
               <FileText size={14} />
               Estado de Cuenta
             </button>
@@ -637,7 +643,7 @@ export default function CustomerDetail() {
       )}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Información General</h2>
         </div>
         <div className="card-body">
@@ -752,7 +758,7 @@ export default function CustomerDetail() {
       </div>
 
       <div className="card">
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Facturas Recientes</h2>
         </div>
         <div className="card-body">

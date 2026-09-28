@@ -199,7 +199,7 @@ export default function TransferenciaForm() {
     // stock — bloqueamos el submit acá para no dejarle al usuario un 400 confuso del servidor.
     const incompleta = items.find((i) => i.usaDimensiones && !combinacionCompleta(i.itemDimensiones ?? [], i.dimensiones ?? {}))
     if (incompleta) {
-      toast.error(`Completa la combinación de dimensión del artículo "${incompleta.itemLabel || incompleta.itemCode}" antes de continuar`)
+      toast.error(`Completa la dimensión del artículo "${incompleta.itemLabel || incompleta.itemCode}" antes de continuar`)
       return
     }
 
@@ -306,7 +306,7 @@ export default function TransferenciaForm() {
                     <span className="col-resize-handle" onMouseDown={startResize('cantidad')} />
                   </th>
           <th style={{ textAlign: 'right' }}>
-                    Combinación
+                    Dimensión
                     <span className="col-resize-handle" onMouseDown={startResize('combination')} />
                   </th>
                   <th />

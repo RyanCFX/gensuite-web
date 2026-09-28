@@ -133,9 +133,9 @@ export default function ReclasificacionForm() {
     }),
     onSuccess: (data) => {
       setResultado({ qty: data.qty })
-      toast.success(`Reclasificación aplicada — ${data.qty} unidades movidas a la nueva combinación.`)
+      toast.success(`Reclasificación aplicada — ${data.qty} unidades movidas a la nueva dimensión.`)
     },
-    onError: (err: unknown) => mostrarErrorApi(err, 'Error al reclasificar la combinación'),
+    onError: (err: unknown) => mostrarErrorApi(err, 'Error al reclasificar la dimensión'),
   })
 
   function resetForm() {
@@ -154,9 +154,9 @@ export default function ReclasificacionForm() {
     e.preventDefault()
     if (!item) { toast.error('Selecciona un artículo'); return }
     if (!warehouse) { toast.error('Selecciona un almacén'); return }
-    if (!desdeCompleta) { toast.error('Completa la combinación actual ("desde")'); return }
-    if (!haciaCompleta) { toast.error('Completa la combinación nueva ("hacia")'); return }
-    if (sonIguales) { toast.error('"desde" y "hacia" son la misma combinación — no hay nada que reclasificar.'); return }
+    if (!desdeCompleta) { toast.error('Completa la dimensión actual ("desde")'); return }
+    if (!haciaCompleta) { toast.error('Completa la dimensión nueva ("hacia")'); return }
+    if (sonIguales) { toast.error('"desde" y "hacia" son la misma dimensión — no hay nada que reclasificar.'); return }
     if (qty === '' || qty <= 0) { toast.error('Indica la cantidad a reclasificar (> 0)'); return }
     reclasificarMutation.mutate()
   }
@@ -167,7 +167,7 @@ export default function ReclasificacionForm() {
         <div className="card">
           <div className="empty-state">
             <p className="empty-title">Sin acceso</p>
-            <p className="empty-sub">No tienes permiso para reclasificar combinaciones de inventario.</p>
+            <p className="empty-sub">No tienes permiso para reclasificar dimensiones de inventario.</p>
           </div>
         </div>
       </div>
@@ -181,8 +181,8 @@ export default function ReclasificacionForm() {
       </a>
 
       <PageHeader
-        title="Reclasificación de Combinación"
-        description='Corrige una combinación mal elegida en el mismo almacén, sin mover valuación — ej. "se marcó Honda/2000 y era Honda/2001". No traslada entre almacenes distintos (eso es Transferencias).'
+        title="Reclasificación de Dimensión"
+        description='Corrige una dimensión mal elegida en el mismo almacén, sin mover valuación — ej. "se marcó Honda/2000 y era Honda/2001". No traslada entre almacenes distintos (eso es Transferencias).'
       />
 
       <form onSubmit={handleSubmit}>
@@ -223,11 +223,11 @@ export default function ReclasificacionForm() {
 
         {item && itemDimensiones.length > 0 && (
           <div className="card" style={{ marginBottom: 16 }}>
-            <div className="card-header"><h2 className="card-title">Combinación actual y nueva</h2></div>
+            <div className="card-header"><h2 className="card-title">Dimensión actual y nueva</h2></div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <div className="ff-wrap" style={{ flex: 1, minWidth: 260 }}>
-                  <label className="ff-label ff-required">Combinación actual (desde)</label>
+                  <label className="ff-label ff-required">Dimensión actual (desde)</label>
                   <CombinacionDimensionSelector
                     itemDimensiones={itemDimensiones}
                     value={desde}
@@ -236,7 +236,7 @@ export default function ReclasificacionForm() {
                 </div>
                 <ArrowRight size={18} style={{ marginTop: 32, color: 'var(--text-tertiary)', flexShrink: 0 }} />
                 <div className="ff-wrap" style={{ flex: 1, minWidth: 260 }}>
-                  <label className="ff-label ff-required">Combinación nueva (hacia)</label>
+                  <label className="ff-label ff-required">Dimensión nueva (hacia)</label>
                   <CombinacionDimensionSelector
                     itemDimensiones={itemDimensiones}
                     value={hacia}
@@ -248,13 +248,13 @@ export default function ReclasificacionForm() {
               {sonIguales && (
                 <div className="inline-alert inline-alert-warn" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <AlertTriangle size={16} />
-                  <span>"desde" y "hacia" son la misma combinación — no hay nada que reclasificar.</span>
+                  <span>"desde" y "hacia" son la misma dimensión — no hay nada que reclasificar.</span>
                 </div>
               )}
 
               {stockParams && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-default)', paddingTop: 12 }}>
-                  <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Disponible en la combinación actual, en "{warehouse}"</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Disponible en la dimensión actual, en "{warehouse}"</span>
                   <span className="stat-value" style={{ fontSize: 24 }}>{loadingStock ? '…' : saldoActual}</span>
                 </div>
               )}
@@ -316,7 +316,7 @@ export default function ReclasificacionForm() {
 
       {resultado && (
         <div className="inline-alert inline-alert-success" style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Reclasificación aplicada: <strong>{resultado.qty}</strong> unidades movidas a la nueva combinación.</span>
+          <span>Reclasificación aplicada: <strong>{resultado.qty}</strong> unidades movidas a la nueva dimensión.</span>
           <button type="button" className="btn btn-ghost btn-size-sm" onClick={resetForm}>Hacer otra reclasificación</button>
         </div>
       )}

@@ -119,7 +119,7 @@ export function CombinacionDimensionSelector({
   }
 
   return (
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: compact ? 'center' : undefined }}>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: compact ? 'center' : undefined, justifyContent: compact ? 'center' : undefined }}>
       {itemDimensiones.map((d) => {
         const catalogo = porCodigo.get(d.dimension)
         const padreCodigo = catalogo?.dimensionPadre

@@ -1,14 +1,13 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getQuotation, submitQuotation, deleteQuotation, convertQuotationToInvoice, cancelQuotation, downloadQuotationPdf } from '@/shared/api/quotations'
+import { getQuotation, getQuotationVersion, submitQuotation, deleteQuotation, convertQuotationToInvoice, cancelQuotation, downloadQuotationPdf } from '@/shared/api/quotations'
 import type { Quotation } from '@/shared/api/types'
-import { ArrowLeft, Download, FileText, Loader2, Send, Trash2, ClipboardList, XCircle, Copy } from 'lucide-react'
+import { ArrowLeft, Download, FileText, Loader2, Send, Trash2, ClipboardList, XCircle, Copy, Link2, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatMoney, displayId } from '@/lib/formatters'
 import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
-import { RelatedDocsCard } from '@/components/shared/RelatedDocsCard'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
@@ -26,32 +25,46 @@ const ITEMS_COLUMNS = [
 ]
 
 const STATUS_BADGE: Record<string, string> = {
-  Draft: 'badge-draft',
-  Submitted: 'badge-submitted',
-  Ordered: 'badge-info',
-  Lost: 'badge-warning',
-  Cancelled: 'badge-cancelled',
+  draft: 'badge-draft',
+  submitted: 'badge-submitted',
+  ordered: 'badge-info',
+  lost: 'badge-warning',
+  cancelled: 'badge-cancelled',
 }
 const STATUS_LABEL: Record<string, string> = {
-  Draft: 'Borrador',
-  Submitted: 'Sometido',
-  Ordered: 'Ordenado',
-  Lost: 'Perdido',
-  Cancelled: 'Cancelado',
+  draft: 'Borrador',
+  submitted: 'Sometido',
+  ordered: 'Cotización ordenada',
+  lost: 'Perdido',
+  cancelled: 'Cancelado',
 }
 
 export default function QuotationDetail() {
-  const { id } = useParams<{ id: string }>()
+  const { id, version } = useParams<{ id: string; version?: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [convertDialogOpen, setConvertDialogOpen] = useState(false)
   const [selectedNcfType, setSelectedNcfType] = useState<string>('B02')
+  const [relatedOpen, setRelatedOpen] = useState(false)
+  const relatedRef = useRef<HTMLDivElement>(null)
   const { widths: itemsColWidths, startResize: startItemsResize } = useResizableColumns(ITEMS_COLUMNS)
+
+  // Una entrada del historial con el mismo id que el documento actual es una revisión de borrador
+  // anterior (no un documento amendado aparte) — GET /quotations/:id/versions/:sequence devuelve
+  // un snapshot liviano (DraftVersion: id/sequence/savedAt/status/items/grandTotal), no la
+  // cotización completa. Viéndola aquí es de solo lectura: no hay acciones ni mutaciones.
+  const isHistoricalVersion = !!version
+
+  const { data: versionData, isLoading: loadingVersion } = useQuery({
+    queryKey: ['quotation-version', id, version],
+    queryFn: () => getQuotationVersion(id!, Number(version)),
+    enabled: isHistoricalVersion && !!id,
+  })
 
   const { data: quotation, isLoading } = useQuery({
     queryKey: ['quotation', id],
     queryFn: () => getQuotation(id!),
-    enabled: !!id,
+    enabled: !isHistoricalVersion && !!id,
   })
 
   const { data: facturacionConfig } = useQuery({
@@ -60,6 +73,20 @@ export default function QuotationDetail() {
     staleTime: 5 * 60_000,
   })
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
+
+  useEffect(() => {
+    if (!relatedOpen) return
+    const onDown = (e: PointerEvent) => {
+      if (relatedRef.current && !relatedRef.current.contains(e.target as Node)) setRelatedOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setRelatedOpen(false) }
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [relatedOpen])
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
@@ -134,6 +161,89 @@ export default function QuotationDetail() {
 
   const isActionsLoading = submitMutation.isPending || deleteMutation.isPending || convertMutation.isPending || cancelMutation.isPending || downloadMutation.isPending
 
+  if (isHistoricalVersion) {
+    if (loadingVersion) {
+      return (
+        <div className="page-container">
+          <div className="skeleton-box" style={{ width: 280, height: 28, marginBottom: 8 }} />
+          <div className="skeleton-box" style={{ width: '100%', height: 256, borderRadius: 'var(--radius-lg)' }} />
+        </div>
+      )
+    }
+    if (!versionData) {
+      return (
+        <div className="page-container">
+          <div className="empty-state">
+            <div className="empty-title">Versión no encontrada</div>
+            <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/cotizaciones/${id}`)}>
+              Ver versión actual
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div className="page-container">
+        <div className="page-header">
+          <div>
+            <a className="page-back-link" onClick={() => navigate(`/cotizaciones/${id}`)}>
+              <ArrowLeft size={14} /> Cotización {id}
+            </a>
+            <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="page-title-dot" />
+              Cotización {displayId(versionData.id, versionData.sequence)}
+              <span className={`badge ${STATUS_BADGE[versionData.status] ?? 'badge-neutral'}`}>
+                {STATUS_LABEL[versionData.status] ?? versionData.status}
+              </span>
+              <span className="badge badge-neutral" title="Estás viendo una revisión anterior de este borrador, de solo lectura">
+                Histórica · versión {versionData.sequence}
+              </span>
+            </h1>
+            <p className="page-sub">Guardada el {formatDate(versionData.savedAt)}</p>
+          </div>
+        </div>
+
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+          <span>Estás viendo una revisión anterior de este borrador — es solo de lectura.</span>
+          <a className="page-back-link" onClick={() => navigate(`/cotizaciones/${id}`)}>Ver versión actual</a>
+        </div>
+
+        <div className="card">
+          <div className="items-table-wrap">
+            <table className="data-table navy-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Descripción</th>
+                  <th style={{ textAlign: 'right' }}>Cant.</th>
+                  <th style={{ textAlign: 'right' }}>Precio Unit.</th>
+                  <th style={{ textAlign: 'right' }}>Importe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {versionData.items.map((item, i) => (
+                  <tr key={i}>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode || '—'}</td>
+                    <td>{item.description || item.itemName || '—'}</td>
+                    <td style={{ textAlign: 'right' }}>{item.qty}</td>
+                    <td style={{ textAlign: 'right' }}>{formatMoney(item.rate)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="items-total-row navy-totals">
+              <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'right' }}>Total</span>
+                <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'left', minWidth: 170 }}>{formatMoney(versionData.grandTotal)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (isLoading) {
     return (
       <div className="page-container">
@@ -171,6 +281,7 @@ export default function QuotationDetail() {
             <ArrowLeft size={14} /> Cotizaciones
           </a>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="page-title-dot" />
             Cotización {displayId(quotation.id, quotation.sequence)}
             <span className={`badge ${STATUS_BADGE[quotation.status] ?? 'badge-neutral'}`}>
               {STATUS_LABEL[quotation.status] ?? quotation.status}
@@ -197,32 +308,61 @@ export default function QuotationDetail() {
         </div>
       </div>
 
-      <div className="doc-actions-bar">
+      <div className="doc-actions-bar" style={{ background: 'transparent', border: 'none', padding: 0, marginBottom: 16 }}>
         <button
-          className="btn btn-secondary btn-size-sm"
+          className="btn btn-secondary btn-size-md"
           onClick={() => navigate(`/cotizaciones/nueva?duplicate=${id}`)}
           disabled={isActionsLoading}
         >
           <Copy size={14} /> Duplicar
         </button>
+        {quotation.salesOrder && (
+          <div className="dropdown" ref={relatedRef}>
+            <button
+              className="btn btn-secondary btn-size-md"
+              aria-haspopup="true"
+              aria-expanded={relatedOpen}
+              onClick={() => setRelatedOpen((o) => !o)}
+            >
+              <Link2 size={14} /> Documentos relacionados
+              <ChevronRight size={11} style={{ transform: 'rotate(90deg)' }} aria-hidden="true" />
+            </button>
+            <div
+              className={`dropdown-panel${relatedOpen ? ' open' : ''}`}
+              role="menu"
+              style={{ left: 0, right: 'auto' }}
+            >
+              <div className="dd-header">
+                <div className="dd-name" style={{ fontSize: 11 }}>Pedido de venta</div>
+              </div>
+              <button
+                className="dd-item"
+                role="menuitem"
+                onClick={() => { setRelatedOpen(false); navigate(`/pedidos/${quotation.salesOrder}`) }}
+              >
+                {quotation.salesOrder}
+              </button>
+            </div>
+          </div>
+        )}
         {quotation.status === 'draft' && (
           <>
             <button
-              className="btn btn-secondary btn-size-sm"
+              className="btn btn-secondary btn-size-md"
               onClick={() => navigate(`/cotizaciones/${id}/editar`)}
               disabled={isActionsLoading}
             >
               <FileText size={14} /> Editar
             </button>
             <button
-              className="btn btn-primary btn-size-sm"
+              className="btn btn-navy btn-size-md"
               onClick={() => submitMutation.mutate()}
               disabled={isActionsLoading}
             >
               <Send size={14} /> Someter
             </button>
             <button
-              className="btn btn-danger btn-size-sm"
+              className="btn btn-danger btn-size-md"
               onClick={() => deleteMutation.mutate()}
               disabled={isActionsLoading}
             >
@@ -232,20 +372,20 @@ export default function QuotationDetail() {
         )}
         {quotation.status === 'submitted' && (
           <>
-            <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/cotizaciones/${id}/editar`)} disabled={isActionsLoading}>
+            <button className="btn btn-secondary btn-size-md" onClick={() => navigate(`/cotizaciones/${id}/editar`)} disabled={isActionsLoading}>
               <FileText size={14} /> Editar
             </button>
-            <button className="btn btn-danger btn-size-sm" onClick={() => cancelMutation.mutate()} disabled={isActionsLoading}>
+            <button className="btn btn-danger btn-size-md" onClick={() => cancelMutation.mutate()} disabled={isActionsLoading}>
               <XCircle size={14} /> Cancelar
             </button>
-            <button className="btn btn-secondary btn-size-sm" onClick={() => setConvertDialogOpen(true)} disabled={isActionsLoading}>
+            <button className="btn btn-secondary btn-size-md" onClick={() => setConvertDialogOpen(true)} disabled={isActionsLoading}>
               <FileText size={14} /> Convertir a Factura
             </button>
-            <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/pedidos/nuevo?quotation=${id}`)} disabled={isActionsLoading}>
+            <button className="btn btn-secondary btn-size-md" onClick={() => navigate(`/pedidos/nuevo?quotation=${id}`)} disabled={isActionsLoading}>
               <ClipboardList size={14} /> Crear Pedido
             </button>
             <button
-              className="btn btn-secondary btn-size-sm"
+              className="btn btn-secondary btn-size-md"
               onClick={() => downloadMutation.mutate()}
               disabled={downloadMutation.isPending}
             >
@@ -255,15 +395,10 @@ export default function QuotationDetail() {
             </button>
           </>
         )}
-        {quotation.status !== 'draft' && quotation.status !== 'submitted' && (
-          <p className="page-sub" style={{ color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
-            {quotation.status === 'cancelled' ? 'Cotización cancelada' : quotation.status === 'ordered' ? 'Cotización ordenada' : 'Cotización perdida'}
-          </p>
-        )}
         {quotation.status === 'ordered' && (
           <>
             <button
-              className="btn btn-secondary btn-size-sm"
+              className="btn btn-secondary btn-size-md"
               onClick={() => downloadMutation.mutate()}
               disabled={downloadMutation.isPending}
             >
@@ -275,19 +410,8 @@ export default function QuotationDetail() {
         )}
       </div>
 
-      <RelatedDocsCard
-        rows={[
-          {
-            label: 'Pedido de venta',
-            links: quotation.salesOrder
-              ? [{ code: quotation.salesOrder, to: `/pedidos/${quotation.salesOrder}` }]
-              : [],
-          },
-        ]}
-      />
-
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Información General</h2>
         </div>
         <div className="card-body">
@@ -333,19 +457,19 @@ export default function QuotationDetail() {
                 </span>
               </span>
             </div>
+            {quotation.notes && (
+              <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+                <span className="detail-label">Notas</span>
+                <span className="detail-value" style={{ whiteSpace: 'pre-line' }}>{quotation.notes}</span>
+              </div>
+            )}
           </div>
-          {quotation.notes && (
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-              <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>Notas</p>
-              <p style={{ fontSize: 13, whiteSpace: 'pre-line' }}>{quotation.notes}</p>
-            </div>
-          )}
         </div>
       </div>
 
       <div className="card">
         <div className="items-table-wrap">
-          <table className="items-table items-table-resizable">
+          <table className="items-table navy-table items-table-resizable">
             <colgroup>
               {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
             </colgroup>
@@ -412,28 +536,26 @@ export default function QuotationDetail() {
               ))}
             </tbody>
           </table>
-          <div className="items-total-row">
-            <div className="items-total-line">
-              <span>Subtotal bruto</span>
-              <span>{formatMoney(grossTotal, quotation.currency)}</span>
+          <div className="items-total-row navy-totals">
+            <div className="items-total-line" style={{ fontSize: 14, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ textAlign: 'right' }}>Subtotal bruto</span>
+              <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(grossTotal, quotation.currency)}</span>
             </div>
-            {totalDiscount > 0 && (
-              <div className="items-total-line" style={{ color: 'var(--text-danger)' }}>
-                <span>Descuento total</span>
-                <span>-{formatMoney(totalDiscount, quotation.currency)}</span>
-              </div>
-            )}
+            <div className="items-total-line" style={{ fontSize: 14, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ textAlign: 'right' }}>Descuento</span>
+              <span style={{ textAlign: 'left', minWidth: 170 }}>-{formatMoney(totalDiscount, quotation.currency)}</span>
+            </div>
             {/*<div className="items-total-line">
               <span>Subtotal neto</span>
               <span>{formatMoney(subtotal, quotation.currency)}</span>
             </div>*/}
-            <div className="items-total-line">
-              <span>Impuesto</span>
-              <span>{formatMoney(taxAmount, quotation.currency)}</span>
+            <div className="items-total-line" style={{ fontSize: 14, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ textAlign: 'right' }}>Impuesto</span>
+              <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(taxAmount, quotation.currency)}</span>
             </div>
-            <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
-              <span>Total</span>
-              <span>{formatMoney(total, quotation.currency)}</span>
+            <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'right' }}>Total</span>
+              <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'left', minWidth: 170 }}>{formatMoney(total, quotation.currency)}</span>
             </div>
           </div>
         </div>
