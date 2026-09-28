@@ -9,7 +9,7 @@ import { client } from '@/shared/api/client'
 import type { Invoice, EstadoCuentaResponse } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useFeature } from '@/shared/features/can'
-import { Pencil, Ban, Building2, User, ArrowLeft, Wallet, Receipt, X, FileText, Download, Eye, EyeOff } from 'lucide-react'
+import { Pencil, Ban, Building2, User, ArrowLeft, Wallet, Receipt, X, FileText, Download, Eye, EyeOff, Plus, Minus, ChevronDown, ChevronRight } from 'lucide-react'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const CREDIT_NOTES_COLUMNS = [
@@ -538,6 +538,7 @@ export default function CustomerDetail() {
   const queryClient = useQueryClient()
   const [showDisableDialog, setShowDisableDialog] = useState(false)
   const [showEstadoCuenta, setShowEstadoCuenta] = useState(false)
+  const [facturasOpen, setFacturasOpen] = useState(true)
   // Secciones embebidas de un módulo gateado dentro de una pantalla núcleo (§6): el "Estado de
   // cuenta"/"Cuentas por cobrar" pertenece a `cuentasPorCobrar` aunque Cliente sea núcleo; las
   // Notas de Crédito a `notasCredito`.
@@ -758,12 +759,30 @@ export default function CustomerDetail() {
       </div>
 
       <div className="card">
-        <div className="card-header navy-card-header">
-          <h2 className="card-title">Facturas Recientes</h2>
+        <div
+          className="card-header navy-card-header"
+          style={{ cursor: 'pointer' }}
+          onClick={() => setFacturasOpen((o) => !o)}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h2 className="card-title">Facturas Recientes</h2>
+            <button
+              type="button"
+              className="btn btn-ghost btn-size-icon-sm"
+              style={{ color: 'var(--on-dark-ink)' }}
+              aria-expanded={facturasOpen}
+              aria-label={facturasOpen ? 'Ocultar facturas' : 'Mostrar facturas'}
+              onClick={(e) => { e.stopPropagation(); setFacturasOpen((o) => !o) }}
+            >
+              {facturasOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+            </button>
+          </div>
         </div>
-        <div className="card-body">
-          {id && <RecentInvoices customerId={id} />}
-        </div>
+        {facturasOpen && (
+          <div className="card-body">
+            {id && <RecentInvoices customerId={id} />}
+          </div>
+        )}
       </div>
 
       {showDisableDialog && (

@@ -29,7 +29,8 @@
 
   --text-primary: #171717;
   --text-secondary: #525252;
-  --text-tertiary: #a3a3a3;
+  /*--text-tertiary: #a3a3a3;*/
+  --text-tertiary: #868686;
   --text-disabled: #d4d4d4;
   --text-inverse: #ffffff;
   --text-brand: #ff4538;
@@ -800,7 +801,7 @@ button {
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.025em;
-  color: var(--text-primary);
+  color: #0E3D51;
   line-height: 1.2;
 }
 
@@ -859,6 +860,9 @@ button {
 
 .btn-ghost { background: transparent; color: var(--text-secondary); border-color: transparent; }
 .btn-ghost:hover { background: var(--surface-hover); color: var(--text-primary); }
+
+/* Botón con texto de error: el borde acompaña en tono error. */
+.btn-ghost[style*="--error-text"] { border-color: var(--error-border); }
 
 .btn-danger { background: var(--error-bg); color: var(--error-text); border-color: var(--error-border); }
 .btn-danger:hover { background: var(--error-text); color: #fff; }
@@ -1479,7 +1483,7 @@ button {
 .ff-textarea:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(255, 69, 56, 0.12); }
 
 .ff-error { font-size: 12px; color: var(--error-text); display: flex; align-items: center; gap: 4px; margin-top: 2px; }
-.ff-hint { font-size: 12px; color: var(--text-tertiary); }
+.ff-hint { font-size: 12px; color: #868686 }
 
 /* ─── FIELD TOOLTIP — ícono de ayuda junto al label, hint en cuadro flotante on-hover/focus ─── */
 .ff-tooltip-icon {
@@ -2008,6 +2012,7 @@ button {
 }
 
 .doc-actions-bar .btn { border: 1.457px solid var(--Gris-Forms, #CCDBE2); }
+.doc-actions-bar .btn-danger { border-color: var(--error-border); }
 .doc-actions-bar .btn-secondary { color: #0E3D51; }
 
 /* ─── ITEMS TABLE (Invoice, Quote, etc.) ─── */

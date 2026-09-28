@@ -317,7 +317,7 @@ export default function QuotationDetail() {
           <Copy size={14} /> Duplicar
         </button>
         {quotation.salesOrder && (
-          <div className="dropdown" ref={relatedRef}>
+          <div className="dropdown" ref={relatedRef} style={{ display: 'flex' }}>
             <button
               className="btn btn-secondary btn-size-md"
               aria-haspopup="true"
