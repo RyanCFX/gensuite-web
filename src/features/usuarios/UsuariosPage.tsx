@@ -18,7 +18,7 @@ import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { formatDate } from '@/lib/formatters'
-import { Plus, Ban, UserCheck, Pencil, X, ScanLine, Mail, ArrowLeft } from 'lucide-react'
+import { Plus, Ban, UserCheck, Pencil, X, ScanLine, Mail, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -27,6 +27,7 @@ import { useLimites } from '@/shared/features/can'
 import { limiteUsuariosAlcanzado, textoContadorUsuarios } from '@/shared/features/catalog'
 import { isApiErrorCode } from '@/shared/api/client'
 import { Select, SelectItem } from '@/components/ui/select'
+import { usePuede } from '@/shared/permissions/can'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
@@ -59,6 +60,8 @@ type ConfirmType = { type: 'revocar' | 'suspender' | 'reactivar' | 'reinvitar'; 
 export default function UsuariosPage() {
   const queryClient = useQueryClient()
   const authUser = useAuthStore((s) => s.user)
+  // PUT /usuarios/:email (incluido `adminPin`) requiere `usuarios.editar` en el usuario logueado.
+  const puedeEditarUsuarios = usePuede('usuarios.editar')
   // Límites del plan (§8): contador "X de Y" junto al botón de alta + botón deshabilitado al
   // llegar al límite. Es ayuda de UX, no la validación real (el submit igual puede intentar y el
   // backend responde LIMITE_USUARIOS_ALCANZADO — ver inviteMutation abajo).
@@ -81,6 +84,11 @@ export default function UsuariosPage() {
   const [mobileNo, setMobileNo] = useState('')
   const [maxDiscountPct, setMaxDiscountPct] = useState(0)
   const [adminCode, setAdminCode] = useState('')
+  // PIN de administrador — campo de solo escritura: siempre arranca vacío, nunca se precarga
+  // (el servidor lo hashea y ningún GET lo devuelve). Solo se manda en el PUT si se tocó.
+  const [adminPin, setAdminPin] = useState('')
+  const [adminPinConfirm, setAdminPinConfirm] = useState('')
+  const [showAdminPin, setShowAdminPin] = useState(false)
   const [scanningAdminCode, setScanningAdminCode] = useState(false)
   const [selectedPerfiles, setSelectedPerfiles] = useState<string[]>([])
   const [selectedBranches, setSelectedBranches] = useState<string[]>([])
@@ -249,7 +257,7 @@ export default function UsuariosPage() {
     : false
 
   const formIsDirty = useDirtyCheck(
-    { lookupEmail, firstName, lastName, mobileNo, maxDiscountPct, adminCode, selectedPerfiles, selectedBranches, defaultBranch, defaultPosProfile },
+    { lookupEmail, firstName, lastName, mobileNo, maxDiscountPct, adminCode, adminPin, adminPinConfirm, selectedPerfiles, selectedBranches, defaultBranch, defaultPosProfile },
     showForm && (!editingUser || (!!usuarioSucursales && !!editingUserDetail)),
   )
   const formClose = useConfirmClose(formIsDirty, resetForm)
@@ -265,6 +273,7 @@ export default function UsuariosPage() {
     setMobileNo(user.phone ?? '')
     setMaxDiscountPct(user.maxDiscountPct ?? 0)
     setAdminCode(user.adminCode ?? '')
+    // adminPin/adminPinConfirm quedan vacíos a propósito — el PIN no se puede leer, solo reconfigurar.
     setSelectedPerfiles([])
   }
 
@@ -277,6 +286,9 @@ export default function UsuariosPage() {
     setMobileNo('')
     setMaxDiscountPct(0)
     setAdminCode('')
+    setAdminPin('')
+    setAdminPinConfirm('')
+    setShowAdminPin(false)
     setScanningAdminCode(false)
     setSelectedPerfiles([])
     setSelectedBranches([])
@@ -304,10 +316,19 @@ export default function UsuariosPage() {
   function handleEditSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!editingUser) return
+    // PIN de administrador — solo se manda si se tocó (campo vacío = no cambiar). Debe ser
+    // exactamente 6 dígitos y coincidir con la confirmación.
+    const pin = adminPin.trim()
+    const pinConfirm = adminPinConfirm.trim()
+    if (pin !== '' || pinConfirm !== '') {
+      if (!/^\d{6}$/.test(pin)) { toast.error('El PIN debe tener exactamente 6 dígitos'); return }
+      if (pin !== pinConfirm) { toast.error('La confirmación del PIN no coincide'); return }
+    }
     const payload: Partial<UpdateUsuarioDto> = {
       mobileNo: mobileNo || undefined,
       maxDiscountPct: maxDiscountPct > 0 ? maxDiscountPct : 0,
       adminCode: adminCode || undefined,
+      ...(pin !== '' ? { adminPin: pin } : {}),
       ...(selectedPerfiles.length > 0 ? { perfiles: selectedPerfiles } : {}),
       branches: isSystemManager ? undefined : selectedBranches,
       defaultBranch: defaultBranch || undefined,
@@ -648,6 +669,47 @@ export default function UsuariosPage() {
                     </button>
                   </div>
                 </div>
+
+                {puedeEditarUsuarios && (
+                  <div className="ff-wrap">
+                    <label className="ff-label">PIN de administrador</label>
+                    <div className="form-row">
+                      <div style={{ flex: 1, position: 'relative' }}>
+                        <input
+                          type={showAdminPin ? 'text' : 'password'}
+                          className="ff-input"
+                          value={adminPin}
+                          onChange={(e) => setAdminPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="Dejar en blanco para no cambiar"
+                          inputMode="numeric"
+                          maxLength={6}
+                          autoComplete="new-password"
+                          style={{ paddingRight: 36 }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminPin((v) => !v)}
+                          title={showAdminPin ? 'Ocultar PIN' : 'Mostrar PIN'}
+                          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 4, display: 'flex' }}
+                        >
+                          {showAdminPin ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                      <input
+                        type={showAdminPin ? 'text' : 'password'}
+                        className="ff-input"
+                        value={adminPinConfirm}
+                        onChange={(e) => setAdminPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="Confirmar PIN"
+                        inputMode="numeric"
+                        maxLength={6}
+                        autoComplete="new-password"
+                        style={{ flex: 1 }}
+                      />
+                    </div>
+                    <p className="ff-hint">6 dígitos — se usa para autorizar acciones sensibles (ej. overrides de descuento en ventas). Varios usuarios pueden compartir el mismo PIN. Solo se puede reconfigurar, no consultar.</p>
+                  </div>
+                )}
 
                 <PerfilesChecklist
                   perfiles={perfiles ?? []}
