@@ -823,15 +823,6 @@ export default function EcfAdminPage() {
       <EcfTabs />
 
       <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="inline-alert inline-alert-info" style={{ alignItems: 'flex-start' }}>
-          <Info size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
-          <span>
-            Pantalla de <strong>setup único</strong>, más técnica que la configuración general. Requiere que el
-            operador ya tenga el RNC certificado y el archivo <code>.p12</code> firmado (proceso que se hace en el
-            panel de Vega, no aquí). <strong>Las pruebas end-to-end siguen pendientes</strong>: ninguna empresa real
-            tiene todavía una cuenta de Vega conectada.
-          </span>
-        </div>
 
         {isLoading ? (
           <span className="skeleton-box" style={{ height: 320, display: 'block' }} />
