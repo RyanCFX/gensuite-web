@@ -42,7 +42,7 @@ const STATUS_BADGE: Record<string, string> = {
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Borrador',
   submitted: 'Sometido',
-  ordered: 'Ordenado',
+  ordered: 'Cotización ordenada',
   lost: 'Perdido',
   cancelled: 'Cancelado',
 }
@@ -141,7 +141,7 @@ export default function QuotationsPage() {
                   <SelectItem value="all">Todos los estados</SelectItem>
                   <SelectItem value="draft">Borrador</SelectItem>
                   <SelectItem value="submitted">Sometido</SelectItem>
-                  <SelectItem value="ordered">Ordenado</SelectItem>
+                  <SelectItem value="ordered">Cotización ordenada</SelectItem>
                   <SelectItem value="lost">Perdido</SelectItem>
                   <SelectItem value="cancelled">Cancelado</SelectItem>
                 </Select>
@@ -241,9 +241,14 @@ export default function QuotationsPage() {
                     <td>{formatDate(q.validTill)}</td>
                     <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(itemTotal)}</td>
                     <td>
-                      <span className={`badge ${STATUS_BADGE[q.status] ?? 'badge-neutral'}`}>
-                        {STATUS_LABEL[q.status] ?? q.status}
-                      </span>
+                      {(() => {
+                        const st = (q.status ?? '').toLowerCase()
+                        return (
+                          <span className={`badge ${STATUS_BADGE[st] ?? 'badge-neutral'}`}>
+                            {STATUS_LABEL[st] ?? q.status}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td onClick={(e) => e.stopPropagation()} className="actions-cell">
                       <ActionsMenu>

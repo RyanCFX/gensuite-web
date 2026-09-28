@@ -4,9 +4,11 @@ import iso from "@/assets/iso.png";
 interface LogoMarkProps {
   size?: number
   showText?: boolean
+  /** Ancho fijo en px — si se omite se calcula desde `size`. */
+  width?: number
 }
 
-export default function LogoMark({ size = 36, showText = true }: LogoMarkProps) {
+export default function LogoMark({ size = 36, showText = true, width }: LogoMarkProps) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center' }}>
       {/*<div
@@ -50,7 +52,7 @@ export default function LogoMark({ size = 36, showText = true }: LogoMarkProps) 
           src={logo}
           className="dd-logo"
           style={{
-            width: size * 4.47,
+            width: width ?? size * 4.47,
             // fontWeight: 600,
             // letterSpacing: '-0.025em',
             // color: 'var(--text-primary)',

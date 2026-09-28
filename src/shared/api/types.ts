@@ -2084,9 +2084,12 @@ export interface DraftVersion {
   savedAt: string;
   id: string;
   grandTotal: number;
+  // Como en `PedidoItem` (ver nota ahí): no asumir que `description` viene poblado — para
+  // Pedidos el backend manda `itemName` en su lugar. Usar `description ?? itemName`.
   items: Array<{
     itemCode: string;
-    description: string;
+    description?: string;
+    itemName?: string;
     qty: number;
     rate: number;
     amount: number;
@@ -2101,9 +2104,11 @@ export interface AmendmentEntry {
   status: string;
   total?: number;
   grandTotal?: number;
+  // Ver nota de `description`/`itemName` en `PedidoItem` — mismo caso para el historial de Pedidos.
   items?: Array<{
     itemCode: string;
-    description: string;
+    description?: string;
+    itemName?: string;
     qty: number;
     rate: number;
     amount: number;
@@ -2130,7 +2135,13 @@ export interface DocumentHistory {
 // Pedido de Venta (Sales Order)
 export interface PedidoItem {
   itemCode: string;
-  description: string;
+  /** `GET /pedidos/:id` en la práctica nunca manda `description` — confirmado en vivo
+   *  (2026-09-27): la línea trae `itemName` en su lugar. Usar `description ?? itemName` al
+   *  mostrarla, nunca asumir que `description` viene poblado. */
+  description?: string;
+  /** Nombre del artículo — ver nota de `description` arriba; este es el campo que el backend
+   *  realmente manda. */
+  itemName?: string;
   qty: number;
   rate: number;
   amount: number;
@@ -3929,6 +3940,13 @@ export interface CobrosConfig {
 
 /** Formato de impresión de PDF para facturas, cobros y compras. "a4"/"carta"/"a6": página completa (mismo diseño, distinto tamaño de papel). "pos": ticket angosto 80mm. */
 export type FormatoImpresion = "a4" | "carta" | "a6" | "pos"
+
+/** Moneda en la que `GET /invoicing/invoices/:id/pdf` imprime los montos — solo aplica a
+ *  formato "a4"/"carta"/"a6" (el ticket POS siempre imprime en DOP, este param se ignora ahí).
+ *  "dop" (default): convierte todo a DOP con la `conversionRate` del documento. "factura": imprime
+ *  en la moneda real del documento (USD/EUR/DOP). Si la factura ya está en DOP ambos valores
+ *  producen el mismo PDF — ver docs/tasks/75_multimoneda_cuenta_unica_consumidor_final_pdf.md §3. */
+export type MonedaPdfImpresion = "dop" | "factura"
 
 // GET/PUT /config/facturacion
 export interface FacturacionConfig {
@@ -5798,6 +5816,10 @@ export interface AccountsSettings {
   roleAllowedToOverBill?: string;
   /** El backend siempre rechaza este campo en `true` — no editable */
   deleteLinkedLedgerEntries?: boolean;
+  /** Ajuste técnico que permite el modelo de cuenta CxC/CxP única en DOP (ver
+   *  docs/tasks/75_multimoneda_cuenta_unica_consumidor_final_pdf.md §1.5) — no es una perilla
+   *  operativa, siempre es `true` en la práctica. Tratar como informativo/de solo lectura. */
+  allowMultiCurrencyInvoicesAgainstSinglePartyAccount?: boolean;
   [key: string]: unknown;
 }
 export type UpdateAccountsSettingsDto = Partial<AccountsSettings>;

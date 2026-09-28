@@ -16,7 +16,6 @@ import { getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateCompraDto, Supplier, DistribucionCuentaDto } from '@/shared/api/types'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { SupplierQuickCreateModal } from '@/features/suppliers/SupplierQuickCreateModal'
@@ -368,22 +367,29 @@ function SerialBatchRow({
             />
           )}
         </td>
-        <td onClick={(e) => e.stopPropagation()} className="actions-cell">
-          <ActionsMenu>
-            <ActionsMenuItem
+        <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ position: 'relative', verticalAlign: 'middle' }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-size-icon-xs"
               onClick={() => onViewItem(item.itemCode)}
               disabled={!item.itemCode}
+              title="Ver detalle"
+              style={{ color: 'var(--text-primary)' }}
             >
-              <Eye size={14} /> Ver detalle
-            </ActionsMenuItem>
-            <ActionsMenuItem
-              danger
+              <Eye size={14} />
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-size-icon-xs"
               onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
               disabled={items.length === 1}
+              title="Eliminar"
+              style={{ color: 'var(--error-text)' }}
             >
-              <Trash2 size={14} /> Eliminar
-            </ActionsMenuItem>
-          </ActionsMenu>
+              <Trash2 size={14} />
+            </button>
+          </div>
         </td>
       </tr>
 
@@ -951,10 +957,10 @@ export default function CompraForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compraData])
 
-  // A diferencia de lo que originalmente documentaba §10.2, GET /compras/:id SÍ ecoa la
-  // combinación de dimensión elegida por línea (confirmado en vivo 2026-09-27) — se usa
-  // directamente para poblar la línea, junto con la config de dimensiones del artículo (para
-  // saber qué selectores mostrar y sus valoresPermitidos/reglas).
+  // GET /compras/:id no devuelve itemName/description por línea (CompraItemDto no los trae) — se
+  // re-consulta el catálogo para poder mostrar el Artículo/Descripción al editar. De paso, esta
+  // misma consulta sirve para la config de dimensiones del artículo (§10.2 — GET SÍ ecoa la
+  // combinación elegida por línea, confirmado en vivo 2026-09-27) y sus valoresPermitidos/reglas.
   useEffect(() => {
     if (!compraData) return
     let cancelled = false
@@ -963,9 +969,15 @@ export default function CompraForm() {
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
         const ci = compraData.items[idx]
-        return catalogItem?.usaDimensiones
-          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones, dimensiones: ci?.dimensiones ?? row.dimensiones }
-          : row
+        if (!catalogItem) return row
+        return {
+          ...row,
+          itemLabel: catalogItem.itemName,
+          description: catalogItem.internalDescription ?? catalogItem.itemName,
+          ...(catalogItem.usaDimensiones
+            ? { itemDimensionesDeclaradas: catalogItem.dimensiones, dimensiones: ci?.dimensiones ?? row.dimensiones }
+            : {}),
+        }
       }))
     })
     return () => { cancelled = true }
@@ -1136,12 +1148,12 @@ export default function CompraForm() {
         hasDimensionError = true
         const faltantes = declaradas.filter((d) => !(item.dimensiones ?? {})[d.dimension]).map((d) => d.dimension).join(', ')
         setItems((prev) => prev.map((r, rIdx) =>
-          rIdx === itemIdx ? { ...r, lineError: `Fila ${itemIdx + 1}: indique la combinación completa${faltantes ? ` (falta: ${faltantes})` : ''}` } : r,
+          rIdx === itemIdx ? { ...r, lineError: `Fila ${itemIdx + 1}: indique la dimensión completa${faltantes ? ` (falta: ${faltantes})` : ''}` } : r,
         ))
       }
     })
     if (hasDimensionError) {
-      toast.error('Hay líneas con combinación de dimensión incompleta — revíselas en la columna Combinación.')
+      toast.error('Hay líneas con dimensión de inventario incompleta — revíselas en la columna Dimensión.')
       return
     }
 
@@ -1368,7 +1380,7 @@ export default function CompraForm() {
       {lineasRequierenReingresoDimension && (
         <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
           <Info size={16} />
-          <span>Esta compra tiene línea(s) con un artículo que usa combinación de dimensión de inventario sin una combinación completa. Selecciónala en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+          <span>Esta compra tiene línea(s) con un artículo que usa dimensión de inventario incompleta. Selecciónala en la columna «Dimensión» antes de guardar, o esa línea será rechazada.</span>
         </div>
       )}
 
@@ -1665,7 +1677,7 @@ export default function CompraForm() {
                         <span className="col-resize-handle" onMouseDown={startResize('udm')} />
                       </th>
                       <th>
-                        Combinación
+                        Dimensión
                         <span className="col-resize-handle" onMouseDown={startResize('combination')} />
                       </th>
                       <th />

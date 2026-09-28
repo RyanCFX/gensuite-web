@@ -753,7 +753,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
             <div className="ff-wrap">
               <label className="ff-label" htmlFor="cuentaCxcDefault">
                 Cuenta CxC Alterna
-                <FieldTooltip>Si se omite, se usa el default de la compañía (112-01 - CUENTAS POR COBRAR CLIENTES).</FieldTooltip>
+                <FieldTooltip>Informativa — la factura siempre contabiliza contra la cuenta CxC única de la compañía (en DOP), sin importar lo que se elija aquí.</FieldTooltip>
               </label>
               <Controller
                 name="cuentaCxcDefault"

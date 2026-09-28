@@ -18,7 +18,7 @@ function ItemsPreview({ items }: { items: NonNullable<AmendmentEntry['items']> }
   const { widths: colWidths, startResize } = useResizableColumns(ITEMS_PREVIEW_COLUMNS)
   return (
     <div style={{ padding: '0 0 12px 44px' }}>
-      <table className="items-table items-table-resizable" style={{ fontSize: 12 }}>
+      <table className="items-table navy-table items-table-resizable" style={{ fontSize: 12 }}>
         <colgroup>
           {ITEMS_PREVIEW_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
         </colgroup>
@@ -36,7 +36,7 @@ function ItemsPreview({ items }: { items: NonNullable<AmendmentEntry['items']> }
           {items.map((item, i) => (
             <tr key={i}>
               <td style={{ fontFamily: 'var(--font-body)', fontSize: 11 }}>{item.itemCode || '—'}</td>
-              <td>{item.description || '—'}</td>
+              <td>{item.description || item.itemName || '—'}</td>
               <td style={{ fontSize: 11, color: 'var(--text-tertiary)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.notes ?? ''}>{item.notes ?? '—'}</td>
               <td style={{ textAlign: 'right' }}>{item.qty}</td>
               <td style={{ textAlign: 'right' }}>{formatDOP(item.rate)}</td>
@@ -91,7 +91,7 @@ function HistoryRow({ entry, isLast, basePath, isDraft }: { entry: AmendmentEntr
             <span style={{ marginLeft: 6 }}>· {entry.status}</span>
           </div>
         </div>
-        <button className="btn btn-ghost btn-size-sm" onClick={handleView}>
+        <button className="btn btn-ghost btn-size-md" onClick={handleView}>
           Ver
         </button>
       </div>
@@ -111,7 +111,7 @@ export function DocumentHistoryCard({ history, basePath, currentDocId }: Documen
 
   return (
     <div className="card" style={{ marginTop: 16 }}>
-      <div className="card-header">
+      <div className="card-header navy-card-header">
         <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <History size={15} /> Historial de versiones
         </h2>

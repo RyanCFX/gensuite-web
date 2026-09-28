@@ -13,6 +13,7 @@ import type {
   PaginationParams,
   ComponentTracking,
   FormatoImpresion,
+  MonedaPdfImpresion,
   EstadoArs,
 } from './types'
 
@@ -125,9 +126,12 @@ export async function asignarTrackingFactura(id: string, items: ComponentTrackin
   return unwrap(res)
 }
 
-export async function getInvoicePdfBlobUrl(id: string, formato?: FormatoImpresion): Promise<string> {
+export async function getInvoicePdfBlobUrl(id: string, formato?: FormatoImpresion, moneda?: MonedaPdfImpresion): Promise<string> {
   const params = new URLSearchParams()
   if (formato) params.set("formato", formato)
+  // El backend ignora `moneda` para formato "pos" (siempre DOP) — se omite ahí para no sugerir
+  // en la URL un control que no existe en la UI.
+  if (moneda && formato !== "pos") params.set("moneda", moneda)
   const qs = params.toString()
   const url = qs ? `${ENDPOINTS.invoices.pdf(id)}?${qs}` : ENDPOINTS.invoices.pdf(id)
   const res = await client.get<Blob>(url, {
@@ -136,9 +140,10 @@ export async function getInvoicePdfBlobUrl(id: string, formato?: FormatoImpresio
   return URL.createObjectURL(res.data)
 }
 
-export async function downloadInvoicePdf(id: string, filename?: string, formato?: FormatoImpresion): Promise<void> {
+export async function downloadInvoicePdf(id: string, filename?: string, formato?: FormatoImpresion, moneda?: MonedaPdfImpresion): Promise<void> {
   const params = new URLSearchParams()
   if (formato) params.set("formato", formato)
+  if (moneda && formato !== "pos") params.set("moneda", moneda)
   const qs = params.toString()
   const url = qs ? `${ENDPOINTS.invoices.pdf(id)}?${qs}` : ENDPOINTS.invoices.pdf(id)
   const res = await client.get<Blob>(url, {

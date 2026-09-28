@@ -338,11 +338,11 @@ export default function OrdenForm() {
       if (item.itemCode && declaradas.length > 0 && !combinacionCompleta(declaradas, item.dimensiones ?? {})) {
         hasDimensionError = true
         const faltantes = declaradas.filter((d) => !(item.dimensiones ?? {})[d.dimension]).map((d) => d.dimension).join(', ')
-        setItems((prev) => prev.map((r, i) => i === itemIdx ? { ...r, lineError: `Fila ${itemIdx + 1}: indique la combinación completa${faltantes ? ` (falta: ${faltantes})` : ''}` } : r))
+        setItems((prev) => prev.map((r, i) => i === itemIdx ? { ...r, lineError: `Fila ${itemIdx + 1}: indique la dimensión completa${faltantes ? ` (falta: ${faltantes})` : ''}` } : r))
       }
     })
     if (hasDimensionError) {
-      toast.error('Hay líneas con combinación de dimensión incompleta — revíselas en la columna de dimensión.')
+      toast.error('Hay líneas con dimensión de inventario incompleta — revíselas en la columna Dimensión.')
       return
     }
 
@@ -433,7 +433,7 @@ export default function OrdenForm() {
       {lineasRequierenReingresoDimension && (
         <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
           <Info size={16} />
-          <span>Esta orden tiene línea(s) con un artículo que usa combinación de dimensión de inventario sin una combinación completa. Selecciónala en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+          <span>Esta orden tiene línea(s) con un artículo que usa dimensión de inventario incompleta. Selecciónala en la columna «Dimensión» antes de guardar, o esa línea será rechazada.</span>
         </div>
       )}
 
@@ -577,7 +577,7 @@ export default function OrdenForm() {
                         <span className="col-resize-handle" onMouseDown={startResize('udm')} />
                       </th>
                       <th>
-                        Combinación
+                        Dimensión
                         <span className="col-resize-handle" onMouseDown={startResize('combination')} />
                       </th>
                       <th />

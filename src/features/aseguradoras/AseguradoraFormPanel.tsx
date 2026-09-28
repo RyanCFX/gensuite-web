@@ -320,7 +320,7 @@ export function AseguradoraFormPanel({ aseguradora, onSuccess, onCancel }: Asegu
             <div className="ff-wrap">
               <label className="ff-label" htmlFor="cuentaCxcDefault">
                 Cuenta CxC Alterna
-                <FieldTooltip>Cuenta contable al facturar el lote consolidado. Si se omite, se usa el default de la compañía.</FieldTooltip>
+                <FieldTooltip>Informativa — al facturar el lote consolidado siempre se contabiliza contra la cuenta CxC única de la compañía (en DOP), sin importar lo que se elija aquí.</FieldTooltip>
               </label>
               <Controller
                 name="cuentaCxcDefault"

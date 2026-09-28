@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffectOnActive } from 'keepalive-for-react'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { listCompras, getCompra } from '@/shared/api/compras-gastos'
+import { getItem } from '@/shared/api/catalog'
 import { listSuppliers } from '@/shared/api/suppliers'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -28,6 +29,7 @@ import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const DEVOLUCION_FORM_COLUMNS = [
   { key: 'codigo', width: 120 },
+  { key: 'articulo', width: 220 },
   { key: 'stockQty', width: 110 },
   { key: 'precio', width: 110 },
   { key: 'qtyDevolver', width: 130 },
@@ -41,6 +43,9 @@ interface FormItem {
    *  así que esto queda `undefined` en la práctica. Se deja cableado para que, el día que el
    *  backend lo agregue, `lineaOriginal` viaje solo sin tocar este formulario de nuevo. */
   name?: string
+  /** Nombre del artículo — GET /compras/:id no lo trae por línea, se resuelve aparte contra el
+   *  catálogo (ver `itemLabels`). */
+  itemLabel?: string
   stockQty: number
   returnQty: number
   rate: number
@@ -130,6 +135,24 @@ export default function DevolucionForm() {
   const [postingDate, setPostingDate] = useState('')
   const [reason, setReason] = useState('')
 
+  // GET /compras/:id no devuelve el nombre del artículo por línea — se re-consulta el catálogo
+  // (una vez por itemCode único) para poder mostrarlo en la columna "Artículo".
+  const [itemLabels, setItemLabels] = useState<Record<string, string>>({})
+  useEffect(() => {
+    if (!sourceCompra) return
+    const codes = [...new Set(sourceCompra.items.map((it) => it.itemCode))]
+    let cancelled = false
+    Promise.all(codes.map((code) => getItem(code).catch(() => null))).then((catalogItems) => {
+      if (cancelled) return
+      const next: Record<string, string> = {}
+      catalogItems.forEach((ci, idx) => {
+        if (ci) next[codes[idx]] = ci.itemName
+      })
+      setItemLabels(next)
+    })
+    return () => { cancelled = true }
+  }, [sourceCompra])
+
   const rows: FormItem[] = useMemo(() => {
     if (!sourceCompra) return []
       const devByCode = new Map(
@@ -150,13 +173,14 @@ export default function DevolucionForm() {
         return {
           itemCode: it.itemCode,
           name: it.id,
+          itemLabel: itemLabels[it.itemCode],
           stockQty: it.qty,
           returnQty: typed === undefined ? initialQty : returnQty,
           rate: it.rate,
           ambiguous: (countByCode.get(it.itemCode) ?? 0) > 1,
         }
     })
-  }, [sourceCompra, devolucion, isEdit, qtys])
+  }, [sourceCompra, devolucion, isEdit, qtys, itemLabels])
 
   const effectivePostingDate = postingDate || (isEdit ? (devolucion?.postingDate ? String(devolucion.postingDate).slice(0, 10) : today) : (sourceCompra?.postingDate ? String(sourceCompra.postingDate).slice(0, 10) : today))
   const effectiveReason = reason || (isEdit ? devolucion?.reason ?? '' : '')
@@ -402,6 +426,10 @@ export default function DevolucionForm() {
                   Código
                   <span className="col-resize-handle" onMouseDown={startResize('codigo')} />
                 </th>
+                <th>
+                  Artículo
+                  <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
+                </th>
                 <th style={{ textAlign: 'right' }}>
                   Stock (qty)
                   <span className="col-resize-handle" onMouseDown={startResize('stockQty')} />
@@ -433,6 +461,7 @@ export default function DevolucionForm() {
                       )}
                     </span>
                   </td>
+                  <td>{it.itemLabel ?? <span className="td-muted">—</span>}</td>
                   <td style={{ textAlign: 'right' }}>{it.stockQty}</td>
                   <td style={{ textAlign: 'right' }}>{formatDOP(it.rate, { trimZeros: true })}</td>
                   <td style={{ textAlign: 'right' }}>
@@ -455,7 +484,7 @@ export default function DevolucionForm() {
                 </tr>
               ))}
               <tr style={{ background: 'var(--surface-sunken)', fontWeight: 600 }}>
-                <td colSpan={4} style={{ textAlign: 'right' }}>Total a devolver</td>
+                <td colSpan={5} style={{ textAlign: 'right' }}>Total a devolver</td>
                 <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatDOP(returnedTotal)}</td>
               </tr>
             </tbody>

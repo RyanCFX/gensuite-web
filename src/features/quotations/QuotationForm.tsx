@@ -33,7 +33,6 @@ import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { isCostoCompraError } from '@/lib/pinOverride'
-import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { listItems, getItem } from '@/shared/api/catalog'
@@ -294,9 +293,11 @@ useEffect(() => {
      setInitialized(true)
    }, [existingQuotation, initialized])
 
-  // A diferencia de lo que originalmente documentaba §10.2, GET /quotations/:id SÍ ecoa la
-  // combinación de dimensión elegida por línea (confirmado en vivo 2026-09-27) — se usa
-  // directamente para poblar la línea.
+  // GET /quotations/:id no devuelve itemName por línea (QuotationItem no lo trae) — se re-consulta
+  // el catálogo para poder mostrar el Artículo al editar. De paso, esta misma consulta sirve para
+  // la config de dimensiones del artículo: a diferencia de lo que originalmente documentaba
+  // §10.2, GET /quotations/:id SÍ ecoa la combinación elegida por línea (confirmado en vivo
+  // 2026-09-27) — se usa directamente para poblar la línea.
   useEffect(() => {
     if (!existingQuotation) return
     let cancelled = false
@@ -305,9 +306,15 @@ useEffect(() => {
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
         const ei = existingQuotation.items[idx]
-        return catalogItem?.usaDimensiones
-          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones, dimensiones: ei?.dimensiones ?? row.dimensiones }
-          : row
+        if (!catalogItem) return row
+        return {
+          ...row,
+          itemLabel: catalogItem.itemName,
+          description: row.description || catalogItem.internalDescription || catalogItem.itemName,
+          ...(catalogItem.usaDimensiones
+            ? { itemDimensionesDeclaradas: catalogItem.dimensiones, dimensiones: ei?.dimensiones ?? row.dimensiones }
+            : {}),
+        }
       }))
     })
     return () => { cancelled = true }
@@ -355,9 +362,10 @@ useEffect(() => {
     setInitialized(true)
   }, [duplicateSource, isEdit, initialized])
 
-  // Igual que al editar: duplicar tampoco trae de vuelta la combinación de dimensión de cada línea
-  // (§10.2) — se re-consulta el catálogo para saber cuáles líneas la necesitan y mostrarles el
-  // selector, obligando a reingresarla antes de guardar la nueva cotización.
+  // GET .../duplicate-source no devuelve itemName por línea — se re-consulta el catálogo para
+  // poder mostrar el Artículo. Igual que al editar: duplicar tampoco trae de vuelta la
+  // combinación de dimensión de cada línea (§10.2) — la misma consulta sirve para saber cuáles
+  // líneas la necesitan y mostrarles el selector, obligando a reingresarla antes de guardar.
   useEffect(() => {
     if (isEdit || !duplicateSource) return
     let cancelled = false
@@ -365,9 +373,13 @@ useEffect(() => {
       if (cancelled) return
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
-        return catalogItem?.usaDimensiones
-          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones }
-          : row
+        if (!catalogItem) return row
+        return {
+          ...row,
+          itemLabel: catalogItem.itemName,
+          description: row.description || catalogItem.internalDescription || catalogItem.itemName,
+          ...(catalogItem.usaDimensiones ? { itemDimensionesDeclaradas: catalogItem.dimensiones } : {}),
+        }
       }))
     })
     return () => { cancelled = true }
@@ -990,7 +1002,7 @@ if (esClienteOcasional) {
         (row.itemDimensionesDeclaradas?.length ?? 0) > 0
         && !combinacionCompleta(row.itemDimensionesDeclaradas ?? [], row.dimensiones ?? {})
       ) {
-        toast.error(`Artículo #${num} (${row.itemLabel ?? row.itemCode}): selecciona la combinación de dimensión completa antes de guardar`)
+        toast.error(`Artículo #${num} (${row.itemLabel ?? row.itemCode}): selecciona la dimensión completa antes de guardar`)
         return
       }
     }
@@ -1027,7 +1039,7 @@ if (esClienteOcasional) {
       {lineasRequierenReingresoDimension && (
         <div className="inline-alert inline-alert-info" style={{ marginBottom: 0 }}>
           <Info size={16} />
-          <span>Esta cotización tiene línea(s) con un artículo que usa combinación de dimensión de inventario sin una combinación completa. Selecciónala en la columna «Combinación» antes de guardar, o esa línea será rechazada.</span>
+          <span>Esta cotización tiene línea(s) con un artículo que usa dimensión de inventario incompleta. Selecciónala en la columna «Dimensión» antes de guardar, o esa línea será rechazada.</span>
         </div>
       )}
 
@@ -1256,7 +1268,7 @@ if (esClienteOcasional) {
                     <span className="col-resize-handle" onMouseDown={startResize('subtotal')} />
                   </th>
                    <th style={{ textAlign: 'right' }}>
-                    Combinación
+                    Dimensión
                     <span className="col-resize-handle" onMouseDown={startResize('combination')} />
                   </th>
                   <th />
@@ -1423,18 +1435,28 @@ if (esClienteOcasional) {
                         )}
                       </td>
 
-                      <td onClick={(e) => e.stopPropagation()} className="actions-cell">
-                        <ActionsMenu>
-                          <ActionsMenuItem
+                      <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ position: 'relative', verticalAlign: 'middle' }}>
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-size-icon-xs"
                             onClick={() => setViewItemCode(item.itemCode)}
                             disabled={!item.itemCode}
+                            title="Ver detalle"
+                            style={{ color: 'var(--text-primary)' }}
                           >
-                            <Eye size={14} /> Ver detalle
-                          </ActionsMenuItem>
-                          <ActionsMenuItem danger onClick={() => removeRow(index)}>
-                            <Trash2 size={14} /> Eliminar
-                          </ActionsMenuItem>
-                        </ActionsMenu>
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-size-icon-xs"
+                            onClick={() => removeRow(index)}
+                            title="Eliminar"
+                            style={{ color: 'var(--error-text)' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -1456,7 +1478,7 @@ if (esClienteOcasional) {
 
           <div className="items-total-row navy-totals">
             <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
-                <span style={{ textAlign: 'right' }}>Subtotal bruto</span>
+                <span style={{ textAlign: 'right' }}>Subtotal</span>
                 <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(grossTotal, currency || monedaBase)}</span>
               </div>
 

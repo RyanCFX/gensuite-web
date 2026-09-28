@@ -56,6 +56,7 @@ const LIST_COLUMNS = [
 
 const ITEMS_COLUMNS = [
   { key: 'codigo', width: 160 },
+  { key: 'articulo', width: 220 },
   { key: 'cantidad', width: 96 },
   { key: 'precio', width: 120 },
   { key: 'importe', width: 120 },
@@ -99,6 +100,7 @@ interface CreditNoteRow {
 
 interface NoteLineItem {
   itemCode: string
+  description?: string
   qty: number
   rate: number
   uom?: string
@@ -293,7 +295,7 @@ export default function CreditNotesPage() {
   useEffect(() => {
     if (selectedInvoiceDetail && selectedInvoiceDetail.id === selectedInvoiceId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- precarga los artículos al llegar el detalle de la factura seleccionada
-      setNoteItems(selectedInvoiceDetail.items.map((i) => ({ itemCode: i.itemCode, qty: i.qty, rate: i.rate, uom: i.uom, name: i.id })))
+      setNoteItems(selectedInvoiceDetail.items.map((i) => ({ itemCode: i.itemCode, description: i.description, qty: i.qty, rate: i.rate, uom: i.uom, name: i.id })))
       // La factura preseleccionada por ?originalInvoice= puede no estar en la lista de 20 —
       // completa la tarjeta de resumen desde el detalle.
       setSelectedInvoice((prev) => prev ?? selectedInvoiceDetail)
@@ -1011,7 +1013,7 @@ export default function CreditNotesPage() {
                           value=""
                           onChange={(val) => {
                             const item = selectedInvoiceDetail?.items.find((i) => i.itemCode === val)
-                            if (item) setNoteItems((prev) => [...prev, { itemCode: item.itemCode, qty: item.qty, rate: item.rate, uom: item.uom, name: item.id }])
+                            if (item) setNoteItems((prev) => [...prev, { itemCode: item.itemCode, description: item.description, qty: item.qty, rate: item.rate, uom: item.uom, name: item.id }])
                           }}
                           options={addItemOptions}
                           onSearch={setAddItemSearch}
@@ -1040,6 +1042,10 @@ export default function CreditNotesPage() {
                             <th>
                               Código
                               <span className="col-resize-handle" onMouseDown={itemsStartResize('codigo')} />
+                            </th>
+                            <th>
+                              Artículo
+                              <span className="col-resize-handle" onMouseDown={itemsStartResize('articulo')} />
                             </th>
                             <th style={{ textAlign: 'right' }}>
                               Cant.
@@ -1071,6 +1077,7 @@ export default function CreditNotesPage() {
                                   )}
                                 </span>
                               </td>
+                              <td>{item.description ?? <span className="td-muted">—</span>}</td>
                               <td>
                                 <QtyInput
                                   className="items-input"

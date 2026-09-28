@@ -44,6 +44,7 @@ const EDIT_DESPACHO_COLUMNS = [
   { key: 'articulo', width: 240 },
   { key: 'cantidad', width: 140 },
   { key: 'almacen', width: 260 },
+  { key: 'dimension', width: 160 },
 ]
 
 export default function DespachoDetail() {
@@ -763,6 +764,10 @@ function EditDespachoModal({
               <th>
                 Almacén
                 <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
+              </th>
+              <th>
+                Dimensión
+                <span className="col-resize-handle" onMouseDown={startResize('dimension')} />
               </th>
             </tr>
           </thead>

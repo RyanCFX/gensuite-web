@@ -1,15 +1,14 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, Fragment } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getPedido, submitPedido, cancelPedido, amendPedido, downloadPedidoPdf, facturarApartado, cancelarApartado } from '@/shared/api/pedidos'
+import { getPedido, getPedidoVersion, submitPedido, cancelPedido, amendPedido, downloadPedidoPdf, facturarApartado, cancelarApartado } from '@/shared/api/pedidos'
 import { listMetodosPago, getFacturacionConfig } from '@/shared/api/config'
 import { crearDespachoDesdePedido } from '@/shared/api/despachos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
-import { RelatedDocsCard } from '@/components/shared/RelatedDocsCard'
 import { displayId, formatDate, formatMoney } from '@/lib/formatters'
 import type { ApiError } from '@/shared/api/types'
-import { ArrowLeft, Download, Send, Trash2, GitBranch, FileText, History, Copy, PackageOpen, AlertTriangle, Ban, Truck, ClipboardCheck } from 'lucide-react'
+import { ArrowLeft, Download, Send, Trash2, GitBranch, FileText, Copy, PackageOpen, AlertTriangle, Ban, Truck, ClipboardCheck, Link2, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -41,21 +40,49 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function PedidoDetail() {
-  const { id } = useParams<{ id: string }>()
+  const { id, version } = useParams<{ id: string; version?: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const [stockWarning, setStockWarning] = useState<string | null>(null)
   const [cancelApartadoOpen, setCancelApartadoOpen] = useState(false)
+  const [relatedOpen, setRelatedOpen] = useState(false)
+  const relatedRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!relatedOpen) return
+    const onDown = (e: PointerEvent) => {
+      if (relatedRef.current && !relatedRef.current.contains(e.target as Node)) setRelatedOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setRelatedOpen(false) }
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [relatedOpen])
   const [apartadoReason, setApartadoReason] = useState('')
   const [apartadoRemanente, setApartadoRemanente] = useState<'' | 'saldo_favor' | 'devolucion'>('')
   const [apartadoModeOfPayment, setApartadoModeOfPayment] = useState('')
   const { widths: itemsColWidths, startResize: startItemsResize } = useResizableColumns(ITEMS_COLUMNS)
 
+  // Una entrada del historial con el mismo id que el documento actual es una revisión de borrador
+  // anterior (no un documento amendado aparte) — GET /pedidos/:id/versions/:sequence devuelve un
+  // snapshot liviano (DraftVersion: id/sequence/savedAt/status/items/grandTotal), no el pedido
+  // completo. Viéndola aquí es de solo lectura: no hay acciones ni mutaciones.
+  const isHistoricalVersion = !!version
+
+  const { data: versionData, isLoading: loadingVersion } = useQuery({
+    queryKey: ['pedido-version', id, version],
+    queryFn: () => getPedidoVersion(id!, Number(version)),
+    enabled: isHistoricalVersion && !!id,
+  })
+
   const { data: pedido, isLoading } = useQuery({
     queryKey: ['pedido', id],
     queryFn: () => getPedido(id!),
-    enabled: !!id,
+    enabled: !isHistoricalVersion && !!id,
   })
 
   const { data: facturacionConfig } = useQuery({
@@ -189,6 +216,74 @@ export default function PedidoDetail() {
   const isPending = submitMutation.isPending || cancelMutation.isPending || amendMutation.isPending
     || downloadMutation.isPending || facturarApartadoMutation.isPending || cancelarApartadoMutation.isPending
 
+  if (isHistoricalVersion) {
+    if (loadingVersion) {
+      return <div className="page-container"><div className="skeleton-box" style={{ width: 280, height: 28 }} /><div className="skeleton-box" style={{ width: '100%', height: 128, marginTop: 12 }} /></div>
+    }
+    if (!versionData) {
+      return (
+        <div className="page-container">
+          <div className="empty-state">
+            <p className="empty-title">Versión no encontrada</p>
+            <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/pedidos/${id}`)}>Ver versión actual</button>
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div className="page-container">
+        <PageHeader
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              Pedido {displayId(versionData.id, versionData.sequence)}
+              <span className={`badge ${STATUS_BADGE[versionData.status] ?? 'badge-neutral'}`}>{STATUS_LABEL[versionData.status] ?? versionData.status}</span>
+              <span className="badge badge-neutral" title="Estás viendo una revisión anterior de este borrador, de solo lectura">
+                Histórica · versión {versionData.sequence}
+              </span>
+            </div>
+          }
+          description={`Guardada el ${formatDate(versionData.savedAt)}`}
+          action={<a className="page-back-link" onClick={() => navigate(`/pedidos/${id}`)}><ArrowLeft size={14} /> Pedidos</a>}
+        />
+
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+          <span>Estás viendo una revisión anterior de este borrador — es solo de lectura.</span>
+          <a className="page-back-link" onClick={() => navigate(`/pedidos/${id}`)}>Ver versión actual</a>
+        </div>
+
+        <div className="card">
+          <div className="items-table-wrap">
+            <table className="data-table navy-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Descripción</th>
+                  <th style={{ textAlign: 'right' }}>Cant.</th>
+                  <th style={{ textAlign: 'right' }}>Precio Unit.</th>
+                  <th style={{ textAlign: 'right' }}>Importe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {versionData.items.map((item, i) => (
+                  <tr key={i}>
+                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode || '—'}</td>
+                    <td>{item.description || item.itemName || '—'}</td>
+                    <td style={{ textAlign: 'right' }}>{item.qty}</td>
+                    <td style={{ textAlign: 'right' }}>{formatMoney(item.rate)}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="items-total-row">
+              <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}><span>Total</span><span>{formatMoney(versionData.grandTotal)}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (isLoading) return <div className="page-container"><div className="skeleton-box" style={{ width: 280, height: 28 }} /><div className="skeleton-box" style={{ width: '100%', height: 128, marginTop: 12 }} /></div>
   if (!pedido) return <div className="page-container"><div className="empty-state"><p className="empty-title">Pedido no encontrado</p></div></div>
 
@@ -198,15 +293,37 @@ export default function PedidoDetail() {
   const taxAmount = pedido.taxAmount ?? 0
   const total = pedido.grandTotal ?? subtotal + taxAmount
 
+  const relatedRows = [
+    {
+      label: 'Cotización',
+      links: pedido.quotation
+        ? [{ code: pedido.quotation, to: `/cotizaciones/${pedido.quotation}` }]
+        : [],
+    },
+    (() => {
+      const facturas = pedido.invoices ?? (pedido.facturaId ? [pedido.facturaId] : [])
+      return {
+        label: facturas.length > 1 ? 'Facturas' : 'Factura',
+        links: facturas.map((f) => ({ code: f, to: `/facturas/${f}` })),
+      }
+    })(),
+  ].filter((r) => r.links.length > 0)
+
+
   return (
     <div className="page-container">
+      <a className="page-back-link" onClick={() => navigate('/pedidos')}>
+        <ArrowLeft size={14} /> Pedidos
+      </a>
       <PageHeader
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="page-title-dot" />
             Pedido {displayId(pedido.id, pedido.sequence)}
-            <span className={`badge ${STATUS_BADGE[pedido.status] ?? 'badge-neutral'}`}>{STATUS_LABEL[pedido.status] ?? pedido.status}</span>
-            {pedido.estadoFlujo && (
+            {pedido.estadoFlujo ? (
               <span className={`badge ${ESTADO_FLUJO_BADGE[pedido.estadoFlujo]}`}>{ESTADO_FLUJO_LABEL[pedido.estadoFlujo]}</span>
+            ) : (
+              <span className={`badge ${STATUS_BADGE[pedido.status] ?? 'badge-neutral'}`}>{STATUS_LABEL[pedido.status] ?? pedido.status}</span>
             )}
             {pedido.sequence > 0 && <span className="badge badge-info">seq {pedido.sequence}</span>}
             {pedido.amendedFrom && <span className="badge badge-neutral">Enmienda</span>}
@@ -226,9 +343,6 @@ export default function PedidoDetail() {
           </div>
         }
         description={`Cliente: ${pedido.customerName}`}
-        action={
-          <a className="page-back-link" onClick={() => navigate('/pedidos')}><ArrowLeft size={14} /> Pedidos</a>
-        }
       />
 
       {stockWarning && (
@@ -245,19 +359,55 @@ export default function PedidoDetail() {
         </div>
       )}
 
-      <div className="doc-actions-bar">
+      <div className="doc-actions-bar" style={{ background: 'transparent', border: 'none', padding: 0, marginBottom: 16 }}>
         <button
-          className="btn btn-secondary btn-size-sm"
+          className="btn btn-secondary btn-size-md"
           onClick={() => navigate(`/pedidos/nuevo?duplicate=${id}`)}
           disabled={isPending}
         >
           <Copy size={14} /> Duplicar
         </button>
+        {relatedRows.length > 0 && (
+          <div className="dropdown" ref={relatedRef} style={{ display: 'flex' }}>
+            <button
+              className="btn btn-secondary btn-size-md"
+              aria-haspopup="true"
+              aria-expanded={relatedOpen}
+              onClick={() => setRelatedOpen((o) => !o)}
+            >
+              <Link2 size={14} /> Documentos relacionados
+              <ChevronRight size={11} style={{ transform: 'rotate(90deg)' }} aria-hidden="true" />
+            </button>
+            <div
+              className={`dropdown-panel${relatedOpen ? ' open' : ''}`}
+              role="menu"
+              style={{ left: 0, right: 'auto' }}
+            >
+              {relatedRows.map((row) => (
+                <Fragment key={row.label}>
+                  <div className="dd-header">
+                    <div className="dd-name" style={{ fontSize: 11 }}>{row.label}</div>
+                  </div>
+                  {row.links.map((l) => (
+                    <button
+                      key={l.to}
+                      className="dd-item"
+                      role="menuitem"
+                      onClick={() => { setRelatedOpen(false); navigate(l.to) }}
+                    >
+                      {l.code}
+                    </button>
+                  ))}
+                </Fragment>
+              ))}
+            </div>
+          </div>
+        )}
         {pedido.status === 'draft' && (
           <>
             {pendienteConfirmarDespacho && (
               <button
-                className="btn btn-navy btn-size-sm"
+                className="btn btn-navy btn-size-md"
                 onClick={() => navigate(`/despachos/confirmaciones?search=${encodeURIComponent(id!)}`)}
                 disabled={isPending}
                 title="La confirmación se hace desde Despachos, no desde este detalle."
@@ -266,22 +416,22 @@ export default function PedidoDetail() {
               </button>
             )}
             <button
-              className="btn btn-primary btn-size-sm"
+              className="btn btn-navy btn-size-md"
               onClick={() => submitMutation.mutate()}
               disabled={isPending || pendienteConfirmarDespacho}
               title={pendienteConfirmarDespacho ? 'Primero confirma la existencia física de los artículos' : undefined}
             >
               <Send size={14} /> {pedido.isLayaway ? 'Someter Apartado' : 'Facturar'}
             </button>
-            <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/pedidos/${id}/editar`)} disabled={isPending}>
+            <button className="btn btn-ghost btn-size-md" onClick={() => navigate(`/pedidos/${id}/editar`)} disabled={isPending}>
               <FileText size={14} /> Editar
             </button>
             {pedido.isLayaway ? (
-              <button className="btn btn-danger btn-size-sm" onClick={openCancelApartadoModal} disabled={isPending}>
+              <button className="btn btn-danger btn-size-md" onClick={openCancelApartadoModal} disabled={isPending}>
                 <Ban size={14} /> Cancelar Apartado
               </button>
             ) : (
-              <button className="btn btn-danger btn-size-sm" onClick={() => cancelMutation.mutate()} disabled={isPending}>
+              <button className="btn btn-danger btn-size-md" onClick={() => cancelMutation.mutate()} disabled={isPending}>
                 <Trash2 size={14} /> Cancelar
               </button>
             )}
@@ -290,24 +440,24 @@ export default function PedidoDetail() {
         {pedido.status === 'submitted' && (
           <>
             {pedido.isLayaway && !pedido.facturaId && (
-              <button className="btn btn-primary btn-size-sm" onClick={() => facturarApartadoMutation.mutate()} disabled={isPending}>
+              <button className="btn btn-navy btn-size-md" onClick={() => facturarApartadoMutation.mutate()} disabled={isPending}>
                 <Send size={14} /> Facturar Apartado
               </button>
             )}
             {despachoHabilitado && (pedido.invoices?.length ?? (pedido.facturaId ? 1 : 0)) === 0 && (
               <button
-                className="btn btn-navy btn-size-sm"
+                className="btn btn-navy btn-size-md"
                 onClick={() => despacharPedidoMutation.mutate()}
                 disabled={despacharPedidoMutation.isPending}
               >
                 <Truck size={14} /> {despacharPedidoMutation.isPending ? 'Creando despacho…' : 'Despachar'}
               </button>
             )}
-            <button className="btn btn-ghost btn-size-sm" onClick={() => amendMutation.mutate()} disabled={isPending}>
+            <button className="btn btn-ghost btn-size-md" onClick={() => amendMutation.mutate()} disabled={isPending}>
               <GitBranch size={14} /> Enmendar
             </button>
             <button
-              className="btn btn-secondary btn-size-sm"
+              className="btn btn-secondary btn-size-md"
               onClick={() => downloadMutation.mutate()}
               disabled={downloadMutation.isPending}
             >
@@ -316,7 +466,7 @@ export default function PedidoDetail() {
                 : <><Download size={14} /> Descargar PDF</>}
             </button>
             {pedido.isLayaway && (
-              <button className="btn btn-danger btn-size-sm" onClick={openCancelApartadoModal} disabled={isPending}>
+              <button className="btn btn-danger btn-size-md" onClick={openCancelApartadoModal} disabled={isPending}>
                 <Ban size={14} /> Cancelar Apartado
               </button>
             )}
@@ -325,7 +475,7 @@ export default function PedidoDetail() {
         {['completed', 'to deliver and bill'].includes(pedido.status) && (
           <>
             <button
-              className="btn btn-secondary btn-size-sm"
+              className="btn btn-secondary btn-size-md"
               onClick={() => downloadMutation.mutate()}
               disabled={downloadMutation.isPending}
             >
@@ -346,26 +496,8 @@ export default function PedidoDetail() {
         })()}
       </div>
 
-      <RelatedDocsCard
-        rows={[
-          {
-            label: 'Cotización',
-            links: pedido.quotation
-              ? [{ code: pedido.quotation, to: `/cotizaciones/${pedido.quotation}` }]
-              : [],
-          },
-          (() => {
-            const facturas = pedido.invoices ?? (pedido.facturaId ? [pedido.facturaId] : [])
-            return {
-              label: facturas.length > 1 ? 'Facturas' : 'Factura',
-              links: facturas.map((f) => ({ code: f, to: `/facturas/${f}` })),
-            }
-          })(),
-        ]}
-      />
-
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header"><h2 className="card-title">Información General</h2></div>
+        <div className="card-header navy-card-header"><h2 className="card-title">Información General</h2></div>
         <div className="card-body">
           <div className="fields-grid">
             <div className="detail-field">
@@ -409,9 +541,9 @@ export default function PedidoDetail() {
             </div>
           </div>
           {pedido.notes && (
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-              <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>Notas</p>
-              <p style={{ fontSize: 13, whiteSpace: 'pre-line' }}>{pedido.notes}</p>
+            <div className="detail-field" style={{ gridColumn: '1 / -1', marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+              <span className="detail-label">Notas</span>
+              <span className="detail-value" style={{ whiteSpace: 'pre-line' }}>{pedido.notes}</span>
             </div>
           )}
         </div>
@@ -419,7 +551,7 @@ export default function PedidoDetail() {
 
       <div className="card">
         <div className="items-table-wrap">
-          <table className="items-table items-table-resizable">
+          <table className="items-table navy-table items-table-resizable">
             <colgroup>
               {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
             </colgroup>
@@ -467,7 +599,7 @@ export default function PedidoDetail() {
               {pedido.items.map((item, i) => (
                 <tr key={i}>
                   <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{item.itemCode || '—'}</td>
-                  <td>{item.description || '—'}</td>
+                  <td>{item.description || item.itemName || '—'}</td>
                   <td style={{ fontSize: 12, color: 'var(--text-tertiary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.notes ?? ''}>{item.notes ?? '—'}</td>
                   <td style={{ textAlign: 'right' }}>{item.qty}</td>
                   <td style={{ textAlign: 'right' }}>{formatMoney(item.rate, pedido.currency)}</td>
@@ -479,24 +611,29 @@ export default function PedidoDetail() {
               ))}
             </tbody>
           </table>
-          <div className="items-total-row">
-            <div className="items-total-line"><span>Subtotal bruto</span><span>{formatMoney(grossTotal, pedido.currency)}</span></div>
-            {totalDiscount > 0 && <div className="items-total-line" style={{ color: 'var(--text-danger)' }}><span>Descuento total</span><span>-{formatMoney(totalDiscount, pedido.currency)}</span></div>}
+          <div className="items-total-row navy-totals">
+            <div className="items-total-line" style={{ fontSize: 14, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ textAlign: 'right' }}>Subtotal bruto</span>
+              <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(grossTotal, pedido.currency)}</span>
+            </div>
+            <div className="items-total-line" style={{ fontSize: 14, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ textAlign: 'right' }}>Descuento</span>
+              <span style={{ textAlign: 'left', minWidth: 170 }}>-{formatMoney(totalDiscount, pedido.currency)}</span>
+            </div>
             {/*<div className="items-total-line"><span>Subtotal neto</span><span>{formatMoney(subtotal, pedido.currency)}</span></div>*/}
-            <div className="items-total-line"><span>Impuesto</span><span>{formatMoney(taxAmount, pedido.currency)}</span></div>
-            <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}><span>Total</span><span>{formatMoney(total, pedido.currency)}</span></div>
+            <div className="items-total-line" style={{ fontSize: 14, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ textAlign: 'right' }}>Impuesto</span>
+              <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(taxAmount, pedido.currency)}</span>
+            </div>
+            <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'right' }}>Total</span>
+              <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'left', minWidth: 170 }}>{formatMoney(total, pedido.currency)}</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {pedido.history && pedido.history.length > 0 && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="card-header"><h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><History size={15} /> Historial de versiones</h2></div>
-          <div className="card-body">
-            <DocumentHistoryCard history={pedido.history} currentDocId={pedido.id} basePath="/pedidos" />
-          </div>
-        </div>
-      )}
+      <DocumentHistoryCard history={pedido.history} currentDocId={pedido.id} basePath="/pedidos" />
 
       {/* Modal: cancelar apartado */}
       {cancelApartadoOpen && (

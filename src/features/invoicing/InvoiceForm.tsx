@@ -1335,7 +1335,7 @@ if (esClienteOcasional) {
       // artículo con `usaDimensiones`, incluso una línea hidratada de una edición que todavía no
       // se volvió a seleccionar (§10.2) — en ese caso `dimensiones` está vacío y esto la atrapa igual.
       if (item._usaDimensiones && item._itemDimensiones && !combinacionCompleta(item._itemDimensiones, item.dimensiones ?? {})) {
-        toast.error(`Línea ${i + 1}: selecciona la combinación de dimensión completa para ${item.itemLabel ?? item.itemCode} antes de continuar`)
+        toast.error(`Línea ${i + 1}: selecciona la dimensión completa para ${item.itemLabel ?? item.itemCode} antes de continuar`)
         return
       }
     }
@@ -1778,7 +1778,7 @@ persistInvoice(buildInvoiceDto())
                     <span className="col-resize-handle" onMouseDown={startResize('ubicacion')} />
                   </th>
                   <th>
-                    Combinación
+                    Dimensión
                     <span className="col-resize-handle" onMouseDown={startResize('combination')} />
                   </th>
                   {arsActiva && (
@@ -2023,7 +2023,7 @@ persistInvoice(buildInvoiceDto())
                             />
                             {item._dimensionesPendientesReseleccion && (
                               <span style={{ fontSize: 11, color: 'var(--color-warning)', display: 'block', whiteSpace: 'normal', maxWidth: 160 }}>
-                                Esta línea usa combinación de dimensión — vuelva a seleccionarla antes de guardar
+                                Esta línea usa dimensión de inventario — vuelva a seleccionarla antes de guardar
                               </span>
                             )}
                           </div>
@@ -2096,6 +2096,7 @@ persistInvoice(buildInvoiceDto())
                           onClick={() => setViewItemCode(item.itemCode)}
                           disabled={!item.itemCode}
                           title="Ver detalle"
+                          style={{ color: 'var(--text-primary)' }}
                         >
                           <Eye size={14} />
                         </button>
@@ -2167,29 +2168,21 @@ persistInvoice(buildInvoiceDto())
             )}
 
             <div className="items-total-row navy-totals">
-              {/* <div className="items-total-line">
-                <span>Subtotal bruto</span>
-                <span>{formatDOP(grossTotal)}</span>
-              </div> */}
-              {totalDiscount > 0 && (
-                <div className="items-total-line">
-                  <span>Descuento total</span>
-                  <span>-{formatMoney(totalDiscount, currency || monedaBase)}</span>
-                </div>
-              )}
-              <div className="items-total-line">
-                <span>Subtotal</span>
-                <span>{formatMoney(subtotal, currency || monedaBase)}</span>
+              <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ textAlign: 'right' }}>Subtotal</span>
+                <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(grossTotal, currency || monedaBase)}</span>
               </div>
-              {taxTotal > 0 && (
-                <div className="items-total-line" style={{ fontSize: 13 }}>
-                  <span>Impuesto</span>
-                  <span>{formatMoney(taxTotal, currency || monedaBase)}</span>
-                </div>
-              )}
-              <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, fontSize: 15 }}>
-                <span>Total</span>
-                <span>{formatMoney(total, currency || monedaBase)}</span>
+              <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ textAlign: 'right' }}>Descuento</span>
+                <span style={{ textAlign: 'left', minWidth: 170 }}>-{formatMoney(totalDiscount, currency || monedaBase)}</span>
+              </div>
+              <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ textAlign: 'right' }}>Impuesto</span>
+                <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(taxTotal, currency || monedaBase)}</span>
+              </div>
+              <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ fontSize: 20, color: '#FCB124', textAlign: 'right' }}>Total</span>
+                <span style={{ fontSize: 20, color: '#FCB124', textAlign: 'left', minWidth: 170 }}>{formatMoney(total, currency || monedaBase)}</span>
               </div>
               {arsActiva && arsServidor && (
                 <>
