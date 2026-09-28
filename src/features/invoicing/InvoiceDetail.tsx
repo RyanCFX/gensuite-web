@@ -427,7 +427,9 @@ export default function InvoiceDetail() {
   const formatosPermitidosPdf = formatosPermitidos?.filter((f) => f !== "pos");
   const permitePos = formatosPermitidos?.includes("pos") ?? false;
 
-  const { data: turno } = useQuery({
+  // Precalienta el caché de ['turno-actual'] (lo lee TurnoCajaIndicator) — el `data` no se
+  // usa acá directamente.
+  useQuery({
     queryKey: ['turno-actual'],
     queryFn: getTurnoActual,
     enabled: !!invoice && invoice.status === "draft" && usaModuloPos,
@@ -1805,9 +1807,6 @@ export default function InvoiceDetail() {
             {ecfCancelBlockedMsg ||
               "Esta factura tiene un e-CF aceptado por la DGII. No se puede anular — para corregirla, emite una Nota de Crédito Electrónica que la referencie."}
           </span>
-          <button className="btn btn-primary btn-size-sm" onClick={irANotaCredito}>
-            Emitir Nota de Crédito
-          </button>
         </div>
       )}
 

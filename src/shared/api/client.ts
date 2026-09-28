@@ -15,17 +15,28 @@ export const client = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-/** Resuelve una URL de archivo devuelta por el backend (ej. `fileUrl` de un upload, "/files/x.png").
- * Se deja SIN resolver contra el origen del backend a propósito: el backend sirve esos archivos
- * con `Cross-Origin-Resource-Policy: same-origin`, así que un `<img src>` apuntando directo a su
- * IP/dominio es bloqueado por el navegador (ERR_BLOCKED_BY_RESPONSE.NotSameOrigin) aunque el
- * archivo exista y responda 200 — el bloqueo es del navegador, no depende de si el recurso está
- * disponible. La ruta relativa se sirve detrás del propio origen del front, que la reenvía al
- * backend igual que ya hace con `/api` (ver `/files` en vite.config.ts y deploy/nginx.conf.example),
- * dejando la petición como same-origin desde el punto de vista del navegador. Si el backend algún
- * día devuelve una URL ya absoluta, se respeta tal cual. */
+/** Resuelve una URL de archivo devuelta por el backend (ej. `logoUrl` de la empresa o
+ *  `fileUrl` de un upload, "/files/x.png").
+ *
+ *  El backend sirve esos archivos con `Cross-Origin-Resource-Policy: same-origin` y a veces con
+ *  URL absoluta a su IP/dominio — un `<img src>` apuntando allá es bloqueado por el navegador
+ *  (ERR_BLOCKED_BY_RESPONSE.NotSameOrigin) aunque el archivo exista y responda 200, y en
+ *  producción además lo bloquearían el CSP (`img-src 'self'...`) y `upgrade-insecure-requests`.
+ *  Por eso las rutas `/files/...` se devuelven relativas: se sirven detrás del propio origen del
+ *  front, que las reenvía al backend igual que ya hace con `/api` (ver `/files` en
+ *  vite.config.ts y deploy/nginx.conf.example), quedando same-origin. Las URLs absolutas que NO
+ *  son del backend (ej. un CDN) se respetan tal cual. */
 export function resolveFileUrl(url: string): string {
-  return url
+  if (!url || url.startsWith('/')) return url
+  try {
+    const parsed = new URL(url)
+    if (parsed.pathname.startsWith('/files/')) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`
+    }
+    return url
+  } catch {
+    return url
+  }
 }
 
 // Evita repetir el mismo toast de permiso dentro de una ventana corta (ráfagas de 403).

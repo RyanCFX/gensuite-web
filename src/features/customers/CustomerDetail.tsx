@@ -9,7 +9,7 @@ import { client } from '@/shared/api/client'
 import type { Invoice, EstadoCuentaResponse } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useFeature } from '@/shared/features/can'
-import { Pencil, Ban, Building2, User, ArrowLeft, Wallet, Receipt, X, FileText, Download, Eye, EyeOff, Plus, Minus, ChevronDown, ChevronRight } from 'lucide-react'
+import { Pencil, Ban, Building2, User, ArrowLeft, Wallet, Receipt, X, FileText, Download, Eye, EyeOff, ChevronDown, ChevronRight } from 'lucide-react'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const CREDIT_NOTES_COLUMNS = [

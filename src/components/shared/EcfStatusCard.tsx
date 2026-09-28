@@ -23,7 +23,7 @@ export function EcfStatusCard({ ecf }: { ecf: EcfSubmitResult }) {
         )}
         {ecf.qrUrl ? (
           <a href={ecf.qrUrl} target="_blank" rel="noreferrer">
-            Ver representación fiscal
+            <u><strong>Ver representación fiscal</strong></u>
           </a>
         ) : (
           <span style={{ color: 'var(--text-tertiary)' }}>

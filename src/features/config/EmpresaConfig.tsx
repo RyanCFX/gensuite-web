@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getEmpresa, updateEmpresa, uploadLogoEmpresa, getCuentasEmpresa, updateCuentasEmpresa, listAlmacenes } from '@/shared/api/config'
+import { resolveFileUrl } from '@/shared/api/client'
 import type { Empresa, CuentasEmpresa, ItemProps } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -488,7 +489,7 @@ export default function EmpresaConfig() {
                   {uploadLogoMutation.isPending ? (
                     <Loader2 size={22} className="spin" />
                   ) : form.logoUrl ? (
-                    <img src={form.logoUrl} alt="Logo de la empresa" />
+                    <img src={resolveFileUrl(form.logoUrl)} alt="Logo de la empresa" />
                   ) : (
                     <span className="empresa-logo-empty">
                       <Image size={24} style={{ color: 'var(--teal-accent)' }} />
