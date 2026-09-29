@@ -38,13 +38,12 @@ import { getItem } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
 import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
 import { crearDespachoDesdeFactura, listDespachos } from "@/shared/api/despachos";
-import { ECF_SUBMIT_UNAVAILABLE_MSG, getEcfTipos } from "@/shared/api/ecf";
-import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from "@/lib/dgii";
+import { ECF_SUBMIT_UNAVAILABLE_MSG } from "@/shared/api/ecf";
 import { esClienteEmisorNoEncontrado } from "@/lib/ecfErrors";
 import { formatStockInsufficientMessage } from "@/lib/stockAlerts";
 import { usePosTicketPrinter } from "@/shared/hooks/usePosTicketPrinter";
 import { useIsSystemManager } from "@/shared/hooks/useIsSystemManager";
-import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion, MonedaPdfImpresion, EcfSubmitResult, EcfModificationCode } from "@/shared/api/types";
+import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion, MonedaPdfImpresion, EcfSubmitResult } from "@/shared/api/types";
 import { esCoberturaCompleta } from "@/shared/api/types";
 import { usePuede } from "@/shared/permissions/can";
 import { CoberturaArsResumen } from "./AseguradoraPanel";
@@ -92,7 +91,6 @@ import {
   ChevronRight,
   Plus,
   Minus,
-  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -256,9 +254,6 @@ export default function InvoiceDetail() {
   >("credit_note_only");
   const [returnModeOfPayment, setReturnModeOfPayment] = useState("");
   const [returnReason, setReturnReason] = useState("");
-  const [modificationCode, setModificationCode] = useState<EcfModificationCode | "">("");
-  const [modificationCodeError, setModificationCodeError] = useState("");
-  const modificationCodeTouched = useRef(false);
 
   const [turnoModalOpen, setTurnoModalOpen] = useState(false);
   const [turnoOpeningAmount, setTurnoOpeningAmount] = useState(0);
