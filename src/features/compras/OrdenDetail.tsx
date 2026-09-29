@@ -5,14 +5,16 @@ import { toast } from 'sonner'
 import {
   getOrdenCompra, submitOrdenCompra, cancelOrdenCompra, amendOrdenCompra,
   cerrarOrdenCompra, reabrirOrdenCompra, ponerEnEsperaOrdenCompra, recibirOrdenCompra, facturarOrdenCompra,
+  getOrdenCompraPdfBlobUrl, downloadOrdenCompraPdf,
 } from '@/shared/api/ordenes-compra'
 import { getSupplier } from '@/shared/api/suppliers'
 import { getItem } from '@/shared/api/catalog'
 import { getCatalogosFiscales, listImpuestosCompras, getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { Send, X, RotateCcw, FileText, Receipt, Truck, Lock, Unlock, PauseCircle } from 'lucide-react'
+import { Send, X, RotateCcw, FileText, Receipt, Truck, Lock, Unlock, PauseCircle, Eye, Download } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -62,6 +64,7 @@ export default function OrdenDetail() {
   const [showRecibir, setShowRecibir] = useState(false)
   const [showFacturar, setShowFacturar] = useState(false)
   const [form, setForm] = useState<CreateInvoiceFromOrdenDto>(defaultFacturarForm())
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const { data: orden, isLoading, isError } = useQuery({
     queryKey: ['orden-compra', id],
@@ -174,7 +177,18 @@ export default function OrdenDetail() {
         )
         return
       }
-      toast.error((err as { message?: string })?.message ?? 'Error al recibir la mercancía')
+      // docs/tasks/81 §2 — "Recibir" queda como acción de respaldo: si la orden ya está 100%
+      // recibida (ej. por la auto-recepción al facturar), el backend responde 400 sin duplicar
+      // nada — se muestra como informativo, no como error.
+      const msg = (err as { message?: string })?.message ?? ''
+      if (/ya est[aá] 100% recibida/i.test(msg)) {
+        toast.info('La orden ya está 100% recibida — no hay nada pendiente por recibir.')
+        queryClient.invalidateQueries({ queryKey: ['orden-compra', id] })
+        queryClient.invalidateQueries({ queryKey: ['ordenes-compra'] })
+        setShowRecibir(false)
+        return
+      }
+      toast.error(msg || 'Error al recibir la mercancía')
     },
   })
 
@@ -191,6 +205,18 @@ export default function OrdenDetail() {
       navigate(`/compras/${name}`)
     },
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al facturar la orden'),
+  })
+
+  // PDF de la orden — GET /compras/ordenes/:id/pdf (ya existía en el backend, docs/tasks/81 §3).
+  const downloadPdfMutation = useMutation({
+    mutationFn: () => downloadOrdenCompraPdf(id!, `orden-compra-${id}.pdf`),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo descargar el PDF'),
+  })
+
+  const previewPdfMutation = useMutation({
+    mutationFn: () => getOrdenCompraPdfBlobUrl(id!),
+    onSuccess: (url) => setPreviewUrl(url),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo generar la vista previa del PDF'),
   })
 
   function handleConfirm() {
@@ -279,6 +305,22 @@ export default function OrdenDetail() {
         description={orden.supplierName}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => previewPdfMutation.mutate()}
+              disabled={previewPdfMutation.isPending}
+              title="Vista previa del PDF de la orden"
+            >
+              <Eye size={14} />Ver PDF
+            </button>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => downloadPdfMutation.mutate()}
+              disabled={downloadPdfMutation.isPending}
+              title="Descargar PDF de la orden"
+            >
+              <Download size={14} />Descargar PDF
+            </button>
             {orden.status === 'draft' && (
               <>
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/compras/ordenes/${id}/editar`)}>
@@ -298,7 +340,11 @@ export default function OrdenDetail() {
                 ) : (
                   <>
                     {canRecibir && (
-                      <button className="btn btn-secondary btn-size-sm" onClick={() => setShowRecibir(true)}>
+                      <button
+                        className="btn btn-secondary btn-size-sm"
+                        onClick={() => setShowRecibir(true)}
+                        title="Recibir a mano (respaldo) — en el caso normal la recepción se genera sola al someter la factura de esta orden"
+                      >
                         <Truck size={14} />Recibir
                       </button>
                     )}
@@ -483,6 +529,9 @@ export default function OrdenDetail() {
                 <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                   Se facturará todo el remanente pendiente de esta orden ({formatDOP(orden.grandTotal - orden.items.reduce((s, i) => s + i.billedAmt, 0))} restante).
                 </p>
+                <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: -8 }}>
+                  Al someter la factura generada, la recepción de mercancía se crea y somete automáticamente — no hace falta recibir a mano.
+                </p>
                 <div className="form-row form-row-2">
                   <div className="ff-wrap">
                     <label className="ff-label">Fecha de Vencimiento</label>
@@ -592,6 +641,8 @@ export default function OrdenDetail() {
           </div>
         </div>
       )}
+
+      <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </div>
   )
 }

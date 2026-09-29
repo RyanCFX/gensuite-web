@@ -100,6 +100,12 @@ export default function CompraDetail() {
       toast.success('Compra sometida')
       queryClient.invalidateQueries({ queryKey: ['compra', id] })
       queryClient.invalidateQueries({ queryKey: ['compras'] })
+      // docs/tasks/81 §2 — si esta factura viene de una Orden de Compra, el backend creó y
+      // sometió la recepción automáticamente en este mismo paso: se refresca el estado de las
+      // órdenes (per_received) por si alguna pantalla de orden quedó abierta.
+      queryClient.invalidateQueries({ queryKey: ['orden-compra'] })
+      queryClient.invalidateQueries({ queryKey: ['ordenes-compra'] })
+      queryClient.invalidateQueries({ queryKey: ['purchase-receipts'] })
       setConfirmAction(null)
       setShowPagoContadoModal(false)
       if (result.data?.ecf) setEcfResult(result.data.ecf)

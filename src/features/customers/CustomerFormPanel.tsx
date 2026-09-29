@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { createCustomer, updateCustomer, listCustomerGroups } from '@/shared/api/customers'
 import { listSucursales } from '@/shared/api/sucursales'
-import { listMetodosPago, listImpuestosVentas, getFacturacionConfig } from '@/shared/api/config'
+import { listMetodosPago, listImpuestosVentas, getFacturacionConfig, getCatalogosFiscales } from '@/shared/api/config'
 import { listUsuarios } from '@/shared/api/usuarios'
 import { getDgiiTaxpayer } from '@/shared/api/dgii'
 import type { ApiError, Customer } from '@/shared/api/types'
@@ -49,6 +49,7 @@ const schema = z.object({
   })).optional(),
   branch: z.string().optional(),
   formaPagoDefault: z.string().optional(),
+  ncfTypeDefault: z.string().optional(),
   descuentoDefaultPct: z.number().min(0, 'Debe ser entre 0 y 100').max(100, 'Debe ser entre 0 y 100').optional(),
   cuentaCxcDefault: z.string().optional(),
   defaultCurrency: z.string().optional(),
@@ -128,6 +129,18 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
   })
   const [impuestoVentasSearch, setImpuestoVentasSearch] = useState('')
 
+  // Catálogo NCF físico (B01–B17) para el "Tipo de Comprobante por Defecto" (docs/tasks/81 §5) —
+  // mismas opciones/etiquetas que el selector de ncfType de facturas.
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales'],
+    queryFn: getCatalogosFiscales,
+    staleTime: 60 * 60_000,
+  })
+  const [ncfDefaultSearch, setNcfDefaultSearch] = useState('')
+  const ncfDefaultOptions: SearchSelectOption[] = (catalogos?.ncfTypesFisicos ?? catalogos?.ncfTypes ?? [])
+    .filter((t) => !ncfDefaultSearch || t.label.toLowerCase().includes(ncfDefaultSearch.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
+
   const { data: usuariosData } = useQuery({
     queryKey: ['usuarios-all'],
     queryFn: () => listUsuarios({ limit: 100 }),
@@ -158,6 +171,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
       telefonos: [],
       branch: '',
       formaPagoDefault: '',
+      ncfTypeDefault: '',
       descuentoDefaultPct: undefined,
       cuentaCxcDefault: '',
       defaultCurrency: '',
@@ -193,6 +207,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
         telefonos: customer.telefonos ?? [],
         branch: customer.branch ?? '',
         formaPagoDefault: customer.formaPagoDefault ?? '',
+        ncfTypeDefault: customer.ncfTypeDefault ?? '',
         descuentoDefaultPct: customer.descuentoDefaultPct ?? undefined,
         cuentaCxcDefault: customer.cuentaCxcDefault ?? '',
         defaultCurrency: customer.defaultCurrency ?? '',
@@ -255,6 +270,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
       telefonos: values.telefonos && values.telefonos.length > 0 ? values.telefonos : undefined,
       branch: values.branch || undefined,
       formaPagoDefault: values.formaPagoDefault || undefined,
+      ncfTypeDefault: values.ncfTypeDefault || undefined,
       descuentoDefaultPct: values.descuentoDefaultPct,
       cuentaCxcDefault: values.cuentaCxcDefault || undefined,
       defaultCurrency: values.defaultCurrency || undefined,
@@ -725,6 +741,27 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
           </div>
 
           <div className="form-row">
+            <div className="ff-wrap">
+              <label className="ff-label" htmlFor="ncfTypeDefault">
+                Tipo de Comprobante por Defecto
+                <FieldTooltip>Prellena el tipo de comprobante (NCF) al crear una factura/cotización a este cliente — editable por documento. No valida ni restringe nada.</FieldTooltip>
+              </label>
+              <Controller
+                name="ncfTypeDefault"
+                control={control}
+                render={({ field }) => (
+                  <SearchSelect
+                    id="ncfTypeDefault"
+                    value={field.value ?? ''}
+                    onChange={(v) => field.onChange(v || '')}
+                    options={ncfDefaultOptions}
+                    onSearch={setNcfDefaultSearch}
+                    selectedLabel={ncfDefaultOptions.find((o) => o.value === field.value)?.label ?? ''}
+                    placeholder="Sin defecto"
+                  />
+                )}
+              />
+            </div>
             <div className="ff-wrap">
               <label className="ff-label" htmlFor="descuentoDefaultPct">
                 % Descuento por Defecto

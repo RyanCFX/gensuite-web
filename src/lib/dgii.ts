@@ -216,6 +216,23 @@ export function ecfStatusBadge(status?: string | null): string {
   }
 }
 
+// ─── Bloqueo de PDF con e-CF no aceptado (docs/tasks/81 §6) ───────────────────
+// GET /invoices/:id/pdf devuelve 400 `ECF_NOT_ACCEPTED` cuando la factura tiene e-CF con
+// estado distinto de ACCEPTED/CONDITIONAL. Sin e-CF (NCF físico) nunca bloquea.
+
+/** `true` si el botón de PDF debería anticipar el bloqueo (sin hacer el request). */
+export function ecfBloqueaPdf(ecf?: { status?: string | null } | null): boolean {
+  if (!ecf) return false
+  const s = (ecf.status ?? '').toUpperCase()
+  return s !== 'ACCEPTED' && s !== 'APPROVED' && s !== 'CONDITIONAL'
+}
+
+/** Mensaje claro para el bloqueo, reutilizando el vocabulario de `ecfStatusLabel`. */
+export function ecfPdfBloqueadoMensaje(ecf?: { status?: string | null } | null): string {
+  const estado = ecfStatusLabel(ecf?.status ?? null)
+  return `Esta factura todavía no puede imprimirse: el e-CF sigue "${estado}" en la DGII. Disponible cuando la DGII lo acepte.`
+}
+
 // ─── e-CF recibidos: conciliación con Purchase Invoice ────────────────────────
 
 export function ecfConciliacionLabel(c?: string | null): string {

@@ -58,7 +58,8 @@ import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { useItemInventory } from '@/shared/hooks/useItemInventory'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { formatStockInsufficientMessage, formatUomNotAllowedMessage } from '@/lib/stockAlerts'
-import { isCostoCompraError } from '@/lib/pinOverride'
+import { isPinPrecioError } from '@/lib/pinOverride'
+import { isPrecioCatalogoError, precioBloqueadoParaLinea } from '@/lib/precioCatalogo'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 
 type NcfType = string
@@ -76,6 +77,10 @@ interface LineItem {
   salesTaxTemplate: string
   /** Precio base al stockUom — se usa para recalcular al cambiar UOM */
   baseRate: number
+  /** Precio escrito a mano por el operador (solo cuando el toggle correspondiente está activo).
+   *  Los reprices automáticos (cambio de cliente/tier, moneda o UDM) no tocan estas líneas —
+   *  igual que `manualDiscountPct` con los descuentos. Se limpia al elegir otro artículo. */
+  precioManual?: boolean
   uom: string
   /** Factor de conversión activo (UOM seleccionada / stockUom) */
   conversionFactor: number
@@ -357,6 +362,20 @@ export default function InvoiceForm() {
   const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
   /** Una factura con cobertura ARS no puede llevar impuestos (§3.7): se oculta el selector. */
   const mostrarImpuestoDocumento = usaImpuestoDocumento && !(esFarmacia && arsEnabled)
+  // Candados "Permitir Modificar Precio Libremente" (servicios/productos por separado) — con
+  // el toggle correspondiente apagado, el precio de la línea debe ser exactamente uno de los
+  // precios de catálogo (A/B/C). El input ya es de solo lectura salvo edición manual habilitada
+  // (ver `updateManualRate`); acá solo se decide por línea según el tipo de artículo y se maneja
+  // el 400 en `handleInvoiceMutationError` — no hay edición libre que reemplazar cuando bloquea.
+  const bloqueoPrecioServicios = facturacionConfig?.permitirModificarPrecioServicios === false
+  const bloqueoPrecioProductos = facturacionConfig?.permitirModificarPrecioProductos === false
+  const algunBloqueoPrecio = bloqueoPrecioServicios || bloqueoPrecioProductos
+  const precioBloqueadoPara = (itemType: string | undefined) =>
+    precioBloqueadoParaLinea(itemType, facturacionConfig ?? undefined)
+  const tiposPrecioBloqueados = [
+    ...(bloqueoPrecioServicios ? ['servicios'] : []),
+    ...(bloqueoPrecioProductos ? ['productos'] : []),
+  ].join(' y ')
 
   // Búsqueda asistida de mostrador (vertical Farmacia) — docs/tasks/
   // PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §9. Sigue el texto tecleado en CUALQUIER fila del
@@ -553,13 +572,39 @@ export default function InvoiceForm() {
     return Math.round(rate * 10000) / 10000
   }
 
+  /** Inversa de `saleRate`: del precio visible al anchor (`baseRate`, moneda base y UDM de
+   *  stock). Se usa al escribir el precio a mano para que el valor tecleado se vuelva la nueva
+   *  base en vez de perderse en el próximo reprice. */
+  function baseRateFromDisplayed(rate: number, factor: number = 1): number {
+    const c = currency && currency !== monedaBase && conversionRate !== '' && Number(conversionRate) > 0
+      ? Number(conversionRate)
+      : 1
+    const safeFactor = factor > 0 ? factor : 1
+    return (rate * c) / safeFactor
+  }
+
+  /** Precio escrito a mano (solo cuando el toggle correspondiente está activo, el input viene
+   *  habilitado). Marca la línea con `precioManual` para que los reprices automáticos la
+   *  respeten. Los pisos de costo/precio mínimo siguen validando al guardar (diálogo de PIN). */
+  function updateManualRate(index: number, raw: string) {
+    if (raw.trim() === '') {
+      updateItem(index, { rate: 0, baseRate: 0, precioManual: true })
+      return
+    }
+    const parsed = Number(raw)
+    if (Number.isNaN(parsed) || parsed < 0) return
+    const row = items[index]
+    if (!row) return
+    updateItem(index, { rate: parsed, baseRate: baseRateFromDisplayed(parsed, row.conversionFactor), precioManual: true })
+  }
+
   // Al elegir/cambiar moneda o tasa, se reconvierten los precios de las líneas ya cargadas en esta
   // sesión (con `_prices`, es decir, elegidas desde el catálogo) — no toca líneas hidratadas de una
   // factura en edición, que ya vienen en la moneda con la que se guardaron originalmente.
   useEffect(() => {
     setItems((prev) =>
       prev.map((row) => {
-        if (!row._prices || !row.itemCode) return row
+        if (!row._prices || !row.itemCode || row.precioManual) return row
         const rate = saleRate(row.baseRate, row.conversionFactor)
         const amount = row.discountMode === 'amount'
           ? calcAmount(row.qty, rate, 0, row.discountAmount)
@@ -629,9 +674,14 @@ export default function InvoiceForm() {
   }, [selectedCustomer])
 
   // ── Auto-select NCF type based on customer (only for new customers) ───────
+  // docs/tasks/81 §5 — el `ncfTypeDefault` del cliente (si tiene) gana sobre la heurística
+  // histórica (gobierno → B15, con RNC → B01, resto → B02). Es solo prellenado: el usuario
+  // puede cambiarlo libremente después.
   useEffect(() => {
     if (!selectedCustomer || !customerTouchedRef.current) return
-    if (selectedCustomer.isGovernment) {
+    if (selectedCustomer.ncfTypeDefault) {
+      setNcfType(selectedCustomer.ncfTypeDefault)
+    } else if (selectedCustomer.isGovernment) {
       setNcfType('B15')
     } else if (selectedCustomer.rnc) {
       setNcfType('B01')
@@ -639,6 +689,22 @@ export default function InvoiceForm() {
       setNcfType('B02')
     }
   }, [selectedCustomer])
+
+  // La búsqueda de clientes (list) puede no traer `ncfTypeDefault` — se enriquece con el
+  // detalle completo para que el prellenado de arriba aplique igual en ese caso.
+  useEffect(() => {
+    if (isEdit || !customerId || esClienteOcasional) return
+    if (selectedCustomer?.id === customerId && selectedCustomer.ncfTypeDefault) return
+    let cancelled = false
+    getCustomer(customerId)
+      .then((full) => {
+        if (cancelled) return
+        setSelectedCustomer((prev) => (prev?.id === customerId ? { ...prev, ...full } : full))
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerId])
 
   // ── Auto-select NCF type for ocasional customers ────────────────────────
   useEffect(() => {
@@ -737,7 +803,11 @@ export default function InvoiceForm() {
         return
       }
       if (msg.toLowerCase().includes('máximo de descuento') || msg.toLowerCase().includes('máximo descuento')) { setPinModalOpen(true); return }
-      if (isCostoCompraError(err)) { setCostPinModalOpen(true); return }
+      if (isPinPrecioError(err)) { setCostPinModalOpen(true); return }
+      // Candado "Permitir Modificar Precio Libremente" apagado — el rate no es A/B/C. Sin PIN
+      // que lo salve: el mensaje del backend ya es comercial y se muestra tal cual, con
+      // duración larga para que el operador lo lea completo.
+      if (isPrecioCatalogoError(err)) { toast.error(msg, { duration: 10000 }); return }
       if (msg.toLowerCase().includes('no tienes acceso a la sucursal')) {
         refetchMyBranches()
         toast.error(`${msg} Tus sucursales asignadas se actualizaron, vuelve a intentar.`)
@@ -775,9 +845,10 @@ export default function InvoiceForm() {
   }
 
   /** Reintenta la MISMA operación (crear o editar) con `pinOverride` embebido, tras el 400 de
-   *  "no puede ser menor al costo de compra" — el backend verifica el PIN dentro de este mismo
-   *  request, no hay un POST /auth/verify-admin-pin aparte. Deja que el 401 (PIN inválido/sin
-   *  permisos) se propague tal cual para que el modal lo muestre y permita reintentar. */
+   *  "no puede ser menor al costo de compra" o "por debajo del precio mínimo" (docs/tasks/81 §1) —
+   *  el backend verifica el PIN dentro de este mismo request, no hay un POST /auth/verify-admin-pin
+   *  aparte. Deja que el 401 (PIN inválido/sin permisos) se propague tal cual para que el modal lo
+   *  muestre y permita reintentar. */
   async function retryInvoiceWithPinOverride(pin: string, identidad: { usuario?: string; codigoTarjeta?: string }) {
     const dto = { ...buildInvoiceDto(), pinOverride: { pin, ...identidad } }
     const invoice = isEdit ? await updateInvoice(editId!, dto) : await createInvoice(dto)
@@ -991,6 +1062,7 @@ export default function InvoiceForm() {
           description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate,
           baseRate,
+          precioManual: undefined,
            amount: calcAmount(row.qty, rate, (autoDiscountPct ?? 0) + defaultManualPct, 0),
           uom: catalogItem.stockUom ?? row.uom,
           conversionFactor: 1,
@@ -1035,7 +1107,7 @@ export default function InvoiceForm() {
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', _comboComponents: undefined, componentTracking: undefined, ubicacion: undefined, ubicacionError: undefined, _usaDimensiones: undefined, _itemDimensiones: undefined, dimensiones: undefined, _dimensionesPendientesReseleccion: undefined })
+    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, precioManual: undefined, discountPct: 0, discountMode: 'pct', discountAmount: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', _comboComponents: undefined, componentTracking: undefined, ubicacion: undefined, ubicacionError: undefined, _usaDimensiones: undefined, _itemDimensiones: undefined, dimensiones: undefined, _dimensionesPendientesReseleccion: undefined })
   }
 
   function selectBundle(index: number, bundle: Bundle) {
@@ -1060,6 +1132,7 @@ export default function InvoiceForm() {
           description: bundle.itemName,
           rate,
           baseRate,
+          precioManual: undefined,
           manualDiscountPct: defaultManualPct,
           discountPct: row.discountMode === 'amount' ? row.discountPct : defaultManualPct,
           amount: row.discountMode === 'amount'
@@ -1152,7 +1225,7 @@ export default function InvoiceForm() {
     const tier = selectedCustomer?.priceTier ?? defaultPriceTier ?? 'B'
     setItems((prev) =>
       prev.map((row) => {
-        if (!row._prices) return row
+        if (!row._prices || row.precioManual) return row
         const baseRate = row._prices[tier] ?? row.baseRate
         const rate = saleRate(baseRate, row.conversionFactor)
         const amount = row.discountMode === 'amount'
@@ -1728,6 +1801,12 @@ persistInvoice(buildInvoiceDto())
             </div>
           )}
           <div className="items-table-wrap">
+            {algunBloqueoPrecio && (
+              <div className="inline-alert inline-alert-info" style={{ margin: 12, marginBottom: 0 }}>
+                <Lock size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
+                <span>Edición manual de precio deshabilitada para {tiposPrecioBloqueados} — esas líneas se venden a su precio de catálogo (A/B/C).</span>
+              </div>
+            )}
             <table className="items-table navy-table items-table-resizable">
               <colgroup>
                 {itemsColumnDefs.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
@@ -1752,6 +1831,9 @@ persistInvoice(buildInvoiceDto())
                   </th>
                   <th style={{ textAlign: 'right' }}>
                     Precio Unit.
+                    {algunBloqueoPrecio && (
+                      <Lock size={11} style={{ marginLeft: 4, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} aria-label="Precio de catálogo en líneas bloqueadas — edición deshabilitada" />
+                    )}
                     <span className="col-resize-handle" onMouseDown={startResize('precio')} />
                   </th>
                   <th style={{ textAlign: 'right' }}>
@@ -1877,18 +1959,30 @@ persistInvoice(buildInvoiceDto())
                         {item.itemType === 'service' || item.itemType === 'combo' ? (
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         ) : (
-                          <UomSelect
-                            value={item.uom}
-                            onChange={(v, factor) => {
-                              updateItem(index, { uom: v, rate: saleRate(item.baseRate, factor), conversionFactor: factor })
-                            }}
-                            itemCode={item.itemCode || undefined}
-                            direction="sale"
-                          />
+                            <UomSelect
+                              value={item.uom}
+                              onChange={(v, factor) => {
+                                // Con precio manual se conserva el valor tecleado y solo se re-ancla
+                                // la base a la nueva UDM; sin precio manual se recalcula del catálogo.
+                                if (item.precioManual) updateItem(index, { uom: v, conversionFactor: factor, baseRate: baseRateFromDisplayed(item.rate, factor) })
+                                else updateItem(index, { uom: v, rate: saleRate(item.baseRate, factor), conversionFactor: factor })
+                              }}
+                              itemCode={item.itemCode || undefined}
+                              direction="sale"
+                            />
                         )}
                       </td>
-                      <td>
-                        <input className="items-input" type="number" min="0" step="0.01" value={round2(item.rate)} disabled style={{ textAlign: 'right' }} />
+                      <td title={precioBloqueadoPara(item.itemType) ? 'Precio de catálogo — la edición manual está deshabilitada para este tipo de artículo' : 'Precio editable — los pisos de costo/mínimo se validan al guardar'}>
+                        <input
+                          className="items-input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={precioBloqueadoPara(item.itemType) ? round2(item.rate) : (item.rate ?? '')}
+                          disabled={precioBloqueadoPara(item.itemType)}
+                          onChange={(e) => updateManualRate(index, e.target.value)}
+                          style={{ textAlign: 'right' }}
+                        />
                       </td>
                        <td>
                          {(() => {
@@ -2304,7 +2398,7 @@ persistInvoice(buildInvoiceDto())
         onSubmitInline={retryInvoiceWithPinOverride}
         onAuthorized={() => setCostPinModalOpen(false)}
         title="Autorización requerida"
-        description="Esta línea se vendería por debajo del costo. Ingresa un PIN de administrador para autorizarlo."
+        description="Esta línea se vendería por debajo del costo o del precio mínimo. Ingresa un PIN de administrador para autorizarlo."
       />
 
       {variantTemplate && (

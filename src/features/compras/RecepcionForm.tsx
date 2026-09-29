@@ -712,6 +712,17 @@ export default function RecepcionForm() {
 
   const grandTotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0)
 
+  // docs/tasks/81 §4 — el conduce (supplierDeliveryNote) es obligatorio cuando la recepción es
+  // standalone, es decir, cuando NINGUNA línea trae `ordenCompra`. Si al menos una línea viene
+  // de una orden, sigue siendo opcional. El backend lo valida igual (400), esto es solo UX
+  // para no dejar que el usuario llegue al submit para enterarse.
+  const esStandalone = useMemo(
+    () => !items.some((i) => i.ordenCompra && i.itemCode),
+    [items],
+  )
+  const conduceRequerido = esStandalone
+  const [conduceError, setConduceError] = useState(false)
+
   // Red de seguridad — ver misma nota en CompraForm.tsx.
   const lineasRequierenReingresoDimension = isEdit && items.some(
     (i) => (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
@@ -720,6 +731,14 @@ export default function RecepcionForm() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!supplierId) { toast.error('Selecciona un proveedor'); return }
+    // Conduce obligatorio en recepción standalone (docs/tasks/81 §4) — validación de frontend,
+    // el backend responde 400 con el mismo mensaje si igual se envía sin él.
+    if (conduceRequerido && !supplierDeliveryNote.trim()) {
+      setConduceError(true)
+      toast.error('El número de conduce (supplierDeliveryNote) es obligatorio para una recepción de mercancía sin orden de compra.')
+      return
+    }
+    setConduceError(false)
 
     // Clear previous line errors
     setItems((prev) => prev.map((i) => ({ ...i, lineError: undefined })))
@@ -933,13 +952,21 @@ export default function RecepcionForm() {
                 </div>
 
                 <div className="ff-wrap">
-                  <label className="ff-label">Remisión del Proveedor</label>
+                  <label className="ff-label">
+                    Remisión del Proveedor {conduceRequerido && <span className="ff-required">*</span>}
+                  </label>
                   <input
-                    className="ff-input"
-                    placeholder="Número de remisión/guía (opcional)"
+                    className={`ff-input${conduceError ? ' ff-input-error' : ''}`}
+                    placeholder={conduceRequerido ? 'Número de conduce (requerido sin orden de compra)' : 'Número de remisión/guía (opcional)'}
                     value={supplierDeliveryNote}
-                    onChange={(e) => setSupplierDeliveryNote(e.target.value)}
+                    onChange={(e) => { setSupplierDeliveryNote(e.target.value); if (e.target.value.trim()) setConduceError(false) }}
                   />
+                  {conduceRequerido && (
+                    <p className="ff-hint" style={{ marginBottom: 0 }}>
+                      Obligatorio porque ninguna línea viene de una orden de compra — es el único rastro de que la mercancía llegó.
+                    </p>
+                  )}
+                  {conduceError && <p className="ff-error">El conduce es obligatorio sin orden de compra.</p>}
                 </div>
 
                 <div className="ff-wrap">

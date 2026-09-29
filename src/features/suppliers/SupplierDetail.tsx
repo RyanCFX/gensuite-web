@@ -414,6 +414,10 @@ export default function SupplierDetail() {
                 <span className="detail-value">{supplier.defaultTipoPagoProveedor ?? 'Sin configurar'}</span>
               </div>
               <div className="detail-field">
+                <span className="detail-label">Tipo de Comprobante por Defecto</span>
+                <span className="detail-value">{supplier.ncfTypeDefault ?? 'Sin configurar'}</span>
+              </div>
+              <div className="detail-field">
                 <span className="detail-label">Almacén de Compras por Defecto</span>
                 <span className="detail-value">{supplier.almacenCompraDefault ?? 'Sin configurar'}</span>
               </div>

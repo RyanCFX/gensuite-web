@@ -318,6 +318,10 @@ export interface Customer {
   branch?: string;
   /** Mode of Payment por defecto — prellena el método de pago al facturar a este cliente. */
   formaPagoDefault?: string;
+  /** Tipo de comprobante (NCF) por defecto — solo para prellenar el selector al crear una
+   *  factura/cotización nueva. No es restrictivo: no valida ni reemplaza el `ncfType` que
+   *  finalmente se envíe. Ver docs/tasks/81_compras_precio_minimo_pdf_conduce_ncf_default.md §5. */
+  ncfTypeDefault?: string | null;
   /** % de descuento por defecto de este cliente (0-100), solo para prellenar el descuento de cada
    *  línea al armar una factura/cotización/pedido nuevo — el frontend lo aplica como sugerencia
    *  editable por línea, nunca se envía ni valida en el backend. No relaja ninguna regla de
@@ -360,6 +364,10 @@ export interface CreateCustomerDto {
   telefonos?: TelefonoCliente[];
   branch?: string;
   formaPagoDefault?: string;
+  /** Tipo de comprobante (NCF) por defecto — solo para prellenar el selector al crear una
+   *  factura/cotización nueva. No es restrictivo. Ver docs/tasks/
+   *  81_compras_precio_minimo_pdf_conduce_ncf_default.md §5. */
+  ncfTypeDefault?: string | null;
   /** Ver `Customer.descuentoDefaultPct` — 0-100, `null` limpia el default en edición. */
   descuentoDefaultPct?: number | null;
   cuentaCxcDefault?: string;
@@ -466,6 +474,9 @@ export interface Supplier {
   defaultTipoBienes606?: string | null;
   defaultFormaPago606?: string | null;
   defaultTipoPagoProveedor?: "Contado" | "Crédito" | null;
+  /** Tipo de comprobante (NCF) por defecto — solo para prellenar el selector al crear una
+   *  compra/gasto nuevo. No es restrictivo. */
+  ncfTypeDefault?: string | null;
   /** Si se configura, las compras a este proveedor (incluidas las compras B2B recibidas de este
    *  socio comercial) entran SIEMPRE a este almacén, sin importar la sucursal — gana sobre
    *  `Sucursal.almacenCompra`. `null`/ausente = se resuelve por la sucursal de la compra. */
@@ -536,6 +547,10 @@ export interface CreateProveedorDto {
   defaultTipoBienes606?: string | null;
   defaultFormaPago606?: string | null;
   defaultTipoPagoProveedor?: "Contado" | "Crédito" | null;
+  /** Tipo de comprobante (NCF) por defecto — solo para prellenar el selector al crear una
+   *  compra/gasto nuevo. No es restrictivo: no valida ni reemplaza el `tipoComprobante` que
+   *  finalmente se envíe. Ver docs/tasks/81_compras_precio_minimo_pdf_conduce_ncf_default.md §5. */
+  ncfTypeDefault?: string | null;
   almacenCompraDefault?: string | null;
   cuentaCxpDefault?: string | null;
   defaultCurrency?: string | null;
@@ -4071,6 +4086,22 @@ export interface FacturacionConfig {
   /** Si el PDF del Pedido (GET /pedidos/:id/pdf, "conduce") incluye columnas de precio/ITBIS/total
    *  y la sección de totales. Default true. En false queda como un conduce sin montos. */
   pedidoConduceIncluyePrecios?: boolean
+  /** Si está activo, editar manualmente el precio de un SERVICIO en una factura/cotización por
+   *  debajo de su "Precio C - Mínimo" exige PIN administrativo (acción `override_costo_minimo`,
+   *  mismo `pinOverride` que el piso de costo). Default false. Ver docs/tasks/
+   *  81_compras_precio_minimo_pdf_conduce_ncf_default.md §1. */
+  pedirPinPrecioMinimoServicios?: boolean
+  /** Igual que `pedirPinPrecioMinimoServicios`, pero para PRODUCTOS — interruptor separado. Se
+   *  suma (no reemplaza) al piso de costo, que sigue aplicando siempre a productos. */
+  pedirPinPrecioMinimoProductos?: boolean
+  /** Si está activo (default), el operador puede escribir cualquier precio (`rate`) en una línea
+   *  de SERVICIO en cotización/pedido/factura — comportamiento histórico. Si se desactiva, el
+   *  precio BRUTO de la línea debe coincidir exactamente con uno de los 3 precios de catálogo del
+   *  artículo (Precio A/B/C); si no, el endpoint responde 400 sin PIN que lo salve. */
+  permitirModificarPrecioServicios?: boolean
+  /** Igual que `permitirModificarPrecioServicios`, pero para líneas de PRODUCTO — interruptor
+   *  separado, mismo comportamiento y mismos 3 documentos. */
+  permitirModificarPrecioProductos?: boolean
 }
 
 /** PUT /config/despacho/futuro — docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §2.1. Los 3 campos

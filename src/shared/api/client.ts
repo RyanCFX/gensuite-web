@@ -181,7 +181,25 @@ client.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    const data = error.response.data as ApiErrorResponse
+    let data = error.response.data as ApiErrorResponse
+
+    // Endpoints que devuelven archivos (`responseType: 'blob'` — PDFs): cuando fallan con 4xx,
+    // axios entrega `error.response.data` como Blob, no como JSON parseado, así que `code`/
+    // `message` nunca llegarían a la UI (caían al `UNKNOWN_ERROR` genérico en inglés). Se lee el
+    // texto del Blob y se parsea para normalizarlo igual que el resto de los endpoints — ej. el
+    // 400 `ECF_NOT_ACCEPTED` de GET /invoices/:id/pdf (docs/tasks/81 §6) o un 403 de permiso en
+    // cualquier otro PDF. Si el cuerpo no es JSON se deja tal cual y cae al genérico de abajo.
+    if (typeof Blob !== 'undefined' && data instanceof Blob) {
+      try {
+        const parsed = JSON.parse(await data.text()) as ApiErrorResponse
+        if (parsed?.error) {
+          error.response.data = parsed
+          data = parsed
+        }
+      } catch {
+        // No era JSON — se deja el Blob original.
+      }
+    }
 
     // El backend a veces redacta `error.message` pensando en quien integra el BFF, no en el
     // usuario final, y menciona "ERPNext" directamente — los clientes de este producto no deben
@@ -433,6 +451,9 @@ export const ERROR_CODES = {
   INVALID_BARCODE: 'INVALID_BARCODE',
   // Turno de caja de un día anterior — ofrecer "Cerrar turno" (reutiliza CerrarTurnoModal).
   POS_TURNO_DESACTUALIZADO: 'POS_TURNO_DESACTUALIZADO',
+  // Factura con e-CF no aceptado por la DGII — GET /invoices/:id/pdf responde 400 en vez de
+  // generar el PDF (docs/tasks/81 §6). La UI muestra un mensaje claro, no un error crudo.
+  ECF_NOT_ACCEPTED: 'ECF_NOT_ACCEPTED',
 
   // ─── Estados de tenant y sesión (§3) — nunca un toast, son pantallas/redirecciones completas.
   // Manejados centralmente en el interceptor de abajo, no en cada `onError` de pantalla. ─────────

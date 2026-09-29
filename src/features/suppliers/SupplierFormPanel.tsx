@@ -42,6 +42,7 @@ const schema = z
     defaultTipoBienes606: z.string().optional(),
     defaultFormaPago606: z.string().optional(),
     defaultTipoPagoProveedor: z.string().optional(),
+    ncfTypeDefault: z.string().optional(),
     almacenCompraDefault: z.string().optional(),
     cuentaCxpDefault: z.string().optional(),
     defaultCurrency: z.string().optional(),
@@ -105,6 +106,13 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   const [defaultFormaPago606Search, setDefaultFormaPago606Search] = useState('')
   const defaultFormaPago606Options: SearchSelectOption[] = (catalogos?.formaPago606 ?? [])
     .filter((t) => !defaultFormaPago606Search || t.label.toLowerCase().includes(defaultFormaPago606Search.toLowerCase()))
+    .map((t) => ({ value: t.value, label: t.label }))
+
+  // "Tipo de Comprobante por Defecto" (docs/tasks/81 §5) — mismo catálogo B01–B17 que el
+  // selector de tipoComprobante de compras/gastos.
+  const [ncfDefaultSearch, setNcfDefaultSearch] = useState('')
+  const ncfDefaultOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? catalogos?.ncfTypesFisicos ?? [])
+    .filter((t) => !ncfDefaultSearch || t.label.toLowerCase().includes(ncfDefaultSearch.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 
   // Sin contexto de sucursal en esta pantalla (es un default a nivel de proveedor, no de
@@ -199,6 +207,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
       defaultTipoBienes606: '',
       defaultFormaPago606: '',
       defaultTipoPagoProveedor: '',
+      ncfTypeDefault: '',
       almacenCompraDefault: '',
       cuentaCxpDefault: '',
       defaultCurrency: '',
@@ -233,6 +242,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
         defaultTipoBienes606: supplier.defaultTipoBienes606 ?? '',
         defaultFormaPago606: supplier.defaultFormaPago606 ?? '',
         defaultTipoPagoProveedor: supplier.defaultTipoPagoProveedor ?? '',
+        ncfTypeDefault: supplier.ncfTypeDefault ?? '',
         almacenCompraDefault: supplier.almacenCompraDefault ?? '',
         cuentaCxpDefault: supplier.cuentaCxpDefault ?? '',
         defaultCurrency: supplier.defaultCurrency ?? '',
@@ -266,6 +276,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
         defaultTipoBienes606: data.defaultTipoBienes606 || undefined,
         defaultFormaPago606: data.defaultFormaPago606 || undefined,
         defaultTipoPagoProveedor: (data.defaultTipoPagoProveedor || undefined) as 'Contado' | 'Crédito' | undefined,
+        ncfTypeDefault: data.ncfTypeDefault || undefined,
         almacenCompraDefault: data.almacenCompraDefault || undefined,
         cuentaCxpDefault: data.cuentaCxpDefault || undefined,
         defaultCurrency: data.defaultCurrency || undefined,
@@ -658,6 +669,26 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                       <SelectItem value="Contado">Contado</SelectItem>
                       <SelectItem value="Crédito">Crédito</SelectItem>
                     </Select>
+                  )}
+                />
+              </div>
+              <div className="ff-wrap">
+                <label className="ff-label">
+                  Tipo de Comprobante por Defecto
+                  <FieldTooltip>Prellena el tipo de comprobante al registrar una Compra o Gasto a este proveedor — editable por documento. No valida ni restringe nada.</FieldTooltip>
+                </label>
+                <Controller
+                  name="ncfTypeDefault"
+                  control={control}
+                  render={({ field }) => (
+                    <SearchSelect
+                      value={field.value ?? ''}
+                      onChange={(v) => field.onChange(v || '')}
+                      options={ncfDefaultOptions}
+                      onSearch={setNcfDefaultSearch}
+                      selectedLabel={ncfDefaultOptions.find((o) => o.value === field.value)?.label ?? ''}
+                      placeholder="Sin configurar"
+                    />
                   )}
                 />
               </div>

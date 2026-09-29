@@ -5,12 +5,14 @@ import { toast } from 'sonner'
 import {
   getSolicitudCompra, submitSolicitudCompra, cancelSolicitudCompra, amendSolicitudCompra,
   detenerSolicitudCompra, reanudarSolicitudCompra, generarOrdenDesdeSolicitud,
+  getSolicitudCompraPdfBlobUrl, downloadSolicitudCompraPdf,
 } from '@/shared/api/solicitudes-compra'
 import { listSuppliers } from '@/shared/api/suppliers'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
+import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { Send, X, RotateCcw, Pause, Play, ShoppingCart, FileText } from 'lucide-react'
+import { Send, X, RotateCcw, Pause, Play, ShoppingCart, FileText, Eye, Download } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
@@ -44,6 +46,7 @@ export default function SolicitudDetail() {
 
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null)
   const [showGenerarOrden, setShowGenerarOrden] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const { data: solicitud, isLoading, isError } = useQuery({
     queryKey: ['solicitud-compra', id],
@@ -97,6 +100,18 @@ export default function SolicitudDetail() {
 
   const isPending = submitMutation.isPending || cancelMutation.isPending || amendMutation.isPending || detenerMutation.isPending || reanudarMutation.isPending
 
+  // PDF de la solicitud — GET /compras/solicitudes/:id/pdf (ya existía, docs/tasks/81 §3).
+  const downloadPdfMutation = useMutation({
+    mutationFn: () => downloadSolicitudCompraPdf(id!, `solicitud-compra-${id}.pdf`),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo descargar el PDF'),
+  })
+
+  const previewPdfMutation = useMutation({
+    mutationFn: () => getSolicitudCompraPdfBlobUrl(id!),
+    onSuccess: (url) => setPreviewUrl(url),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo generar la vista previa del PDF'),
+  })
+
   if (isLoading) {
     return (
       <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -136,6 +151,22 @@ export default function SolicitudDetail() {
         description={`Creada el ${formatDate(solicitud.transactionDate)}`}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => previewPdfMutation.mutate()}
+              disabled={previewPdfMutation.isPending}
+              title="Vista previa del PDF de la solicitud"
+            >
+              <Eye size={14} />Ver PDF
+            </button>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => downloadPdfMutation.mutate()}
+              disabled={downloadPdfMutation.isPending}
+              title="Descargar PDF de la solicitud"
+            >
+              <Download size={14} />Descargar PDF
+            </button>
             {solicitud.status === 'draft' && (
               <>
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/compras/solicitudes/${id}/editar`)}>
@@ -300,6 +331,7 @@ export default function SolicitudDetail() {
           }}
         />
       )}
+      <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </div>
   )
 }

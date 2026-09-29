@@ -103,6 +103,16 @@ export async function getOrdenCompraPdfBlobUrl(id: string): Promise<string> {
   return URL.createObjectURL(res.data)
 }
 
+export async function downloadOrdenCompraPdf(id: string, filename?: string): Promise<void> {
+  const res = await client.get<Blob>(ENDPOINTS.ordenesCompra.pdf(id), { responseType: 'blob' })
+  const blobUrl = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename ?? `orden-compra-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(blobUrl)
+}
+
 // ─── Abastecimiento (multi-pedido) — docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §5 ───
 
 /** Viene ya ordenado FIFO por transactionDate — no reordenar del lado del cliente. */

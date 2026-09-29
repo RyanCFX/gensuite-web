@@ -717,6 +717,10 @@ export default function CustomerDetail() {
               <span className="detail-value">{customer.formaPagoDefault ?? '—'}</span>
             </div>
             <div className="detail-field">
+              <span className="detail-label">Tipo de Comprobante por Defecto</span>
+              <span className="detail-value">{customer.ncfTypeDefault ?? '—'}</span>
+            </div>
+            <div className="detail-field">
               <span className="detail-label">Cuenta CxC Alterna</span>
               <span className="detail-value">{customer.cuentaCxcDefault ?? '—'}</span>
             </div>

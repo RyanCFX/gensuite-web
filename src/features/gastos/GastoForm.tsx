@@ -400,6 +400,8 @@ export default function GastoForm() {
 
     if (!tipoBienes606 && s.defaultTipoBienes606) setTipoBienes606(s.defaultTipoBienes606)
     if (!formaPago606 && s.defaultFormaPago606) setFormaPago606(s.defaultFormaPago606)
+    // docs/tasks/81 §5 — `ncfTypeDefault` prellena `tipoComprobante` (editable por documento).
+    if (!tipoComprobante && s.ncfTypeDefault) setTipoComprobante(s.ncfTypeDefault)
 
     setTaxesTemplate((prev) =>
       prev.length === 0 ? (s.impuestoGastosDefault?.map((d) => d.id) ?? []) : prev,
@@ -418,7 +420,7 @@ export default function GastoForm() {
       if (!s.diasCredito) setTipoPago('Contado')
       else if (s.defaultTipoPagoProveedor) setTipoPago(s.defaultTipoPagoProveedor)
     }
-  }, [supplierDetail, esProveedorOcasional, tipoBienes606, formaPago606, dueDateTouched, tipoPagoTouched])
+  }, [supplierDetail, esProveedorOcasional, tipoBienes606, formaPago606, tipoComprobante, dueDateTouched, tipoPagoTouched])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Hint: cuando el usuario no dejó ninguna retención pero el proveedor tiene defaults,

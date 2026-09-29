@@ -62,3 +62,21 @@ export async function facturarPurchaseReceipt(id: string, data: FacturarPurchase
   )
   return unwrap(res)
 }
+
+// GET /compras/purchase-receipt/:id/pdf — PDF de la recepción (docs/tasks/81 §3). Sin parámetros
+// de query: siempre página completa, sin variante POS ni toggle de moneda. Requiere el permiso
+// `compras.recepcion.imprimir`.
+export async function getPurchaseReceiptPdfBlobUrl(id: string): Promise<string> {
+  const res = await client.get<Blob>(ENDPOINTS.purchaseReceipt.pdf(id), { responseType: 'blob' })
+  return URL.createObjectURL(res.data)
+}
+
+export async function downloadPurchaseReceiptPdf(id: string, filename?: string): Promise<void> {
+  const res = await client.get<Blob>(ENDPOINTS.purchaseReceipt.pdf(id), { responseType: 'blob' })
+  const blobUrl = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename ?? `recepcion-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(blobUrl)
+}

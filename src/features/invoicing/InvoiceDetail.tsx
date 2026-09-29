@@ -105,6 +105,7 @@ import { useMetodoPagoCurrencies } from "@/shared/hooks/useMetodoPagoCurrencies"
 import { isApiErrorCode, ERROR_CODES } from "@/shared/api/client";
 import { DocumentHistoryCard } from "@/components/shared/DocumentHistoryCard";
 import { EcfStatusCard } from "@/components/shared/EcfStatusCard";
+import { ecfBloqueaPdf, ecfPdfBloqueadoMensaje } from "@/lib/dgii";
 import { PdfFormatButton } from "@/components/shared/PdfFormatButton";
 import { PdfPreviewModal } from "@/components/shared/PdfPreviewModal";
 import { SearchSelect } from "@/shared/ui/SearchSelect";
@@ -1161,7 +1162,16 @@ export default function InvoiceDetail() {
 
   const downloadMutation = useMutation({
     mutationFn: (formato?: FormatoImpresion) => downloadInvoicePdf(id!, `factura-${id}.pdf`, formato ?? formatoImpresionDefault, pdfMoneda),
-    onError: (err: { message?: string }) => toast.error(err?.message ?? "No se pudo descargar el PDF"),
+    onError: (err: ApiError) => {
+      // docs/tasks/81 §6 — e-CF no aceptado: mensaje claro, no error crudo. Se detecta por
+      // código y, por robustez, también por el texto del backend ("todavía no está aceptado").
+      const msg = (err as { message?: string })?.message ?? "";
+      if (isApiErrorCode(err, ERROR_CODES.ECF_NOT_ACCEPTED) || /todav[ií]a no est[aá] aceptado/i.test(msg)) {
+        toast.error(msg || ecfPdfBloqueadoMensaje(ecfResult ?? invoice?.ecf), { duration: 8000 });
+        return;
+      }
+      toast.error(msg || "No se pudo descargar el PDF");
+    },
   });
 
   // Botón "Imprimir POS" — a diferencia de "Ver PDF"/"Descargar PDF", no genera ningún
@@ -1181,8 +1191,22 @@ export default function InvoiceDetail() {
   const previewMutation = useMutation({
     mutationFn: (formato?: FormatoImpresion) => getInvoicePdfBlobUrl(id!, formato ?? formatoImpresionDefault, pdfMoneda),
     onSuccess: (url) => setPreviewUrl(url),
-    onError: (err: { message?: string }) => toast.error(err?.message ?? "No se pudo generar la vista previa del PDF"),
+    onError: (err: ApiError) => {
+      // docs/tasks/81 §6 — e-CF no aceptado: mensaje claro, no error crudo (código o mensaje).
+      const msg = (err as { message?: string })?.message ?? "";
+      if (isApiErrorCode(err, ERROR_CODES.ECF_NOT_ACCEPTED) || /todav[ií]a no est[aá] aceptado/i.test(msg)) {
+        toast.error(msg || ecfPdfBloqueadoMensaje(ecfResult ?? invoice?.ecf), { duration: 8000 });
+        return;
+      }
+      toast.error(msg || "No se pudo generar la vista previa del PDF");
+    },
   });
+
+  // docs/tasks/81 §6 (recomendado) — anticipar el bloqueo en la UI: si ya se sabe que el e-CF
+  // no está aceptado, avisar junto a los botones antes de que el usuario lo intente. El backend
+  // igual protege el endpoint aunque el botón no se deshabilite.
+  const ecfActual = ecfResult ?? invoice?.ecf;
+  const pdfBloqueadoPorEcf = ecfBloqueaPdf(ecfActual);
 
   // PDF/A de archivado fiscal — solo relevante para facturas con e-CF emitido.
   const pdfaMutation = useMutation({
@@ -1666,6 +1690,15 @@ export default function InvoiceDetail() {
         )}
         {invoice.status === "submitted" && (
           <>
+            {pdfBloqueadoPorEcf && (
+              <span
+                className="badge badge-warning"
+                style={{ fontSize: 12 }}
+                title="El PDF se habilitará cuando la DGII acepte el e-CF"
+              >
+                PDF disponible cuando la DGII acepte el e-CF
+              </span>
+            )}
             {mostrarTogglePdfMoneda && (
               <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }} title="Moneda en la que se imprimen los montos del PDF (a4/carta/a6) — el ticket POS siempre imprime en DOP">
                 <button

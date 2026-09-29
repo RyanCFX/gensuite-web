@@ -866,6 +866,7 @@ export default function CompraForm() {
   // Al resolver el proveedor, pre-llenamos los campos 606 e impuestos/retenciones que trae.
   // No sobre-escribimos valores que el usuario ya haya definido (ni en modo edición desde el
   // draft). Cada vez que se cambie de proveedor, los defaults del nuevo proveedor se aplican.
+  // docs/tasks/81 §5 — `ncfTypeDefault` prellena `tipoComprobante` con la misma regla.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const s = supplierDetail
@@ -873,6 +874,7 @@ export default function CompraForm() {
 
     if (!tipoBienes606 && s.defaultTipoBienes606) setTipoBienes606(s.defaultTipoBienes606)
     if (!formaPago606 && s.defaultFormaPago606) setFormaPago606(s.defaultFormaPago606)
+    if (!tipoComprobante && s.ncfTypeDefault) setTipoComprobante(s.ncfTypeDefault)
 
     setTaxesTemplate((prev) =>
       prev.length === 0 ? (s.impuestoComprasDefault?.map((d) => d.id) ?? []) : prev,
@@ -880,7 +882,7 @@ export default function CompraForm() {
     setRetenciones((prev) =>
       prev.length === 0 ? (s.retencionesDefault?.map((d) => d.id) ?? []) : prev,
     )
-  }, [supplierDetail, esProveedorOcasional, tipoBienes606, formaPago606])
+  }, [supplierDetail, esProveedorOcasional, tipoBienes606, formaPago606, tipoComprobante])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Hint: cuando el usuario no dejó ninguna retención pero el proveedor tiene defaults,

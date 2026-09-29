@@ -21,7 +21,7 @@ import { formatMoney, displayId, round2, formatDate } from '@/lib/formatters'
 import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { Select, SelectItem } from '@/components/ui/select'
-import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, UserPlus, ChevronDown, RotateCcw, Info } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, UserPlus, ChevronDown, RotateCcw, Info, Lock } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { toast } from 'sonner'
@@ -32,7 +32,8 @@ import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
-import { isCostoCompraError } from '@/lib/pinOverride'
+import { isPinPrecioError } from '@/lib/pinOverride'
+import { isPrecioCatalogoError, precioBloqueadoParaLinea } from '@/lib/precioCatalogo'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { listItems, getItem } from '@/shared/api/catalog'
@@ -57,6 +58,10 @@ interface LineItem {
   /** Precio en `monedaBase` (catálogo), ya ajustado por UDM pero SIN convertir a la moneda
    *  elegida — es el anchor a partir del cual se recalcula `rate` al cambiar moneda/tasa/UDM. */
   baseRate: number
+  /** Precio escrito a mano por el operador (solo cuando el toggle correspondiente está activo).
+   *  Los reprices automáticos (cambio de cliente/tier, moneda o UDM) no tocan estas líneas —
+   *  igual que `manualDiscountPct` con los descuentos. Se limpia al elegir otro artículo. */
+  precioManual?: boolean
   amount: number
   discountPct: number
   salesTaxPct: number
@@ -192,6 +197,19 @@ export default function QuotationForm() {
     staleTime: 5 * 60_000,
   })
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
+  // Candados "Permitir Modificar Precio Libremente" (servicios/productos por separado) — con el
+  // toggle correspondiente apagado, el precio de la línea debe ser exactamente uno de los precios
+  // de catálogo (A/B/C). Se decide por línea según el tipo de artículo; el 400 se maneja en
+  // `handleError`.
+  const bloqueoPrecioServicios = facturacionConfig?.permitirModificarPrecioServicios === false
+  const bloqueoPrecioProductos = facturacionConfig?.permitirModificarPrecioProductos === false
+  const algunBloqueoPrecio = bloqueoPrecioServicios || bloqueoPrecioProductos
+  const precioBloqueadoPara = (itemType: string | undefined) =>
+    precioBloqueadoParaLinea(itemType, facturacionConfig ?? undefined)
+  const tiposPrecioBloqueados = [
+    ...(bloqueoPrecioServicios ? ['servicios'] : []),
+    ...(bloqueoPrecioProductos ? ['productos'] : []),
+  ].join(' y ')
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
   const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
@@ -223,13 +241,39 @@ export default function QuotationForm() {
     return Math.round(rate * 10000) / 10000
   }
 
+  /** Inversa de `saleRate`: del precio visible al anchor (`baseRate`, moneda base y UDM de
+   *  stock). Se usa al escribir el precio a mano para que el valor tecleado se vuelva la nueva
+   *  base en vez de perderse en el próximo reprice. */
+  function baseRateFromDisplayed(rate: number, factor: number = 1): number {
+    const c = currency && currency !== monedaBase && conversionRate !== '' && Number(conversionRate) > 0
+      ? Number(conversionRate)
+      : 1
+    const safeFactor = factor > 0 ? factor : 1
+    return (rate * c) / safeFactor
+  }
+
+  /** Precio escrito a mano (solo cuando el toggle correspondiente está activo, el input viene
+   *  habilitado). Marca la línea con `precioManual` para que los reprices automáticos la
+   *  respeten. Los pisos de costo/precio mínimo siguen validando al guardar (diálogo de PIN). */
+  function updateManualRate(index: number, raw: string) {
+    if (raw.trim() === '') {
+      updateItem(index, { rate: 0, baseRate: 0, precioManual: true })
+      return
+    }
+    const parsed = Number(raw)
+    if (Number.isNaN(parsed) || parsed < 0) return
+    const row = items[index]
+    if (!row) return
+    updateItem(index, { rate: parsed, baseRate: baseRateFromDisplayed(parsed, row.conversionFactor), precioManual: true })
+  }
+
   // Al elegir/cambiar moneda o tasa, se reconvierten los precios de las líneas ya cargadas en esta
   // sesión (con `_prices`, es decir, elegidas desde el catálogo) — no toca líneas hidratadas de una
   // cotización existente, que ya vienen en la moneda con la que se guardaron originalmente.
   useEffect(() => {
     setItems((prev) =>
       prev.map((row) => {
-        if (!row._prices || !row.itemCode) return row
+        if (!row._prices || !row.itemCode || row.precioManual) return row
         const rate = saleRate(row.baseRate, row.conversionFactor)
         const amount = row.discountMode === 'amount'
           ? calcAmount(row.qty, rate, 0, row.discountAmount)
@@ -622,7 +666,7 @@ function buildDto(): CreateQuotationDto {
    }
 
    /** Reintenta la MISMA operación (crear o editar) con `pinOverride` embebido, tras el 400 de
-    *  "no puede ser menor al costo de compra" — el backend verifica el PIN dentro de este mismo
+    *  "no puede ser menor al costo de compra" o "por debajo del precio mínimo" (docs/tasks/81 §1) — el backend verifica el PIN dentro de este mismo
     *  request, no hay un POST /auth/verify-admin-pin aparte. Deja que el 401 (PIN inválido/sin
     *  permisos) se propague tal cual para que el modal lo muestre y permita reintentar. */
    async function retryQuotationWithPinOverride(pin: string, identidad: { usuario?: string; codigoTarjeta?: string }) {
@@ -670,8 +714,15 @@ function buildDto(): CreateQuotationDto {
       setPinModalOpen(true)
       return
     }
-    if (isCostoCompraError(err)) {
+    if (isPinPrecioError(err)) {
       setCostPinModalOpen(true)
+      return
+    }
+    // Candado "Permitir Modificar Precio Libremente" apagado — el rate no es A/B/C. Sin PIN
+    // que lo salve: el mensaje del backend ya es comercial y se muestra tal cual, con duración
+    // larga para que el operador lo lea completo.
+    if (isPrecioCatalogoError(err)) {
+      toast.error(msg, { duration: 10000 })
       return
     }
     if (msg.toLowerCase().includes('no tienes acceso a la sucursal')) {
@@ -777,6 +828,7 @@ function buildDto(): CreateQuotationDto {
           description: catalogItem.internalDescription ?? catalogItem.itemName,
           rate,
           baseRate,
+          precioManual: undefined,
           conversionFactor: 1,
           amount: calcAmount(row.qty, rate, (autoDiscountPct ?? 0) + defaultManualPct, 0),
           maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
@@ -837,6 +889,7 @@ function buildDto(): CreateQuotationDto {
           description: bundle.itemName,
           rate,
           baseRate,
+          precioManual: undefined,
           conversionFactor: 1,
           manualDiscountPct: defaultManualPct,
           discountPct: row.discountMode === 'amount' ? row.discountPct : defaultManualPct,
@@ -862,7 +915,7 @@ function buildDto(): CreateQuotationDto {
   }
 
   function clearCatalogItem(index: number) {
-    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, discountPct: 0, discountMode: 'pct', discountAmount: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', itemDimensionesDeclaradas: undefined, dimensiones: undefined })
+    updateItem(index, { itemCode: '', itemLabel: undefined, itemType: undefined, description: '', rate: 0, amount: 0, precioManual: undefined, discountPct: 0, discountMode: 'pct', discountAmount: 0, manualDiscountPct: 0, salesTaxPct: 0, salesTaxTemplate: '', itemDimensionesDeclaradas: undefined, dimensiones: undefined })
   }
 
   // ── Reprice on customer change ───────────────────────────────────────────
@@ -870,7 +923,7 @@ function buildDto(): CreateQuotationDto {
     const tier = customerPriceTier ?? defaultPriceTier ?? 'B'
     setItems((prev) =>
       prev.map((row) => {
-        if (!row._prices) return row
+        if (!row._prices || row.precioManual) return row
         const baseRate = row._prices[tier] ?? row.baseRate
         const rate = saleRate(baseRate, row.conversionFactor)
         const amount = row.discountMode === 'amount'
@@ -1229,6 +1282,12 @@ if (esClienteOcasional) {
         {/* ── Artículos ───────────────────────────────────────────────────── */}
         <div className="card">
           <div className="items-table-wrap">
+            {algunBloqueoPrecio && (
+              <div className="inline-alert inline-alert-info" style={{ margin: 12, marginBottom: 0 }}>
+                <Lock size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
+                <span>Edición manual de precio deshabilitada para {tiposPrecioBloqueados} — esas líneas se venden a su precio de catálogo (A/B/C).</span>
+              </div>
+            )}
             <table className="items-table navy-table items-table-resizable">
               <colgroup>
                 {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
@@ -1253,6 +1312,9 @@ if (esClienteOcasional) {
                   </th>
                   <th style={{ textAlign: 'right' }}>
                     Precio Unit.
+                    {algunBloqueoPrecio && (
+                      <Lock size={11} style={{ marginLeft: 4, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} aria-label="Precio de catálogo en líneas bloqueadas — edición deshabilitada" />
+                    )}
                     <span className="col-resize-handle" onMouseDown={startResize('precio')} />
                   </th>
                   <th style={{ textAlign: 'right' }}>
@@ -1331,7 +1393,12 @@ if (esClienteOcasional) {
                         ) : (
                           <UomSelect
                             value={item.uom}
-                            onChange={(v, factor) => updateItem(index, { uom: v, rate: saleRate(item.baseRate, factor), conversionFactor: factor })}
+                            onChange={(v, factor) => {
+                              // Con precio manual se conserva el valor tecleado y solo se re-ancla
+                              // la base a la nueva UDM; sin precio manual se recalcula del catálogo.
+                              if (item.precioManual) updateItem(index, { uom: v, conversionFactor: factor, baseRate: baseRateFromDisplayed(item.rate, factor) })
+                              else updateItem(index, { uom: v, rate: saleRate(item.baseRate, factor), conversionFactor: factor })
+                            }}
                             itemCode={item.itemCode || undefined}
                             error={submitted && !item.uom}
                             direction="sale"
@@ -1339,14 +1406,15 @@ if (esClienteOcasional) {
                         )}
                       </td>
 
-                      <td>
+                      <td title={precioBloqueadoPara(item.itemType) ? 'Precio de catálogo — la edición manual está deshabilitada para este tipo de artículo' : 'Precio editable — los pisos de costo/mínimo se validan al guardar'}>
                         <input
                           className={`items-input${submitted && (!item.rate || item.rate <= 0) ? ' items-input-error' : ''}`}
                           type="number"
                           min="0"
                           step="0.01"
-                          value={round2(item.rate)}
-                          disabled
+                          value={precioBloqueadoPara(item.itemType) ? round2(item.rate) : (item.rate ?? '')}
+                          disabled={precioBloqueadoPara(item.itemType)}
+                          onChange={(e) => updateManualRate(index, e.target.value)}
                           style={{ textAlign: 'right' }}
                         />
                       </td>
@@ -1564,7 +1632,7 @@ if (esClienteOcasional) {
         onSubmitInline={retryQuotationWithPinOverride}
         onAuthorized={() => setCostPinModalOpen(false)}
         title="Autorización requerida"
-        description="Esta línea se vendería por debajo del costo. Ingresa un PIN de administrador para autorizarlo."
+        description="Esta línea se vendería por debajo del costo o del precio mínimo. Ingresa un PIN de administrador para autorizarlo."
       />
 
       {variantTemplate && (

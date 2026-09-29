@@ -79,3 +79,13 @@ export async function getSolicitudCompraPdfBlobUrl(id: string): Promise<string> 
   const res = await client.get<Blob>(ENDPOINTS.solicitudesCompra.pdf(id), { responseType: 'blob' })
   return URL.createObjectURL(res.data)
 }
+
+export async function downloadSolicitudCompraPdf(id: string, filename?: string): Promise<void> {
+  const res = await client.get<Blob>(ENDPOINTS.solicitudesCompra.pdf(id), { responseType: 'blob' })
+  const blobUrl = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename ?? `solicitud-compra-${id}.pdf`
+  a.click()
+  URL.revokeObjectURL(blobUrl)
+}

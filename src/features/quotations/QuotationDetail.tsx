@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getQuotation, getQuotationVersion, submitQuotation, deleteQuotation, convertQuotationToInvoice, cancelQuotation, downloadQuotationPdf } from '@/shared/api/quotations'
+import { getCustomer } from '@/shared/api/customers'
 import type { Quotation } from '@/shared/api/types'
 import { ArrowLeft, Download, FileText, Loader2, Send, Trash2, ClipboardList, XCircle, Copy, Link2, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
@@ -66,6 +67,20 @@ export default function QuotationDetail() {
     queryFn: () => getQuotation(id!),
     enabled: !isHistoricalVersion && !!id,
   })
+
+  // docs/tasks/81 §5 — al convertir a factura, el selector de NCF arranca prellenado con el
+  // `ncfTypeDefault` del cliente (si tiene). Solo prellenado: editable antes de convertir.
+  const { data: quotationCustomer } = useQuery({
+    queryKey: ['customer', quotation?.customer],
+    queryFn: () => getCustomer(quotation!.customer),
+    enabled: !!quotation?.customer && !quotation?.esClienteOcasional,
+    staleTime: 5 * 60_000,
+  })
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (quotationCustomer?.ncfTypeDefault) setSelectedNcfType(quotationCustomer.ncfTypeDefault)
+  }, [quotationCustomer?.ncfTypeDefault])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],

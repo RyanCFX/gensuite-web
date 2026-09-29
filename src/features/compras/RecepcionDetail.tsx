@@ -4,15 +4,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   getPurchaseReceipt, submitPurchaseReceipt, cancelPurchaseReceipt, amendPurchaseReceipt, facturarPurchaseReceipt,
+  getPurchaseReceiptPdfBlobUrl, downloadPurchaseReceiptPdf,
 } from '@/shared/api/purchase-receipt'
 import { getSupplier } from '@/shared/api/suppliers'
 import { getCatalogosFiscales, listImpuestosCompras, getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PrintLabelsModal } from '@/components/shared/PrintLabelsModal'
+import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import { Badge } from '@/shared/ui/Badge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { Send, X, RotateCcw, FileText, Receipt, Printer } from 'lucide-react'
+import { Send, X, RotateCcw, FileText, Receipt, Printer, Eye, Download } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -58,6 +60,7 @@ export default function RecepcionDetail() {
   const [showFacturar, setShowFacturar] = useState(false)
   const [showPrintLabels, setShowPrintLabels] = useState(false)
   const [form, setForm] = useState<FacturarPurchaseReceiptDto>(defaultFacturarForm())
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const { data: receipt, isLoading, isError } = useQuery({
     queryKey: ['purchase-receipt', id],
@@ -156,6 +159,19 @@ export default function RecepcionDetail() {
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'Error al generar la factura'),
   })
 
+  // PDF de recepción — GET /compras/purchase-receipt/:id/pdf (docs/tasks/81 §3). Sin variantes
+  // de formato ni moneda: siempre página completa.
+  const downloadMutation = useMutation({
+    mutationFn: () => downloadPurchaseReceiptPdf(id!, `recepcion-${id}.pdf`),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo descargar el PDF'),
+  })
+
+  const previewMutation = useMutation({
+    mutationFn: () => getPurchaseReceiptPdfBlobUrl(id!),
+    onSuccess: (url) => setPreviewUrl(url),
+    onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo generar la vista previa del PDF'),
+  })
+
   function handleConfirm() {
     if (confirmAction === 'submit') submitMutation.mutate()
     else if (confirmAction === 'cancel') cancelMutation.mutate()
@@ -234,6 +250,22 @@ export default function RecepcionDetail() {
         description={receipt.supplierName}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => previewMutation.mutate()}
+              disabled={previewMutation.isPending}
+              title="Vista previa del PDF de recepción (incluye el conduce cuando lo tiene)"
+            >
+              <Eye size={14} />Ver PDF
+            </button>
+            <button
+              className="btn btn-secondary btn-size-sm"
+              onClick={() => downloadMutation.mutate()}
+              disabled={downloadMutation.isPending}
+              title="Descargar PDF de recepción (incluye el conduce cuando lo tiene)"
+            >
+              <Download size={14} />Descargar PDF
+            </button>
             {receipt.status === 'draft' && (
               <>
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/compras/recepciones/${id}/editar`)}>
@@ -528,6 +560,7 @@ export default function RecepcionDetail() {
         onClose={() => setShowPrintLabels(false)}
         initialItems={receipt.items.map((it) => ({ itemCode: it.itemCode, itemName: it.itemName, qty: it.qty }))}
       />
+      <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
     </div>
   )
 }

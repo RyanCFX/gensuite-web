@@ -219,6 +219,7 @@ export const ENDPOINTS = {
     cancel: (id: string) => `/compras/purchase-receipt/${id}/cancel`,
     amend: (id: string) => `/compras/purchase-receipt/${id}/amend`,
     facturar: (id: string) => `/compras/purchase-receipt/${id}/facturar`,
+    pdf: (id: string) => `/compras/purchase-receipt/${id}/pdf`,
   },
   solicitudesCompra: {
     list: '/compras/solicitudes',

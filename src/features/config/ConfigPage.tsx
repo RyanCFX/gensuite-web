@@ -2871,6 +2871,10 @@ function FacturacionConfigSection() {
     .map((m) => ({ value: m.name, label: m.name }))
   const [flujoCobro, setFlujoCobro] = useState<'directo' | 'caja'>('directo')
   const [requiereUbicacionVenta, setRequiereUbicacionVenta] = useState(false)
+  const [pedirPinPrecioMinimoServicios, setPedirPinPrecioMinimoServicios] = useState(false)
+  const [pedirPinPrecioMinimoProductos, setPedirPinPrecioMinimoProductos] = useState(false)
+  const [permitirModificarPrecioServicios, setPermitirModificarPrecioServicios] = useState(true)
+  const [permitirModificarPrecioProductos, setPermitirModificarPrecioProductos] = useState(true)
   const [requiereSerialLoteCompra, setRequiereSerialLoteCompra] = useState(false)
   const [actualizarCostoEnCompra, setActualizarCostoEnCompra] = useState(true)
   const [usaDepartamentos, setUsaDepartamentos] = useState(true)
@@ -2910,7 +2914,11 @@ function FacturacionConfigSection() {
      if (data) {
        setSelectedRoles(data.rolesCancelacionFactura ?? [])
        setFlujoCobro(data.flujoCobro ?? "directo")
-       setRequiereUbicacionVenta(data.requiereUbicacionVenta ?? false)
+        setRequiereUbicacionVenta(data.requiereUbicacionVenta ?? false)
+        setPedirPinPrecioMinimoServicios(data.pedirPinPrecioMinimoServicios ?? false)
+        setPedirPinPrecioMinimoProductos(data.pedirPinPrecioMinimoProductos ?? false)
+        setPermitirModificarPrecioServicios(data.permitirModificarPrecioServicios ?? true)
+        setPermitirModificarPrecioProductos(data.permitirModificarPrecioProductos ?? true)
        setRequiereSerialLoteCompra(data.requiereSerialLoteCompra ?? false)
        setActualizarCostoEnCompra(data.actualizarCostoEnCompra ?? true)
        setUsaDepartamentos(data.usaDepartamentos ?? true)
@@ -3143,6 +3151,79 @@ function FacturacionConfigSection() {
               <FieldTooltip>
                 Si está activo, no se podrá vender un artículo de inventario si no tiene una Ubicación asignada dentro
                 del almacén desde el cual se factura.
+              </FieldTooltip>
+            </span>
+          </label>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-check-wrap">
+            <input
+              type="checkbox"
+              className="ff-check"
+              checked={pedirPinPrecioMinimoServicios}
+              onChange={(e) => setPedirPinPrecioMinimoServicios(e.target.checked)}
+            />
+            <span style={{ fontSize: 13 }}>
+              Pedir PIN si el precio de un SERVICIO está bajo el mínimo
+              <FieldTooltip>
+                Si está activo, editar manualmente el precio de un servicio por debajo de su "Precio C" al crear
+                o editar una factura/cotización exige autorización con PIN.
+              </FieldTooltip>
+            </span>
+          </label>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-check-wrap">
+            <input
+              type="checkbox"
+              className="ff-check"
+              checked={pedirPinPrecioMinimoProductos}
+              onChange={(e) => setPedirPinPrecioMinimoProductos(e.target.checked)}
+            />
+            <span style={{ fontSize: 13 }}>
+              Pedir PIN si el precio de un PRODUCTO está bajo el mínimo
+              <FieldTooltip>
+                Igual que el anterior, para productos. Se suma al piso de costo existente — un producto puede
+                requerir PIN por costo, por precio mínimo, o por ambos motivos.
+              </FieldTooltip>
+            </span>
+          </label>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-check-wrap">
+            <input
+              type="checkbox"
+              className="ff-check"
+              checked={permitirModificarPrecioServicios}
+              onChange={(e) => setPermitirModificarPrecioServicios(e.target.checked)}
+            />
+            <span style={{ fontSize: 13 }}>
+              Permitir Modificar Precio Libremente en Servicios
+              <FieldTooltip>
+                Si está activo (default), el operador puede escribir cualquier precio para un servicio
+                al cotizar, pedir o facturar. Si se desactiva, el precio de esa línea debe ser
+                exactamente uno de los 3 precios de catálogo (Precio A, B o C) — sin PIN que lo salve.
+              </FieldTooltip>
+            </span>
+          </label>
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-check-wrap">
+            <input
+              type="checkbox"
+              className="ff-check"
+              checked={permitirModificarPrecioProductos}
+              onChange={(e) => setPermitirModificarPrecioProductos(e.target.checked)}
+            />
+            <span style={{ fontSize: 13 }}>
+              Permitir Modificar Precio Libremente en Productos
+              <FieldTooltip>
+                Igual que el anterior, para productos — interruptor independiente. Se puede dejar el
+                precio de servicios libre y bloquear el de productos al catálogo, o viceversa.
               </FieldTooltip>
             </span>
           </label>
@@ -3847,6 +3928,10 @@ function FacturacionConfigSection() {
                 rolesCancelacionFactura: selectedRoles,
                 flujoCobro,
                 requiereUbicacionVenta,
+                pedirPinPrecioMinimoServicios,
+                pedirPinPrecioMinimoProductos,
+                permitirModificarPrecioServicios,
+                permitirModificarPrecioProductos,
                 requiereSerialLoteCompra,
                 actualizarCostoEnCompra,
                 usaDepartamentos,
