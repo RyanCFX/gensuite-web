@@ -11,7 +11,7 @@ import { toast } from 'sonner'
 import { AlertTriangle, AlertCircle, Plus, Pencil, Trash2, Info, Ban } from 'lucide-react'
 import { getEcfConfig } from '@/shared/api/config'
 import {
-  listEcfSequences, createEcfSequence, updateEcfSequence, deleteEcfSequence, getEcfTipos, voidEcfRanges,
+  listEcfSequences, createEcfSequence, updateEcfSequence, deleteEcfSequence, voidEcfRanges,
 } from '@/shared/api/ecf'
 import type { EcfSequence, EcfTipoElectronico } from '@/shared/api/types'
 import { ECF_TIPOS, ECF_ENV_LABELS, ecfTipoLabel } from '@/lib/dgii'
@@ -424,7 +424,9 @@ export function EcfSequencesPanel() {
   })
   const company = ecfConfig?.company ?? ''
 
-  const { data: tipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos })
+  // WIP: query comentado junto con el banner que lo usaba (líneas 451/455-463) — restaurarlo
+  // cuando se reactive esa UI.
+  // const { data: tipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos })
 
   const { data: sequences, isLoading, isError } = useQuery({
     queryKey: ['ecf-secuencias', company],
@@ -448,11 +450,11 @@ export function EcfSequencesPanel() {
     )
   }
 
-  const electronicosCount = (tipos ?? []).filter((t) => t.electronico).length
+  // const electronicosCount = (tipos ?? []).filter((t) => t.electronico).length
 
   return (
     <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div className="inline-alert inline-alert-info">
+      {/*<div className="inline-alert inline-alert-info">
         <Info size={15} aria-hidden="true" style={{ flexShrink: 0 }} />
         <span>
           Rangos numéricos autorizados por la DGII para comprobantes electrónicos, sincronizados con Vega.
@@ -460,7 +462,7 @@ export function EcfSequencesPanel() {
             ? ` Hay ${electronicosCount} tipo(s) habilitado(s) para emitirse como e-CF.`
             : ' Ningún tipo está habilitado todavía para emitirse como e-CF.'}
         </span>
-      </div>
+      </div>*/}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <RecargarButton />
@@ -553,8 +555,8 @@ export function EcfSequencesPanel() {
                     : sequences.map((s) => (
                         <tr key={s.id}>
                           <td>
-                            <span className="badge badge-neutral" style={{ fontWeight: 600 }}>{s.typeId}</span>
-                            <span style={{ marginLeft: 6, fontSize: 12, color: 'var(--text-tertiary)' }}>{s.ncfType}</span>
+                            <span className="badge badge-neutral" style={{ fontWeight: 600 }}>E{s.typeId}</span>
+                            {/*<span style={{ marginLeft: 6, fontSize: 12, color: 'var(--text-tertiary)' }}>{s.ncfType}</span>*/}
                           </td>
                           <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ECF_ENV_LABELS[s.env] ?? s.env}</td>
                           <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
