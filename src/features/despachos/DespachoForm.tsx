@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Minus, Trash2 } from 'lucide-react'
 import { crearDespacho } from '@/shared/api/despachos'
 import { listCustomers } from '@/shared/api/customers'
 import { listSucursales } from '@/shared/api/sucursales'
@@ -52,7 +52,9 @@ export default function DespachoForm() {
   const [department, setDepartment] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyRow()])
+  const [notesOpen, setNotesOpen] = useState(false)
   const ITEMS_COLUMNS = [
+    { key: 'codigo', width: 100 },
     { key: 'articulo', width: 240 },
     { key: 'cantidad', width: 100 },
     { key: 'almacen', width: 200 },
@@ -184,16 +186,16 @@ export default function DespachoForm() {
       <a className="page-back-link" onClick={() => navigate('/despachos')}><ArrowLeft size={14} /> Despachos</a>
 
       <PageHeader
-        title="Nuevo despacho"
+        title={<><span className="page-title-dot" />Nuevo despacho</>}
         description="Venta mostrador sin pedido previo — el operador arma las líneas a mano. Queda en Borrador para revisar antes de someter."
         action={<RecargarButton label="Actualizar" />}
       />
 
       <form onSubmit={handleSubmit}>
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Datos generales</h2></div>
+          <div className="card-header navy-card-header"><h2 className="card-title">Datos generales</h2></div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="form-row form-row-3">
+            <div className="form-row">
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Cliente</label>
                 <SearchSelect
@@ -230,20 +232,17 @@ export default function DespachoForm() {
         </div>
 
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header">
-            <span className="card-title">Artículos</span>
-            <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setItems((prev) => [...prev, emptyRow()])}>
-              <Plus size={14} /> Agregar
-            </button>
-          </div>
-          <div className="card-body" style={{ padding: 0 }}>
-            <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
-              <table className="items-table items-table-resizable">
+          <div className="items-table-wrap">
+            <table className="items-table navy-table items-table-resizable">
                 <colgroup>
                   {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
                 </colgroup>
                 <thead>
                   <tr>
+                    <th>
+                      Código
+                      <span className="col-resize-handle" onMouseDown={startResize('codigo')} />
+                    </th>
                     <th>
                       Artículo
                       <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
@@ -266,6 +265,9 @@ export default function DespachoForm() {
                 <tbody>
                   {items.map((row, idx) => (
                     <tr key={idx}>
+                      <td>
+                        <span className="td-muted" style={{ fontSize: 12 }}>{row.itemCode || '—'}</span>
+                      </td>
                       <td style={{ minWidth: 240 }}>
                         <ItemSelect
                           value={row.itemCode}
@@ -308,29 +310,61 @@ export default function DespachoForm() {
                           />
                         )}
                       </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-size-icon-sm"
-                          onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-                          disabled={items.length === 1}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                      <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ position: 'relative', verticalAlign: 'middle' }}>
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-size-icon-xs"
+                            onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+                            disabled={items.length === 1}
+                            title="Eliminar"
+                            style={{ color: 'var(--error-text)' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
+              <button type="button" className="btn btn-ghost btn-size-sm" onClick={() => setItems((prev) => [...prev, emptyRow()])}>
+                <Plus size={14} /> Agregar artículo
+              </button>
+            </div>
         </div>
 
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Notas</h2></div>
-          <div className="card-body">
-            <textarea className="ff-input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <div
+            className="card-header navy-card-header"
+            style={{ cursor: 'pointer' }}
+            onClick={() => setNotesOpen((o) => !o)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 className="card-title">Notas</h2>
+              <button
+                type="button"
+                className="navy-header-toggle-btn icon-swap"
+                aria-expanded={notesOpen}
+                aria-label={notesOpen ? 'Ocultar notas' : 'Mostrar notas'}
+                onClick={(e) => { e.stopPropagation(); setNotesOpen((o) => !o) }}
+              >
+                {notesOpen ? <Minus size={13} /> : <Plus size={13} />}
+              </button>
+            </div>
+            {!notesOpen && (
+              <span className="navy-header-hint">
+                Agrega comentarios para aclarar datos del despacho.
+              </span>
+            )}
           </div>
+          {notesOpen && (
+            <div className="card-body">
+              <textarea className="ff-input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
+          )}
         </div>
 
         <div className="doc-actions-bar">

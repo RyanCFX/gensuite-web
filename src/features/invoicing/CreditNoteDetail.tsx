@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { formatDate, formatMoney } from '@/lib/formatters'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
-import { RefundCreditNoteModal, ApplyCreditNoteModal } from './CreditNoteActionModals'
+import { ApplyCreditNoteModal } from './CreditNoteActionModals'
 import type { CreditNoteActionTarget } from './CreditNoteActionModals'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { EstadoArsBadge } from './EstadoArsBadge'
@@ -106,7 +106,6 @@ export default function CreditNoteDetail() {
   })
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [refundTarget, setRefundTarget] = useState<CreditNoteActionTarget | null>(null)
   const [applyTarget, setApplyTarget] = useState<CreditNoteActionTarget | null>(null)
   const previewMutation = useMutation({
     mutationFn: () => getCreditNotePdfBlobUrl(noteId),
@@ -249,12 +248,6 @@ export default function CreditNoteDetail() {
         )}
         {hasUsageInfo && (note.availableAmount ?? 0) > 0 && (
           <>
-            <button
-              className="btn btn-secondary btn-size-md"
-              onClick={() => setRefundTarget({ id: noteId, grandTotal: note.grandTotal, currency })}
-            >
-              <Wallet size={14} /> Reembolsar
-            </button>
             <button
               className="btn btn-secondary btn-size-md"
               onClick={() => setApplyTarget({ id: noteId, returnAgainst: originalInvoiceId, grandTotal: note.grandTotal, currency })}
@@ -466,9 +459,6 @@ export default function CreditNoteDetail() {
 
       {previewUrl && <PdfPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />}
 
-      {refundTarget && (
-        <RefundCreditNoteModal note={refundTarget} onClose={() => setRefundTarget(null)} />
-      )}
       {applyTarget && (
         <ApplyCreditNoteModal note={applyTarget} onClose={() => setApplyTarget(null)} />
       )}

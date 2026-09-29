@@ -16,7 +16,7 @@ import { listDepartamentos } from '@/shared/api/departamentos'
 import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo, EcfModificationCode } from '@/shared/api/types'
 import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
 import { Select, SelectItem } from '@/components/ui/select'
-import { Plus, Loader2, Wallet, ArrowRightLeft, ChevronDown, ChevronRight, Download, SlidersHorizontal, AlertTriangle } from 'lucide-react'
+import { Plus, Loader2, ArrowRightLeft, ChevronDown, ChevronRight, Download, SlidersHorizontal, AlertTriangle } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
@@ -34,7 +34,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
-import { RefundCreditNoteModal, ApplyCreditNoteModal } from './CreditNoteActionModals'
+import { ApplyCreditNoteModal } from './CreditNoteActionModals'
 
 const LIST_COLUMNS = [
   { key: 'expand', width: 28 },
@@ -219,7 +219,6 @@ export default function CreditNotesPage() {
   const [reason, setReason] = useState('')
   const [modificationCode, setModificationCode] = useState<EcfModificationCode | ''>('')
   const [noteItems, setNoteItems] = useState<NoteLineItem[]>([])
-  const [refundTarget, setRefundTarget] = useState<CreditNoteRow | null>(null)
 
   // ── Aplicar a factura / convertir a saldo a favor ─────────────────────────
   const [applyTarget, setApplyTarget] = useState<CreditNoteRow | null>(null)
@@ -373,9 +372,6 @@ export default function CreditNotesPage() {
   const crearIsDirty = useDirtyCheck({ selectedInvoiceId, reason, modificationCode, noteItems }, modalOpen)
   const crearClose = useConfirmClose(crearIsDirty, handleCloseModal)
 
-  function openRefundModal(note: CreditNoteRow) {
-    setRefundTarget(note)
-  }
 
   function openApplyModal(note: CreditNoteRow) {
     setApplyTarget(note)
@@ -623,13 +619,7 @@ export default function CreditNotesPage() {
                         {canAct && (
                           <>
                             <button
-                              className="btn btn-ghost btn-size-sm"
-                              onClick={(e) => { e.stopPropagation(); openRefundModal(note) }}
-                            >
-                              <Wallet size={13} /> Reembolsar
-                            </button>
-                            <button
-                              className="btn btn-ghost btn-size-sm"
+                              className="btn btn-secondary btn-size-sm"
                               onClick={(e) => { e.stopPropagation(); openApplyModal(note) }}
                             >
                               <ArrowRightLeft size={13} /> Aplicar a factura
@@ -958,9 +948,6 @@ export default function CreditNotesPage() {
         variant="danger"
       />
 
-      {refundTarget && (
-        <RefundCreditNoteModal note={refundTarget} onClose={() => setRefundTarget(null)} />
-      )}
 
       {applyTarget && (
         <ApplyCreditNoteModal note={applyTarget} onClose={() => setApplyTarget(null)} />
