@@ -1166,6 +1166,22 @@ export interface DevolucionDetail {
   modifiedAt: string;
 }
 
+// GET /credit-notes/:id — detalle. El backend devuelve el shape de detalle (igual que
+// GET /devoluciones/:id: `creditNoteId`, `documentStatus`, `originalInvoice` objeto, `items`,
+// bloque `aseguradora`), no el shape de lista. Por tolerancia se aceptan también los aliases
+// de lista (`id`, `status`, `originalInvoice` string, `returnAgainst`) — la pantalla de detalle
+// normaliza ambos.
+export interface CreditNoteDetail extends Omit<DevolucionDetail, 'originalInvoice'> {
+  /** Alias de lista — presente si el backend devuelve shape de lista. */
+  id?: string;
+  status?: string;
+  returnAgainst?: string | null;
+  originalInvoice: DevolucionOriginalInvoice | string | null;
+  /** Heredada de la factura original (solo shape de lista). */
+  currency?: string;
+  conversionRate?: number;
+}
+
 // ─── Devoluciones de Compras ──────────────────────────────────────────────────
 // Flujo independiente de Compras: nota de crédito de compra con ciclo de vida
 // Draft → Submitted → (Cancelled | Amended) y aplicación de saldo a CxP.
@@ -4240,6 +4256,14 @@ export interface EcfClientsListResult {
   mode: EcfMode;
 }
 
+/** GET /config/ecf/admin/clients/by-rnc/:rnc — dice si el RNC ya existe como Client en
+ *  Vega y, si existe, devuelve su info (incluido el certificado: `hasCertificate` y
+ *  `certificateExpiresAt` dentro de `client`). 404 = no existe. */
+export interface EcfClientByRncResult {
+  exists: boolean;
+  client?: EcfClient | null;
+}
+
 /** POST /config/ecf/admin/clients/link — vincula un Client que ya existe en Vega sin crearlo. */
 export interface LinkEcfClientDto {
   /** Nombre EXACTO de la Company en ERPNext. */
@@ -4310,17 +4334,46 @@ export interface VoidEcfRangesDto {
 // El openapi documenta los paths y los DTOs de request, no las respuestas — estos tipos derivan
 // del documento de la tarea (tolerantes: campos opcionales donde no es explícito).
 
-// GET /config/ecf/certificacion (solo lectura, requiere ?company=)
+// GET /config/ecf/certificacion (solo lectura, requiere ?company=). Shape real verificado
+// contra el backend: el estado vive en `client.certificationStage` + `completedStages` +
+// `canGoLive`, con el desglose en `dgiiSteps`. Se conservan los campos legacy como
+// opcionales por tolerancia.
+export interface EcfCertificacionDgiiStep {
+  step: number;
+  title: string;
+  /** "complete" cuando el paso está listo; cualquier otro valor = pendiente/en curso. */
+  status: string;
+  internalStages: string[];
+}
+
+export interface EcfCertificacionClient {
+  id: string;
+  rnc: string;
+  legalName: string;
+  /** "CERTIFIED" cuando el tenant está certificado con Vega. */
+  certificationStage?: string | null;
+  activeEnv?: string | null;
+}
+
 export interface EcfCertificacion {
-  /** Etapa cruda del trámite de 14 pasos + "CERTIFIED" (ej. "STATUS_VERIFIED"). */
-  stage: string;
-  /** Etiqueta ya traducida al español por el backend. */
-  stageLabel: string;
+  client?: EcfCertificacionClient | null;
+  /** Incluye "CERTIFIED" cuando está certificado. */
+  completedStages?: string[];
+  remainingStages?: string[];
+  /** 0–100. */
+  progress?: number;
+  canGoLive?: boolean;
+  dgiiSteps?: EcfCertificacionDgiiStep[];
+  dgiiStepsCompleted?: number;
   /** Qué falta, ya en español ("" si CERTIFIED). */
-  siguientePaso: string;
-  /** Derivado de stage === "CERTIFIED" si el backend no lo trae. */
+  siguientePaso?: string;
+  /** Legacy — etapa cruda (ej. "STATUS_VERIFIED"). Hoy el backend no lo trae. */
+  stage?: string;
+  /** Legacy — etiqueta en español. Hoy el backend no lo trae. */
+  stageLabel?: string;
+  /** Legacy explícito del backend (si viene, manda). */
   certified?: boolean;
-  /** Progreso numérico, si el backend lo incluye. */
+  /** Legacy — progreso numérico alternativo. */
   paso?: number;
   totalPasos?: number;
 }

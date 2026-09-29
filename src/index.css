@@ -221,6 +221,38 @@ button {
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--radius-full); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
 
+/* Solo Windows: scrollbar inferior visible en contenedores de tabla con desborde
+   horizontal (macOS usa overlay y se mantiene oculto por la regla global). */
+.os-windows .table-wrap,
+.os-windows .table-scroll,
+.os-windows .items-table-wrap,
+.os-windows .dash-table-wrap {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.os-windows .table-wrap::-webkit-scrollbar,
+.os-windows .table-scroll::-webkit-scrollbar,
+.os-windows .items-table-wrap::-webkit-scrollbar,
+.os-windows .dash-table-wrap::-webkit-scrollbar {
+  display: block;
+  height: 10px;
+}
+.os-windows .table-wrap::-webkit-scrollbar-thumb,
+.os-windows .table-scroll::-webkit-scrollbar-thumb,
+.os-windows .items-table-wrap::-webkit-scrollbar-thumb,
+.os-windows .dash-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.os-windows .table-wrap::-webkit-scrollbar-track,
+.os-windows .table-scroll::-webkit-scrollbar-track,
+.os-windows .items-table-wrap::-webkit-scrollbar-track,
+.os-windows .dash-table-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 *:focus-visible {
   outline: 2px solid var(--brand-primary);
   outline-offset: 2px;

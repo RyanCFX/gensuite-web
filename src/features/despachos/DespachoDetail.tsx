@@ -247,7 +247,8 @@ export default function DespachoDetail() {
 
       <div className="page-header">
         <div>
-          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span className="page-title-dot" />
             {despacho.id}
             <span className={`badge ${DESPACHO_STATUS_BADGE[despacho.status]}`}>{DESPACHO_STATUS_LABEL[despacho.status]}</span>
             <span className="badge badge-neutral" title="Estado nativo de ERPNext — informativo">{DELIVERY_STATUS_LABEL[despacho.deliveryStatus]}</span>
@@ -272,56 +273,56 @@ export default function DespachoDetail() {
         </div>
       )}
 
-      <div className="doc-actions-bar">
+      <div className="doc-actions-bar" style={{ background: 'transparent', border: 'none', padding: 0, marginBottom: 16 }}>
         {despacho.status === 'draft' && puedeEditar && (
-          <button className="btn btn-ghost btn-size-sm" onClick={() => setEditOpen(true)}>
+          <button className="btn btn-ghost btn-size-md" onClick={() => setEditOpen(true)}>
             <Pencil size={14} /> Editar
           </button>
         )}
         {despacho.status === 'draft' && puedeEditar && trackedLines.length > 0 && (
-          <button className="btn btn-ghost btn-size-sm" onClick={() => setTrackingOpen(true)}>
+          <button className="btn btn-ghost btn-size-md" onClick={() => setTrackingOpen(true)}>
             <Wrench size={14} /> Asignar serial/lote
           </button>
         )}
         {despacho.status === 'draft' && puedeEditar && (
-          <button className="btn btn-ghost btn-size-sm" onClick={() => setConfirmarStockOpen(true)}>
+          <button className="btn btn-ghost btn-size-md" onClick={() => setConfirmarStockOpen(true)}>
             <PackageCheck size={14} /> Confirmar stock
           </button>
         )}
         {despacho.status === 'draft' && puedeSometer && (
-          <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmSubmit(true)} disabled={submitMutation.isPending}>
+          <button className="btn btn-navy btn-size-md" onClick={() => setConfirmSubmit(true)} disabled={submitMutation.isPending}>
             <Send size={14} /> Someter
           </button>
         )}
         {despacho.status === 'draft' && puedeEditar && (
-          <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmDelete(true)} disabled={deleteMutation.isPending}>
+          <button className="btn btn-danger btn-size-md" onClick={() => setConfirmDelete(true)} disabled={deleteMutation.isPending}>
             <Trash2 size={14} /> Eliminar
           </button>
         )}
         {despacho.status === 'submitted' && puedeCancelar && (
-          <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmCancel(true)} disabled={cancelMutation.isPending}>
+          <button className="btn btn-danger btn-size-md" onClick={() => setConfirmCancel(true)} disabled={cancelMutation.isPending}>
             <Ban size={14} /> Cancelar
           </button>
         )}
         {despacho.status === 'submitted' && !despacho.salesInvoice && puedeFacturar && (
-          <button className="btn btn-secondary btn-size-sm" onClick={() => setConfirmFacturar(true)} disabled={facturarMutation.isPending}>
+          <button className="btn btn-navy btn-size-md" onClick={() => setConfirmFacturar(true)} disabled={facturarMutation.isPending}>
             <Receipt size={14} /> Facturar
           </button>
         )}
         {despacho.status === 'submitted' && !despacho.isReturn && puedeDevolver && (
-          <button className="btn btn-secondary btn-size-sm" onClick={() => setConfirmDevolucion(true)} disabled={devolucionMutation.isPending}>
+          <button className="btn btn-secondary btn-size-md" onClick={() => setConfirmDevolucion(true)} disabled={devolucionMutation.isPending}>
             <RotateCcw size={14} /> Crear Devolución
           </button>
         )}
         {despacho.status === 'submitted' && puedeImprimir && (
-          <button className="btn btn-ghost btn-size-sm" onClick={handleDownload} disabled={downloading}>
+          <button className="btn btn-ghost btn-size-md" onClick={handleDownload} disabled={downloading}>
             <Download size={14} /> {downloading ? 'Descargando…' : 'Descargar PDF'}
           </button>
         )}
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header"><h2 className="card-title">Información del Despacho</h2></div>
+        <div className="card-header navy-card-header"><h2 className="card-title">Información del Despacho</h2></div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="fields-grid">
             <div className="detail-field">
@@ -374,7 +375,7 @@ export default function DespachoDetail() {
 
       <div className="card">
         <div className="table-scroll">
-          <table className="data-table items-table-resizable">
+          <table className="data-table navy-table items-table-resizable">
             <colgroup>
               {DESPACHO_ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
             </colgroup>

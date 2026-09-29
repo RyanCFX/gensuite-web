@@ -13,6 +13,15 @@ initSentry()
 
 useAuthStore.getState().hydrate()
 
+// Solo Windows: marca la raíz para mostrar scrollbar inferior en tablas con desborde
+// horizontal (en macOS los scrollbars son overlay y se ocultan por CSS global).
+if (
+  (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform === 'Windows' ||
+  navigator.platform.indexOf('Win') === 0
+) {
+  document.documentElement.classList.add('os-windows')
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <Sentry.ErrorBoundary

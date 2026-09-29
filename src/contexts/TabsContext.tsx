@@ -93,6 +93,7 @@ function getTitleForPath(pathname: string): string {
     [/^\/despachos\/confirmaciones$/, 'Confirmaciones de Despacho'],
     [/^\/despachos\/(.+)$/, (m) => `Despacho: ${m[1]}`],
     [/^\/despachos$/, 'Despachos'],
+    [/^\/notas-credito\/(.+)$/, (m) => `Nota de Crédito: ${m[1]}`],
     [/^\/notas-credito$/, 'Notas de Crédito'],
     [/^\/notas-debito$/, 'Notas de Débito'],
     [/^\/devoluciones\/nueva$/, 'Nueva Devolución'],

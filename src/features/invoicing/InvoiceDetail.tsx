@@ -185,6 +185,7 @@ export default function InvoiceDetail() {
   const queryClient = useQueryClient();
   const isSystemManager = useIsSystemManager();
   const tieneContabilidad = useFeature('contabilidad');
+  const tieneRelacionesComerciales = useFeature('relacionesComerciales');
 
   // Bloque opcional (u obligatorio si el cliente no tiene crédito) de "¿Cómo se cobra?"
   // al someter — ver escenarios en handleSubmitClick. La forma del bloque depende de
@@ -332,7 +333,8 @@ export default function InvoiceDetail() {
   // docs/tasks/relaciones_comerciales/FASE_08_FLUJO_VENTA_FRONTEND.md §5.
   const puedeEnviarVenta = usePuede("relaciones.venta.enviar");
   const puedeIgualarVenta = usePuede("relaciones.venta.igualar");
-  const necesitaLookupB2B = (puedeEnviarVenta || puedeIgualarVenta) && invoice?.status === "submitted";
+  const necesitaLookupB2B =
+    tieneRelacionesComerciales && (puedeEnviarVenta || puedeIgualarVenta) && invoice?.status === "submitted";
 
   const relacionClienteSocio = useRelacionComercialPorContraparte("customer", invoice?.customer, necesitaLookupB2B);
 
@@ -434,7 +436,9 @@ export default function InvoiceDetail() {
   const formatosPermitidosPdf = formatosPermitidos?.filter((f) => f !== "pos");
   const permitePos = formatosPermitidos?.includes("pos") ?? false;
 
-  const { data: turno } = useQuery({
+  // Precalienta el caché de ['turno-actual'] (lo lee TurnoCajaIndicator) — el `data` no se
+  // usa acá directamente.
+  useQuery({
     queryKey: ['turno-actual'],
     queryFn: getTurnoActual,
     enabled: !!invoice && invoice.status === "draft" && usaModuloPos,
@@ -1814,9 +1818,6 @@ export default function InvoiceDetail() {
             {ecfCancelBlockedMsg ||
               "Esta factura tiene un e-CF aceptado por la DGII. No se puede anular — para corregirla, emite una Nota de Crédito Electrónica que la referencie."}
           </span>
-          <button className="btn btn-primary btn-size-sm" onClick={irANotaCredito}>
-            Emitir Nota de Crédito
-          </button>
         </div>
       )}
 

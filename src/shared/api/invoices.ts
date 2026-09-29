@@ -35,6 +35,8 @@ export interface ListInvoicesParams extends PaginationParams {
   estadoArs?: EstadoArs
   /** `true` = con cobertura ARS y todavía sin lote. */
   sinLote?: boolean
+  /** `true` = excluye facturas que ya tienen nota de crédito. */
+  sinNotaCredito?: boolean
 }
 
 export async function listInvoices(params?: ListInvoicesParams) {

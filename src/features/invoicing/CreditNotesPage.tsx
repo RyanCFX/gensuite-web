@@ -4,16 +4,11 @@ import {
   listCreditNotes,
   createCreditNote,
   submitCreditNote,
-  refundCreditNote,
-  aplicarCreditNoteAFactura,
-  removerCreditNoteAplicada,
-  getCreditNoteSaldoFavor,
   downloadCreditNotePdf,
 } from '@/shared/api/notes'
 import { listInvoices, getInvoice } from '@/shared/api/invoices'
-import { listMetodosPago, getCatalogosFiscales } from '@/shared/api/config'
+import { getCatalogosFiscales } from '@/shared/api/config'
 import { getEcfTipos } from '@/shared/api/ecf'
-import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { listSucursales } from '@/shared/api/sucursales'
@@ -39,6 +34,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { RefundCreditNoteModal, ApplyCreditNoteModal } from './CreditNoteActionModals'
 
 const LIST_COLUMNS = [
   { key: 'expand', width: 28 },
@@ -224,16 +220,9 @@ export default function CreditNotesPage() {
   const [modificationCode, setModificationCode] = useState<EcfModificationCode | ''>('')
   const [noteItems, setNoteItems] = useState<NoteLineItem[]>([])
   const [refundTarget, setRefundTarget] = useState<CreditNoteRow | null>(null)
-  const [refundAmount, setRefundAmount] = useState(0)
-  const [refundModeOfPayment, setRefundModeOfPayment] = useState('')
-  const [refundBankAccount, setRefundBankAccount] = useState('')
 
   // ── Aplicar a factura / convertir a saldo a favor ─────────────────────────
   const [applyTarget, setApplyTarget] = useState<CreditNoteRow | null>(null)
-  const [applyInvoiceId, setApplyInvoiceId] = useState('')
-  const [applyInvoiceLabel, setApplyInvoiceLabel] = useState('')
-  const [applyInvoiceQuery, setApplyInvoiceQuery] = useState('')
-  const [applyAmount, setApplyAmount] = useState(0)
 
   const { data: notesData, isLoading } = useQuery({
     queryKey: [
@@ -258,31 +247,6 @@ export default function CreditNotesPage() {
       refundedAmountMax: refundedAmountMax ? Number(refundedAmountMax) : undefined,
     }),
   })
-
-  const { data: metodos } = useQuery({
-    queryKey: ['metodos-pago'],
-    queryFn: listMetodosPago,
-    enabled: !!refundTarget,
-    staleTime: 5 * 60_000,
-  })
-  const [refundModeOfPaymentSearch, setRefundModeOfPaymentSearch] = useState('')
-  const refundModeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
-    .filter((m) => !m.disabled)
-    .filter((m) => !refundModeOfPaymentSearch || m.name.toLowerCase().includes(refundModeOfPaymentSearch.toLowerCase()))
-    .map((m) => ({ value: m.name, label: m.name }))
-
-  const refundMetodoSeleccionado = (metodos ?? []).find((m) => m.name === refundModeOfPayment)
-  const refundRequiresBankAccount = refundMetodoSeleccionado?.requiresBankAccount && !refundMetodoSeleccionado.defaultBankAccount
-
-  const { data: refundCuentasBancarias } = useQuery({
-    queryKey: ['cuentas-bancarias-activas'],
-    queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
-    enabled: !!refundRequiresBankAccount,
-  })
-  const [refundBankAccountSearch, setRefundBankAccountSearch] = useState('')
-  const refundBankAccountOptions: SearchSelectOption[] = (refundCuentasBancarias?.items ?? [])
-    .filter((c) => !refundBankAccountSearch || c.accountName.toLowerCase().includes(refundBankAccountSearch.toLowerCase()))
-    .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))
 
   // El listado de facturas (GET /invoices) no incluye `items[]` — solo el detalle (GET /invoices/:id) lo tiene.
   // Se necesita el detalle completo para poder poblar/editar los artículos a devolver.
@@ -312,7 +276,7 @@ export default function CreditNotesPage() {
 
   const { data: invoicesData, isLoading: invoicesLoading } = useQuery({
     queryKey: ['invoices-submitted', invoiceQuery],
-    queryFn: () => listInvoices({ status: 'submitted', search: invoiceQuery || undefined, limit: 20 }),
+    queryFn: () => listInvoices({ status: 'submitted', search: invoiceQuery || undefined, limit: 20, sinNotaCredito: true }),
     enabled: modalOpen,
   })
 
@@ -409,151 +373,13 @@ export default function CreditNotesPage() {
   const crearIsDirty = useDirtyCheck({ selectedInvoiceId, reason, modificationCode, noteItems }, modalOpen)
   const crearClose = useConfirmClose(crearIsDirty, handleCloseModal)
 
-  const refundMutation = useMutation({
-    mutationFn: () => refundCreditNote(refundTarget!.id, {
-      modeOfPayment: refundModeOfPayment,
-      amount: refundAmount,
-      bankAccount: refundBankAccount || undefined,
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
-      toast.success('Nota de crédito reembolsada')
-      closeRefundModal()
-    },
-    onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al reembolsar la nota de crédito')
-    },
-  })
-
   function openRefundModal(note: CreditNoteRow) {
     setRefundTarget(note)
-    setRefundAmount(Math.abs(note.grandTotal ?? 0))
-    setRefundModeOfPayment('')
-    setRefundBankAccount('')
   }
-
-  // La nota de crédito no expone el `customer` directamente — lo obtenemos de su factura original.
-  const { data: applyOriginalInvoice } = useQuery({
-    queryKey: ['invoice', applyTarget?.returnAgainst],
-    queryFn: () => getInvoice(applyTarget!.returnAgainst),
-    enabled: !!applyTarget,
-  })
-
-  // Facturas destino válidas: en Draft (sin paymentStatus aún) o Sometidas con saldo pendiente
-  // (unpaid/partial) — no tiene sentido ofrecer una factura ya paid como destino.
-  const { data: applyInvoicesData, isLoading: applyInvoicesLoading } = useQuery({
-    queryKey: ['invoices-for-credit-apply', applyOriginalInvoice?.customer, applyInvoiceQuery],
-    queryFn: async () => {
-      const customer = applyOriginalInvoice!.customer
-      const search = applyInvoiceQuery || undefined
-      const [draft, pending] = await Promise.all([
-        listInvoices({ customer, search, status: 'draft', limit: 20 }),
-        listInvoices({ customer, search, status: 'submitted', paymentStatus: ['unpaid', 'partly_paid'], limit: 20 }),
-      ])
-      const seen = new Set<string>()
-      const items = [...draft.items, ...pending.items].filter((inv) => {
-        if (seen.has(inv.id)) return false
-        seen.add(inv.id)
-        return true
-      })
-      return { items, meta: draft.meta }
-    },
-    enabled: !!applyTarget && !!applyOriginalInvoice?.customer,
-  })
-
-  const applyInvoiceOptions: SearchSelectOption[] = (applyInvoicesData?.items ?? []).map((inv) => ({
-    value: inv.id,
-    label: inv.ncf ?? inv.id,
-    sublabel: `${formatDate(inv.postingDate)} — ${formatMoney(inv.grandTotal, inv.currency)} (${inv.status})`,
-  }))
-
-  // Para saber si applyTarget ya está aplicada a la factura seleccionada (evita el 409 del backend)
-  const { data: applyCreditNoteSaldo } = useQuery({
-    queryKey: ['credit-note-saldo-favor', applyOriginalInvoice?.customer],
-    queryFn: () => getCreditNoteSaldoFavor(applyOriginalInvoice!.customer),
-    enabled: !!applyTarget && !!applyOriginalInvoice?.customer,
-  })
-
-  const applyTargetEntry = applyCreditNoteSaldo?.entries.find((e) => e.creditNoteId === applyTarget?.id)
-  const alreadyAppliedToSelected = applyInvoiceId
-    ? applyTargetEntry?.appliedTo.find((a) => a.invoiceId === applyInvoiceId)
-    : undefined
-  const canUndoApply = alreadyAppliedToSelected?.status === 'pending'
-
-  const applyMutation = useMutation({
-    mutationFn: () => aplicarCreditNoteAFactura(applyTarget!.id, {
-      invoiceId: applyInvoiceId,
-      amount: applyAmount || undefined,
-    }),
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
-      queryClient.invalidateQueries({ queryKey: ['invoice', result.id] })
-      queryClient.invalidateQueries({ queryKey: ['invoices'] })
-      toast.success('Aplicado a la factura correctamente')
-      navigate(`/facturas/${result.id}`)
-      closeApplyModal()
-    },
-    onError: (err: ApiError) => {
-      if (err?.statusCode === 400) {
-        toast.error('Selecciona una factura destino para aplicar la nota de crédito')
-        return
-      }
-      if (err?.statusCode === 409) {
-        toast.error(err.message)
-        queryClient.invalidateQueries({ queryKey: ['credit-note-saldo-favor', applyOriginalInvoice?.customer] })
-        return
-      }
-      toast.error(err?.message ?? 'Error al aplicar la nota de crédito')
-    },
-  })
-
-  const removeApplyMutation = useMutation({
-    mutationFn: () => removerCreditNoteAplicada(applyTarget!.id, applyInvoiceId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
-      queryClient.invalidateQueries({ queryKey: ['credit-note-saldo-favor', applyOriginalInvoice?.customer] })
-      queryClient.invalidateQueries({ queryKey: ['invoice', applyInvoiceId] })
-      toast.success('Aplicación deshecha — ya puedes volver a aplicar con un nuevo monto')
-    },
-    onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? 'Error al deshacer la aplicación — solo es posible mientras la factura siga en Borrador')
-    },
-  })
 
   function openApplyModal(note: CreditNoteRow) {
     setApplyTarget(note)
-    setApplyInvoiceId('')
-    setApplyInvoiceLabel('')
-    setApplyInvoiceQuery('')
-    setApplyAmount(Math.abs(note.grandTotal ?? 0))
   }
-
-  function closeApplyModal() {
-    setApplyTarget(null)
-    setApplyInvoiceId('')
-    setApplyInvoiceLabel('')
-    setApplyInvoiceQuery('')
-    setApplyAmount(0)
-  }
-
-  const applyAmountValid = applyAmount > 0
-  const canConfirmApply = applyAmountValid && !!applyInvoiceId && !alreadyAppliedToSelected
-
-  const aplicarIsDirty = useDirtyCheck({ applyInvoiceId, applyAmount }, !!applyTarget)
-  const aplicarClose = useConfirmClose(aplicarIsDirty, closeApplyModal)
-
-  function closeRefundModal() {
-    setRefundTarget(null)
-    setRefundAmount(0)
-    setRefundModeOfPayment('')
-    setRefundBankAccount('')
-  }
-
-  const refundAmountValid = refundAmount > 0 && refundAmount <= Math.abs(refundTarget?.grandTotal ?? 0)
-  const canConfirmRefund = refundAmountValid && !!refundModeOfPayment && (!refundRequiresBankAccount || !!refundBankAccount)
-
-  const reembolsoIsDirty = useDirtyCheck({ refundAmount, refundModeOfPayment, refundBankAccount }, !!refundTarget)
-  const reembolsoClose = useConfirmClose(reembolsoIsDirty, closeRefundModal)
 
   function updateNoteItem(index: number, patch: Partial<NoteLineItem>) {
     setNoteItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)))
@@ -754,12 +580,16 @@ export default function CreditNotesPage() {
                 const canAct = isSubmittedWithUsageInfo && (note.availableAmount ?? 0) > 0
                 return (
                 <Fragment key={note.id}>
-                <tr>
+                <tr
+                  onClick={() => navigate(`/notas-credito/${encodeURIComponent(note.id)}`)}
+                  style={{ cursor: 'pointer' }}
+                  title="Ver detalle"
+                >
                   <td>
                     {hasAppliedTo && (
                       <button
                         className="btn btn-ghost btn-size-icon-sm"
-                        onClick={() => setExpandedNoteId(isExpanded ? null : note.id)}
+                        onClick={(e) => { e.stopPropagation(); setExpandedNoteId(isExpanded ? null : note.id) }}
                         title="Ver facturas aplicadas"
                       >
                         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -794,13 +624,13 @@ export default function CreditNotesPage() {
                           <>
                             <button
                               className="btn btn-ghost btn-size-sm"
-                              onClick={() => openRefundModal(note)}
+                              onClick={(e) => { e.stopPropagation(); openRefundModal(note) }}
                             >
                               <Wallet size={13} /> Reembolsar
                             </button>
                             <button
                               className="btn btn-ghost btn-size-sm"
-                              onClick={() => openApplyModal(note)}
+                              onClick={(e) => { e.stopPropagation(); openApplyModal(note) }}
                             >
                               <ArrowRightLeft size={13} /> Aplicar a factura
                             </button>
@@ -814,7 +644,7 @@ export default function CreditNotesPage() {
                       <button
                         className="btn btn-ghost btn-size-icon-sm"
                         title="Descargar PDF"
-                        onClick={() => downloadPdfMutation.mutate(note.id)}
+                        onClick={(e) => { e.stopPropagation(); downloadPdfMutation.mutate(note.id) }}
                         disabled={downloadPdfMutation.isPending && downloadPdfMutation.variables === note.id}
                       >
                         <Download size={14} />
@@ -831,7 +661,7 @@ export default function CreditNotesPage() {
                           <div key={a.invoiceId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                             <button
                               style={{ fontFamily: 'var(--font-body)', fontSize: 12, color: 'var(--color-brand)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline' }}
-                              onClick={() => navigate(`/facturas/${a.invoiceId}`)}
+                              onClick={(e) => { e.stopPropagation(); navigate(`/facturas/${a.invoiceId}`) }}
                             >
                               {a.invoiceId}
                             </button>
@@ -1129,197 +959,12 @@ export default function CreditNotesPage() {
       />
 
       {refundTarget && (
-        <div className="modal-overlay" onClick={reembolsoClose.requestClose}>
-          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Wallet size={16} /> Reembolsar nota de crédito
-              </h2>
-              <button className="modal-close" onClick={reembolsoClose.requestClose}>×</button>
-            </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                {refundTarget.id} — Total disponible: {formatMoney(Math.abs(refundTarget.grandTotal ?? 0), refundTarget.currency)}
-              </p>
-              <div className="ff-wrap">
-                <label className="ff-label ff-required" htmlFor="refundAmount">Monto a reembolsar</label>
-                <input
-                  id="refundAmount"
-                  className={`ff-input${!refundAmountValid ? ' items-input-error' : ''}`}
-                  type="number"
-                  min="0.01"
-                  max={Math.abs(refundTarget.grandTotal ?? 0)}
-                  step="0.01"
-                  value={refundAmount || ''}
-                  onChange={(e) => setRefundAmount(parseFloat(e.target.value) || 0)}
-                />
-                {!refundAmountValid && (
-                  <p className="ff-hint" style={{ color: 'red' }}>El monto debe ser mayor a 0 y no exceder {formatMoney(Math.abs(refundTarget.grandTotal ?? 0), refundTarget.currency)}</p>
-                )}
-              </div>
-              <div className="ff-wrap">
-                <label className="ff-label ff-required" htmlFor="refundModeOfPayment">Método de pago</label>
-                <SearchSelect
-                  id="refundModeOfPayment"
-                  value={refundModeOfPayment}
-                  onChange={(val) => { setRefundModeOfPayment(val); setRefundBankAccount('') }}
-                  options={refundModeOfPaymentOptions}
-                  onSearch={setRefundModeOfPaymentSearch}
-                  selectedLabel={refundModeOfPayment}
-                  placeholder="Seleccionar…"
-                />
-              </div>
-
-              {refundMetodoSeleccionado?.requiresBankAccount && (
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="refundBankAccount">
-                    Cuenta Bancaria {refundRequiresBankAccount && <span className="ff-required">*</span>}
-                  </label>
-                  <SearchSelect
-                    id="refundBankAccount"
-                    value={refundBankAccount}
-                    onChange={setRefundBankAccount}
-                    options={refundBankAccountOptions}
-                    onSearch={setRefundBankAccountSearch}
-                    selectedLabel={refundCuentasBancarias?.items.find((c) => c.id === refundBankAccount)?.accountName ?? ''}
-                    placeholder={refundMetodoSeleccionado.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
-                    error={!!refundRequiresBankAccount && !refundBankAccount}
-                  />
-                </div>
-              )}
-            </div>
-            <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={reembolsoClose.requestClose}>Volver</button>
-              <button
-                className="btn btn-primary"
-                onClick={() => refundMutation.mutate()}
-                disabled={!canConfirmRefund || refundMutation.isPending}
-              >
-                {refundMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-                <Wallet size={14} /> Confirmar reembolso
-              </button>
-            </div>
-          </div>
-        </div>
+        <RefundCreditNoteModal note={refundTarget} onClose={() => setRefundTarget(null)} />
       )}
-
-      <ConfirmModal
-        open={reembolsoClose.confirming}
-        onClose={reembolsoClose.cancelDiscard}
-        onConfirm={reembolsoClose.confirmDiscard}
-        title="¿Descartar cambios?"
-        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
-        confirmLabel="Descartar cambios"
-        variant="danger"
-      />
 
       {applyTarget && (
-        <div className="modal-overlay" onClick={aplicarClose.requestClose}>
-          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h2 className="modal-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <ArrowRightLeft size={16} /> Aplicar nota de crédito
-              </h2>
-              <button className="modal-close" onClick={aplicarClose.requestClose}>×</button>
-            </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                {applyTarget.id} — Total de la nota: {formatMoney(Math.abs(applyTarget.grandTotal ?? 0), applyTarget.currency)}
-              </p>
-
-              <div className="ff-wrap">
-                <label className="ff-label ff-required">
-                  Factura destino
-                  <FieldTooltip>Se aplicará directamente a la factura seleccionada.</FieldTooltip>
-                </label>
-                <SearchSelect
-                  value={applyInvoiceId}
-                  selectedLabel={applyInvoiceLabel}
-                  onChange={(val, opt) => {
-                    setApplyInvoiceId(val)
-                    setApplyInvoiceLabel(opt?.label ?? '')
-                  }}
-                  options={applyInvoiceOptions}
-                  onSearch={setApplyInvoiceQuery}
-                  loading={applyInvoicesLoading}
-                  placeholder="Buscar factura del cliente…"
-                  error={!applyInvoiceId}
-                />
-                {!applyInvoiceId && (
-                  <p className="ff-hint" style={{ color: 'red' }}>Selecciona una factura destino</p>
-                )}
-              </div>
-
-              {alreadyAppliedToSelected ? (
-                <div className="inline-alert" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Wallet size={16} />
-                  <span>
-                    Esta nota ya está aplicada a esta factura por {formatMoney(alreadyAppliedToSelected.amount, applyTarget?.currency)}
-                    {' '}
-                    <span className={`badge ${alreadyAppliedToSelected.status === 'reconciled' ? 'badge-success' : 'badge-warning'}`}>
-                      {alreadyAppliedToSelected.status === 'reconciled' ? 'Reconciliada' : 'Pendiente'}
-                    </span>
-                    {alreadyAppliedToSelected.status === 'pending'
-                      ? '. Para cambiar el monto, deshaz la aplicación y vuelve a aplicarla.'
-                      : '. Ya fue reconciliada contra la factura sometida — no se puede deshacer.'}
-                  </span>
-                </div>
-              ) : (
-                <div className="ff-wrap">
-                  <label className="ff-label ff-required" htmlFor="applyAmount">
-                    Monto a aplicar
-                    <FieldTooltip>
-                      Prellenado con el total de la nota — si excede el saldo restante realmente disponible (ya sea porque hay reembolsos o conversiones previas), el sistema te lo indicará.
-                    </FieldTooltip>
-                  </label>
-                  <input
-                    id="applyAmount"
-                    className={`ff-input${!applyAmountValid ? ' items-input-error' : ''}`}
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={applyAmount || ''}
-                    onChange={(e) => setApplyAmount(parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-              )}
-            </div>
-            <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={aplicarClose.requestClose}>Cancelar</button>
-              {alreadyAppliedToSelected ? (
-                <button
-                  className="btn btn-danger"
-                  onClick={() => removeApplyMutation.mutate()}
-                  disabled={!canUndoApply || removeApplyMutation.isPending}
-                  title={canUndoApply ? undefined : 'Ya reconciliada — no se puede deshacer'}
-                >
-                  {removeApplyMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-                  Deshacer aplicación
-                </button>
-              ) : (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => applyMutation.mutate()}
-                  disabled={!canConfirmApply || applyMutation.isPending}
-                >
-                  {applyMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-                  Aplicar a factura
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <ApplyCreditNoteModal note={applyTarget} onClose={() => setApplyTarget(null)} />
       )}
-
-      <ConfirmModal
-        open={aplicarClose.confirming}
-        onClose={aplicarClose.cancelDiscard}
-        onConfirm={aplicarClose.confirmDiscard}
-        title="¿Descartar cambios?"
-        description="Tienes cambios sin guardar en este formulario. Si continúas, se perderán."
-        confirmLabel="Descartar cambios"
-        variant="danger"
-      />
     </div>
   )
 }

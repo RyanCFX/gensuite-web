@@ -11,11 +11,11 @@
 // ningún tenant real tiene todavía una cuenta de Vega conectada ni un certificado cargado. Crear
 // el Project en el panel de Vega y conseguir el .p12 firmado son pasos manuales fuera del sistema.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Check, ChevronDown, Eye, EyeOff, Info, Lock, ShieldCheck, Unlink } from 'lucide-react'
+import { Check, ChevronDown, Eye, EyeOff, Info, Loader2, Lock, ShieldCheck, Unlink } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { EcfTabs } from '@/shared/ui/EcfTabs'
@@ -24,9 +24,10 @@ import { ConfirmModal } from '@/shared/ui/Modal'
 import { getEcfConfig, getEmpresa } from '@/shared/api/config'
 import {
   connectEcfApiKey, createEcfClient, uploadEcfCertificate, registerEcfWebhook,
-  listEcfClients, linkEcfClient, unlinkEcfClient,
+  getEcfClientByRnc, linkEcfClient, unlinkEcfClient,
 } from '@/shared/api/ecf'
-import type { ApiError, EcfClient, EcfMode } from '@/shared/api/types'
+import type { ApiError, EcfClient, EcfClientByRncResult, EcfMode } from '@/shared/api/types'
+import { validateRNCDetailed, validateCedulaDetailed } from '@/lib/validators/dgii'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { formatDate } from '@/lib/formatters'
 
@@ -173,108 +174,236 @@ function ConnectApiKeyStep({ done, locked }: { done: boolean; locked: boolean })
 }
 
 // ─── Step 2 — Emisor (RNC) ────────────────────────────────────────────────────
+// Flujo: solo el input de RNC/cédula. Con 9 dígitos se valida el RNC y se consulta en
+// Vega (GET /clients/by-rnc/:rnc): si existe se vincula directo —sin elegir de una
+// lista—; si no existe se piden los demás datos para crearlo. Con 11 dígitos se valida
+// la cédula (persona física).
 
-function ClientCertBadge({ c }: { c: EcfClient }) {
-  return c.hasCertificate
-    ? <span className="badge badge-success">Certificado ✔</span>
-    : <span className="badge badge-neutral">Certificado ✖</span>
+const RNC_LOOKUP_DEBOUNCE_MS = 800
+const RNC_ERROR_DELAY_MS = 3000
+
+function onlyDigits(v: string): string {
+  return v.replace(/\D/g, '').slice(0, 11)
 }
 
-// Lista de emisores ya existentes en el proyecto Vega — permite vincular uno en vez de
-// chocar con el 409 de RNC duplicado al intentar crearlo de nuevo.
-function SelectExistingClient({
-  clients, company, companyRnc, onLinked, onSwitchToCreate,
+function VegaClientCard({ c }: { c: EcfClient }) {
+  return (
+    <div style={{ border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', padding: 12, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+      <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <strong style={{ fontFamily: 'var(--font-body)' }}>{c.rnc}</strong>
+        <span>{c.legalName}</span>
+        {c.activeEnv && <span className="badge badge-neutral">{c.activeEnv}</span>}
+      </span>
+      <span style={{ color: 'var(--text-tertiary)' }}>
+        Etapa de certificación: {c.certificationStage ?? '—'}
+      </span>
+      {c.hasCertificate ? (
+        <span className="badge badge-success" style={{ alignSelf: 'flex-start' }}>
+          Certificado ✔{c.certificateExpiresAt ? ` — vence el ${formatDate(String(c.certificateExpiresAt))}` : ''}
+        </span>
+      ) : (
+        <span className="badge badge-neutral" style={{ alignSelf: 'flex-start' }}>Sin certificado — lo subirás en el paso 3</span>
+      )}
+    </div>
+  )
+}
+
+function EmisorLookup({
+  company, companyRnc, onLookupChange,
 }: {
-  clients: EcfClient[]
   company: string
   companyRnc?: string | null
-  onLinked: () => void
-  onSwitchToCreate: () => void
+  onLookupChange?: (r: EcfClientByRncResult | null) => void
 }) {
   const qc = useQueryClient()
-  const selectable = clients.filter((c) => !c.linkedCompany)
-  const [selectedId, setSelectedId] = useState(
-    () => selectable.find((c) => c.rnc === companyRnc)?.id ?? selectable[0]?.id ?? '',
-  )
+  const [doc, setDoc] = useState(() => onlyDigits(companyRnc ?? ''))
+  const [touched, setTouched] = useState(false)
+  const [conflict, setConflict] = useState<{ id: string; rnc: string; legalName: string } | null>(null)
+  const [rncErrorVisible, setRncErrorVisible] = useState(false)
+  const [lookupArmed, setLookupArmed] = useState(false)
+
+  // Prellena con el RNC de la empresa si lo tiene configurado.
+  useEffect(() => {
+    if (!touched && companyRnc && !doc) setDoc(onlyDigits(companyRnc))
+  }, [companyRnc, touched, doc])
+
+  const digits = doc
+  const isNine = digits.length === 9
+  const isEleven = digits.length === 11
+  const rncValid = isNine ? validateRNCDetailed(digits).valid : false
+  const cedulaCheck = isEleven ? validateCedulaDetailed(digits) : null
+
+  // Un RNC de 9 dígitos inválido no muestra error de inmediato — podría ser una cédula
+  // en curso (11 dígitos). Solo se muestra si pasan 3s sin escribir más o si sale del campo.
+  useEffect(() => {
+    if (!(digits.length === 9 && !rncValid)) {
+      setRncErrorVisible(false)
+      return
+    }
+    const t = setTimeout(() => setRncErrorVisible(true), RNC_ERROR_DELAY_MS)
+    return () => clearTimeout(t)
+  }, [digits, rncValid])
+
+  // Espera un poco antes de consultar en Vega por si sigue escribiendo la cédula.
+  useEffect(() => {
+    setLookupArmed(false)
+    if (!(digits.length === 9 && rncValid)) return
+    const t = setTimeout(() => setLookupArmed(true), RNC_LOOKUP_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [digits, rncValid])
+
+  // El conflicto es del RNC anterior — se limpia al seguir escribiendo.
+  useEffect(() => {
+    setConflict(null)
+  }, [digits])
+
+  const lookupQuery = useQuery({
+    queryKey: ['ecf-client-by-rnc', digits],
+    queryFn: () => getEcfClientByRnc(digits),
+    enabled: lookupArmed && digits.length === 9 && rncValid,
+    staleTime: 60_000,
+  })
+  const lookup = lookupArmed && digits.length === 9 && rncValid ? lookupQuery.data ?? null : null
+
+  useEffect(() => {
+    onLookupChange?.(lookup)
+  }, [lookup, onLookupChange])
 
   const linkMutation = useMutation({
     mutationFn: (vegaClientId: string) => linkEcfClient({ company: company.trim(), vegaClientId }),
     onSuccess: () => {
       toast.success('Emisor vinculado a la compañía')
       qc.invalidateQueries({ queryKey: ['ecf-config'] })
-      onLinked()
     },
     onError: handleMutationError,
   })
 
+  const lookupError = lookupQuery.error as ApiError | null
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <p className="ff-hint" style={{ margin: 0 }}>
-        Este RNC ya existe en el proyecto Vega. Selecciona el emisor que corresponde a <strong>{company}</strong>{' '}
-        para vincularlo, en vez de crear uno nuevo.
-      </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {clients.map((c) => {
-          const disabled = !!c.linkedCompany
-          return (
-            <label
-              key={c.id}
-              className="ff-check-wrap"
-              style={{
-                alignItems: 'flex-start', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)',
-                padding: 10, opacity: disabled ? 0.55 : 1, cursor: disabled ? 'default' : 'pointer',
-              }}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {!company && (
+        <div className="inline-alert inline-alert-warn">
+          <Info size={15} style={{ flexShrink: 0 }} />
+          <span>No hay una empresa configurada para e-CF. Configúrala antes de crear o vincular el emisor.</span>
+        </div>
+      )}
+      <div className="ff-wrap">
+        <label className="ff-label" htmlFor="ecf-emisor-doc">
+          RNC o cédula del emisor <span className="ff-required">*</span>
+        </label>
+        <input
+          id="ecf-emisor-doc"
+          className={`ff-input${(rncErrorVisible || (cedulaCheck && !cedulaCheck.valid)) ? ' ff-input-error' : ''}`}
+          value={doc}
+          inputMode="numeric"
+          maxLength={11}
+          placeholder="101012345 (RNC) u 00112345678 (cédula)"
+          onChange={(e) => { setTouched(true); setDoc(onlyDigits(e.target.value)) }}
+          onBlur={() => { if (digits.length === 9 && !rncValid) setRncErrorVisible(true) }}
+        />
+        {rncErrorVisible ? (
+          <p className="ff-hint" style={{ color: 'var(--color-error)' }}>
+            {validateRNCDetailed(digits).reason ?? 'RNC no válido.'} Si es persona física, continúa con los 11 dígitos de la cédula.
+          </p>
+        ) : cedulaCheck && !cedulaCheck.valid ? (
+          <p className="ff-hint" style={{ color: 'var(--color-error)' }}>Cédula no válida: {cedulaCheck.reason}</p>
+        ) : (
+          <p className="ff-hint">9 dígitos = RNC · 11 dígitos = cédula (persona física).</p>
+        )}
+      </div>
+
+      {isNine && rncValid && lookupQuery.isLoading && (
+        <p className="ff-hint" style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
+          <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Consultando en Vega…
+        </p>
+      )}
+
+      {isNine && rncValid && lookup?.exists && lookup.client && (
+        <>
+          <VegaClientCard c={lookup.client} />
+          <div>
+            <button
+              className="btn btn-primary btn-size-sm"
+              onClick={() => linkMutation.mutate(lookup.client!.id)}
+              disabled={!company.trim() || linkMutation.isPending}
             >
-              <input
-                type="radio"
-                name="ecf-client-select"
-                className="ff-check"
-                checked={selectedId === c.id}
-                disabled={disabled}
-                onChange={() => setSelectedId(c.id)}
-                style={{ marginTop: 3 }}
-              />
-              <span style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
-                <span style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <strong>{c.rnc}</strong>
-                  <span>{c.legalName}</span>
-                  {c.activeEnv && <span className="badge badge-neutral">{c.activeEnv}</span>}
-                  <ClientCertBadge c={c} />
-                </span>
-                <span style={{ color: 'var(--text-tertiary)' }}>
-                  Etapa de certificación: {c.certificationStage ?? '—'}
-                  {disabled && <> · Ya vinculado a <strong>{c.linkedCompany}</strong></>}
-                </span>
-              </span>
-            </label>
-          )
-        })}
-      </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button
-          className="btn btn-primary btn-size-sm"
-          onClick={() => linkMutation.mutate(selectedId)}
-          disabled={!selectedId || linkMutation.isPending}
-        >
-          {linkMutation.isPending ? 'Vinculando…' : 'Vincular emisor seleccionado'}
-        </button>
-        <button className="btn btn-ghost btn-size-sm" onClick={onSwitchToCreate} disabled={linkMutation.isPending}>
-          Crear un emisor nuevo en su lugar
-        </button>
-      </div>
+              {linkMutation.isPending ? 'Vinculando…' : 'Vincular este emisor'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {isNine && rncValid && lookup && !lookup.exists && (
+        <>
+          <div className="inline-alert inline-alert-info" style={{ alignItems: 'flex-start' }}>
+            <Info size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <span>Aún no tienes cliente en Vega, créalo.</span>
+          </div>
+          {conflict ? (
+            <ConflictLinkPrompt
+              conflict={conflict}
+              company={company}
+              onLinked={() => { setConflict(null); qc.invalidateQueries({ queryKey: ['ecf-config'] }) }}
+              onDismiss={() => setConflict(null)}
+            />
+          ) : (
+            <CreateClientForm company={company} rnc={digits} onConflict={setConflict} />
+          )}
+        </>
+      )}
+
+      {isNine && rncValid && lookupError && (
+        <>
+          <div className="inline-alert inline-alert-warn" style={{ alignItems: 'flex-start' }}>
+            <Info size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <span>No se pudo consultar en Vega ({lookupError.message ?? 'error de conexión'}). Puedes completar los datos para crearlo de todos modos.</span>
+          </div>
+          {conflict ? (
+            <ConflictLinkPrompt
+              conflict={conflict}
+              company={company}
+              onLinked={() => { setConflict(null); qc.invalidateQueries({ queryKey: ['ecf-config'] }) }}
+              onDismiss={() => setConflict(null)}
+            />
+          ) : (
+            <CreateClientForm company={company} rnc={digits} onConflict={setConflict} />
+          )}
+        </>
+      )}
+
+      {isEleven && cedulaCheck?.valid && (
+        <>
+          <p className="ff-hint" style={{ margin: 0 }}>
+            Persona física — completa los datos para crear el emisor con esta cédula.
+          </p>
+          {conflict ? (
+            <ConflictLinkPrompt
+              conflict={conflict}
+              company={company}
+              onLinked={() => { setConflict(null); qc.invalidateQueries({ queryKey: ['ecf-config'] }) }}
+              onDismiss={() => setConflict(null)}
+            />
+          ) : (
+            <CreateClientForm company={company} rnc={digits} onConflict={setConflict} />
+          )}
+        </>
+      )}
     </div>
   )
 }
 
 function CreateClientForm({
-  company, onConflict,
+  company, rnc, onConflict,
 }: {
   company: string
+  /** RNC/cédula ya validado en el paso — viene del input de arriba, no se edita aquí. */
+  rnc: string
   onConflict: (info: { id: string; rnc: string; legalName: string }) => void
 }) {
   const qc = useQueryClient()
   const [form, setForm] = useState({
-    rnc: '', legalName: '', tradeName: '', address: '',
+    legalName: '', tradeName: '', address: '',
     municipality: '', province: '', email: '', economicActivity: '',
   })
   const [phones, setPhones] = useState<string[]>([''])
@@ -285,7 +414,7 @@ function CreateClientForm({
   const mutation = useMutation({
     mutationFn: () => createEcfClient({
       company: company.trim(),
-      rnc: form.rnc.trim(),
+      rnc,
       legalName: form.legalName.trim(),
       tradeName: form.tradeName.trim() || undefined,
       address: form.address.trim(),
@@ -303,7 +432,7 @@ function CreateClientForm({
       if (err?.statusCode === 409) {
         const existingClientId = err.details?.existingClientId as string | undefined
         if (existingClientId) {
-          onConflict({ id: existingClientId, rnc: form.rnc.trim(), legalName: form.legalName.trim() })
+          onConflict({ id: existingClientId, rnc, legalName: form.legalName.trim() })
           return
         }
         toast.error(err?.message ?? 'Ya existe un emisor conectado para esta compañía.')
@@ -314,40 +443,32 @@ function CreateClientForm({
     },
   })
 
-  const canSubmit = company.trim() && form.rnc.trim() && form.legalName.trim() && form.address.trim()
+  const canSubmit = company.trim() && rnc && form.legalName.trim() && form.address.trim()
 
   return (
     <>
-      {company
-        ? (
-            <p className="ff-hint" style={{ margin: 0 }}>
-              El emisor se registra para la empresa <strong>{company}</strong>.
-            </p>
-          )
-        : (
-            <div className="inline-alert inline-alert-warn">
-              <Info size={15} style={{ flexShrink: 0 }} />
-              <span>No hay una empresa configurada para e-CF. Configúrala antes de crear el emisor.</span>
-            </div>
-          )}
+      <p className="ff-hint" style={{ margin: 0 }}>
+        El emisor se registra para la empresa <strong>{company || '—'}</strong> con RNC/cédula{' '}
+        <strong style={{ fontFamily: 'var(--font-body)' }}>{rnc}</strong>.
+      </p>
       <div className="form-row">
-        <div className="ff-wrap">
-          <label className="ff-label">RNC <span className="ff-required">*</span></label>
-          <input className="ff-input" value={form.rnc} onChange={set('rnc')} placeholder="101012345" />
-        </div>
         <div className="ff-wrap">
           <label className="ff-label">Razón social <span className="ff-required">*</span></label>
           <input className="ff-input" value={form.legalName} onChange={set('legalName')} />
         </div>
-      </div>
-      <div className="form-row">
         <div className="ff-wrap">
           <label className="ff-label">Nombre comercial</label>
           <input className="ff-input" value={form.tradeName} onChange={set('tradeName')} />
         </div>
+      </div>
+      <div className="form-row">
         <div className="ff-wrap">
           <label className="ff-label">Correo</label>
           <input className="ff-input" value={form.email} onChange={set('email')} />
+        </div>
+        <div className="ff-wrap">
+          <label className="ff-label">Actividad económica</label>
+          <input className="ff-input" value={form.economicActivity} onChange={set('economicActivity')} />
         </div>
       </div>
       <div className="ff-wrap">
@@ -363,10 +484,6 @@ function CreateClientForm({
           <label className="ff-label">Provincia</label>
           <input className="ff-input" value={form.province} onChange={set('province')} />
         </div>
-      </div>
-      <div className="ff-wrap">
-        <label className="ff-label">Actividad económica</label>
-        <input className="ff-input" value={form.economicActivity} onChange={set('economicActivity')} />
       </div>
       <div className="ff-wrap">
         <label className="ff-label">Teléfonos <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>(máx. 3)</span></label>
@@ -494,32 +611,18 @@ function UnlinkClientButton({ company, rnc }: { company: string; rnc: string }) 
 }
 
 function CreateClientStep({
-  done, locked, defaultCompany, companyRnc, existing,
+  done, locked, defaultCompany, companyRnc, existing, onLookupChange,
 }: {
   done: boolean
   locked: boolean
   defaultCompany: string
   companyRnc?: string | null
   existing?: { company: string; rnc: string; certificateExpiresAt?: string | null; certificationStage?: string | null }
+  onLookupChange?: (r: EcfClientByRncResult | null) => void
 }) {
-  const qc = useQueryClient()
   // La Company de ERPNext viene de GET /config/ecf y debe coincidir EXACTAMENTE — se envía
   // automáticamente, el usuario no la edita.
   const company = defaultCompany
-  // null = sin elección manual del usuario todavía → se deriva de la lista de emisores.
-  const [viewOverride, setViewOverride] = useState<'select' | 'create' | null>(null)
-  const [conflict, setConflict] = useState<{ id: string; rnc: string; legalName: string } | null>(null)
-
-  const clientsQuery = useQuery({
-    queryKey: ['ecf-clients'],
-    queryFn: () => listEcfClients(),
-    enabled: !done && !locked,
-  })
-  const clients = clientsQuery.data?.clients ?? []
-  const selectable = clients.filter((c) => !c.linkedCompany)
-  // Por defecto, si algún emisor libre existe en el proyecto se propone vincularlo en vez de
-  // arrancar el formulario de crear — la elección manual del usuario (viewOverride) siempre gana.
-  const view = viewOverride ?? (selectable.length > 0 ? 'select' : 'create')
 
   if (done && existing) {
     return (
@@ -542,37 +645,9 @@ function CreateClientStep({
   return (
     <StepCard
       n={2} title="Crear el emisor (RNC)" done={done} locked={locked}
-      hint="Crea el «Client» en Vega — el RNC bajo el cual se emiten los comprobantes — o vincula uno que ya exista en el proyecto."
+      hint="Escribe el RNC del emisor — se valida y se consulta en Vega. Si ya existe allá, lo vinculas directo; si no, completas sus datos para crearlo."
     >
-      {clientsQuery.isLoading ? (
-        <span className="skeleton-box" style={{ height: 80, display: 'block' }} />
-      ) : selectable.length > 0 && view === 'select' ? (
-        <SelectExistingClient
-          clients={clients}
-          company={company}
-          companyRnc={companyRnc}
-          onLinked={() => qc.invalidateQueries({ queryKey: ['ecf-clients'] })}
-          onSwitchToCreate={() => setViewOverride('create')}
-        />
-      ) : (
-        <>
-          {selectable.length > 0 && (
-            <button type="button" className="btn btn-ghost btn-size-xs" onClick={() => setViewOverride('select')} style={{ alignSelf: 'flex-start' }}>
-              ← Seleccionar un emisor existente en su lugar
-            </button>
-          )}
-          {conflict ? (
-            <ConflictLinkPrompt
-              conflict={conflict}
-              company={company}
-              onLinked={() => { setConflict(null); qc.invalidateQueries({ queryKey: ['ecf-clients'] }) }}
-              onDismiss={() => setConflict(null)}
-            />
-          ) : (
-            <CreateClientForm company={company} onConflict={setConflict} />
-          )}
-        </>
-      )}
+      <EmisorLookup company={company} companyRnc={companyRnc} onLookupChange={onLookupChange} />
     </StepCard>
   )
 }
@@ -580,11 +655,19 @@ function CreateClientStep({
 // ─── Step 3 — Certificado ─────────────────────────────────────────────────────
 
 function CertificateStep({
-  done, locked, company, expiresAt,
-}: { done: boolean; locked: boolean; company?: string; expiresAt?: string | null }) {
+  done, locked, company, expiresAt, vegaSourced,
+}: {
+  done: boolean
+  locked: boolean
+  company?: string
+  expiresAt?: string | null
+  /** El certificado se conoce por el by-rnc de Vega (aún no reflejado en el provisioning). */
+  vegaSourced?: boolean
+}) {
   const qc = useQueryClient()
   const [file, setFile] = useState<File | null>(null)
   const [password, setPassword] = useState('')
+  const [replaceOpen, setReplaceOpen] = useState(false)
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -595,38 +678,65 @@ function CertificateStep({
       toast.success(`Certificado cargado — vence el ${formatDate(res.certificateExpiresAt)}`)
       setFile(null)
       setPassword('')
+      setReplaceOpen(false)
       qc.invalidateQueries({ queryKey: ['ecf-config'] })
     },
     onError: handleMutationError,
   })
 
+  // Si Vega ya trae el certificado (by-rnc) o ya está cargado, solo se muestra la info —
+  // no se pide subirlo. Reemplazar sigue disponible bajo demanda.
+  const hasCert = done || vegaSourced
+  const showForm = !hasCert || replaceOpen
+
   return (
     <StepCard
       n={3} title="Subir el certificado de firma" done={done} locked={locked}
-      hint="Certificado PKCS#12 (.p12 / .pfx) firmado, obtenido en el panel de Vega. Se convierte a base64 en el navegador antes de enviarse."
+      hint={showForm ? 'Certificado PKCS#12 (.p12 / .pfx) firmado, obtenido en el panel de Vega. Se convierte a base64 en el navegador antes de enviarse.' : undefined}
     >
-      {done && expiresAt && (
-        <div className={`inline-alert ${expiresSoon(expiresAt) ? 'inline-alert-warn' : 'inline-alert-info'}`}>
+      {hasCert && (
+        <div className={`inline-alert ${expiresAt && expiresSoon(expiresAt) ? 'inline-alert-warn' : 'inline-alert-info'}`}>
           <Info size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
           <span>
-            Certificado vigente — vence el <strong>{formatDate(expiresAt)}</strong>.
-            {expiresSoon(expiresAt) && ' Falta poco para vencer; renuévalo pronto.'}
+            {expiresAt ? (
+              <>
+                Certificado vigente — vence el <strong>{formatDate(expiresAt)}</strong>.
+                {expiresSoon(expiresAt) && ' Falta poco para vencer; renuévalo pronto.'}
+              </>
+            ) : (
+              'Vega ya tiene un certificado para este emisor — no necesitas subirlo.'
+            )}
           </span>
         </div>
       )}
-      <div className="ff-wrap">
-        <label className="ff-label">Archivo del certificado</label>
-        <input type="file" accept=".p12,.pfx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-      </div>
-      <div className="ff-wrap">
-        <label className="ff-label">Contraseña del certificado</label>
-        <input className="ff-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="off" />
-      </div>
-      <div>
-        <button className="btn btn-primary btn-size-sm" onClick={() => mutation.mutate()} disabled={!file || !password || mutation.isPending}>
-          {mutation.isPending ? 'Subiendo…' : done ? 'Reemplazar certificado' : 'Subir certificado'}
-        </button>
-      </div>
+      {showForm ? (
+        <>
+          <div className="ff-wrap">
+            <label className="ff-label">Archivo del certificado</label>
+            <input type="file" accept=".p12,.pfx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label">Contraseña del certificado</label>
+            <input className="ff-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="off" />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary btn-size-sm" onClick={() => mutation.mutate()} disabled={!file || !password || mutation.isPending}>
+              {mutation.isPending ? 'Subiendo…' : done ? 'Reemplazar certificado' : 'Subir certificado'}
+            </button>
+            {hasCert && (
+              <button className="btn btn-ghost btn-size-sm" onClick={() => { setReplaceOpen(false); setFile(null); setPassword('') }}>
+                Cancelar
+              </button>
+            )}
+          </div>
+        </>
+      ) : (
+        <div>
+          <button className="btn btn-ghost btn-size-sm" onClick={() => setReplaceOpen(true)}>
+            Subir un certificado diferente
+          </button>
+        </div>
+      )}
     </StepCard>
   )
 }
@@ -670,6 +780,9 @@ export default function EcfAdminPage() {
   const isSystemManager = useIsSystemManager()
   const { data, isLoading } = useQuery({ queryKey: ['ecf-config'], queryFn: getEcfConfig })
   const { data: empresa } = useQuery({ queryKey: ['empresa'], queryFn: getEmpresa, enabled: isSystemManager })
+  // Resultado del by-rnc del paso 2 — para no pedir el certificado en el paso 3 si Vega ya
+  // lo tiene. Solo vale mientras el paso 2 no esté completado (después manda el provisioning).
+  const [vegaLookup, setVegaLookup] = useState<EcfClientByRncResult | null>(null)
 
   if (!isSystemManager) {
     return (
@@ -690,7 +803,8 @@ export default function EcfAdminPage() {
 
   const step1Done = !!(prov?.hasApiKeyTest || prov?.hasApiKeyLive)
   const step2Done = (prov?.clientes?.length ?? 0) > 0
-  const step3Done = !!cliente?.certificateExpiresAt
+  const lookupCert = !step2Done ? vegaLookup?.client : undefined
+  const step3Done = !!cliente?.certificateExpiresAt || !!lookupCert?.hasCertificate
   const activeMode: EcfMode | null = prov?.activeMode ?? null
 
   return (
@@ -709,15 +823,6 @@ export default function EcfAdminPage() {
       <EcfTabs />
 
       <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="inline-alert inline-alert-info" style={{ alignItems: 'flex-start' }}>
-          <Info size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
-          <span>
-            Pantalla de <strong>setup único</strong>, más técnica que la configuración general. Requiere que el
-            operador ya tenga el RNC certificado y el archivo <code>.p12</code> firmado (proceso que se hace en el
-            panel de Vega, no aquí). <strong>Las pruebas end-to-end siguen pendientes</strong>: ninguna empresa real
-            tiene todavía una cuenta de Vega conectada.
-          </span>
-        </div>
 
         {isLoading ? (
           <span className="skeleton-box" style={{ height: 320, display: 'block' }} />
@@ -730,12 +835,14 @@ export default function EcfAdminPage() {
               defaultCompany={data?.company ?? ''}
               companyRnc={empresa?.rnc}
               existing={cliente}
+              onLookupChange={setVegaLookup}
             />
             <CertificateStep
               done={step3Done}
               locked={!step2Done}
               company={data?.company ?? undefined}
-              expiresAt={cliente?.certificateExpiresAt}
+              expiresAt={cliente?.certificateExpiresAt ?? lookupCert?.certificateExpiresAt ?? null}
+              vegaSourced={!cliente?.certificateExpiresAt && !!lookupCert?.hasCertificate}
             />
             <WebhookStep locked={!step3Done} activeMode={activeMode} />
 

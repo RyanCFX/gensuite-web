@@ -9,7 +9,7 @@ import { client } from '@/shared/api/client'
 import type { Invoice, EstadoCuentaResponse } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useFeature } from '@/shared/features/can'
-import { Pencil, Ban, Building2, User, ArrowLeft, Wallet, Receipt, X, FileText, Download, Eye, EyeOff, Plus, Minus, ChevronDown, ChevronRight } from 'lucide-react'
+import { Pencil, Ban, Building2, User, ArrowLeft, Wallet, Receipt, X, FileText, Download, Eye, EyeOff, ChevronDown, ChevronRight } from 'lucide-react'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 const CREDIT_NOTES_COLUMNS = [
@@ -61,16 +61,12 @@ function SemaforoIndicator({ customerId }: { customerId: string }) {
   }
 
   return (
-    <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-body">
-        <div className={`semaforo ${statusClass[entry.semaforo] ?? ''}`} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span className="semaforo-dot" />
-          <span style={{ fontWeight: 500 }}>{labelMap[entry.semaforo] ?? entry.semaforo}</span>
-          <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
-            ({(entry.pctUsado ?? 0).toFixed(1)}% utilizado — {formatDOP(entry.balance)} de {formatDOP(entry.creditLimit)})
-          </span>
-        </div>
-      </div>
+    <div className={`semaforo ${statusClass[entry.semaforo] ?? ''}`} style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '0 18px' }}>
+      <span className="semaforo-dot" />
+      <span style={{ fontWeight: 500 }}>{labelMap[entry.semaforo] ?? entry.semaforo}</span>
+      <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+        ({(entry.pctUsado ?? 0).toFixed(1)}% utilizado — {formatDOP(entry.balance)} de {formatDOP(entry.creditLimit)})
+      </span>
     </div>
   )
 }
@@ -119,26 +115,48 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
   })
 
   const { widths: colWidths, startResize } = useResizableColumns(CREDIT_NOTES_COLUMNS)
+  const [open, setOpen] = useState(true)
 
   if (!saldo || saldo.entries.length === 0) return null
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-header navy-card-header">
-        <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Receipt size={16} /> Notas de Crédito
-        </h2>
+      <div
+        className="card-header navy-card-header"
+        style={{ cursor: 'pointer' }}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Receipt size={16} /> Notas de Crédito
+          </h2>
+          <button
+            type="button"
+            className="btn btn-ghost btn-size-icon-sm"
+            style={{ color: 'var(--on-dark-ink)' }}
+            aria-expanded={open}
+            aria-label={open ? 'Ocultar notas de crédito' : 'Mostrar notas de crédito'}
+            onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
+          >
+            {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+          </button>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {saldo.balance > 0 && (
-            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+            <span style={{ fontSize: 12, color: 'var(--on-dark-ink)' }}>
               Disponible: {formatDOP(saldo.balance)}
             </span>
           )}
-          <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/notas-credito?customer=${customerId}`)}>
+          <button
+            className="btn btn-ghost btn-size-sm"
+            style={{ color: 'var(--on-dark-ink)' }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/notas-credito?customer=${customerId}`) }}
+          >
             Ver todas
           </button>
         </div>
       </div>
+      {open && (<>
       <div className="table-scroll">
         <table className="data-table navy-table items-table-resizable">
           <colgroup>
@@ -222,6 +240,7 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
           </tbody>
         </table>
       </div>
+      </>)}
     </div>
   )
 }
@@ -255,8 +274,9 @@ function RecentInvoices({ customerId }: { customerId: string }) {
   }
 
   const statusBadge = (status: string) => {
-    if (status === 'Submitted') return <span className="badge badge-success">Sometido</span>
-    if (status === 'Cancelled') return <span className="badge badge-error">Cancelado</span>
+    const st = (status ?? '').toLowerCase()
+    if (st === 'submitted') return <span className="badge badge-success">Sometido</span>
+    if (st === 'cancelled') return <span className="badge badge-error">Cancelado</span>
     return <span className="badge badge-draft">Borrador</span>
   }
 
@@ -318,10 +338,13 @@ function EstadoCuentaPreview({
   isLoading: boolean
 }) {
   const [showPreview, setShowPreview] = useState(true)
+  const [cuentaOpen, setCuentaOpen] = useState(true)
   const { widths: docsColWidths, startResize: startDocsResize } = useResizableColumns(DOCUMENTOS_PENDIENTES_COLUMNS)
   // El backend puede devolver `aging` en forma no-arreglo para algunos clientes — normalizar
   // para no romper el render (la sección se oculta si no hay buckets válidos).
   const agingBuckets = Array.isArray(data?.aging) ? data.aging : []
+  // El total del backend puede venir desactualizado — el real es la suma de los saldos visibles.
+  const totalSaldos = (data?.documentos ?? []).reduce((acc, d) => acc + (d.saldo ?? 0), 0)
   const agingColumns = agingBuckets.map((bucket) => ({ key: `bucket-${bucket.label}`, width: 100 }))
   const { widths: agingColWidths, startResize: startAgingResize } = useResizableColumns([
     ...agingColumns,
@@ -333,11 +356,27 @@ function EstadoCuentaPreview({
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-header navy-card-header">
-        <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <FileText size={16} /> Estado de Cuenta
-        </h2>
-        <div style={{ display: 'flex', gap: 8 }}>
+      <div
+        className="card-header navy-card-header"
+        style={{ cursor: 'pointer' }}
+        onClick={() => setCuentaOpen((o) => !o)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <FileText size={16} /> Estado de Cuenta
+          </h2>
+          <button
+            type="button"
+            className="btn btn-ghost btn-size-icon-sm"
+            style={{ color: 'var(--on-dark-ink)' }}
+            aria-expanded={cuentaOpen}
+            aria-label={cuentaOpen ? 'Ocultar estado de cuenta' : 'Mostrar estado de cuenta'}
+            onClick={(e) => { e.stopPropagation(); setCuentaOpen((o) => !o) }}
+          >
+            {cuentaOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }} onClick={(e) => e.stopPropagation()}>
           <button
             className="btn btn-ghost btn-size-sm"
             style={{ color: 'var(--on-dark-ink)' }}
@@ -357,6 +396,8 @@ function EstadoCuentaPreview({
         </div>
       </div>
 
+      {cuentaOpen && (
+      <>
       {isLoading && (
         <div className="card-body">
           <div className="skeleton-box" style={{ height: 200, width: '100%' }} />
@@ -461,7 +502,7 @@ function EstadoCuentaPreview({
                     <tfoot>
                       <tr>
                         <td colSpan={7} style={{ textAlign: 'right', fontWeight: 700 }}>Total Pendiente</td>
-                        <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--error-text)' }}>{formatDOP(data.totalPendiente)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--error-text)' }}>{formatDOP(totalSaldos)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -501,7 +542,7 @@ function EstadoCuentaPreview({
                       {agingBuckets.map((bucket, i) => (
                         <td key={i} style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(bucket.total)}</td>
                       ))}
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatDOP(data.totalPendiente)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatDOP(totalSaldos)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -527,6 +568,8 @@ function EstadoCuentaPreview({
             <p className="empty-sub">No se pudo obtener la información del servidor.</p>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   )
@@ -630,18 +673,6 @@ export default function CustomerDetail() {
         </div>
       </div>
 
-      {customer.hasCredit && id && tieneCxC && <SemaforoIndicator customerId={id} />}
-      {id && tieneCxC && <SaldoFavorIndicator customerId={id} />}
-      {id && tieneNotasCredito && <CreditNotesIndicator customerId={id} />}
-
-      {id && tieneCxC && showEstadoCuenta && (
-        <EstadoCuentaPreview
-          customerId={id}
-          customerName={customer.customerName}
-          data={estadoCuenta}
-          isLoading={isEstadoCuentaLoading}
-        />
-      )}
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header navy-card-header">
@@ -755,8 +786,23 @@ export default function CustomerDetail() {
               <span className="detail-value">{formatDate(customer.modifiedAt)}</span>
             </div>
           </div>
+          {customer.hasCredit && id && tieneCxC && <SemaforoIndicator customerId={id} />}
         </div>
       </div>
+
+      {id && tieneCxC && showEstadoCuenta && (
+        <EstadoCuentaPreview
+          customerId={id}
+          customerName={customer.customerName}
+          data={estadoCuenta}
+          isLoading={isEstadoCuentaLoading}
+        />
+      )}
+
+      {id && tieneCxC && <SaldoFavorIndicator customerId={id} />}
+      {id && tieneNotasCredito && <CreditNotesIndicator customerId={id} />}
+
+
 
       <div className="card">
         <div
