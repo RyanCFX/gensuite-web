@@ -9,6 +9,7 @@ import type {
 } from './types'
 
 export interface ListCustomersParams extends PaginationParams {
+  search?: string
   disabled?: boolean
   customerName?: string
   customerType?: 'Company' | 'Individual'

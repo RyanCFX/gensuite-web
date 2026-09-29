@@ -538,7 +538,7 @@ export default function QuotationDetail() {
           </table>
           <div className="items-total-row navy-totals">
             <div className="items-total-line" style={{ fontSize: 14, justifyContent: 'flex-end', gap: 24 }}>
-              <span style={{ textAlign: 'right' }}>Subtotal bruto</span>
+              <span style={{ textAlign: 'right' }}>Subtotal</span>
               <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(grossTotal, quotation.currency)}</span>
             </div>
             <div className="items-total-line" style={{ fontSize: 14, justifyContent: 'flex-end', gap: 24 }}>

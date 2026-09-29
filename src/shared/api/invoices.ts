@@ -18,6 +18,7 @@ import type {
 } from './types'
 
 export interface ListInvoicesParams extends PaginationParams {
+  search?: string
   customer?: string
   status?: 'draft' | 'submitted' | 'cancelled' | 'all'
   fromDate?: string

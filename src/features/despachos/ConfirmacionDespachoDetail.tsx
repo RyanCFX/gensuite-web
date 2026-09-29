@@ -131,10 +131,13 @@ export default function ConfirmacionDespachoDetail() {
 
   return (
     <div className="page-container">
+      <Link to="/despachos/confirmaciones" className="page-back-link">
+        <ArrowLeft size={14} /> Despachos
+      </Link>
       <PageHeader
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Link to="/despachos/confirmaciones" className="page-back-link"><ArrowLeft size={14} /></Link>
+            <span className="page-title-dot" />
             Confirmación de despacho — {solicitud.salesOrder}
             <span className={`badge ${STATUS_BADGE[solicitud.status]}`}>{solicitud.status}</span>
           </div>

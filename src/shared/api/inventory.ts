@@ -25,6 +25,7 @@ import type {
 } from './types'
 
 export interface InventoryFilterParams extends PaginationParams {
+  search?: string
   warehouse?: string
   branch?: string
   category?: string

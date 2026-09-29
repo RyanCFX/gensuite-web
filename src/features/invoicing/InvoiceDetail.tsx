@@ -7,6 +7,7 @@ import {
   igualarConEnmiendaTransaccion,
 } from "@/shared/api/relaciones";
 import { useRelacionComercialPorContraparte } from "@/shared/hooks/useRelacionComercialPorContraparte";
+import { useFeature } from "@/shared/features/can";
 import { Badge } from "@/shared/ui/Badge";
 import { FieldTooltip } from "@/shared/ui/FieldTooltip";
 import { Modal } from "@/shared/ui/Modal";
@@ -37,12 +38,13 @@ import { getItem } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
 import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
 import { crearDespachoDesdeFactura, listDespachos } from "@/shared/api/despachos";
-import { ECF_SUBMIT_UNAVAILABLE_MSG } from "@/shared/api/ecf";
+import { ECF_SUBMIT_UNAVAILABLE_MSG, getEcfTipos } from "@/shared/api/ecf";
+import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from "@/lib/dgii";
 import { esClienteEmisorNoEncontrado } from "@/lib/ecfErrors";
 import { formatStockInsufficientMessage } from "@/lib/stockAlerts";
 import { usePosTicketPrinter } from "@/shared/hooks/usePosTicketPrinter";
 import { useIsSystemManager } from "@/shared/hooks/useIsSystemManager";
-import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion, MonedaPdfImpresion, EcfSubmitResult } from "@/shared/api/types";
+import type { ApiError, SubmitInvoiceDto, ComponentTracking, FormatoImpresion, MonedaPdfImpresion, EcfSubmitResult, EcfModificationCode } from "@/shared/api/types";
 import { esCoberturaCompleta } from "@/shared/api/types";
 import { usePuede } from "@/shared/permissions/can";
 import { CoberturaArsResumen } from "./AseguradoraPanel";
@@ -90,6 +92,7 @@ import {
   ChevronRight,
   Plus,
   Minus,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -181,6 +184,7 @@ export default function InvoiceDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isSystemManager = useIsSystemManager();
+  const tieneContabilidad = useFeature('contabilidad');
 
   // Bloque opcional (u obligatorio si el cliente no tiene crédito) de "¿Cómo se cobra?"
   // al someter — ver escenarios en handleSubmitClick. La forma del bloque depende de
@@ -251,6 +255,9 @@ export default function InvoiceDetail() {
   >("credit_note_only");
   const [returnModeOfPayment, setReturnModeOfPayment] = useState("");
   const [returnReason, setReturnReason] = useState("");
+  const [modificationCode, setModificationCode] = useState<EcfModificationCode | "">("");
+  const [modificationCodeError, setModificationCodeError] = useState("");
+  const modificationCodeTouched = useRef(false);
 
   const [turnoModalOpen, setTurnoModalOpen] = useState(false);
   const [turnoOpeningAmount, setTurnoOpeningAmount] = useState(0);
@@ -1725,18 +1732,20 @@ export default function InvoiceDetail() {
             >
               <RotateCcw size={14} /> Devolver producto(s)
             </button>
-            <button
-              className="btn btn-secondary btn-size-md"
-              onClick={() => {
-                const postingDate = invoice.postingDate.split('T')[0]
-                navigate(
-                  `/contabilidad/libro-diario?voucherNo=${encodeURIComponent(invoice.id)}` +
-                  `&voucherType=Sales+Invoice&fromDate=${postingDate}&toDate=${postingDate}`,
-                )
-              }}
-            >
-              <BookOpen size={14} /> Ver asientos
-            </button>
+            {tieneContabilidad && (
+              <button
+                className="btn btn-secondary btn-size-md"
+                onClick={() => {
+                  const postingDate = invoice.postingDate.split('T')[0]
+                  navigate(
+                    `/contabilidad/libro-diario?voucherNo=${encodeURIComponent(invoice.id)}` +
+                    `&voucherType=Sales+Invoice&fromDate=${postingDate}&toDate=${postingDate}`,
+                  )
+                }}
+              >
+                <BookOpen size={14} /> Ver asientos
+              </button>
+            )}
             {ecfAceptado ? (
               <button
                 className="btn btn-navy btn-size-md"
@@ -2306,7 +2315,7 @@ export default function InvoiceDetail() {
                   </p>
                 </div>
               ) : (
-                <div className="table-scroll">
+                <div className="table-scroll" style={{ marginTop: 10 }}>
                   <table className="data-table items-table-resizable">
                     <colgroup>
                       {CREDIT_NOTE_COLUMNS.map((c) => <col key={c.key} style={{ width: creditNoteColWidths[c.key] }} />)}
@@ -2844,7 +2853,7 @@ export default function InvoiceDetail() {
               return (
                 <>
                   <div className="items-total-line" style={{ fontSize: 14, justifyContent: "flex-end", gap: 24 }}>
-                    <span style={{ textAlign: "right" }}>Subtotal bruto</span>
+                    <span style={{ textAlign: "right" }}>Subtotal</span>
                     <span style={{ textAlign: "left", minWidth: 170 }}>{formatMoney(gross, invoice.currency)}</span>
                   </div>
                   <div className="items-total-line" style={{ fontSize: 14, justifyContent: "flex-end", gap: 24 }}>
@@ -2861,7 +2870,7 @@ export default function InvoiceDetail() {
             {creditoAplicado > 0 && (
               <div
                 className="items-total-line"
-                style={{ fontSize: 14, justifyContent: "flex-end", gap: 24, color: "var(--color-success)" }}
+                style={{ fontSize: 14, justifyContent: "flex-end", gap: 24 }}
               >
                 <span style={{ textAlign: "right" }}>Crédito</span>
                 <span style={{ textAlign: "left", minWidth: 170 }}>-{formatMoney(creditoAplicado, invoice.currency)}</span>
@@ -2875,13 +2884,13 @@ export default function InvoiceDetail() {
               <span style={{ fontSize: roundingAdjustment !== 0 ? 13 : 18, color: "#FCB124", textAlign: "left", minWidth: 170 }}>{formatMoney(invoice.grandTotal, invoice.currency)}</span>
             </div>
             {invoice.currency && invoice.currency !== monedaBase && invoice.baseGrandTotal != null && (
-              <div className="items-total-line" style={{ fontSize: 12, justifyContent: "flex-end", gap: 24, color: "var(--text-tertiary)" }}>
+              <div className="items-total-line" style={{ fontSize: 14, justifyContent: "flex-end", gap: 24 }}>
                 <span style={{ textAlign: "right" }}>Equivalente en {monedaBase}</span>
                 <span style={{ textAlign: "left", minWidth: 170 }}>≈ {formatMoney(invoice.baseGrandTotal, monedaBase)}</span>
               </div>
             )}
             {roundingAdjustment !== 0 && (
-              <div className="items-total-line" style={{ fontSize: 13, justifyContent: "flex-end", gap: 24, color: "var(--text-tertiary)" }}>
+              <div className="items-total-line" style={{ fontSize: 14, justifyContent: "flex-end", gap: 24 }}>
                 <span style={{ textAlign: "right" }}>Ajuste por redondeo</span>
                 <span style={{ textAlign: "left", minWidth: 170 }}>{roundingAdjustment > 0 ? "+" : ""}{formatMoney(roundingAdjustment, invoice.currency)}</span>
               </div>
@@ -2907,14 +2916,14 @@ export default function InvoiceDetail() {
             {invoice.status === "submitted" && (
               <div
                 className="items-total-line"
-                style={{ fontWeight: 600, justifyContent: "flex-end", gap: 24, color: outstandingColor }}
+                style={{ fontSize: 14, justifyContent: "flex-end", gap: 24 }}
               >
                 <span style={{ textAlign: "right" }}>Pendiente</span>
                 <span style={{ textAlign: "left", minWidth: 170 }}>{formatMoney(invoice.outstandingAmount, invoice.currency)}</span>
               </div>
             )}
             {invoice.status === "submitted" && invoice.currency && invoice.currency !== monedaBase && invoice.baseOutstandingAmount != null && (
-              <div className="items-total-line" style={{ fontSize: 12, justifyContent: "flex-end", gap: 24, color: "var(--text-tertiary)" }}>
+              <div className="items-total-line" style={{ fontSize: 14, justifyContent: "flex-end", gap: 24 }}>
                 <span style={{ textAlign: "right" }}>Pendiente equivalente en {monedaBase}</span>
                 <span style={{ textAlign: "left", minWidth: 170 }}>≈ {formatMoney(invoice.baseOutstandingAmount, monedaBase)}</span>
               </div>

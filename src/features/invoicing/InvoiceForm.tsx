@@ -2186,13 +2186,13 @@ persistInvoice(buildInvoiceDto())
               </div>
               {arsActiva && arsServidor && (
                 <>
-                  <div className="items-total-line" style={{ color: 'var(--color-brand)' }}>
-                    <span>Cubre la ARS</span>
-                    <span>-{formatDOP(arsServidor.montoCobertura)}</span>
+                  <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+                    <span style={{ textAlign: 'right' }}>Cubre la ARS</span>
+                    <span style={{ textAlign: 'left', minWidth: 170 }}>-{formatDOP(arsServidor.montoCobertura)}</span>
                   </div>
-                  <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
-                    <span>A cargo del paciente</span>
-                    <span>{formatDOP(arsServidor.montoPaciente)}</span>
+                  <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
+                    <span style={{ textAlign: 'right' }}>A cargo del paciente</span>
+                    <span style={{ textAlign: 'left', minWidth: 170 }}>{formatDOP(arsServidor.montoPaciente)}</span>
                   </div>
                 </>
               )}

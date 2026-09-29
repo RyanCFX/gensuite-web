@@ -275,8 +275,11 @@ export default function PedidoDetail() {
                 ))}
               </tbody>
             </table>
-            <div className="items-total-row">
-              <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}><span>Total</span><span>{formatMoney(versionData.grandTotal)}</span></div>
+            <div className="items-total-row navy-totals">
+              <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: 'flex-end', gap: 24 }}>
+                <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'right' }}>Total</span>
+                <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'left', minWidth: 170 }}>{formatMoney(versionData.grandTotal)}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -613,7 +616,7 @@ export default function PedidoDetail() {
           </table>
           <div className="items-total-row navy-totals">
             <div className="items-total-line" style={{ fontSize: 14, justifyContent: 'flex-end', gap: 24 }}>
-              <span style={{ textAlign: 'right' }}>Subtotal bruto</span>
+              <span style={{ textAlign: 'right' }}>Subtotal</span>
               <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(grossTotal, pedido.currency)}</span>
             </div>
             <div className="items-total-line" style={{ fontSize: 14, justifyContent: 'flex-end', gap: 24 }}>

@@ -68,10 +68,13 @@ function getTitleForPath(pathname: string): string {
 
     // Cotizaciones / Pedidos / Transferencias / Facturas
     [/^\/cotizaciones\/nueva$/, 'Nueva Cotización'],
+    [/^\/cotizaciones\/(.+)\/editar$/, (m) => `Editar Cotización: ${m[1]}`],
+    [/^\/cotizaciones\/(.+)\/versions\/(.+)$/, (m) => `Cotización: ${m[1]} (v${m[2]})`],
     [/^\/cotizaciones\/(.+)$/, (m) => `Cotización: ${m[1]}`],
     [/^\/cotizaciones$/, 'Cotizaciones'],
     [/^\/pedidos\/nuevo$/, 'Nuevo Pedido'],
     [/^\/pedidos\/(.+)\/editar$/, (m) => `Editar Pedido: ${m[1]}`],
+    [/^\/pedidos\/(.+)\/versions\/(.+)$/, (m) => `Pedido: ${m[1]} (v${m[2]})`],
     [/^\/pedidos\/(.+)$/, (m) => `Pedido: ${m[1]}`],
     [/^\/pedidos$/, 'Pedidos'],
     [/^\/transferencias\/nueva$/, 'Nueva Transferencia'],
@@ -79,10 +82,20 @@ function getTitleForPath(pathname: string): string {
     [/^\/transferencias$/, 'Transferencias'],
     [/^\/facturas\/nueva$/, 'Nueva Factura'],
     [/^\/facturas\/(.+)\/editar$/, 'Editar Factura'],
+    [/^\/facturas\/(.+)\/versions\/(.+)$/, (m) => `Factura: ${m[1]} (v${m[2]})`],
     [/^\/facturas\/(.+)$/, (m) => `Factura: ${m[1]}`],
     [/^\/facturas$/, 'Facturas'],
+
+    // Despachos
+    [/^\/despachos\/nuevo$/, 'Nuevo Despacho'],
+    [/^\/despachos\/pendientes$/, 'Despachos Pendientes'],
+    [/^\/despachos\/confirmaciones\/(.+)$/, (m) => `Confirmación: ${m[1]}`],
+    [/^\/despachos\/confirmaciones$/, 'Confirmaciones de Despacho'],
+    [/^\/despachos\/(.+)$/, (m) => `Despacho: ${m[1]}`],
+    [/^\/despachos$/, 'Despachos'],
     [/^\/notas-credito$/, 'Notas de Crédito'],
     [/^\/notas-debito$/, 'Notas de Débito'],
+    [/^\/devoluciones\/nueva$/, 'Nueva Devolución'],
     [/^\/devoluciones\/(.+)$/, (m) => `Devolución: ${m[1]}`],
     [/^\/devoluciones$/, 'Devoluciones'],
 
@@ -93,6 +106,15 @@ function getTitleForPath(pathname: string): string {
     [/^\/compras\/recepciones$/, 'Recepción de Mercancía'],
     [/^\/compras\/costos-importacion\/(.+)$/, (m) => `Costo de Importación ${m[1]}`],
     [/^\/compras\/costos-importacion$/, 'Costos de Importación'],
+    [/^\/compras\/ordenes\/nueva$/, 'Nueva Orden de Compra'],
+    [/^\/compras\/ordenes\/abastecimiento$/, 'Abastecimiento'],
+    [/^\/compras\/ordenes\/(.+)\/editar$/, (m) => `Editar Orden de Compra: ${m[1]}`],
+    [/^\/compras\/ordenes\/(.+)$/, (m) => `Orden de Compra: ${m[1]}`],
+    [/^\/compras\/ordenes$/, 'Órdenes de Compra'],
+    [/^\/compras\/solicitudes\/nueva$/, 'Nueva Solicitud de Compra'],
+    [/^\/compras\/solicitudes\/(.+)\/editar$/, (m) => `Editar Solicitud de Compra: ${m[1]}`],
+    [/^\/compras\/solicitudes\/(.+)$/, (m) => `Solicitud de Compra: ${m[1]}`],
+    [/^\/compras\/solicitudes$/, 'Solicitudes de Compra'],
     [/^\/compras\/nueva$/, 'Nueva Compra'],
     [/^\/compras\/(.+)\/editar$/, (m) => `Editar Compra: ${m[1]}`],
     [/^\/compras\/(.+)$/, (m) => `Compra: ${m[1]}`],
@@ -162,6 +184,59 @@ function getTitleForPath(pathname: string): string {
     [/^\/contabilidad\/cierre-periodo$/, 'Cierre de Período'],
     [/^\/contabilidad\/libro-diario$/, 'Libro Diario'],
     [/^\/contabilidad\/libro-mayor$/, 'Libro Mayor'],
+
+    // Farmacia ARS
+    [/^\/farmacia\/aseguradoras\/nueva$/, 'Nueva Aseguradora'],
+    [/^\/farmacia\/aseguradoras\/(.+)\/editar$/, (m) => `Editar Aseguradora: ${m[1]}`],
+    [/^\/farmacia\/aseguradoras\/(.+)$/, (m) => `Aseguradora: ${m[1]}`],
+    [/^\/farmacia\/aseguradoras$/, 'Aseguradoras'],
+    [/^\/farmacia\/lotes\/(.+)$/, (m) => `Lote: ${m[1]}`],
+    [/^\/farmacia\/lotes$/, 'Lotes de Facturación ARS'],
+    [/^\/farmacia\/principios-activos$/, 'Principios Activos'],
+
+    // Catálogo — Dimensiones de inventario
+    [/^\/catalogo\/dimensiones$/, 'Dimensiones de Inventario'],
+
+    // Inventario extra
+    [/^\/inventario\/carga-inicial\/nueva$/, 'Registrar entrada'],
+    [/^\/inventario\/carga-inicial\/(.+)$/, (m) => `Entrada: ${m[1]}`],
+    [/^\/inventario\/carga-inicial$/, 'Carga Inicial de Inventario'],
+    [/^\/inventario\/ajustes-dimension$/, 'Ajuste de Dimensión'],
+    [/^\/inventario\/reclasificaciones$/, 'Reclasificación de Dimensión'],
+
+    // e-CF
+    [/^\/ecf-recibidos\/(.+)$/, (m) => `e-CF Recibido: ${m[1]}`],
+    [/^\/ecf-recibidos$/, 'e-CF Recibidos'],
+    [/^\/ecf-emitidos\/(.+)$/, (m) => `e-CF Emitido: ${m[1]}`],
+    [/^\/ecf-emitidos$/, 'e-CF Emitidos'],
+
+    // Relaciones comerciales
+    [/^\/relaciones-comerciales\/transacciones\/(.+)$/, (m) => `Transacción: ${m[1]}`],
+    [/^\/relaciones-comerciales\/transacciones$/, 'Transacciones'],
+    [/^\/relaciones-comerciales\/(.+)$/, (m) => `Relación: ${m[1]}`],
+    [/^\/relaciones-comerciales$/, 'Relaciones Comerciales'],
+
+    // Tesorería — Cheques
+    [/^\/tesoreria\/cheques\/(.+)$/, (m) => `Cheque: ${m[1]}`],
+    [/^\/tesoreria\/cheques$/, 'Cheques'],
+
+    // Apertura / migración de saldos
+    [/^\/apertura\/diagnostico$/, 'Migración de Saldos — Diagnóstico'],
+    [/^\/apertura\/resumen$/, 'Cuadre de la Migración'],
+    [/^\/apertura\/ventas\/nueva$/, 'Cargar saldo de cliente'],
+    [/^\/apertura\/ventas\/importar$/, 'Carga masiva de ventas'],
+    [/^\/apertura\/ventas\/(.+)$/, (m) => `Venta: ${m[1]}`],
+    [/^\/apertura\/ventas$/, 'Ventas — Migración de Saldos'],
+    [/^\/apertura\/compras\/nueva$/, 'Cargar saldo de proveedor'],
+    [/^\/apertura\/compras\/importar$/, 'Carga masiva de compras'],
+    [/^\/apertura\/compras\/(.+)$/, (m) => `Compra: ${m[1]}`],
+    [/^\/apertura\/compras$/, 'Compras — Migración de Saldos'],
+    [/^\/apertura\/inventario\/nueva$/, 'Cargar inventario inicial'],
+    [/^\/apertura\/inventario\/(.+)$/, (m) => `Inventario: ${m[1]}`],
+    [/^\/apertura\/inventario$/, 'Inventario — Migración de Saldos'],
+
+    [/^\/reportes$/, 'Reportes'],
+    [/^\/mi-cuenta$/, 'Mi cuenta'],
 
     // Configuración
     [/^\/config\/empresa$/, 'Empresa'],

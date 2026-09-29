@@ -10,6 +10,7 @@ import type {
 } from './types'
 
 export interface ListQuotationsParams extends PaginationParams {
+  search?: string
   customer?: string
   status?: 'draft' | 'submitted' | 'ordered' | 'lost' | 'cancelled' | 'all'
   fromDate?: string

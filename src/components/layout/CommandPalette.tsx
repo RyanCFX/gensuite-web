@@ -2,6 +2,10 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getFacturacionConfig } from '@/shared/api/config'
+import { listInvoices } from '@/shared/api/invoices'
+import { listQuotations } from '@/shared/api/quotations'
+import { listCustomers } from '@/shared/api/customers'
+import { listInventory } from '@/shared/api/inventory'
 import { usePermissionsStore } from '@/stores/permissions.store'
 import { useFeaturesStore } from '@/stores/features.store'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
@@ -27,6 +31,16 @@ interface SearchItem {
   group: string
   icon: ReactNode
   keywords?: string   // extra search terms
+  sublabel?: string   // detalle visible en resultados de datos
+}
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delayMs)
+    return () => clearTimeout(t)
+  }, [value, delayMs])
+  return debounced
 }
 
 const ALL_ITEMS: SearchItem[] = [
@@ -272,6 +286,77 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     [query, usaModuloPos, acciones, esFarmacia, isSystemManager, features, featuresReady, reportesHabilitados],
   )
 
+  // ── Búsqueda de datos (facturas, cotizaciones, clientes, artículos) ──────────
+  // Mismo gating que la navegación: solo se consulta lo que el usuario podría abrir.
+  const permCtx = useMemo(
+    () => ({ acciones, esFarmacia, isSystemManager, features, featuresReady, reportesHabilitados }),
+    [acciones, esFarmacia, isSystemManager, features, featuresReady, reportesHabilitados],
+  )
+  const rutaPermitida = (path: string) =>
+    itemPermitido({ id: `probe:${path}`, label: '', path, group: '', icon: null }, permCtx)
+  const puedeFacturas = rutaPermitida('/facturas')
+  const puedeCotizaciones = rutaPermitida('/cotizaciones')
+  const puedeClientes = rutaPermitida('/clientes')
+  const puedeArticulos = rutaPermitida('/inventario/productos')
+
+  const debounced = useDebouncedValue(query.trim(), 250)
+  const canData = open && debounced.length >= 2
+
+  const qFacturas = useQuery({
+    queryKey: ['cmd-search', 'facturas', debounced],
+    queryFn: () => listInvoices({ limit: 5, search: debounced }),
+    enabled: canData && puedeFacturas,
+    staleTime: 30_000,
+    retry: false,
+  })
+  const qCotizaciones = useQuery({
+    queryKey: ['cmd-search', 'cotizaciones', debounced],
+    queryFn: () => listQuotations({ limit: 5, search: debounced }),
+    enabled: canData && puedeCotizaciones,
+    staleTime: 30_000,
+    retry: false,
+  })
+  const qClientes = useQuery({
+    queryKey: ['cmd-search', 'clientes', debounced],
+    queryFn: () => listCustomers({ limit: 5, search: debounced }),
+    enabled: canData && puedeClientes,
+    staleTime: 30_000,
+    retry: false,
+  })
+  const qArticulos = useQuery({
+    queryKey: ['cmd-search', 'articulos', debounced],
+    queryFn: () => listInventory({ limit: 5, search: debounced }),
+    enabled: canData && puedeArticulos,
+    staleTime: 30_000,
+    retry: false,
+  })
+
+  const dataResults: SearchItem[] = useMemo(() => {
+    if (!canData) return []
+    const out: SearchItem[] = []
+    for (const inv of qFacturas.data?.items ?? []) {
+      out.push({ id: `inv-${inv.id}`, label: inv.id, sublabel: inv.customerName, path: `/facturas/${inv.id}`, group: 'Facturas', icon: <Receipt size={15} /> })
+    }
+    for (const q of qCotizaciones.data?.items ?? []) {
+      out.push({ id: `quot-${q.id}`, label: q.id, sublabel: q.customerName, path: `/cotizaciones/${q.id}`, group: 'Cotizaciones', icon: <FileText size={15} /> })
+    }
+    for (const c of qClientes.data?.items ?? []) {
+      out.push({ id: `cli-${c.id}`, label: c.customerName, sublabel: c.id, path: `/clientes/${c.id}`, group: 'Clientes', icon: <Users size={15} /> })
+    }
+    const seenArt = new Set<string>()
+    for (const a of qArticulos.data?.items ?? []) {
+      if (seenArt.has(a.itemCode)) continue
+      seenArt.add(a.itemCode)
+      out.push({ id: `art-${a.itemCode}`, label: a.itemName, sublabel: a.itemCode, path: `/inventario/productos/${a.itemCode}`, group: 'Artículos', icon: <Package size={15} /> })
+    }
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canData, qFacturas.data, qCotizaciones.data, qClientes.data, qArticulos.data])
+
+  const searchingData = canData && (qFacturas.isPending || qCotizaciones.isPending || qClientes.isPending || qArticulos.isPending)
+
+  const allResults = useMemo(() => [...results, ...dataResults], [results, dataResults])
+
   // Reset on open
   useEffect(() => {
     if (open) {
@@ -282,7 +367,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   }, [open])
 
   // Reset focus when results change
-  useEffect(() => { setFocusedIdx(0) }, [results])
+  useEffect(() => { setFocusedIdx(0) }, [allResults])
 
   // Scroll focused item into view
   useEffect(() => {
@@ -300,7 +385,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault()
-        setFocusedIdx((i) => Math.min(i + 1, results.length - 1))
+        setFocusedIdx((i) => Math.min(i + 1, allResults.length - 1))
         break
       case 'ArrowUp':
         e.preventDefault()
@@ -308,7 +393,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         break
       case 'Enter':
         e.preventDefault()
-        if (results[focusedIdx]) handleSelect(results[focusedIdx])
+        if (allResults[focusedIdx]) handleSelect(allResults[focusedIdx])
         break
       case 'Escape':
         onClose()
@@ -321,7 +406,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   // Group results for display
   const grouped: { group: string; items: SearchItem[] }[] = []
   const seen = new Set<string>()
-  for (const item of results) {
+  for (const item of allResults) {
     if (!seen.has(item.group)) {
       seen.add(item.group)
       grouped.push({ group: item.group, items: [] })
@@ -364,7 +449,12 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
         {/* Results */}
         <div className="cmd-body" ref={listRef}>
-          {results.length === 0 ? (
+          {searchingData && dataResults.length === 0 && (
+            <div style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12 }}>
+              Buscando datos…
+            </div>
+          )}
+          {allResults.length === 0 && !searchingData ? (
             <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
               Sin resultados para "<strong>{query}</strong>"
             </div>
@@ -373,7 +463,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
               <div key={group}>
                 <div className="cmd-group-label">{group}</div>
                 {items.map((item) => {
-                  const globalIdx = results.indexOf(item)
+                  const globalIdx = allResults.indexOf(item)
                   const isActive = globalIdx === focusedIdx
                   return (
                     <button
@@ -387,7 +477,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                       </span>
                       <span className="cmd-item-label">{item.label}</span>
                       <span className="cmd-item-hint" style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>
-                        {item.group}
+                        {item.sublabel ?? item.group}
                       </span>
                       {isActive && (
                         <ArrowRight size={12} style={{ color: 'var(--brand-primary)', flexShrink: 0 }} aria-hidden="true" />
