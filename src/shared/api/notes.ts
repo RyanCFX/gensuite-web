@@ -4,6 +4,7 @@ import type {
   CreateCreditNoteDto,
   CreateDebitNoteDto,
   CreditNote,
+  CreditNoteDetail,
   RefundCreditNoteDto,
   AplicarCreditNoteDto,
   AplicarCreditNoteResult,
@@ -37,7 +38,7 @@ export async function listCreditNotes(params?: ListNotesParams) {
 }
 
 export async function getCreditNote(id: string) {
-  const res = await client.get<{ success: true; data: CreditNote }>(ENDPOINTS.creditNotes.byId(id))
+  const res = await client.get<{ success: true; data: CreditNoteDetail }>(ENDPOINTS.creditNotes.byId(id))
   return unwrap(res)
 }
 
@@ -77,6 +78,11 @@ export async function getCreditNoteSaldoFavor(customerId: string) {
     ENDPOINTS.creditNotes.saldoFavor(customerId),
   )
   return unwrap(res)
+}
+
+export async function getCreditNotePdfBlobUrl(id: string): Promise<string> {
+  const res = await client.get<Blob>(ENDPOINTS.creditNotes.pdf(id), { responseType: 'blob' })
+  return URL.createObjectURL(res.data)
 }
 
 export async function downloadCreditNotePdf(id: string, filename?: string): Promise<void> {

@@ -9,6 +9,7 @@ import type {
   EcfConnectResult,
   CreateEcfClientDto,
   EcfClient,
+  EcfClientByRncResult,
   EcfClientsListResult,
   LinkEcfClientDto,
   EcfMode,
@@ -23,6 +24,7 @@ import type {
   ActivarContingenciaDto,
   FlushContingenciaDto,
   FlushContingenciaResult,
+  ApiError,
 } from './types'
 
 /** Mensaje para el 503 al someter un documento cuando la DGII está caída y el tenant tiene
@@ -113,6 +115,30 @@ export async function linkEcfClient(data: LinkEcfClientDto) {
     data,
   )
   return unwrap(res)
+}
+
+// Dice si un RNC ya existe como Client en el proyecto Vega (y trae su info, incluido el
+// certificado). 404 = no existe todavía. Tolerante al shape: acepta `{ exists, client }`
+// o el Client directo.
+export async function getEcfClientByRnc(rnc: string): Promise<EcfClientByRncResult> {
+  try {
+    const res = await client.get<{ success: true; data: unknown }>(
+      ENDPOINTS.config.ecfAdminClientByRnc(rnc),
+    )
+    const d = unwrap(res) as EcfClientByRncResult | EcfClient | null
+    if (!d) return { exists: false, client: null }
+    if (typeof (d as EcfClientByRncResult).exists === 'boolean') {
+      const r = d as EcfClientByRncResult
+      return { exists: r.exists, client: r.client ?? null }
+    }
+    if (typeof (d as EcfClient).rnc === 'string' || typeof (d as EcfClient).id === 'string') {
+      return { exists: true, client: d as EcfClient }
+    }
+    return { exists: false, client: null }
+  } catch (err) {
+    if ((err as ApiError)?.statusCode === 404) return { exists: false, client: null }
+    throw err
+  }
 }
 
 export async function uploadEcfCertificate(data: UploadEcfCertificateDto, company?: string) {

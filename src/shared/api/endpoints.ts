@@ -378,6 +378,7 @@ export const ENDPOINTS = {
     ecfAdminConnect: '/config/ecf/admin/connect',
     ecfAdminClients: '/config/ecf/admin/clients',
     ecfAdminClientsLink: '/config/ecf/admin/clients/link',
+    ecfAdminClientByRnc: (rnc: string) => `/config/ecf/admin/clients/by-rnc/${encodeURIComponent(rnc)}`,
     ecfAdminClientsByCompany: (company: string) => `/config/ecf/admin/clients/${encodeURIComponent(company)}`,
     ecfAdminCertificate: '/config/ecf/admin/certificate',
     ecfAdminWebhook: '/config/ecf/admin/webhook',

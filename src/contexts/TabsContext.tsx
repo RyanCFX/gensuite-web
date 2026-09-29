@@ -81,6 +81,7 @@ function getTitleForPath(pathname: string): string {
     [/^\/facturas\/(.+)\/editar$/, 'Editar Factura'],
     [/^\/facturas\/(.+)$/, (m) => `Factura: ${m[1]}`],
     [/^\/facturas$/, 'Facturas'],
+    [/^\/notas-credito\/(.+)$/, (m) => `Nota de Crédito: ${m[1]}`],
     [/^\/notas-credito$/, 'Notas de Crédito'],
     [/^\/notas-debito$/, 'Notas de Débito'],
     [/^\/devoluciones\/(.+)$/, (m) => `Devolución: ${m[1]}`],
