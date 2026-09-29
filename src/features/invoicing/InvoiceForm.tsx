@@ -173,8 +173,16 @@ function todayIso() {
   return format(new Date(), 'yyyy-MM-dd')
 }
 
-function defaultDueDate() {
-  return format(addDays(new Date(), 30), 'yyyy-MM-dd')
+/** Fecha de vencimiento: nunca la elige el operador ni se envía al API — es puramente
+ *  informativa para la vista. Regla de negocio:
+ *  1. Cliente sin crédito (`hasCredit` false): vencimiento = fecha de la factura.
+ *  2. Cliente con crédito: vencimiento = fecha de la factura + `creditDays`.
+ *  Un cliente ocasional nunca tiene crédito. */
+function computeDueDate(baseDate: Date, customer: Customer | null, esClienteOcasional: boolean): string {
+  if (!esClienteOcasional && customer?.hasCredit) {
+    return format(addDays(baseDate, customer.creditDays || 0), 'yyyy-MM-dd')
+  }
+  return format(baseDate, 'yyyy-MM-dd')
 }
 
 function calcAmount(qty: number, rate: number, discountPct: number = 0, discountAmount: number = 0) {
@@ -286,7 +294,6 @@ export default function InvoiceForm() {
   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
   const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
   const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
-  const [dueDate, setDueDate] = useState(defaultDueDate())
   const [ncfType, setNcfType] = useState<NcfType>('B02')
   const [items, setItems] = useState<LineItem[]>([])
   // Disponibilidad real (físico − reservado) por artículo — docs/tasks/73_alertas_stock_disponible_reservado.md.
@@ -348,6 +355,14 @@ export default function InvoiceForm() {
   const arsServidor = esCoberturaCompleta(editingInvoice?.aseguradora) ? editingInvoice.aseguradora : null
   /** `Facturado` = bloque inmutable; el resto de los estados de un borrador son editables. */
   const arsSoloLectura = arsServidor?.estadoArs === 'Facturado'
+
+  /** Solo informativa — ver `computeDueDate`. En edición se basa en el `postingDate` real de la
+   *  factura (fijo); al crear, en "hoy" (la fecha que el servidor le asignará al someter). */
+  const dueDate = computeDueDate(
+    isEdit && editingInvoice?.postingDate ? new Date(editingInvoice.postingDate) : new Date(),
+    selectedCustomer,
+    esClienteOcasional,
+  )
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
@@ -863,7 +878,6 @@ export default function InvoiceForm() {
     clienteOcasionalNombre,
     clienteOcasionalRnc,
     clienteOcasionalDireccion,
-    dueDate,
     ncfType,
     items,
     notes,
@@ -883,7 +897,6 @@ export default function InvoiceForm() {
     if (!isEdit || !editingInvoice || scalarsHydratedRef.current) return
     scalarsHydratedRef.current = true
     const inv = editingInvoice
-    setDueDate((inv.dueDate ?? '').slice(0, 10))
     setNcfType((inv.ncfType || 'B02') as NcfType)
     setBranch(inv.branch ?? '')
     setDepartment(inv.department ?? '')
@@ -1476,7 +1489,6 @@ persistInvoice(buildInvoiceDto())
             clienteOcasionalDireccion: clienteOcasionalDireccion || undefined,
           }
         : { customer: customerId }),
-      dueDate,
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
       ncfType,
@@ -1667,8 +1679,8 @@ persistInvoice(buildInvoiceDto())
                   id="dueDate"
                   className="ff-input"
                   value={dueDate}
-                  onChange={setDueDate}
-                  clearable
+                  onChange={() => {}}
+                  disabled
                 />
               </div>
 

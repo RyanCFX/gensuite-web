@@ -713,8 +713,10 @@ export interface CreateInvoiceDto {
   /** Ya NO se manda — la fecha de la factura la asigna siempre el servidor (fecha real del
    *  momento del request). Si el body llega a incluir `postingDate`, el backend responde 400
    *  ("property postingDate should not exist"). El campo sigue viniendo en las respuestas.
-   *  `UpdateInvoiceDto = CreateInvoiceDto` (reemplazo completo) — tampoco va en el PUT. */
-  dueDate?: string;
+   *  `UpdateInvoiceDto = CreateInvoiceDto` (reemplazo completo) — tampoco va en el PUT.
+   *  `dueDate` tampoco se manda: la calcula el backend (hoy postingDate + 0/creditDays según
+   *  `Customer.hasCredit`). El frontend la muestra solo de forma informativa, sin editarla ni
+   *  enviarla — ver `defaultDueDate` en InvoiceForm.tsx. */
   branch?: string;
   department?: string;
   ncfType: "B01" | "B02" | "B14" | "B15" | "B16";
