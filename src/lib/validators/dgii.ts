@@ -14,8 +14,10 @@ export function validateRNCDetailed(value: string): DGIIValidationResult {
   const weights = [7, 9, 8, 6, 5, 4, 3, 2]
   const sum = weights.reduce((acc, w, i) => acc + parseInt(clean[i]) * w, 0)
   const remainder = sum % 11
+  // Módulo 11 de la DGII: resto 0 → dígito 2, resto 1 → dígito 1, cualquier otro resto
+  // (incluido 10) → 11 - resto. Ojo: 0 y 10 NO comparten el mismo caso (11-10=1, no 2).
   let check: number
-  if (remainder === 0 || remainder === 10) check = 2
+  if (remainder === 0) check = 2
   else if (remainder === 1) check = 1
   else check = 11 - remainder
   if (check !== parseInt(clean[8])) {
