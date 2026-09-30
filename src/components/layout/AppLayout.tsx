@@ -742,7 +742,6 @@ const ADMIN_ONLY_PATHS = new Set([
   "/config/permisos",
   "/config/roles",
   "/config/auditoria-pin",
-  "/config/cajas",
   "/config/ecf/admin",
   "/config/ecf/certificacion",
   "/config/ecf/contingencia",
@@ -833,11 +832,15 @@ function filtrarNavList(
 // Solo visible con tenant.vertical === "farmacia" (docs/PROMPT_FARMACIA_V2_FRONTEND.md §1).
 const FARMACIA_ONLY_PATHS = new Set(["/config/farmacia"]);
 
-// Grupos/ítems de NAV_FINANZAS que solo tienen sentido con el módulo POS habilitado
-// (Facturacion Config.usaModuloPos) — identificados por su `prefix` (grupos) o `path` (ítems sueltos).
+// Grupos/ítems de NAV_FINANZAS que solo tienen sentido con el módulo POS habilitado. "/caja" y
+// "/turnos" ya NO están acá: se gatean por el feature `caja` (RUTAS_FEATURES en
+// shared/features/catalog.ts, vía GET /me/features, sin restricción de permiso). Antes dependían
+// de `Facturacion Config.usaModuloPos` (GET /config/facturacion, que exige `config.facturacion.ver`)
+// — un usuario con un perfil de solo Caja no tiene ese permiso, la petición le daba 403, y
+// `usaModuloPos` caía por defecto a `false`, escondiéndole el módulo entero pese a tener
+// `caja.listar` en `true`. El grupo de reportes de caja/turno sigue acá porque no tiene un
+// feature equivalente todavía (ver tarea aparte).
 const POS_ONLY_NAV_KEYS = new Set([
-  "/caja",
-  "/turnos",
   "/reportes/cuadreTurno|/reportes/caja|/reportes/corteCajaDia",
 ]);
 
@@ -849,8 +852,10 @@ const ECF_ONLY_NAV_KEYS = new Set(["/ecf-emitidos", "/ecf-recibidos"]);
 // docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §1.2. El flag puede cambiar en
 // caliente: no lo cacheamos más allá de la query de facturacion-config (staleTime 5min, se
 // refresca explícitamente después de habilitar/deshabilitar desde Configuración).
+// "/despachos" ya NO está acá: mismo caso que "/caja"/"/turnos" (ver comentario de
+// POS_ONLY_NAV_KEYS) — ya se gatea por el feature `despacho` de GET /me/features, que no exige
+// `config.facturacion.ver`. Los otros dos ítems siguen acá porque no tienen feature equivalente.
 const DESPACHO_ONLY_NAV_KEYS = new Set([
-  "/despachos",
   "/compras/ordenes/abastecimiento",
   "/reportes/despacho-margen|/reportes/despacho-reservas|/reportes/despacho-faltantes|/reportes/despacho-pendientes-compra",
 ]);

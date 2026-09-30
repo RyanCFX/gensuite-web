@@ -245,7 +245,7 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/config/sucursales', accion: 'sucursales.listar' },
   { pattern: '/config/plantillas-facturas', accion: 'plantillas.impresion.listar' },
   { pattern: '/config/plantillas-etiquetas', accion: 'plantillas.impresion.listar' },
-  { pattern: '/config/cajas', accion: null, soloSystemManager: true },
+  { pattern: '/config/cajas', accion: 'pos.cajas.listar' },
   { pattern: '/config/centros-costo', accion: 'contabilidad.centros-costo.listar' },
   { pattern: '/config/bancos', accion: 'tesoreria.bancos.listar' },
   { pattern: '/config/cuentas-bancarias', accion: 'tesoreria.cuentas-bancarias.listar' },
