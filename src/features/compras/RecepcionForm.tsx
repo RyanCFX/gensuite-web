@@ -10,6 +10,7 @@ import { listWarehouses } from '@/shared/api/inventory'
 import { listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
 import { getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
+import { todayIso } from '@/lib/formatters'
 import type { CreatePurchaseReceiptDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -34,6 +35,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
+import { useAlmacenCompraDefault } from '@/shared/hooks/useAlmacenCompraDefault'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 interface ItemRow {
@@ -482,7 +484,7 @@ export default function RecepcionForm() {
   const [supplierId, setSupplierId] = useState('')
   const [supplierName, setSupplierName] = useState('')
   const [supplierQuery, setSupplierQuery] = useState('')
-  const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0])
+  const [postingDate, setPostingDate] = useState(todayIso())
   const [supplierDeliveryNote, setSupplierDeliveryNote] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem(defaultWh)])
   const ITEMS_COLUMNS = [
@@ -575,9 +577,12 @@ export default function RecepcionForm() {
     enabled: isSystemManager,
     staleTime: 60_000,
   })
-  const branchOptions = isSystemManager
-    ? (allSucursales?.items.map((s) => s.name) ?? [])
-    : (myBranches?.branches ?? [])
+  const branchOptions = useMemo(
+    () => (isSystemManager
+      ? (allSucursales?.items.map((s) => s.name) ?? [])
+      : (myBranches?.branches ?? [])),
+    [isSystemManager, allSucursales, myBranches],
+  )
   const [branchSearch, setBranchSearch] = useState('')
   const branchSelectOptions: SearchSelectOption[] = branchOptions
     .filter((b) => !branchSearch || b.toLowerCase().includes(branchSearch.toLowerCase()))
@@ -586,6 +591,16 @@ export default function RecepcionForm() {
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
   }, [myBranches])
+
+  // Si solo hay una sucursal disponible, se selecciona sola y el select se bloquea
+  // (igual que en ventas y el resto de compras).
+  useEffect(() => {
+    if (branchOptions.length === 1 && branch !== branchOptions[0]) setBranch(branchOptions[0])
+  }, [branchOptions, branch])
+
+  // Almacén de compra por defecto: proveedor > sucursal (igual que el backend).
+  // El retorno no se usa directo: el hook rellena las filas vía efecto (ver itemCount).
+  useAlmacenCompraDefault({ supplierId, branch, isEdit, setItems, defaultWh, itemCount: items.length })
 
   const { data: receiptData, isLoading: loadingEdit } = useQuery({
     queryKey: ['purchase-receipt', id],
@@ -979,6 +994,7 @@ export default function RecepcionForm() {
                     selectedLabel={branch}
                     placeholder="Sin especificar"
                     error={branchError}
+                    disabled={branchOptions.length === 1}
                   />
                 </div>
 

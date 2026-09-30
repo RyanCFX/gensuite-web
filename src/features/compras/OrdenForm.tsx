@@ -2,14 +2,16 @@ import { useState, useCallback, useEffect, useMemo, Fragment } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffectOnActive } from 'keepalive-for-react'
+import { format, addDays } from 'date-fns'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createOrdenCompra, updateOrdenCompra, getOrdenCompra } from '@/shared/api/ordenes-compra'
-import { listSuppliers } from '@/shared/api/suppliers'
+import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
+import { todayIso } from '@/lib/formatters'
 import type { CreateOrdenCompraDto, Item, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -28,6 +30,7 @@ import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useAlmacenCompraDefault } from '@/shared/hooks/useAlmacenCompraDefault'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -98,9 +101,10 @@ export default function OrdenForm() {
   const [supplierId, setSupplierId] = useState('')
   const [supplierName, setSupplierName] = useState('')
   const [supplierQuery, setSupplierQuery] = useState('')
-  const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0])
+  const [transactionDate, setTransactionDate] = useState(todayIso())
   const [scheduleDate, setScheduleDate] = useState('')
   const [currency, setCurrency] = useState('DOP')
+  const [currencyTouched, setCurrencyTouched] = useState(false)
   const [conversionRate, setConversionRate] = useState(1)
   const [items, setItems] = useState<ItemRow[]>([emptyItem(defaultWh)])
   const ITEMS_COLUMNS = [
@@ -177,9 +181,12 @@ export default function OrdenForm() {
     enabled: isSystemManager,
     staleTime: 60_000,
   })
-  const branchOptions = isSystemManager
-    ? (allSucursales?.items.map((s) => s.name) ?? [])
-    : (myBranches?.branches ?? [])
+  const branchOptions = useMemo(
+    () => (isSystemManager
+      ? (allSucursales?.items.map((s) => s.name) ?? [])
+      : (myBranches?.branches ?? [])),
+    [isSystemManager, allSucursales, myBranches],
+  )
   const [branchSearch, setBranchSearch] = useState('')
   const branchSelectOptions: SearchSelectOption[] = branchOptions
     .filter((b) => !branchSearch || b.toLowerCase().includes(branchSearch.toLowerCase()))
@@ -188,6 +195,42 @@ export default function OrdenForm() {
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
   }, [myBranches])
+
+  // Si solo hay una sucursal disponible, se selecciona sola y el select se bloquea
+  // (igual que en ventas — InvoiceForm).
+  useEffect(() => {
+    if (branchOptions.length === 1 && branch !== branchOptions[0]) setBranch(branchOptions[0])
+  }, [branchOptions, branch])
+
+  // ── Defaults del proveedor (igual que en compras/nueva) ────────────────────
+  // El endpoint POST /compras/ordenes no persiste condiciones de pago (tipo de
+  // pago, vencimiento, 606) — solo moneda e impuestos. Los términos se muestran
+  // como referencia de las condiciones configuradas del proveedor; la moneda sí
+  // se aplica al documento.
+  const { data: supplierDetail } = useQuery({
+    queryKey: ['supplier', supplierId],
+    queryFn: () => getSupplier(supplierId),
+    enabled: !!supplierId,
+    staleTime: 5 * 60_000,
+  })
+  const supplierTerms = (suppliersData?.items ?? []).find((s) => s.id === supplierId) ?? supplierDetail
+  const supplierDiasCredito = supplierTerms?.diasCredito ?? 0
+  // Misma regla que CompraForm: sin días de crédito no hay crédito posible.
+  const supplierTipoPagoPrevisto = !supplierDiasCredito
+    ? 'Contado'
+    : (supplierTerms?.defaultTipoPagoProveedor ?? 'Contado')
+  const supplierVencimientoPrevisto = supplierId && supplierDiasCredito > 0 && transactionDate
+    ? format(addDays(new Date(`${transactionDate}T00:00:00`), supplierDiasCredito), 'dd/MM/yyyy')
+    : null
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!isEdit && !currencyTouched && supplierDetail?.defaultCurrency) setCurrency(supplierDetail.defaultCurrency)
+  }, [supplierDetail, currencyTouched, isEdit])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Almacén de compra por defecto: proveedor > sucursal (igual que el backend).
+  // El retorno no se usa directo: el hook rellena las filas vía efecto (ver itemCount).
+  useAlmacenCompraDefault({ supplierId, branch, isEdit, setItems, defaultWh, itemCount: items.length })
 
   const { data: ordenData, isLoading: loadingEdit } = useQuery({
     queryKey: ['orden-compra', id],
@@ -443,6 +486,12 @@ export default function OrdenForm() {
                       const resolvedId = sid === '' ? '' : (opt?.value ?? sid)
                       setSupplierId(resolvedId)
                       setSupplierName(opt?.label ?? '')
+                      // Default inmediato desde el listado (igual que en compras/nueva);
+                      // el detalle (supplierDetail) lo refuerza vía efecto si faltara.
+                      const selected = suppliersData?.items.find((s) => s.id === resolvedId)
+                      if (selected && !currencyTouched && selected.defaultCurrency) {
+                        setCurrency(selected.defaultCurrency)
+                      }
                     }}
                     options={supplierOptions}
                     onSearch={setSupplierQuery}
@@ -464,7 +513,7 @@ export default function OrdenForm() {
 
                 <div className="ff-wrap">
                   <label className="ff-label">Moneda</label>
-                  <input className="ff-input" value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} placeholder="DOP" />
+                  <input className="ff-input" value={currency} onChange={(e) => { setCurrency(e.target.value.toUpperCase()); setCurrencyTouched(true) }} placeholder="DOP" />
                 </div>
 
                 {currency !== 'DOP' && (
@@ -491,8 +540,21 @@ export default function OrdenForm() {
                     selectedLabel={branch}
                     placeholder="Sin especificar"
                     error={branchError}
+                    disabled={branchOptions.length === 1}
                   />
                 </div>
+
+                {supplierTerms && (
+                  <div className="ff-wrap" style={{ gridColumn: '1 / -1' }}>
+                    <p className="ff-hint" style={{ margin: 0 }}>
+                      Condiciones del proveedor: {supplierTipoPagoPrevisto}
+                      {supplierDiasCredito > 0 && ` · ${supplierDiasCredito} días de crédito`}
+                      {supplierVencimientoPrevisto && ` · vence ${supplierVencimientoPrevisto}`}
+                      {supplierTerms.defaultFormaPago606 && ` · ${supplierTerms.defaultFormaPago606}`}
+                      {supplierTerms.defaultTipoBienes606 && ` · ${supplierTerms.defaultTipoBienes606}`}
+                    </p>
+                  </div>
+                )}
 
                 {usaDepartamentos && (
                   <div className="ff-wrap">

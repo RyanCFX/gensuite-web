@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffectOnActive } from 'keepalive-for-react'
+import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createCompra, updateCompra, getCompra } from '@/shared/api/compras-gastos'
@@ -14,6 +15,7 @@ import { listRetenciones } from '@/shared/api/retenciones'
 import { useSupplierEmisorElectronico } from '@/shared/hooks/useSupplierEmisorElectronico'
 import { getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
+import { todayIso } from '@/lib/formatters'
 import type { CreateCompraDto, Supplier, DistribucionCuentaDto } from '@/shared/api/types'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ArrowLeft, Save, Plus, Trash2, Eye, Loader2, Info, UserPlus } from 'lucide-react'
@@ -49,6 +51,7 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useAlmacenCompraDefault } from '@/shared/hooks/useAlmacenCompraDefault'
 
 interface ItemRow {
   itemCode: string
@@ -594,7 +597,7 @@ export default function CompraForm() {
   const [proveedorOcasionalRnc, setProveedorOcasionalRnc] = useState('')
   const [supplierQuery, setSupplierQuery] = useState('')
   const [showCreateSupplier, setShowCreateSupplier] = useState(false)
-  const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0])
+  const [postingDate, setPostingDate] = useState(todayIso())
   const [dueDate, setDueDate] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem(defaultWh)])
   const ITEMS_COLUMNS = [
@@ -680,8 +683,8 @@ export default function CompraForm() {
   })
 
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
+    queryKey: ['catalogos-fiscales', { type: 'compra' }],
+    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
     staleTime: 60 * 60_000,
   })
   const [tipoBienes606Search, setTipoBienes606Search] = useState('')
@@ -816,9 +819,12 @@ export default function CompraForm() {
     enabled: isSystemManager,
     staleTime: 60_000,
   })
-  const branchOptions = isSystemManager
-    ? (allSucursales?.items.map((s) => s.name) ?? [])
-    : (myBranches?.branches ?? [])
+  const branchOptions = useMemo(
+    () => (isSystemManager
+      ? (allSucursales?.items.map((s) => s.name) ?? [])
+      : (myBranches?.branches ?? [])),
+    [isSystemManager, allSucursales, myBranches],
+  )
   const [branchSearch, setBranchSearch] = useState('')
   const branchSelectOptions: SearchSelectOption[] = branchOptions
     .filter((b) => !branchSearch || b.toLowerCase().includes(branchSearch.toLowerCase()))
@@ -827,6 +833,16 @@ export default function CompraForm() {
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
   }, [myBranches])
+
+  // Si solo hay una sucursal disponible, se selecciona sola y el select se bloquea
+  // (igual que en ventas — InvoiceForm).
+  useEffect(() => {
+    if (branchOptions.length === 1 && branch !== branchOptions[0]) setBranch(branchOptions[0])
+  }, [branchOptions, branch])
+
+  // Almacén de compra por defecto: proveedor > sucursal (igual que el backend).
+  // El retorno no se usa directo: el hook rellena las filas vía efecto (ver itemCount).
+  useAlmacenCompraDefault({ supplierId, branch, isEdit, setItems, defaultWh, itemCount: items.length })
 
   // ── Catálogos de retenciones (multiselect) ─────────────────────────────────
   const { data: retencionesData } = useQuery({
@@ -1406,9 +1422,9 @@ export default function CompraForm() {
                             else if (selected.defaultTipoPagoProveedor) setTipoPago(selected.defaultTipoPagoProveedor)
                           }
                           if (selected.diasCredito) {
-                            const base = new Date(postingDate || new Date().toISOString().split('T')[0])
+                            const base = new Date(postingDate || todayIso())
                             base.setDate(base.getDate() + selected.diasCredito)
-                            setDueDate(base.toISOString().split('T')[0])
+                            setDueDate(format(base, 'yyyy-MM-dd'))
                           }
                         }
                       }}
@@ -1505,7 +1521,7 @@ export default function CompraForm() {
                     selectedLabel={branch}
                     placeholder="Sin especificar"
                     error={branchError}
-                    disabled={isReturn}
+                    disabled={isReturn || branchOptions.length === 1}
                   />
                 </div>
 
