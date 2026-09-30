@@ -6,6 +6,7 @@ import { ShieldOff, Plus, ChevronRight, Pencil, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
+import { useAccesoV2Activo } from '@/shared/permissions/useAcceso'
 import { listRoles } from '@/shared/api/usuarios'
 import { createRole, getPerfiles, createPerfil, updatePerfilRoles, deletePerfil } from '@/shared/api/roles'
 import type { ApiError, CreateRoleDto, RolePerfil } from '@/shared/api/types'
@@ -33,6 +34,9 @@ type TabKey = 'roles' | 'perfiles'
 
 export default function RolesPage() {
   const isSystemManager = useIsSystemManager()
+  // Permisos v2 activo: los Role Profiles/roles de ERPNext los deriva el backend desde los
+  // perfiles de acceso — la gestión manual queda como avanzada (§7 del prompt v2).
+  const v2Activo = useAccesoV2Activo()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<TabKey>('roles')
@@ -151,16 +155,25 @@ export default function RolesPage() {
         >
           Roles
         </button>
-        <button
-          type="button"
-          className={`tab-btn${activeTab === 'perfiles' ? ' on' : ''}`}
-          onClick={() => setActiveTab('perfiles')}
-        >
-          Perfiles de rol
-        </button>
+        {!v2Activo && (
+          <button
+            type="button"
+            className={`tab-btn${activeTab === 'perfiles' ? ' on' : ''}`}
+            onClick={() => setActiveTab('perfiles')}
+          >
+            Perfiles de rol
+          </button>
+        )}
       </div>
 
-      {activeTab === 'roles' ? (
+      {v2Activo && (
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+          Los roles de ERPNext se asignan solos desde los perfiles de acceso
+          (Configuración → Acceso). Esta pantalla queda como administración avanzada.
+        </div>
+      )}
+
+      {activeTab === 'roles' || v2Activo ? (
       <div className="card navy-table-card">
       <div className="table-scroll">
         <table className="data-table navy-table items-table-resizable">

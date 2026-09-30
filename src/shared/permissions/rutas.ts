@@ -25,6 +25,7 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/inicio', accion: null },
 
   // Clientes
+  { pattern: '/clientes/nuevo', accion: 'clientes.crear' },
   { pattern: '/clientes/*', accion: 'clientes.listar' },
   { pattern: '/clientes', accion: 'clientes.listar' },
 
@@ -34,12 +35,14 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/catalogo/cuentas-por-pagar', accion: 'catalogo.cuentas-pagar.listar' },
   { pattern: '/catalogo/combos', accion: 'catalogo.combos.listar' },
   { pattern: '/catalogo/descuentos', accion: 'catalogo.descuentos.listar' },
+  { pattern: '/catalogo/servicios/nuevo', accion: 'catalogo.items.crear' },
   { pattern: '/catalogo/servicios/*', accion: 'catalogo.items.listar' },
   { pattern: '/catalogo/servicios', accion: 'catalogo.items.listar' },
   { pattern: '/catalogo/atributos', accion: 'catalogo.atributos.listar' },
   { pattern: '/catalogo/dimensiones', accion: 'catalogo.dimensiones.listar' },
 
   // Farmacia ARS (vertical)
+  { pattern: '/farmacia/aseguradoras/nueva', accion: 'aseguradoras.crear', soloFarmacia: true },
   { pattern: '/farmacia/aseguradoras/*', accion: 'aseguradoras.listar', soloFarmacia: true },
   { pattern: '/farmacia/aseguradoras', accion: 'aseguradoras.listar', soloFarmacia: true },
   { pattern: '/farmacia/lotes/*', accion: 'farmacia.lotes.listar', soloFarmacia: true },
@@ -47,33 +50,40 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/farmacia/principios-activos', accion: 'farmacia.principios-activos.listar', soloFarmacia: true },
 
   // Cotizaciones
+  { pattern: '/cotizaciones/nueva', accion: 'cotizaciones.crear' },
   { pattern: '/cotizaciones/*', accion: 'cotizaciones.listar' },
   { pattern: '/cotizaciones', accion: 'cotizaciones.listar' },
 
   // Pedidos
+  { pattern: '/pedidos/nuevo', accion: 'pedidos.crear' },
   { pattern: '/pedidos/*', accion: 'pedidos.listar' },
   { pattern: '/pedidos', accion: 'pedidos.listar' },
 
   // Despachos (Delivery Note) — docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §2.
   // Gateado también por el flag despachoHabilitado en el menú (AppLayout) — acá solo el permiso.
+  { pattern: '/despachos/nuevo', accion: 'despachos.crear' },
   { pattern: '/despachos/*', accion: 'despachos.ver' },
   { pattern: '/despachos', accion: 'despachos.ver' },
 
   // Transferencias entre almacenes
+  { pattern: '/transferencias/nueva', accion: 'inventario.transferencias.crear' },
   { pattern: '/transferencias/*', accion: 'inventario.transferencias.listar' },
   { pattern: '/transferencias', accion: 'inventario.transferencias.listar' },
 
   // Facturación
+  { pattern: '/facturas/nueva', accion: 'ventas.factura.crear' },
   { pattern: '/facturas/*', accion: 'ventas.factura.listar' },
   { pattern: '/facturas', accion: 'ventas.factura.listar' },
   { pattern: '/notas-credito/*', accion: 'ventas.nota-credito.listar' },
   { pattern: '/notas-credito', accion: 'ventas.nota-credito.listar' },
   { pattern: '/notas-debito/*', accion: 'ventas.nota-debito.crear' },
   { pattern: '/notas-debito', accion: 'ventas.nota-debito.crear' },
+  { pattern: '/devoluciones/nueva', accion: 'ventas.devolucion.crear' },
   { pattern: '/devoluciones/*', accion: 'ventas.devolucion.listar' },
   { pattern: '/devoluciones', accion: 'ventas.devolucion.listar' },
 
   // Inventario
+  { pattern: '/inventario/productos/nuevo', accion: 'catalogo.items.crear' },
   { pattern: '/inventario/productos/*', accion: 'catalogo.items.listar' },
   { pattern: '/inventario/productos', accion: 'catalogo.items.listar' },
   { pattern: '/inventario/stock', accion: 'inventario.stock.consultar' },
@@ -90,18 +100,23 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/inventario/carga-inicial', accion: 'inventario.carga-inicial.listar' },
 
   // Compras (marcador Compras RD ya resuelto en acciones; la lectura no lo exige)
+  { pattern: '/compras/recepciones/nueva', accion: 'compras.recepcion.crear' },
   { pattern: '/compras/recepciones/*', accion: 'compras.recepcion.listar' },
   { pattern: '/compras/recepciones', accion: 'compras.recepcion.listar' },
+  { pattern: '/compras/solicitudes/nueva', accion: 'compras.solicitud.crear' },
   { pattern: '/compras/solicitudes/*', accion: 'compras.solicitud.listar' },
   { pattern: '/compras/solicitudes', accion: 'compras.solicitud.listar' },
+  { pattern: '/compras/ordenes/nueva', accion: 'compras.orden.crear' },
   { pattern: '/compras/ordenes/*', accion: 'compras.orden.listar' },
   { pattern: '/compras/ordenes', accion: 'compras.orden.listar' },
   { pattern: '/compras/costos-importacion/*', accion: 'compras.costos-importacion.listar' },
   { pattern: '/compras/costos-importacion', accion: 'compras.costos-importacion.listar' },
+  { pattern: '/compras/nueva', accion: 'compras.factura.crear' },
   { pattern: '/compras/*', accion: 'compras.factura.listar' },
   { pattern: '/compras', accion: 'compras.factura.listar' },
 
   // Devoluciones de compras — sin acción propia en el catálogo; se apoya en la lectura de compras
+  { pattern: '/devoluciones-compras/nueva', accion: 'compras.factura.crear' },
   { pattern: '/devoluciones-compras/*', accion: 'compras.factura.listar' },
   { pattern: '/devoluciones-compras', accion: 'compras.factura.listar' },
 
@@ -112,10 +127,12 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/ecf-emitidos', accion: 'ecf.emitidos.listar' },
 
   // Gastos (marcador Gastos RD ya resuelto en acciones)
+  { pattern: '/gastos/nuevo', accion: 'gastos.crear' },
   { pattern: '/gastos/*', accion: 'gastos.listar' },
   { pattern: '/gastos', accion: 'gastos.listar' },
 
   // Proveedores
+  { pattern: '/proveedores/nuevo', accion: 'proveedores.crear' },
   { pattern: '/proveedores/*', accion: 'proveedores.listar' },
   { pattern: '/proveedores', accion: 'proveedores.listar' },
 
@@ -143,10 +160,13 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/pagos/*', accion: 'cobros.pago.listar' },
 
   // Tesorería
+  { pattern: '/tesoreria/emisiones/nueva', accion: 'tesoreria.emision.crear' },
   { pattern: '/tesoreria/emisiones/*', accion: 'tesoreria.emision.listar' },
   { pattern: '/tesoreria/emisiones', accion: 'tesoreria.emision.listar' },
+  { pattern: '/tesoreria/depositos/nuevo', accion: 'tesoreria.deposito.crear' },
   { pattern: '/tesoreria/depositos/*', accion: 'tesoreria.deposito.listar' },
   { pattern: '/tesoreria/depositos', accion: 'tesoreria.deposito.listar' },
+  { pattern: '/tesoreria/transferencias/nueva', accion: 'tesoreria.transferencia.crear' },
   { pattern: '/tesoreria/transferencias/*', accion: 'tesoreria.transferencia.listar' },
   { pattern: '/tesoreria/transferencias', accion: 'tesoreria.transferencia.listar' },
   { pattern: '/tesoreria/movimientos', accion: 'tesoreria.movimientos-banco.listar' },
@@ -206,8 +226,10 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/apertura/inventario', accion: 'apertura.inventario.listar' },
 
   // Contabilidad
+  { pattern: '/cuentas/nueva', accion: 'contabilidad.cuentas.crear' },
   { pattern: '/cuentas/*', accion: 'contabilidad.cuentas.listar' },
   { pattern: '/cuentas', accion: 'contabilidad.cuentas.listar' },
+  { pattern: '/asientos/nuevo', accion: 'contabilidad.asientos.crear' },
   { pattern: '/asientos/*', accion: 'contabilidad.asientos.listar' },
   { pattern: '/asientos', accion: 'contabilidad.asientos.listar' },
   { pattern: '/contabilidad/cierre-periodo', accion: 'contabilidad.cierre-periodo.listar' },
@@ -228,6 +250,7 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/config/bancos', accion: 'tesoreria.bancos.listar' },
   { pattern: '/config/cuentas-bancarias', accion: 'tesoreria.cuentas-bancarias.listar' },
   { pattern: '/config/tesoreria/tipos-documento', accion: 'tesoreria.tipos-documento.listar' },
+  { pattern: '/config/tesoreria/plantillas-cheque/nueva', accion: 'tesoreria.plantillas-cheque.crear' },
   { pattern: '/config/tesoreria/plantillas-cheque/*', accion: 'tesoreria.plantillas-cheque.listar' },
   { pattern: '/config/tesoreria/plantillas-cheque', accion: 'tesoreria.plantillas-cheque.listar' },
   { pattern: '/config/departamentos', accion: 'departamentos.listar' },
@@ -253,6 +276,9 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/config/impuestos-compras', accion: 'config.impuestos-compras.ver' },
   { pattern: '/config/impuestos-articulo', accion: 'config.item-tax-templates.ver' },
   { pattern: '/config/permisos', accion: null, soloSystemManager: true },
+  // Admin de acceso v2 (§7): cuando el backend exponga `config.acceso.gestionar`,
+  // migrar a esa acción. Mientras tanto, meta-administración por rol.
+  { pattern: '/config/acceso', accion: null, soloSystemManager: true },
   { pattern: '/config/roles/*', accion: null, soloSystemManager: true },
   { pattern: '/config/roles', accion: null, soloSystemManager: true },
   { pattern: '/config/auditoria-pin', accion: null, soloSystemManager: true },

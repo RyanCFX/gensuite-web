@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { listInvoices } from '@/shared/api/invoices'
 import type { ListInvoicesParams } from '@/shared/api/invoices'
-import { listSucursales } from '@/shared/api/sucursales'
 import { Plus, Eye, Search, GitBranch, SlidersHorizontal } from 'lucide-react'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
 import { getCatalogosFiscales } from '@/shared/api/config'
@@ -13,14 +12,17 @@ import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { fallbackSucursales, fallbackAseguradoras } from '@/shared/api/opcionesFallback'
+import { useFiltrosPantalla } from '@/shared/permissions/useAcceso'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { usePermissionsStore } from '@/stores/permissions.store'
-import { listAseguradoras, nombreAseguradora } from '@/shared/api/aseguradoras'
 import { EstadoArsBadge } from './EstadoArsBadge'
 import type { EstadoArs } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
 type EstadoArsFilter = EstadoArs | 'all' | 'sinLote'
@@ -51,6 +53,7 @@ const PAYMENT_LABEL: Record<string, string> = {
 }
 
 export default function InvoicesPage() {
+  const puedeCrear = usePuede('ventas.factura.crear')
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
@@ -69,30 +72,13 @@ export default function InvoicesPage() {
   const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
   const [aseguradora, setAseguradora] = useState('')
   const [aseguradoraLabel, setAseguradoraLabel] = useState('')
-  const [aseguradoraSearch, setAseguradoraSearch] = useState('')
+  // Filtros protegidos v2 (prompt Permisos v2 §3.3): pantalla `ventas.factura` (gate
+  // `ventas.factura.listar` sin el último segmento). Los controles bloqueados se esconden
+  // y los params se sanean antes de llamar al API (nunca se mandan).
+  const filtros = useFiltrosPantalla('ventas.factura')
   const [estadoArs, setEstadoArs] = useState<EstadoArsFilter>('all')
 
-  const { data: aseguradorasData, isLoading: aseguradorasLoading } = useQuery({
-    queryKey: ['aseguradoras-filtro-facturas', aseguradoraSearch],
-    queryFn: () => listAseguradoras({ nombre: aseguradoraSearch || undefined, limit: 15 }),
-    enabled: esFarmacia,
-  })
-  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((a) => ({
-    value: a.id,
-    label: nombreAseguradora(a),
-  }))
-
-  const { data: sucursalesData } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-  })
-  const sucursales = sucursalesData?.items ?? []
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchOptions: SearchSelectOption[] = sucursales
-    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
-
-  const params: ListInvoicesParams = {
+  const rawParams: ListInvoicesParams = {
     search: search || undefined,
     status: status === 'all' ? undefined : status,
     paymentStatus: paymentStatus === 'all' ? undefined : paymentStatus,
@@ -115,6 +101,9 @@ export default function InvoicesPage() {
         }
       : {}),
   }
+
+  // Los bloqueados nunca se mandan (aunque vengan con valor por defecto o URL compartida).
+  const { limpios: params } = filtros.sanear(rawParams)
 
   const { data, isLoading } = useQuery({
     queryKey: ['invoices', params],
@@ -192,10 +181,12 @@ export default function InvoicesPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <RecargarButton />
-          <button className="btn btn-navy" onClick={() => navigate('/facturas/nueva')}>
-            <Plus size={16} />
-            Nueva Factura
-          </button>
+          {puedeCrear && (
+            <button className="btn btn-navy" onClick={() => navigate('/facturas/nueva')}>
+              <Plus size={16} />
+              Nueva Factura
+            </button>
+          )}
         </div>
       </div>
 
@@ -212,6 +203,7 @@ export default function InvoicesPage() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              {filtros.puedeFiltrar('status') && (
               <FilterField label="Estado">
                 <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
                   <SelectItem value="all">Todos</SelectItem>
@@ -220,6 +212,8 @@ export default function InvoicesPage() {
                   <SelectItem value="cancelled">Cancelado</SelectItem>
                 </Select>
               </FilterField>
+              )}
+              {filtros.puedeFiltrar('paymentStatus') && (
               <FilterField label="Estado de pago">
                 <Select value={paymentStatus} onValueChange={(val) => setPaymentStatus(val as PaymentFilter)}>
                   <SelectItem value="all">Todo estado pago</SelectItem>
@@ -228,29 +222,32 @@ export default function InvoicesPage() {
                   <SelectItem value="paid">Pagado</SelectItem>
                 </Select>
               </FilterField>
+              )}
+              {filtros.puedeFiltrar('branch') && (
               <FilterField label="Sucursal" style={{ width: 200 }}>
-                <SearchSelect
+                <OpcionesSelect
+                  recurso="sucursales"
                   value={branch}
                   onChange={setBranch}
-                  options={branchOptions}
-                  onSearch={setBranchSearch}
-                  selectedLabel={branch}
                   placeholder="Todas las sucursales"
+                  selectedLabel={branch}
+                  fallback={fallbackSucursales}
                 />
               </FilterField>
-              {esFarmacia && (
+              )}
+              {esFarmacia && filtros.puedeFiltrar('aseguradora') && (
                 <>
                   <FilterField label="Aseguradora" style={{ width: 200 }}>
-                    <SearchSelect
+                    <OpcionesSelect
+                      recurso="aseguradoras"
                       value={aseguradora}
                       selectedLabel={aseguradoraLabel}
                       onChange={(val, opt) => { setAseguradora(val); setAseguradoraLabel(opt?.label ?? '') }}
-                      options={aseguradoraOptions}
-                      onSearch={setAseguradoraSearch}
-                      loading={aseguradorasLoading}
                       placeholder="Todas las ARS"
+                      fallback={fallbackAseguradoras}
                     />
                   </FilterField>
+                  {filtros.puedeFiltrar('estadoArs') && (
                   <FilterField label="Estado ARS">
                     <Select value={estadoArs} onValueChange={(val) => setEstadoArs(val as EstadoArsFilter)}>
                       <SelectItem value="all">Todo estado ARS</SelectItem>
@@ -261,6 +258,7 @@ export default function InvoicesPage() {
                       <SelectItem value="sinLote">Con cobertura, sin lote</SelectItem>
                     </Select>
                   </FilterField>
+                  )}
                 </>
               )}
 
@@ -356,9 +354,11 @@ export default function InvoicesPage() {
                   <div className="empty-state">
                     <div className="empty-title">Sin facturas</div>
                     <p className="empty-sub">Crea tu primera factura para comenzar.</p>
-                    <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/facturas/nueva')}>
-                      <Plus size={14} /> Nueva Factura
-                    </button>
+                    {puedeCrear && (
+                      <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/facturas/nueva')}>
+                        <Plus size={14} /> Nueva Factura
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -429,6 +429,7 @@ export default function InvoicesPage() {
           </>
         }
       >
+        {filtros.puedeFiltrar('ncfType') && (
         <div className="ff-wrap">
           <label className="ff-label">Tipo NCF</label>
           <SearchSelect
@@ -440,7 +441,9 @@ export default function InvoicesPage() {
             placeholder="Todos los tipos NCF"
           />
         </div>
+        )}
 
+        {(filtros.puedeFiltrar('fromDate') || filtros.puedeFiltrar('toDate')) && (
         <div className="ff-wrap">
           <label className="ff-label">Fecha</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -449,7 +452,9 @@ export default function InvoicesPage() {
             <DatePicker className="ff-input" value={toDate} onChange={setToDate} clearable />
           </div>
         </div>
+        )}
 
+        {filtros.puedeFiltrar('ncf') && (
         <div className="ff-wrap">
           <label className="ff-label">NCF</label>
           <input
@@ -459,7 +464,9 @@ export default function InvoicesPage() {
             onChange={(e) => setNcf(e.target.value)}
           />
         </div>
+        )}
 
+        {(filtros.puedeFiltrar('grandTotalMin') || filtros.puedeFiltrar('grandTotalMax')) && (
         <div className="ff-wrap">
           <label className="ff-label">Total</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -480,6 +487,7 @@ export default function InvoicesPage() {
             />
           </div>
         </div>
+        )}
       </Drawer>
     </div>
   )

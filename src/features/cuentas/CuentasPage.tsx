@@ -10,6 +10,7 @@ import { CuentaMovimientosModal } from '@/features/contabilidad/CuentaMovimiento
 import { Select, SelectItem } from '@/components/ui/select'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const PAGE_SIZE = 25
 
@@ -157,6 +158,7 @@ function TreeNode({ cuenta, depth, onNavigate, onMovimientos }: { cuenta: Cuenta
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CuentasPage() {
+  const puedeCrear = usePuede('contabilidad.cuentas.crear')
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'lista' | 'arbol'>('lista')
   const [movimientosAccount, setMovimientosAccount] = useState<string | null>(null)
@@ -210,10 +212,12 @@ export default function CuentasPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <RecargarButton />
-          <button className="btn btn-navy" onClick={() => navigate('/cuentas/nueva')}>
-            <Plus size={16} />
-            Nueva Cuenta
-          </button>
+          {puedeCrear && (
+            <button className="btn btn-navy" onClick={() => navigate('/cuentas/nueva')}>
+              <Plus size={16} />
+              Nueva Cuenta
+            </button>
+          )}
         </div>
       </div>
 

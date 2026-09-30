@@ -17,10 +17,12 @@ import { Drawer } from '@/shared/ui/Drawer'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const PAGE_SIZE = 20
 
 export default function CustomersPage() {
+  const puedeCrear = usePuede('clientes.crear')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -136,10 +138,12 @@ export default function CustomersPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <RecargarButton />
-          <button className="btn btn-navy" onClick={() => navigate('/clientes/nuevo')}>
-            <Plus size={16} />
-            Nuevo Cliente
-          </button>
+          {puedeCrear && (
+            <button className="btn btn-navy" onClick={() => navigate('/clientes/nuevo')}>
+              <Plus size={16} />
+              Nuevo Cliente
+            </button>
+          )}
         </div>
       </div>
 

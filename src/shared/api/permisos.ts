@@ -91,7 +91,36 @@ export async function resetPermisos(doctype: string) {
   await client.post(ENDPOINTS.permisos.reset, { doctype })
 }
 
-export async function assignPermiso(dto: AssignPermisoDto) {
-  const res = await client.post<{ success: true; data: PermisoRow }>(ENDPOINTS.permisos.asignar, dto)
-  return res.data.data
+export async function assignPermiso(dto: AssignPermisoDto): Promise<PermisoRow[]> {
+  // El backend responde `data` como ARRAY de filas crudas de DocPerm (flags en
+  // 0/1, `parent` = doctype, `if_owner`, más metadatos de Frappe) — no como un
+  // único PermisoRow. Se normaliza defensivamente (array o un solo objeto).
+  const res = await client.post<{ success: true; data: unknown }>(ENDPOINTS.permisos.asignar, dto)
+  const data = res.data.data
+  const list = Array.isArray(data) ? data : [data]
+  return list
+    .filter((r): r is RawDocPerm => !!r && typeof r === 'object' && typeof (r as RawDocPerm).role === 'string')
+    .map(normalizeDocPermRow)
+}
+
+/** Fila cruda de DocPerm tal como la devuelve el backend (flags 0/1). */
+interface RawDocPerm {
+  role: string
+  permlevel?: number | string
+  if_owner?: number | boolean
+  [k: string]: unknown
+}
+
+function toFlagBoolean(v: unknown): boolean {
+  return v === true || v === 1 || v === '1'
+}
+
+function normalizeDocPermRow(raw: RawDocPerm): PermisoRow {
+  const row = {
+    role: raw.role,
+    permlevel: typeof raw.permlevel === 'string' ? Number(raw.permlevel) : (raw.permlevel ?? 0),
+    ifOwner: toFlagBoolean(raw.if_owner),
+  } as PermisoRow
+  for (const pt of PERMISO_PTYPES) row[pt] = toFlagBoolean(raw[pt])
+  return row
 }

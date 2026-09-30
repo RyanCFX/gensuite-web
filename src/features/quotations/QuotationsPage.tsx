@@ -19,6 +19,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const COLUMNS = [
   { key: 'id', width: 100 },
@@ -48,6 +49,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function QuotationsPage() {
+  const puedeCrear = usePuede('cotizaciones.crear')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [customerId, setCustomerId] = useState('')
@@ -114,10 +116,12 @@ export default function QuotationsPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <RecargarButton />
-          <button className="btn btn-navy" onClick={() => navigate('/cotizaciones/nueva')}>
-            <Plus size={16} />
-            Nueva Cotización
-          </button>
+          {puedeCrear && (
+            <button className="btn btn-navy" onClick={() => navigate('/cotizaciones/nueva')}>
+              <Plus size={16} />
+              Nueva Cotización
+            </button>
+          )}
         </div>
       </div>
 
@@ -217,9 +221,11 @@ export default function QuotationsPage() {
                   <div className="empty-state">
                     <div className="empty-title">Sin cotizaciones</div>
                     <p className="empty-sub">Crea tu primera cotización para comenzar.</p>
-                    <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/cotizaciones/nueva')}>
-                      <Plus size={14} /> Nueva Cotización
-                    </button>
+                    {puedeCrear && (
+                      <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/cotizaciones/nueva')}>
+                        <Plus size={14} /> Nueva Cotización
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

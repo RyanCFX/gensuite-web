@@ -14,6 +14,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const PAGE_SIZE = 20
 
@@ -34,6 +35,7 @@ function PerOrderedBadge({ perOrdered }: { perOrdered: number }) {
 }
 
 export default function SolicitudesPage() {
+  const puedeCrear = usePuede('compras.solicitud.crear')
   const navigate = useNavigate()
   const [status, setStatus] = useState<string>('all')
   const [orderingStatus, setOrderingStatus] = useState<string>('all')
@@ -69,10 +71,12 @@ export default function SolicitudesPage() {
         action={
           <>
             <RecargarButton />
-            <button className="btn btn-navy" onClick={() => navigate('/compras/solicitudes/nueva')}>
-              <Plus size={16} />
-              Nueva Solicitud
-            </button>
+            {puedeCrear && (
+              <button className="btn btn-navy" onClick={() => navigate('/compras/solicitudes/nueva')}>
+                <Plus size={16} />
+                Nueva Solicitud
+              </button>
+            )}
           </>
         }
       />
@@ -180,9 +184,11 @@ export default function SolicitudesPage() {
                                 </div>
                                 <p className="empty-title">Sin solicitudes</p>
                                 <p className="empty-sub">No hay solicitudes de compra registradas.</p>
-                                <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/compras/solicitudes/nueva')}>
-                                  <Plus size={14} />Nueva Solicitud
-                                </button>
+                                {puedeCrear && (
+                                  <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/compras/solicitudes/nueva')}>
+                                    <Plus size={14} />Nueva Solicitud
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>

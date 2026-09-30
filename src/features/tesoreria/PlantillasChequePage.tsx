@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { PlantillasTabs } from '@/shared/ui/PlantillasTabs'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const COLUMNS = [
   { key: 'nombre', width: 200 },
@@ -15,6 +16,7 @@ const COLUMNS = [
 ]
 
 export default function PlantillasChequePage() {
+  const puedeCrear = usePuede('tesoreria.plantillas-cheque.crear')
   const navigate = useNavigate()
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
@@ -33,10 +35,12 @@ export default function PlantillasChequePage() {
         action={
           <>
             <RecargarButton />
-            <button className="btn btn-primary" onClick={() => navigate('/config/tesoreria/plantillas-cheque/nueva')}>
-              <Plus size={16} />
-              Nueva Plantilla
-            </button>
+            {puedeCrear && (
+              <button className="btn btn-primary" onClick={() => navigate('/config/tesoreria/plantillas-cheque/nueva')}>
+                <Plus size={16} />
+                Nueva Plantilla
+              </button>
+            )}
           </>
         }
       />

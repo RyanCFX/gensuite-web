@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuthStore } from '@/stores/auth.store'
-import { usePermissionsStore } from '@/stores/permissions.store'
+import { usePermissionsStore, sincronizarAccesoEnFoco } from '@/stores/permissions.store'
 import { useFeaturesStore } from '@/stores/features.store'
 import { useTenantStatusStore, type TenantBlockingCode } from '@/stores/tenantStatus.store'
 
@@ -70,6 +70,10 @@ export function ProtectedRoute() {
 
   // Features y permisos se piden UNA sola vez al iniciar sesión (o al cambiar de tenant),
   // en paralelo — ver docs/tasks/80_features_tenant_discriminacion_ui.md §3.
+  // El refresco de acceso por foco (>60 s, Permisos v2 §2.1) se registra una sola vez.
+  useEffect(() => {
+    sincronizarAccesoEnFoco()
+  }, [])
   useEffect(() => {
     if (isAuthenticated && !needsTenantSelection && permStatus === 'idle') {
       fetchPermissions()

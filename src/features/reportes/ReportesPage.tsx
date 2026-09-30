@@ -1,4 +1,4 @@
-import { useState, Fragment } from 'react'
+import { useState, Fragment, createContext, useContext } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -34,13 +34,7 @@ import { useFeaturesStore } from '@/stores/features.store'
 import { REPORTE_KEY_POR_TIPO } from '@/shared/features/catalog'
 import type { LibroDiarioByDimension, CuadreTurnoRow, CorteCajaDiaTurno, AgingGroupBy } from '@/shared/api/types'
 import { CorteCajaView } from '@/components/shared/CorteCajaView'
-import { listSucursales } from '@/shared/api/sucursales'
-import { listCustomers } from '@/shared/api/customers'
-import { listAseguradoras, nombreAseguradora } from '@/shared/api/aseguradoras'
-import { listSuppliers } from '@/shared/api/suppliers'
-import { listUsuarios } from '@/shared/api/usuarios'
-import { listItems } from '@/shared/api/catalog'
-import { getFacturacionConfig, listAlmacenes } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { format } from 'date-fns'
@@ -49,6 +43,13 @@ import { BarChart3, AlertCircle, Download, FileText, Loader2, RefreshCw } from '
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { useOpciones } from '@/shared/hooks/useOpciones'
+import {
+  fallbackSucursales, fallbackClientes, fallbackProveedores, fallbackArticulos,
+  fallbackAlmacenes, fallbackUsuarios, fallbackAseguradoras,
+} from '@/shared/api/opcionesFallback'
+import { useFiltrosPantalla } from '@/shared/permissions/useAcceso'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { GlLedgerTable } from '@/shared/ui/GlLedgerTable'
@@ -56,13 +57,14 @@ import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
 // ─── Branch / Department filter ──────────────────────────────────────────────
 
-function useBranchOptions() {
-  const { data } = useQuery({
-    queryKey: ['reportes-sucursales-options'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    staleTime: 60_000,
-  })
-  return data?.items ?? []
+// Clave de pantalla v2 del reporte activo (`reportes.<tipo>`, §3.4 del prompt de Permisos
+// v2): los filtros compartidos la consumen para esconder controles bloqueados.
+const ReportePantallaContext = createContext('')
+
+function useReporteFiltros() {
+  const pantalla = useContext(ReportePantallaContext)
+  const filtros = useFiltrosPantalla(pantalla)
+  return { pantalla, filtros }
 }
 
 /** Selectores opcionales de Sucursal / Departamento para reportes con rango de fechas. */
@@ -75,23 +77,20 @@ function BranchDepartmentFilters({
   department: string
   onDepartmentChange: (v: string) => void
 }) {
-  const branches = useBranchOptions()
-
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchOptions: SearchSelectOption[] = branches
-    .filter((b) => !branchSearch || b.name.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((b) => ({ value: b.name, label: b.name }))
+  const { pantalla } = useReporteFiltros()
+  const filtros = useFiltrosPantalla(pantalla)
+  if (!filtros.puedeFiltrar('branch')) return null
 
   return (
     <>
       <FilterField label="Sucursal" style={{ width: 200 }}>
-        <SearchSelect
+        <OpcionesSelect
+          recurso="sucursales"
           value={branch}
           onChange={onBranchChange}
-          options={branchOptions}
-          onSearch={setBranchSearch}
           selectedLabel={branch}
           placeholder="Todas las sucursales"
+          fallback={fallbackSucursales}
         />
       </FilterField>
     </>
@@ -298,16 +297,19 @@ function DgiiReport({ tipo }: { tipo: '606' | '607' | '608' }) {
   const [downloadingExcel, setDownloadingExcel] = useState(false)
   const fn = tipo === '606' ? getReporte606 : tipo === '607' ? getReporte607 : getReporte608
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteDgiiRaw = { year, month, branch: branch || undefined, department: department || undefined }
+  const { limpios: paramsReporteDgii } = filtros.sanear(paramsReporteDgiiRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-dgii', tipo, year, month, branch, department],
-    queryFn: () => fn({ year, month, branch: branch || undefined, department: department || undefined }),
+    queryFn: () => fn(paramsReporteDgii),
     retry: false,
   })
 
   async function handleDownloadExcel() {
     setDownloadingExcel(true)
     try {
-      await downloadReporteExcel(tipo, year, month, branch || undefined)
+      await downloadReporteExcel(tipo, year, month, paramsReporteDgii.branch)
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? 'Error al descargar el Excel'
       const { toast } = await import('sonner')
@@ -406,9 +408,12 @@ function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
   const fn = tipo === 'balance' ? getBalanceGeneral : getIngresosEgresos
   const downloadPdf = tipo === 'balance' ? downloadBalanceGeneralPdf : downloadIngresosEgresosPdf
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteFinancialRaw = { fromDate, toDate, periodicity, branch: branch || undefined, department: department || undefined }
+  const { limpios: paramsReporteFinancial } = filtros.sanear(paramsReporteFinancialRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-financial', tipo, fromDate, toDate, periodicity, branch, department],
-    queryFn: () => fn({ fromDate, toDate, periodicity, branch: branch || undefined, department: department || undefined }),
+    queryFn: () => fn(paramsReporteFinancial),
     retry: false,
   })
 
@@ -440,7 +445,7 @@ function FinancialReport({ tipo }: { tipo: 'balance' | 'pl' }) {
             </div>
             <div className="filter-bar-right">
               <DownloadPdfButton
-                onDownload={() => downloadPdf({ fromDate, toDate, periodicity, branch: branch || undefined, department: department || undefined })}
+                onDownload={() => downloadPdf(paramsReporteFinancial)}
               />
             </div>
           </div>
@@ -471,9 +476,12 @@ function VentasReport() {
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteVentasRaw = { fromDate, toDate, groupBy, branch: branch || undefined, department: department || undefined }
+  const { limpios: paramsReporteVentas } = filtros.sanear(paramsReporteVentasRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-ventas', fromDate, toDate, groupBy, branch, department],
-    queryFn: () => getReporteVentas({ fromDate, toDate, groupBy, branch: branch || undefined, department: department || undefined }),
+    queryFn: () => getReporteVentas(paramsReporteVentas),
     retry: false,
   })
 
@@ -503,7 +511,7 @@ function VentasReport() {
             </div>
             <div className="filter-bar-right">
               <DownloadPdfButton
-                onDownload={() => downloadVentasPdf({ fromDate, toDate, groupBy, branch: branch || undefined, department: department || undefined })}
+                onDownload={() => downloadVentasPdf(paramsReporteVentas)}
               />
             </div>
           </div>
@@ -530,9 +538,12 @@ function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
   // hoy para Movimientos de Inventario, no para ningún otro reporte.
   const puedeVerMovimientos = usePermissionsStore((s) => s.acciones['reportes.inventario.movimientos.ver'] === true)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteInventarioRaw = { fromDate, toDate, branch: branch || undefined, department: department || undefined }
+  const { limpios: paramsReporteInventario } = filtros.sanear(paramsReporteInventarioRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-inventario', tipo, fromDate, toDate, branch, department],
-    queryFn: () => fn({ fromDate, toDate, branch: branch || undefined, department: department || undefined }),
+    queryFn: () => fn(paramsReporteInventario),
     retry: false,
   })
 
@@ -575,7 +586,7 @@ function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
                 </button>
               )}
               <DownloadPdfButton
-                onDownload={() => downloadPdf({ fromDate, toDate, branch: branch || undefined, department: department || undefined })}
+                onDownload={() => downloadPdf(paramsReporteInventario)}
               />
             </div>
           </div>
@@ -598,22 +609,16 @@ function InventarioReport({ tipo }: { tipo: 'stock' | 'movimientos' }) {
 
 function CxcAgingReport() {
   const [customer, setCustomer] = useState('')
-  const [customerLabel, setCustomerLabel] = useState('')
-  const [customerQuery, setCustomerQuery] = useState('')
   const [groupBy, setGroupBy] = useState<AgingGroupBy>('party')
+  const customerFilter = useCustomerFilter(customer)
+  const { filtros } = useReporteFiltros()
 
-  const { data: customersData, isLoading: customersLoading } = useQuery({
-    queryKey: ['customerSearch', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-  })
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
-  }))
+  const rawParams = { customer: customer || undefined, groupBy }
+  const { limpios: params } = filtros.sanear(rawParams)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-cxc-aging', customer, groupBy],
-    queryFn: () => getCxcAging({ customer: customer || undefined, groupBy }),
+    queryFn: () => getCxcAging(params),
     retry: false,
   })
 
@@ -627,17 +632,19 @@ function CxcAgingReport() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
+              {filtros.puedeFiltrar('customer') && (
               <FilterField label="Cliente" style={{ width: 240 }}>
                 <SearchSelect
                   value={customer}
-                  selectedLabel={customerLabel}
-                  onChange={(val, opt) => { setCustomer(val); setCustomerLabel(opt?.label ?? '') }}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={customersLoading}
+                  selectedLabel={customerFilter.label}
+                  onChange={(val) => setCustomer(val)}
+                  options={customerFilter.options}
+                  onSearch={customerFilter.onSearch}
+                  loading={customerFilter.isLoading}
                   placeholder="Todos los clientes"
                 />
               </FilterField>
+              )}
               <FilterField label="Agrupar por">
                 <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
                   <SelectItem value="party">Agrupar por Cliente</SelectItem>
@@ -646,7 +653,7 @@ function CxcAgingReport() {
               </FilterField>
             </div>
             <div className="filter-bar-right">
-              <DownloadPdfButton onDownload={() => downloadCxcAgingPdf({ customer: customer || undefined, groupBy })} />
+              <DownloadPdfButton onDownload={() => downloadCxcAgingPdf(params)} />
             </div>
           </div>
         </div>
@@ -662,22 +669,16 @@ function CxcAgingReport() {
 
 function CxpAgingReport() {
   const [supplier, setSupplier] = useState('')
-  const [supplierLabel, setSupplierLabel] = useState('')
-  const [supplierQuery, setSupplierQuery] = useState('')
   const [groupBy, setGroupBy] = useState<AgingGroupBy>('party')
+  const supplierFilter = useSupplierFilter(supplier)
+  const { filtros } = useReporteFiltros()
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['supplierSearch', supplierQuery],
-    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
-  })
-  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
-    value: s.id,
-    label: s.supplierName,
-  }))
+  const rawParams = { supplier: supplier || undefined, groupBy }
+  const { limpios: params } = filtros.sanear(rawParams)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-cxp-aging', supplier, groupBy],
-    queryFn: () => getCxpAging({ supplier: supplier || undefined, groupBy }),
+    queryFn: () => getCxpAging(params),
     retry: false,
   })
 
@@ -691,17 +692,19 @@ function CxpAgingReport() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
+              {filtros.puedeFiltrar('supplier') && (
               <FilterField label="Proveedor" style={{ width: 240 }}>
                 <SearchSelect
                   value={supplier}
-                  selectedLabel={supplierLabel}
-                  onChange={(val, opt) => { setSupplier(val); setSupplierLabel(opt?.label ?? '') }}
-                  options={supplierOptions}
-                  onSearch={setSupplierQuery}
-                  loading={suppliersLoading}
+                  selectedLabel={supplierFilter.label}
+                  onChange={(val) => setSupplier(val)}
+                  options={supplierFilter.options}
+                  onSearch={supplierFilter.onSearch}
+                  loading={supplierFilter.isLoading}
                   placeholder="Todos los proveedores"
                 />
               </FilterField>
+              )}
               <FilterField label="Agrupar por">
                 <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
                   <SelectItem value="party">Agrupar por Proveedor</SelectItem>
@@ -710,7 +713,7 @@ function CxpAgingReport() {
               </FilterField>
             </div>
             <div className="filter-bar-right">
-              <DownloadPdfButton onDownload={() => downloadCxpAgingPdf({ supplier: supplier || undefined, groupBy })} />
+              <DownloadPdfButton onDownload={() => downloadCxpAgingPdf(params)} />
             </div>
           </div>
         </div>
@@ -734,9 +737,12 @@ function CajaCuadreReport() {
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
   const { widths: metodoPagoColWidths, startResize: startMetodoPagoResize } = useResizableColumns(METODO_PAGO_COLUMNS)
+  const { filtros } = useReporteFiltros()
+  const paramsReporteCajaRaw = { date, branch: branch || undefined, department: department || undefined }
+  const { limpios: paramsReporteCaja } = filtros.sanear(paramsReporteCajaRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-caja', date, branch, department],
-    queryFn: () => getCajaCuadre({ date, branch: branch || undefined, department: department || undefined }),
+    queryFn: () => getCajaCuadre(paramsReporteCaja),
     retry: false,
   })
 
@@ -764,7 +770,7 @@ function CajaCuadreReport() {
             </div>
             <div className="filter-bar-right">
               <DownloadPdfButton
-                onDownload={() => downloadCajaCuadrePdf({ date, branch: branch || undefined, department: department || undefined })}
+                onDownload={() => downloadCajaCuadrePdf(paramsReporteCaja)}
               />
             </div>
           </div>
@@ -910,15 +916,6 @@ function CajaCuadreReport() {
   )
 }
 
-function useCajeroOptions() {
-  const { data } = useQuery({
-    queryKey: ['reportes-cajeros-options'],
-    queryFn: () => listUsuarios({ limit: 100 }),
-    staleTime: 60_000,
-  })
-  return data?.items ?? []
-}
-
 function diferenciaColor(diff: number): string | undefined {
   if (diff < 0) return 'var(--error-text)'
   if (diff > 0) return 'var(--warning-text)'
@@ -929,16 +926,16 @@ function CuadreTurnoReport() {
   const [fromDate, setFromDate] = useState(monthStart())
   const [toDate, setToDate] = useState(today())
   const [cajero, setCajero] = useState('')
+  const [cajeroLabel, setCajeroLabel] = useState('')
   const [downloadingExcel, setDownloadingExcel] = useState(false)
-  const cajeros = useCajeroOptions()
-  const [cajeroSearch, setCajeroSearch] = useState('')
-  const cajeroOptions: SearchSelectOption[] = cajeros
-    .filter((u) => !cajeroSearch || u.fullName.toLowerCase().includes(cajeroSearch.toLowerCase()))
-    .map((u) => ({ value: u.email, label: u.fullName }))
+  const { filtros } = useReporteFiltros()
+
+  const rawParamsCuadre = { fromDate, toDate, cajero: cajero || undefined }
+  const { limpios: paramsCuadre } = filtros.sanear(rawParamsCuadre)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-cuadre-turno', fromDate, toDate, cajero],
-    queryFn: () => getCuadreTurno({ fromDate, toDate, cajero: cajero || undefined }),
+    queryFn: () => getCuadreTurno(paramsCuadre),
     retry: false,
   })
 
@@ -977,7 +974,7 @@ function CuadreTurnoReport() {
   async function handleDownloadExcel() {
     setDownloadingExcel(true)
     try {
-      await downloadCuadreTurnoExcel({ fromDate, toDate, cajero: cajero || undefined })
+      await downloadCuadreTurnoExcel(paramsCuadre)
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? 'Error al descargar el Excel'
       const { toast } = await import('sonner')
@@ -999,16 +996,18 @@ function CuadreTurnoReport() {
               <FilterField label="Hasta">
                 <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
               </FilterField>
+              {filtros.puedeFiltrar('cajero') && (
               <FilterField label="Cajero" style={{ width: 200 }}>
-                <SearchSelect
+                <OpcionesSelect
+                  recurso="usuarios"
                   value={cajero}
-                  onChange={setCajero}
-                  options={cajeroOptions}
-                  onSearch={setCajeroSearch}
-                  selectedLabel={cajeros.find((u) => u.email === cajero)?.fullName ?? ''}
+                  selectedLabel={cajeroLabel}
+                  onChange={(val, opt) => { setCajero(val); setCajeroLabel(opt?.label ?? '') }}
                   placeholder="Todos los cajeros"
+                  fallback={fallbackUsuarios}
                 />
               </FilterField>
+              )}
             </div>
             <div className="filter-bar-right">
               <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadExcel} disabled={downloadingExcel}>
@@ -1017,7 +1016,7 @@ function CuadreTurnoReport() {
               </button>
               {/* Acción separada — /pdf ignora cualquier `format`, no es un tercer valor del selector de Excel */}
               <DownloadPdfButton
-                onDownload={() => downloadCuadreTurnoPdf({ fromDate, toDate, cajero: cajero || undefined })}
+                onDownload={() => downloadCuadreTurnoPdf(paramsCuadre)}
               />
             </div>
           </div>
@@ -1129,15 +1128,15 @@ function CorteCajaDiaReport() {
   const [date, setDate] = useState(today())
   const [cajero, setCajero] = useState('')
   const [downloadingPdf, setDownloadingPdf] = useState(false)
-  const cajeros = useCajeroOptions()
-  const [cajeroSearch, setCajeroSearch] = useState('')
-  const cajeroOptions: SearchSelectOption[] = cajeros
-    .filter((u) => !cajeroSearch || u.fullName.toLowerCase().includes(cajeroSearch.toLowerCase()))
-    .map((u) => ({ value: u.email, label: u.fullName }))
+  const [cajeroLabel, setCajeroLabel] = useState('')
+  const { filtros: filtrosCorte } = useReporteFiltros()
+
+  const rawParamsCorte = { date, cajero: cajero || undefined }
+  const { limpios: paramsCorte } = filtrosCorte.sanear(rawParamsCorte)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-corte-caja-dia', date, cajero],
-    queryFn: () => getCorteCajaDia({ date, cajero: cajero || undefined }),
+    queryFn: () => getCorteCajaDia(paramsCorte),
     enabled: !!date,
     retry: false,
   })
@@ -1166,7 +1165,7 @@ function CorteCajaDiaReport() {
   async function handleDownloadPdf() {
     setDownloadingPdf(true)
     try {
-      await downloadCorteCajaDiaPdf({ date, cajero: cajero || undefined })
+      await downloadCorteCajaDiaPdf(paramsCorte)
     } catch (err) {
       toast.error((err as { message?: string })?.message ?? 'No se pudo descargar el PDF')
     } finally {
@@ -1183,16 +1182,18 @@ function CorteCajaDiaReport() {
               <FilterField label="Fecha">
                 <DatePicker className="filter-select" value={date} onChange={setDate} />
               </FilterField>
+              {filtrosCorte.puedeFiltrar('cajero') && (
               <FilterField label="Cajero" style={{ width: 200 }}>
-                <SearchSelect
+                <OpcionesSelect
+                  recurso="usuarios"
                   value={cajero}
-                  onChange={setCajero}
-                  options={cajeroOptions}
-                  onSearch={setCajeroSearch}
-                  selectedLabel={cajeros.find((u) => u.email === cajero)?.fullName ?? ''}
+                  selectedLabel={cajeroLabel}
+                  onChange={(val, opt) => { setCajero(val); setCajeroLabel(opt?.label ?? '') }}
                   placeholder="Todos los cajeros"
+                  fallback={fallbackUsuarios}
                 />
               </FilterField>
+              )}
             </div>
             <div className="filter-bar-right">
               <button className="btn btn-secondary btn-size-sm" onClick={handleDownloadPdf} disabled={downloadingPdf || !date}>
@@ -1339,38 +1340,24 @@ function LibroDiarioReport() {
   const [partyType, setPartyType] = useState<'' | 'Customer' | 'Supplier'>('')
   const [party, setParty] = useState('')
   const [partyLabel, setPartyLabel] = useState('')
-  const [partyQuery, setPartyQuery] = useState('')
-
-  const { data: customersData, isLoading: customersLoading } = useQuery({
-    queryKey: ['customerSearch', partyQuery],
-    queryFn: () => listCustomers({ search: partyQuery || undefined, limit: 15 }),
-    enabled: partyType === 'Customer',
-  })
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['supplierSearch', partyQuery],
-    queryFn: () => listSuppliers({ search: partyQuery || undefined, limit: 15 }),
-    enabled: partyType === 'Supplier',
-  })
-  const partyOptions: SearchSelectOption[] = partyType === 'Customer'
-    ? (customersData?.items ?? []).map((c) => ({ value: c.id, label: c.customerName }))
-    : partyType === 'Supplier'
-      ? (suppliersData?.items ?? []).map((s) => ({ value: s.id, label: s.supplierName }))
-      : []
 
   function handlePartyTypeChange(val: string) {
     setPartyType(val === 'all' ? '' : (val as 'Customer' | 'Supplier'))
     setParty('')
     setPartyLabel('')
-    setPartyQuery('')
   }
+
+  const { filtros } = useReporteFiltros()
+  const rawParams = {
+    fromDate, toDate, branch: branch || undefined, department: department || undefined, groupBy,
+    partyType: partyType || undefined,
+    party: partyType && party ? party : undefined,
+  }
+  const { limpios: params } = filtros.sanear(rawParams)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-libro-diario', fromDate, toDate, branch, department, groupBy, partyType, party],
-    queryFn: () => getLibroDiario({
-      fromDate, toDate, branch: branch || undefined, department: department || undefined, groupBy,
-      partyType: partyType || undefined,
-      party: partyType && party ? party : undefined,
-    }),
+    queryFn: () => getLibroDiario(params),
     retry: false,
   })
 
@@ -1410,16 +1397,16 @@ function LibroDiarioReport() {
                   <SelectItem value="Supplier">Proveedor</SelectItem>
                 </Select>
               </FilterField>
-              {partyType && (
+              {partyType && filtros.puedeFiltrar('party') && (
                 <FilterField label={partyType === 'Customer' ? 'Cliente' : 'Proveedor'} style={{ width: 220 }}>
-                  <SearchSelect
+                  <OpcionesSelect
+                    key={partyType}
+                    recurso={partyType === 'Customer' ? 'clientes' : 'proveedores'}
                     value={party}
                     selectedLabel={partyLabel}
                     onChange={(val, opt) => { setParty(val); setPartyLabel(opt?.label ?? '') }}
-                    options={partyOptions}
-                    onSearch={setPartyQuery}
-                    loading={partyType === 'Customer' ? customersLoading : suppliersLoading}
                     placeholder={partyType === 'Customer' ? 'Todos los clientes' : 'Todos los proveedores'}
+                    fallback={partyType === 'Customer' ? fallbackClientes : fallbackProveedores}
                   />
                 </FilterField>
               )}
@@ -1452,9 +1439,12 @@ function LibroMayorReport() {
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteLibroMayorRaw = { fromDate, toDate, branch: branch || undefined, department: department || undefined }
+  const { limpios: paramsReporteLibroMayor } = filtros.sanear(paramsReporteLibroMayorRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-libro-mayor', fromDate, toDate, branch, department],
-    queryFn: () => getLibroMayor({ fromDate, toDate, branch: branch || undefined, department: department || undefined }),
+    queryFn: () => getLibroMayor(paramsReporteLibroMayor),
     retry: false,
   })
 
@@ -1496,15 +1486,12 @@ function LibroMayorReport() {
 // Nunca `/customers`: el vertical expone las ARS en su propio CRUD y el backend rechaza un
 // Customer que no sea aseguradora (docs/PROMPT_FARMACIA_V2_FRONTEND.md §3.2).
 function useAseguradoraFilter(aseguradoraId: string) {
+  const { filtros: filtrosCtx } = useReporteFiltros()
   const [query, setQuery] = useState('')
-  const { data, isLoading } = useQuery({
-    queryKey: ['aseguradoras-filtro-reportes', query],
-    queryFn: () => listAseguradoras({ nombre: query || undefined, limit: 15 }),
-  })
-  const options: SearchSelectOption[] = (data?.items ?? []).map((a) => ({ value: a.id, label: nombreAseguradora(a) }))
-  const encontrada = data?.items.find((a) => a.id === aseguradoraId)
-  const label = encontrada ? nombreAseguradora(encontrada) : ''
-  return { options, label, isLoading, onSearch: setQuery }
+  const { data, isLoading } = useOpciones('aseguradoras', { q: query, limit: 15, fallback: fallbackAseguradoras })
+  const options: SearchSelectOption[] = (data ?? []).map((a) => ({ value: a.value, label: a.label }))
+  const label = data?.find((a) => a.value === aseguradoraId)?.label ?? ''
+  return { options, label, isLoading, onSearch: setQuery , visible: filtrosCtx.puedeFiltrar('aseguradora') }
 }
 
 function FarmaciaLotesReport() {
@@ -1514,9 +1501,12 @@ function FarmaciaLotesReport() {
   const [hasta, setHasta] = useState('')
   const aseguradoraFilter = useAseguradoraFilter(aseguradora)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteFarmaciaLotesRaw = { aseguradora: aseguradora || undefined, estado: estado || undefined, desde: desde || undefined, hasta: hasta || undefined }
+  const { limpios: paramsReporteFarmaciaLotes } = filtros.sanear(paramsReporteFarmaciaLotesRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-farmacia-lotes', aseguradora, estado, desde, hasta],
-    queryFn: () => getReporteFarmaciaLotes({ aseguradora: aseguradora || undefined, estado: estado || undefined, desde: desde || undefined, hasta: hasta || undefined }),
+    queryFn: () => getReporteFarmaciaLotes(paramsReporteFarmaciaLotes),
     retry: false,
   })
 
@@ -1526,6 +1516,7 @@ function FarmaciaLotesReport() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
+              {aseguradoraFilter.visible && (
               <FilterField label="ARS" style={{ width: 200 }}>
                 <SearchSelect
                   value={aseguradora}
@@ -1537,6 +1528,8 @@ function FarmaciaLotesReport() {
                   placeholder="Todas las ARS"
                 />
               </FilterField>
+              )}
+              {filtros.puedeFiltrar('estado') && (
               <FilterField label="Estado">
                 <Select value={estado || 'all'} onValueChange={(val) => setEstado(val === 'all' ? '' : val)}>
                   <SelectItem value="all">Todos los estados</SelectItem>
@@ -1545,6 +1538,7 @@ function FarmaciaLotesReport() {
                   <SelectItem value="Facturado">Facturado</SelectItem>
                 </Select>
               </FilterField>
+              )}
               <FilterField label="Desde">
                 <DatePicker className="filter-select" clearable value={desde} onChange={setDesde} />
               </FilterField>
@@ -1571,14 +1565,17 @@ function FarmaciaFacturasArsReport() {
   const [hasta, setHasta] = useState('')
   const aseguradoraFilter = useAseguradoraFilter(aseguradora)
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['reporte-farmacia-facturas-ars', aseguradora, estadoArs, desde, hasta],
-    queryFn: () => getReporteFacturasArs({
+  const { filtros } = useReporteFiltros()
+  const paramsReporteFarmaciaFacturasArsRaw = {
       aseguradora: aseguradora || undefined,
       estadoArs: estadoArs || undefined,
       desde: desde || undefined,
       hasta: hasta || undefined,
-    }),
+    }
+  const { limpios: paramsReporteFarmaciaFacturasArs } = filtros.sanear(paramsReporteFarmaciaFacturasArsRaw)
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-farmacia-facturas-ars', aseguradora, estadoArs, desde, hasta],
+    queryFn: () => getReporteFacturasArs(paramsReporteFarmaciaFacturasArs),
     retry: false,
   })
 
@@ -1588,6 +1585,7 @@ function FarmaciaFacturasArsReport() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
+              {aseguradoraFilter.visible && (
               <FilterField label="ARS" style={{ width: 200 }}>
                 <SearchSelect
                   value={aseguradora}
@@ -1599,6 +1597,8 @@ function FarmaciaFacturasArsReport() {
                   placeholder="Todas las ARS"
                 />
               </FilterField>
+              )}
+              {filtros.puedeFiltrar('estadoArs') && (
               <FilterField label="Estado ARS">
                 <Select value={estadoArs || 'all'} onValueChange={(val) => setEstadoArs(val === 'all' ? '' : val)}>
                   <SelectItem value="all">Todos los estados</SelectItem>
@@ -1608,6 +1608,7 @@ function FarmaciaFacturasArsReport() {
                   <SelectItem value="Anulada">Anulada</SelectItem>
                 </Select>
               </FilterField>
+              )}
               <FilterField label="Desde">
                 <DatePicker className="filter-select" clearable value={desde} onChange={setDesde} />
               </FilterField>
@@ -1666,9 +1667,12 @@ function FacturacionFiscalReport() {
   const puedeImprimir = usePermissionsStore((s) => s.acciones['reportes.dgii.facturacion-fiscal.imprimir'] === true)
   const { widths: comprobanteColWidths, startResize: startComprobanteResize } = useResizableColumns(COMPROBANTE_FORMA_PAGO_COLUMNS)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteFacturacionFiscalRaw = { fromDate, toDate, branch: branch || undefined, department: department || undefined }
+  const { limpios: paramsReporteFacturacionFiscal } = filtros.sanear(paramsReporteFacturacionFiscalRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-facturacion-fiscal', fromDate, toDate, branch, department],
-    queryFn: () => getFacturacionFiscal({ fromDate, toDate, branch: branch || undefined, department: department || undefined }),
+    queryFn: () => getFacturacionFiscal(paramsReporteFacturacionFiscal),
     retry: false,
   })
 
@@ -1694,7 +1698,7 @@ function FacturacionFiscalReport() {
             {puedeImprimir && (
               <div className="filter-bar-right">
                 <DownloadPdfButton
-                  onDownload={() => downloadFacturacionFiscalPdf({ fromDate, toDate, branch: branch || undefined, department: department || undefined })}
+                  onDownload={() => downloadFacturacionFiscalPdf(paramsReporteFacturacionFiscal)}
                 />
               </div>
             )}
@@ -1800,58 +1804,45 @@ function FacturacionFiscalReport() {
 
 // ─── 9 reportes nativos nuevos (docs/tasks/62_reportes_solicitados_y_reportes_nuevos.md §Parte 2) ─
 // Mismo patrón {columns, rows} de siempre — se renderizan con AutoTable, igual que Ventas/
-// Balance/Valoración de Stock. Filtros compartidos de Proveedor/Cliente/Artículo/Almacén.
+// Balance/Valoración de Stock. Filtros compartidos de Proveedor/Cliente/Artículo/Almacén
+// alimentados por GET /opciones/:recurso (con fallback legacy si el backend aún no lo expone).
 
 function useSupplierFilter(supplierId: string) {
+  const { filtros: filtrosCtx } = useReporteFiltros()
   const [query, setQuery] = useState('')
-  const { data, isLoading } = useQuery({
-    queryKey: ['supplier-filtro-reportes', query],
-    queryFn: () => listSuppliers({ search: query || undefined, limit: 15 }),
-  })
-  const options: SearchSelectOption[] = (data?.items ?? []).map((s) => ({ value: s.id, label: s.supplierName }))
-  const encontrado = data?.items.find((s) => s.id === supplierId)
-  const label = encontrado ? encontrado.supplierName : ''
-  return { options, label, isLoading, onSearch: setQuery }
+  const { data, isLoading } = useOpciones('proveedores', { q: query, limit: 15, fallback: fallbackProveedores })
+  const options: SearchSelectOption[] = (data ?? []).map((s) => ({ value: s.value, label: s.label }))
+  const label = data?.find((s) => s.value === supplierId)?.label ?? ''
+  return { options, label, isLoading, onSearch: setQuery , visible: filtrosCtx.puedeFiltrar('supplier') }
 }
 
 function useCustomerFilter(customerId: string) {
+  const { filtros: filtrosCtx } = useReporteFiltros()
   const [query, setQuery] = useState('')
-  const { data, isLoading } = useQuery({
-    queryKey: ['customer-filtro-reportes', query],
-    queryFn: () => listCustomers({ search: query || undefined, limit: 15 }),
-  })
-  const options: SearchSelectOption[] = (data?.items ?? []).map((c) => ({ value: c.id, label: c.customerName }))
-  const encontrado = data?.items.find((c) => c.id === customerId)
-  const label = encontrado ? encontrado.customerName : ''
-  return { options, label, isLoading, onSearch: setQuery }
+  const { data, isLoading } = useOpciones('clientes', { q: query, limit: 15, fallback: fallbackClientes })
+  const options: SearchSelectOption[] = (data ?? []).map((c) => ({ value: c.value, label: c.label }))
+  const label = data?.find((c) => c.value === customerId)?.label ?? ''
+  return { options, label, isLoading, onSearch: setQuery , visible: filtrosCtx.puedeFiltrar('customer') }
 }
 
 function useItemFilter(itemCode: string) {
+  const { filtros: filtrosCtx } = useReporteFiltros()
   const [query, setQuery] = useState('')
-  const { data, isLoading } = useQuery({
-    queryKey: ['item-filtro-reportes', query],
-    queryFn: () => listItems({ search: query || undefined, limit: 15 }),
-  })
-  const options: SearchSelectOption[] = (data?.items ?? []).map((i) => ({ value: i.id, label: `${i.id} — ${i.itemName}` }))
-  const encontrado = data?.items.find((i) => i.id === itemCode)
-  const label = encontrado ? `${encontrado.id} — ${encontrado.itemName}` : ''
-  return { options, label, isLoading, onSearch: setQuery }
+  const { data, isLoading } = useOpciones('articulos', { q: query, limit: 15, fallback: fallbackArticulos })
+  const options: SearchSelectOption[] = (data ?? []).map((i) => ({ value: i.value, label: `${i.value} — ${i.label}` }))
+  const encontrado = data?.find((i) => i.value === itemCode)
+  const label = encontrado ? `${encontrado.value} — ${encontrado.label}` : ''
+  return { options, label, isLoading, onSearch: setQuery , visible: filtrosCtx.puedeFiltrar('itemCode') }
 }
 
 function useWarehouseFilter(warehouseId: string) {
+  const { filtros: filtrosCtx } = useReporteFiltros()
   const [query, setQuery] = useState('')
-  const { data } = useQuery({
-    queryKey: ['almacenes-filtro-reportes'],
-    queryFn: () => listAlmacenes(),
-    staleTime: 60_000,
-  })
+  const { data } = useOpciones('almacenes', { q: query, limit: 100, fallback: fallbackAlmacenes })
   const almacenes = data ?? []
-  const options: SearchSelectOption[] = almacenes
-    .filter((w) => !query || w.name.toLowerCase().includes(query.toLowerCase()))
-    .map((w) => ({ value: w.id, label: w.name }))
-  const encontrado = almacenes.find((w) => w.id === warehouseId)
-  const label = encontrado ? encontrado.name : ''
-  return { options, label, onSearch: setQuery }
+  const options: SearchSelectOption[] = almacenes.map((w) => ({ value: w.value, label: w.label }))
+  const label = almacenes.find((w) => w.value === warehouseId)?.label ?? ''
+  return { options, label, onSearch: setQuery , visible: filtrosCtx.puedeFiltrar('warehouse') }
 }
 
 // ─── Despacho — 4 reportes nativos de ERPNext (docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §9) ─
@@ -1867,9 +1858,12 @@ function DespachoMargenReport() {
   const customerFilter = useCustomerFilter(customer)
   const itemFilter = useItemFilter(itemCode)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteDespachoMargenRaw = { fromDate, toDate, branch: branch || undefined, department: department || undefined, customer: customer || undefined, itemCode: itemCode || undefined }
+  const { limpios: paramsReporteDespachoMargen } = filtros.sanear(paramsReporteDespachoMargenRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-despacho-margen', fromDate, toDate, branch, department, customer, itemCode],
-    queryFn: () => getDespachoMargen({ fromDate, toDate, branch: branch || undefined, department: department || undefined, customer: customer || undefined, itemCode: itemCode || undefined }),
+    queryFn: () => getDespachoMargen(paramsReporteDespachoMargen),
     retry: false,
   })
 
@@ -1889,6 +1883,7 @@ function DespachoMargenReport() {
                 branch={branch} onBranchChange={setBranch}
                 department={department} onDepartmentChange={setDepartment}
               />
+              {customerFilter.visible && (
               <FilterField label="Cliente" style={{ width: 200 }}>
                 <SearchSelect
                   value={customer}
@@ -1900,6 +1895,8 @@ function DespachoMargenReport() {
                   placeholder="Todos los clientes"
                 />
               </FilterField>
+              )}
+              {itemFilter.visible && (
               <FilterField label="Artículo" style={{ width: 220 }}>
                 <SearchSelect
                   value={itemCode}
@@ -1911,6 +1908,7 @@ function DespachoMargenReport() {
                   placeholder="Todos los artículos"
                 />
               </FilterField>
+              )}
             </div>
           </div>
         </div>
@@ -1934,9 +1932,12 @@ function DespachoReservasReport() {
   const warehouseFilter = useWarehouseFilter(warehouse)
   const itemFilter = useItemFilter(itemCode)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteDespachoReservasRaw = { fromDate, toDate, branch: branch || undefined, department: department || undefined, warehouse: warehouse || undefined, itemCode: itemCode || undefined }
+  const { limpios: paramsReporteDespachoReservas } = filtros.sanear(paramsReporteDespachoReservasRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-despacho-reservas', fromDate, toDate, branch, department, warehouse, itemCode],
-    queryFn: () => getDespachoReservas({ fromDate, toDate, branch: branch || undefined, department: department || undefined, warehouse: warehouse || undefined, itemCode: itemCode || undefined }),
+    queryFn: () => getDespachoReservas(paramsReporteDespachoReservas),
     retry: false,
   })
 
@@ -1956,6 +1957,7 @@ function DespachoReservasReport() {
                 branch={branch} onBranchChange={setBranch}
                 department={department} onDepartmentChange={setDepartment}
               />
+              {warehouseFilter.visible && (
               <FilterField label="Almacén" style={{ width: 200 }}>
                 <SearchSelect
                   value={warehouse}
@@ -1966,6 +1968,8 @@ function DespachoReservasReport() {
                   placeholder="Todos los almacenes"
                 />
               </FilterField>
+              )}
+              {itemFilter.visible && (
               <FilterField label="Artículo" style={{ width: 220 }}>
                 <SearchSelect
                   value={itemCode}
@@ -1977,6 +1981,7 @@ function DespachoReservasReport() {
                   placeholder="Todos los artículos"
                 />
               </FilterField>
+              )}
             </div>
           </div>
         </div>
@@ -2002,9 +2007,12 @@ function DespachoFaltantesReport() {
   const warehouseFilter = useWarehouseFilter(warehouse)
   const itemFilter = useItemFilter(itemCode)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteDespachoFaltantesRaw = { fromDate, toDate, branch: branch || undefined, department: department || undefined, warehouse, itemCode: itemCode || undefined }
+  const { limpios: paramsReporteDespachoFaltantes } = filtros.sanear(paramsReporteDespachoFaltantesRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-despacho-faltantes', fromDate, toDate, branch, department, warehouse, itemCode],
-    queryFn: () => getDespachoFaltantes({ fromDate, toDate, branch: branch || undefined, department: department || undefined, warehouse, itemCode: itemCode || undefined }),
+    queryFn: () => getDespachoFaltantes(paramsReporteDespachoFaltantes),
     enabled: !!warehouse,
     retry: false,
   })
@@ -2025,6 +2033,7 @@ function DespachoFaltantesReport() {
                 branch={branch} onBranchChange={setBranch}
                 department={department} onDepartmentChange={setDepartment}
               />
+              {warehouseFilter.visible && (
               <FilterField label="Almacén" style={{ width: 200 }}>
                 <SearchSelect
                   value={warehouse}
@@ -2036,6 +2045,8 @@ function DespachoFaltantesReport() {
                   error={!warehouse}
                 />
               </FilterField>
+              )}
+              {itemFilter.visible && (
               <FilterField label="Artículo" style={{ width: 220 }}>
                 <SearchSelect
                   value={itemCode}
@@ -2047,6 +2058,7 @@ function DespachoFaltantesReport() {
                   placeholder="Todos los artículos"
                 />
               </FilterField>
+              )}
             </div>
           </div>
         </div>
@@ -2091,9 +2103,12 @@ function FlujoEfectivoReport() {
   const [department, setDepartment] = useState('')
   const puedeImprimir = usePermissionsStore((s) => s.acciones['reportes.contabilidad.flujo-efectivo.imprimir'] === true)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteFlujoEfectivoRaw = { fromDate, toDate, periodicity, branch: branch || undefined, department: department || undefined }
+  const { limpios: paramsReporteFlujoEfectivo } = filtros.sanear(paramsReporteFlujoEfectivoRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-flujo-efectivo', fromDate, toDate, periodicity, branch, department],
-    queryFn: () => getFlujoEfectivo({ fromDate, toDate, periodicity, branch: branch || undefined, department: department || undefined }),
+    queryFn: () => getFlujoEfectivo(paramsReporteFlujoEfectivo),
     retry: false,
   })
 
@@ -2124,7 +2139,7 @@ function FlujoEfectivoReport() {
             {puedeImprimir && (
               <div className="filter-bar-right">
                 <DownloadPdfButton
-                  onDownload={() => downloadFlujoEfectivoPdf({ fromDate, toDate, periodicity, branch: branch || undefined, department: department || undefined })}
+                  onDownload={() => downloadFlujoEfectivoPdf(paramsReporteFlujoEfectivo)}
                 />
               </div>
             )}
@@ -2151,9 +2166,12 @@ function ComprasAnaliticaReport() {
   const itemFilter = useItemFilter(itemCode)
   const puedeImprimir = usePermissionsStore((s) => s.acciones['reportes.compras.analitica.imprimir'] === true)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteComprasAnaliticaRaw = { fromDate, toDate, branch: branch || undefined, department: department || undefined, supplier: supplier || undefined, itemCode: itemCode || undefined }
+  const { limpios: paramsReporteComprasAnalitica } = filtros.sanear(paramsReporteComprasAnaliticaRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-compras-analitica', fromDate, toDate, branch, department, supplier, itemCode],
-    queryFn: () => getComprasAnalitica({ fromDate, toDate, branch: branch || undefined, department: department || undefined, supplier: supplier || undefined, itemCode: itemCode || undefined }),
+    queryFn: () => getComprasAnalitica(paramsReporteComprasAnalitica),
     retry: false,
   })
 
@@ -2173,6 +2191,7 @@ function ComprasAnaliticaReport() {
                 branch={branch} onBranchChange={setBranch}
                 department={department} onDepartmentChange={setDepartment}
               />
+              {supplierFilter.visible && (
               <FilterField label="Proveedor" style={{ width: 200 }}>
                 <SearchSelect
                   value={supplier}
@@ -2184,6 +2203,8 @@ function ComprasAnaliticaReport() {
                   placeholder="Todos los proveedores"
                 />
               </FilterField>
+              )}
+              {itemFilter.visible && (
               <FilterField label="Artículo" style={{ width: 220 }}>
                 <SearchSelect
                   value={itemCode}
@@ -2195,11 +2216,12 @@ function ComprasAnaliticaReport() {
                   placeholder="Todos los artículos"
                 />
               </FilterField>
+              )}
             </div>
             {puedeImprimir && (
               <div className="filter-bar-right">
                 <DownloadPdfButton
-                  onDownload={() => downloadComprasAnaliticaPdf({ fromDate, toDate, branch: branch || undefined, department: department || undefined, supplier: supplier || undefined, itemCode: itemCode || undefined })}
+                  onDownload={() => downloadComprasAnaliticaPdf(paramsReporteComprasAnalitica)}
                 />
               </div>
             )}
@@ -2224,9 +2246,12 @@ function ComprasRegistroReport() {
   const supplierFilter = useSupplierFilter(supplier)
   const puedeImprimir = usePermissionsStore((s) => s.acciones['reportes.compras.registro.imprimir'] === true)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteComprasRegistroRaw = { fromDate, toDate, supplier: supplier || undefined, branch: branch || undefined, department: department || undefined }
+  const { limpios: paramsReporteComprasRegistro } = filtros.sanear(paramsReporteComprasRegistroRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-compras-registro', fromDate, toDate, supplier, branch, department],
-    queryFn: () => getComprasRegistro({ fromDate, toDate, supplier: supplier || undefined, branch: branch || undefined, department: department || undefined }),
+    queryFn: () => getComprasRegistro(paramsReporteComprasRegistro),
     retry: false,
   })
 
@@ -2242,6 +2267,7 @@ function ComprasRegistroReport() {
               <FilterField label="Hasta">
                 <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
               </FilterField>
+              {supplierFilter.visible && (
               <FilterField label="Proveedor" style={{ width: 200 }}>
                 <SearchSelect
                   value={supplier}
@@ -2253,6 +2279,7 @@ function ComprasRegistroReport() {
                   placeholder="Todos los proveedores"
                 />
               </FilterField>
+              )}
               <BranchDepartmentFilters
                 branch={branch} onBranchChange={setBranch}
                 department={department} onDepartmentChange={setDepartment}
@@ -2261,7 +2288,7 @@ function ComprasRegistroReport() {
             {puedeImprimir && (
               <div className="filter-bar-right">
                 <DownloadPdfButton
-                  onDownload={() => downloadComprasRegistroPdf({ fromDate, toDate, supplier: supplier || undefined, branch: branch || undefined, department: department || undefined })}
+                  onDownload={() => downloadComprasRegistroPdf(paramsReporteComprasRegistro)}
                 />
               </div>
             )}
@@ -2288,9 +2315,12 @@ function VentasItemWiseReport() {
   const itemFilter = useItemFilter(itemCode)
   const puedeImprimir = usePermissionsStore((s) => s.acciones['reportes.ventas.item-wise.imprimir'] === true)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteVentasItemWiseRaw = { fromDate, toDate, branch: branch || undefined, department: department || undefined, customer: customer || undefined, itemCode: itemCode || undefined }
+  const { limpios: paramsReporteVentasItemWise } = filtros.sanear(paramsReporteVentasItemWiseRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-ventas-item-wise', fromDate, toDate, branch, department, customer, itemCode],
-    queryFn: () => getVentasItemWise({ fromDate, toDate, branch: branch || undefined, department: department || undefined, customer: customer || undefined, itemCode: itemCode || undefined }),
+    queryFn: () => getVentasItemWise(paramsReporteVentasItemWise),
     retry: false,
   })
 
@@ -2310,6 +2340,7 @@ function VentasItemWiseReport() {
                 branch={branch} onBranchChange={setBranch}
                 department={department} onDepartmentChange={setDepartment}
               />
+              {customerFilter.visible && (
               <FilterField label="Cliente" style={{ width: 200 }}>
                 <SearchSelect
                   value={customer}
@@ -2321,6 +2352,8 @@ function VentasItemWiseReport() {
                   placeholder="Todos los clientes"
                 />
               </FilterField>
+              )}
+              {itemFilter.visible && (
               <FilterField label="Artículo" style={{ width: 220 }}>
                 <SearchSelect
                   value={itemCode}
@@ -2332,11 +2365,12 @@ function VentasItemWiseReport() {
                   placeholder="Todos los artículos"
                 />
               </FilterField>
+              )}
             </div>
             {puedeImprimir && (
               <div className="filter-bar-right">
                 <DownloadPdfButton
-                  onDownload={() => downloadVentasItemWisePdf({ fromDate, toDate, branch: branch || undefined, department: department || undefined, customer: customer || undefined, itemCode: itemCode || undefined })}
+                  onDownload={() => downloadVentasItemWisePdf(paramsReporteVentasItemWise)}
                 />
               </div>
             )}
@@ -2363,9 +2397,12 @@ function ComprasItemWiseReport() {
   const itemFilter = useItemFilter(itemCode)
   const puedeImprimir = usePermissionsStore((s) => s.acciones['reportes.compras.item-wise.imprimir'] === true)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteComprasItemWiseRaw = { fromDate, toDate, branch: branch || undefined, department: department || undefined, supplier: supplier || undefined, itemCode: itemCode || undefined }
+  const { limpios: paramsReporteComprasItemWise } = filtros.sanear(paramsReporteComprasItemWiseRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-compras-item-wise', fromDate, toDate, branch, department, supplier, itemCode],
-    queryFn: () => getComprasItemWise({ fromDate, toDate, branch: branch || undefined, department: department || undefined, supplier: supplier || undefined, itemCode: itemCode || undefined }),
+    queryFn: () => getComprasItemWise(paramsReporteComprasItemWise),
     retry: false,
   })
 
@@ -2385,6 +2422,7 @@ function ComprasItemWiseReport() {
                 branch={branch} onBranchChange={setBranch}
                 department={department} onDepartmentChange={setDepartment}
               />
+              {supplierFilter.visible && (
               <FilterField label="Proveedor" style={{ width: 200 }}>
                 <SearchSelect
                   value={supplier}
@@ -2396,6 +2434,8 @@ function ComprasItemWiseReport() {
                   placeholder="Todos los proveedores"
                 />
               </FilterField>
+              )}
+              {itemFilter.visible && (
               <FilterField label="Artículo" style={{ width: 220 }}>
                 <SearchSelect
                   value={itemCode}
@@ -2407,11 +2447,12 @@ function ComprasItemWiseReport() {
                   placeholder="Todos los artículos"
                 />
               </FilterField>
+              )}
             </div>
             {puedeImprimir && (
               <div className="filter-bar-right">
                 <DownloadPdfButton
-                  onDownload={() => downloadComprasItemWisePdf({ fromDate, toDate, branch: branch || undefined, department: department || undefined, supplier: supplier || undefined, itemCode: itemCode || undefined })}
+                  onDownload={() => downloadComprasItemWisePdf(paramsReporteComprasItemWise)}
                 />
               </div>
             )}
@@ -2439,9 +2480,12 @@ function PedidosAnaliticaReport() {
   const customerFilter = useCustomerFilter(customer)
   const puedeImprimir = usePermissionsStore((s) => s.acciones['reportes.pedidos.analitica.imprimir'] === true)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReportePedidosAnaliticaRaw = { fromDate, toDate, branch: branch || undefined, department: department || undefined, customer: customer || undefined }
+  const { limpios: paramsReportePedidosAnalitica } = filtros.sanear(paramsReportePedidosAnaliticaRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-pedidos-analitica', fromDate, toDate, branch, department, customer],
-    queryFn: () => getPedidosAnalitica({ fromDate, toDate, branch: branch || undefined, department: department || undefined, customer: customer || undefined }),
+    queryFn: () => getPedidosAnalitica(paramsReportePedidosAnalitica),
     retry: false,
   })
 
@@ -2461,6 +2505,7 @@ function PedidosAnaliticaReport() {
                 branch={branch} onBranchChange={setBranch}
                 department={department} onDepartmentChange={setDepartment}
               />
+              {customerFilter.visible && (
               <FilterField label="Cliente" style={{ width: 200 }}>
                 <SearchSelect
                   value={customer}
@@ -2472,11 +2517,12 @@ function PedidosAnaliticaReport() {
                   placeholder="Todos los clientes"
                 />
               </FilterField>
+              )}
             </div>
             {puedeImprimir && (
               <div className="filter-bar-right">
                 <DownloadPdfButton
-                  onDownload={() => downloadPedidosAnaliticaPdf({ fromDate, toDate, branch: branch || undefined, department: department || undefined, customer: customer || undefined })}
+                  onDownload={() => downloadPedidosAnaliticaPdf(paramsReportePedidosAnalitica)}
                 />
               </div>
             )}
@@ -2501,9 +2547,12 @@ function ComprasOrdenesAnaliticaReport() {
   const supplierFilter = useSupplierFilter(supplier)
   const puedeImprimir = usePermissionsStore((s) => s.acciones['reportes.compras.ordenes-analitica.imprimir'] === true)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteComprasOrdenesAnaliticaRaw = { fromDate, toDate, branch: branch || undefined, department: department || undefined, supplier: supplier || undefined }
+  const { limpios: paramsReporteComprasOrdenesAnalitica } = filtros.sanear(paramsReporteComprasOrdenesAnaliticaRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-compras-ordenes-analitica', fromDate, toDate, branch, department, supplier],
-    queryFn: () => getComprasOrdenesAnalitica({ fromDate, toDate, branch: branch || undefined, department: department || undefined, supplier: supplier || undefined }),
+    queryFn: () => getComprasOrdenesAnalitica(paramsReporteComprasOrdenesAnalitica),
     retry: false,
   })
 
@@ -2523,6 +2572,7 @@ function ComprasOrdenesAnaliticaReport() {
                 branch={branch} onBranchChange={setBranch}
                 department={department} onDepartmentChange={setDepartment}
               />
+              {supplierFilter.visible && (
               <FilterField label="Proveedor" style={{ width: 200 }}>
                 <SearchSelect
                   value={supplier}
@@ -2534,11 +2584,12 @@ function ComprasOrdenesAnaliticaReport() {
                   placeholder="Todos los proveedores"
                 />
               </FilterField>
+              )}
             </div>
             {puedeImprimir && (
               <div className="filter-bar-right">
                 <DownloadPdfButton
-                  onDownload={() => downloadComprasOrdenesAnaliticaPdf({ fromDate, toDate, branch: branch || undefined, department: department || undefined, supplier: supplier || undefined })}
+                  onDownload={() => downloadComprasOrdenesAnaliticaPdf(paramsReporteComprasOrdenesAnalitica)}
                 />
               </div>
             )}
@@ -2565,9 +2616,12 @@ function InventarioAntiguedadReport() {
   const itemFilter = useItemFilter(itemCode)
   const puedeImprimir = usePermissionsStore((s) => s.acciones['reportes.inventario.antiguedad.imprimir'] === true)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteInventarioAntiguedadRaw = { date, branch: branch || undefined, department: department || undefined, warehouse: warehouse || undefined, itemCode: itemCode || undefined }
+  const { limpios: paramsReporteInventarioAntiguedad } = filtros.sanear(paramsReporteInventarioAntiguedadRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-inventario-antiguedad', date, branch, department, warehouse, itemCode],
-    queryFn: () => getInventarioAntiguedad({ date, branch: branch || undefined, department: department || undefined, warehouse: warehouse || undefined, itemCode: itemCode || undefined }),
+    queryFn: () => getInventarioAntiguedad(paramsReporteInventarioAntiguedad),
     retry: false,
   })
 
@@ -2584,6 +2638,7 @@ function InventarioAntiguedadReport() {
                 branch={branch} onBranchChange={setBranch}
                 department={department} onDepartmentChange={setDepartment}
               />
+              {warehouseFilter.visible && (
               <FilterField label="Almacén" style={{ width: 200 }}>
                 <SearchSelect
                   value={warehouse}
@@ -2594,6 +2649,8 @@ function InventarioAntiguedadReport() {
                   placeholder="Todos los almacenes"
                 />
               </FilterField>
+              )}
+              {itemFilter.visible && (
               <FilterField label="Artículo" style={{ width: 220 }}>
                 <SearchSelect
                   value={itemCode}
@@ -2605,11 +2662,12 @@ function InventarioAntiguedadReport() {
                   placeholder="Todos los artículos"
                 />
               </FilterField>
+              )}
             </div>
             {puedeImprimir && (
               <div className="filter-bar-right">
                 <DownloadPdfButton
-                  onDownload={() => downloadInventarioAntiguedadPdf({ date, branch: branch || undefined, department: department || undefined, warehouse: warehouse || undefined, itemCode: itemCode || undefined })}
+                  onDownload={() => downloadInventarioAntiguedadPdf(paramsReporteInventarioAntiguedad)}
                 />
               </div>
             )}
@@ -2635,9 +2693,12 @@ function InventarioProyeccionReport() {
   const itemFilter = useItemFilter(itemCode)
   const puedeImprimir = usePermissionsStore((s) => s.acciones['reportes.inventario.proyeccion.imprimir'] === true)
 
+  const { filtros } = useReporteFiltros()
+  const paramsReporteInventarioProyeccionRaw = { branch: branch || undefined, department: department || undefined, warehouse: warehouse || undefined, itemCode: itemCode || undefined }
+  const { limpios: paramsReporteInventarioProyeccion } = filtros.sanear(paramsReporteInventarioProyeccionRaw)
   const { data, isLoading, error } = useQuery({
     queryKey: ['reporte-inventario-proyeccion', branch, department, warehouse, itemCode],
-    queryFn: () => getInventarioProyeccion({ branch: branch || undefined, department: department || undefined, warehouse: warehouse || undefined, itemCode: itemCode || undefined }),
+    queryFn: () => getInventarioProyeccion(paramsReporteInventarioProyeccion),
     retry: false,
   })
 
@@ -2651,6 +2712,7 @@ function InventarioProyeccionReport() {
                 branch={branch} onBranchChange={setBranch}
                 department={department} onDepartmentChange={setDepartment}
               />
+              {warehouseFilter.visible && (
               <FilterField label="Almacén" style={{ width: 200 }}>
                 <SearchSelect
                   value={warehouse}
@@ -2661,6 +2723,8 @@ function InventarioProyeccionReport() {
                   placeholder="Todos los almacenes"
                 />
               </FilterField>
+              )}
+              {itemFilter.visible && (
               <FilterField label="Artículo" style={{ width: 220 }}>
                 <SearchSelect
                   value={itemCode}
@@ -2672,11 +2736,12 @@ function InventarioProyeccionReport() {
                   placeholder="Todos los artículos"
                 />
               </FilterField>
+              )}
             </div>
             {puedeImprimir && (
               <div className="filter-bar-right">
                 <DownloadPdfButton
-                  onDownload={() => downloadInventarioProyeccionPdf({ branch: branch || undefined, department: department || undefined, warehouse: warehouse || undefined, itemCode: itemCode || undefined })}
+                  onDownload={() => downloadInventarioProyeccionPdf(paramsReporteInventarioProyeccion)}
                 />
               </div>
             )}
@@ -3068,7 +3133,9 @@ export default function ReportesPage() {
           description={meta?.description}
           action={<RecargarButton />}
         />
-        {renderReport()}
+        <ReportePantallaContext.Provider value={`reportes.${active}`}>
+          {renderReport()}
+        </ReportePantallaContext.Provider>
       </div>
     </div>
   )

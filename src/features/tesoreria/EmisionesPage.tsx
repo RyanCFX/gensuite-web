@@ -16,6 +16,7 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const COLUMNS = [
   { key: 'fecha', width: 100 },
@@ -40,6 +41,7 @@ const STATUS_LABEL: Record<TesoreriaEstado, string> = {
 type EstadoFilter = TesoreriaEstado | 'all'
 
 export default function EmisionesPage() {
+  const puedeCrear = usePuede('tesoreria.emision.crear')
   const navigate = useNavigate()
   const [cuentaBancaria, setCuentaBancaria] = useState('')
   const [tipoDocumento, setTipoDocumento] = useState('')
@@ -80,10 +82,12 @@ export default function EmisionesPage() {
         action={
           <>
             <RecargarButton />
-            <button className="btn btn-navy" onClick={() => navigate('/tesoreria/emisiones/nueva')}>
-              <Plus size={16} />
-              Nueva Emisión
-            </button>
+            {puedeCrear && (
+              <button className="btn btn-navy" onClick={() => navigate('/tesoreria/emisiones/nueva')}>
+                <Plus size={16} />
+                Nueva Emisión
+              </button>
+            )}
           </>
         }
       />

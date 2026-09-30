@@ -19,6 +19,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { Select, SelectItem } from '@/components/ui/select'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const PAGE_SIZE = 20
 
@@ -68,6 +69,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function DevolucionesPage() {
+  const puedeCrear = usePuede('ventas.devolucion.crear')
   const navigate = useNavigate()
 
   const [search, setSearch] = useState('')
@@ -203,10 +205,12 @@ export default function DevolucionesPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <RecargarButton />
-          <button className="btn btn-navy" onClick={() => navigate('/devoluciones/nueva')}>
-            <Plus size={16} />
-            Nueva Devolución
-          </button>
+          {puedeCrear && (
+            <button className="btn btn-navy" onClick={() => navigate('/devoluciones/nueva')}>
+              <Plus size={16} />
+              Nueva Devolución
+            </button>
+          )}
         </div>
       </div>
 

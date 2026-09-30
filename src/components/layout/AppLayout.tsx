@@ -42,6 +42,7 @@ import {
   DollarSign,
   Clock,
   ShieldCheck,
+  KeyRound,
   LayoutTemplate,
   Landmark,
   ArrowRightLeft,
@@ -658,6 +659,7 @@ const NAV_CONFIG: NavEntry = {
     },
     { label: "Usuarios", icon: <UserCog size={14} />, path: "/usuarios" },
     // Administrativos — requieren System Manager en ERPNext, filtrados en el render (ver AppLayoutInner)
+    { label: "Acceso", icon: <KeyRound size={14} />, path: "/config/acceso" },
     { label: "Permisos", icon: <Lock size={14} />, path: "/config/permisos" },
     { label: "Roles", icon: <ShieldCheck size={14} />, path: "/config/roles" },
     { label: "Auditoría de PIN", icon: <ScrollText size={14} />, path: "/config/auditoria-pin" },
@@ -706,6 +708,7 @@ const CONFIG_ITEM_GROUP: Record<string, string> = {
   "/config/farmacia": "Sistema",
   "/usuarios": "Sistema",
   "/config/permisos": "Sistema",
+  "/config/acceso": "Sistema",
   "/config/roles": "Sistema",
   "/config/auditoria-pin": "Sistema",
   "/config/perfil": "Sistema",
@@ -735,6 +738,7 @@ function flattenConfigNav(root: NavGroup): { group: string; item: NavItem }[] {
 // verá el ítem en el menú aunque sí pueda abrir la ruta directamente; la propia página valida el
 // rol igual.
 const ADMIN_ONLY_PATHS = new Set([
+  "/config/acceso",
   "/config/permisos",
   "/config/roles",
   "/config/auditoria-pin",

@@ -15,6 +15,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FilterField } from '@/shared/ui/FilterField'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const PAGE_SIZE = 25
 
@@ -29,6 +30,7 @@ const COLUMNS = [
 ]
 
 export default function JournalPage() {
+  const puedeCrear = usePuede('contabilidad.asientos.crear')
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -88,10 +90,12 @@ export default function JournalPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <RecargarButton />
-          <button className="btn btn-navy" onClick={() => navigate('/asientos/nuevo')}>
-            <Plus size={16} />
-            Nuevo Asiento
-          </button>
+          {puedeCrear && (
+            <button className="btn btn-navy" onClick={() => navigate('/asientos/nuevo')}>
+              <Plus size={16} />
+              Nuevo Asiento
+            </button>
+          )}
         </div>
       </div>
 

@@ -9,6 +9,15 @@ import {
 import { getPerfiles } from '@/shared/api/roles'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listCajas } from '@/shared/api/cajas'
+import {
+  listPerfilesAcceso, getUsuarioAcceso, putUsuarioAcceso, getAccesoCatalogo,
+} from '@/shared/api/acceso'
+import { useAccesoV2Activo } from '@/shared/permissions/useAcceso'
+import { usePermissionsStore } from '@/stores/permissions.store'
+import {
+  estadoDesdeGrants, grantsDelArbol, type EstadoPantalla,
+} from '@/shared/permissions/acceso'
+import { AccesoUsuarioTab } from '@/features/acceso/AccesoUsuarioTab'
 import type { ApiError, Usuario, InviteUsuarioDto, UpdateUsuarioDto, MembershipStatus, UsuarioLookupResult } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -96,6 +105,14 @@ export default function UsuariosPage() {
   const [defaultBranchSearch, setDefaultBranchSearch] = useState('')
   const [defaultPosProfile, setDefaultPosProfile] = useState('')
   const [defaultPosProfileSearch, setDefaultPosProfileSearch] = useState('')
+  // Permisos v2 (§8): en modo `activo` el acceso va por perfiles de acceso, no por
+  // Role Profiles de ERPNext. Tab "Acceso" del modal de editar.
+  const v2Activo = useAccesoV2Activo()
+  const [editTab, setEditTab] = useState<'datos' | 'acceso'>('datos')
+  const [selectedPerfilesAcceso, setSelectedPerfilesAcceso] = useState<string[]>([])
+  const [excepciones, setExcepciones] = useState<Record<string, EstadoPantalla> | null>(null)
+  const [accesoSeededFor, setAccesoSeededFor] = useState<string | null>(null)
+  const [excepcionesTocadas, setExcepcionesTocadas] = useState(false)
   const { orderBy, sort } = useSortState()
 
   const USUARIOS_COLUMNS = [
@@ -124,6 +141,37 @@ export default function UsuariosPage() {
   // el FORMULARIO de invitar/editar ya no arma esa lista a mano, usa `perfiles` (§6.2/§6.3).
   const { data: roles } = useQuery({ queryKey: ['roles'], queryFn: listRoles })
   const { data: perfiles, isError: perfilesError } = useQuery({ queryKey: ['roles-perfiles'], queryFn: getPerfiles })
+
+  const { data: perfilesAcceso, isError: perfilesAccesoError } = useQuery({
+    queryKey: ['acceso-perfiles'],
+    queryFn: listPerfilesAcceso,
+    enabled: v2Activo,
+    retry: false,
+  })
+  const { data: usuarioAcceso } = useQuery({
+    queryKey: ['acceso-usuario', editingUser?.email],
+    queryFn: () => getUsuarioAcceso(editingUser!.email),
+    enabled: v2Activo && !!editingUser,
+    retry: false,
+  })
+  const { data: catalogoAcceso } = useQuery({
+    queryKey: ['acceso-catalogo'],
+    queryFn: () => getAccesoCatalogo(true),
+    enabled: v2Activo && !!editingUser,
+    retry: false,
+    staleTime: 60_000,
+  })
+
+  // Seed del tab Acceso al editar: perfiles asignados + excepciones (una vez por email).
+  // Mismo patrón que los seeds vecinos de esta pantalla.
+  useEffect(() => {
+    if (v2Activo && editingUser && usuarioAcceso && catalogoAcceso && accesoSeededFor !== editingUser.email) {
+      setSelectedPerfilesAcceso(usuarioAcceso.perfiles.map((p) => p.id))
+      setExcepciones(estadoDesdeGrants(catalogoAcceso.modulos, usuarioAcceso.grants))
+      setExcepcionesTocadas(false)
+      setAccesoSeededFor(editingUser.email)
+    }
+  }, [v2Activo, editingUser, usuarioAcceso, catalogoAcceso, accesoSeededFor])
 
   const { data: sucursalesData } = useQuery({
     queryKey: ['sucursales-all'],
@@ -212,6 +260,10 @@ export default function UsuariosPage() {
       }
       // §9 PERFIL_NO_CONTRATADO (400): no debería pasar si el selector usa GET /roles/perfiles
       // en vivo (ver PerfilesChecklist abajo — consume el endpoint sin filtro adicional, §7).
+      // v2: PERFIL_INEXISTENTE (alguien eliminó un perfil) → recargar perfiles de acceso.
+      if (isApiErrorCode(err, 'PERFIL_INEXISTENTE')) {
+        queryClient.invalidateQueries({ queryKey: ['acceso-perfiles'] })
+      }
       toast.error(apiMessage(err, 'Error al invitar al usuario'))
     },
   })
@@ -226,6 +278,30 @@ export default function UsuariosPage() {
     // §9 PERFIL_NO_CONTRATADO (400): no debería pasar si el selector usa GET /roles/perfiles
     // en vivo — mensaje genérico.
     onError: (err) => toast.error(apiMessage(err, 'Error al actualizar el usuario')),
+  })
+
+  // Guardado en modo `activo`: PATCH /usuarios/:email (sin roles/perfiles) y luego
+  // PUT /acceso/usuarios/:email (perfiles + excepciones si se tocaron). Un solo toast.
+  const saveV2Mutation = useMutation({
+    mutationFn: async (vars: { email: string; userData: Partial<UpdateUsuarioDto>; perfiles: string[]; grants?: import('@/shared/api/types').Grant[] }) => {
+      await updateUsuario(vars.email, vars.userData)
+      await putUsuarioAcceso(vars.email, vars.grants ? { perfiles: vars.perfiles, grants: vars.grants } : { perfiles: vars.perfiles })
+    },
+    onSuccess: (_res, vars) => {
+      toast.success('Usuario actualizado')
+      queryClient.invalidateQueries({ queryKey: ['usuarios'] })
+      if (vars.email === authUser?.email) {
+        usePermissionsStore.getState().refreshSilencioso()
+      }
+      resetForm()
+    },
+    onError: (err) => {
+      if (isApiErrorCode(err, 'ULTIMO_ADMINISTRADOR')) {
+        toast.error('Debe haber al menos un administrador de permisos.')
+        return
+      }
+      toast.error(apiMessage(err, 'No se pudo guardar el usuario'))
+    },
   })
 
   const revocarMutation = useMutation({
@@ -257,7 +333,7 @@ export default function UsuariosPage() {
     : false
 
   const formIsDirty = useDirtyCheck(
-    { lookupEmail, firstName, lastName, mobileNo, maxDiscountPct, adminCode, adminPin, adminPinConfirm, selectedPerfiles, selectedBranches, defaultBranch, defaultPosProfile },
+    { lookupEmail, firstName, lastName, mobileNo, maxDiscountPct, adminCode, adminPin, adminPinConfirm, selectedPerfiles, selectedPerfilesAcceso, excepcionesTocadas, selectedBranches, defaultBranch, defaultPosProfile },
     showForm && (!editingUser || (!!usuarioSucursales && !!editingUserDetail)),
   )
   const formClose = useConfirmClose(formIsDirty, resetForm)
@@ -270,6 +346,7 @@ export default function UsuariosPage() {
   function openEdit(user: Usuario) {
     resetForm()
     setEditingUser(user)
+    setEditTab('datos')
     setMobileNo(user.phone ?? '')
     setMaxDiscountPct(user.maxDiscountPct ?? 0)
     setAdminCode(user.adminCode ?? '')
@@ -291,6 +368,11 @@ export default function UsuariosPage() {
     setShowAdminPin(false)
     setScanningAdminCode(false)
     setSelectedPerfiles([])
+    setSelectedPerfilesAcceso([])
+    setAccesoSeededFor(null)
+    setExcepciones(null)
+    setExcepcionesTocadas(false)
+    setEditTab('datos')
     setSelectedBranches([])
     setDefaultBranch('')
     setDefaultPosProfile('')
@@ -301,9 +383,24 @@ export default function UsuariosPage() {
     setSelectedPerfiles((prev) => (prev.includes(name) ? prev.filter((p) => p !== name) : [...prev, name]))
   }
 
+  function togglePerfilAcceso(id: string) {
+    setSelectedPerfilesAcceso((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]))
+  }
+
   function handleInviteSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!lookupResult) return
+    if (v2Activo) {
+      // Modo `activo`: solo perfilesAcceso (al menos uno). Mandar roles/perfiles → 400.
+      if (selectedPerfilesAcceso.length === 0) { toast.error('Selecciona al menos un perfil de acceso'); return }
+      if (!lookupResult.exists && !firstName.trim()) { toast.error('El nombre es requerido'); return }
+      inviteMutation.mutate({
+        email: lookupEmail,
+        ...(lookupResult.exists ? {} : { firstName: firstName.trim(), lastName: lastName.trim() || undefined, mobileNo: mobileNo || undefined }),
+        perfilesAcceso: selectedPerfilesAcceso,
+      })
+      return
+    }
     if (selectedPerfiles.length === 0) { toast.error('Selecciona al menos un perfil de rol'); return }
     if (!lookupResult.exists && !firstName.trim()) { toast.error('El nombre es requerido'); return }
     inviteMutation.mutate({
@@ -324,6 +421,27 @@ export default function UsuariosPage() {
       if (!/^\d{6}$/.test(pin)) { toast.error('El PIN debe tener exactamente 6 dígitos'); return }
       if (pin !== pinConfirm) { toast.error('La confirmación del PIN no coincide'); return }
     }
+    if (v2Activo) {
+      // Modo `activo`: el acceso (perfiles + excepciones) va por /acceso/usuarios/:email;
+      // PATCH /usuarios/:email NO lleva roles ni perfiles (400 ACCESO_V2_ACTIVO).
+      const payload: Partial<UpdateUsuarioDto> = {
+        mobileNo: mobileNo || undefined,
+        maxDiscountPct: maxDiscountPct > 0 ? maxDiscountPct : 0,
+        adminCode: adminCode || undefined,
+        ...(pin !== '' ? { adminPin: pin } : {}),
+        branches: selectedBranches,
+        defaultBranch: defaultBranch || undefined,
+        defaultPosProfile: defaultPosProfile || undefined,
+      }
+      const grants = excepcionesTocadas && excepciones && catalogoAcceso
+        ? grantsDelArbol(catalogoAcceso.modulos, excepciones)
+        : undefined
+      saveV2Mutation.mutate({ email: editingUser.email, userData: payload, perfiles: selectedPerfilesAcceso, grants })
+      if (editingUser.email === authUser?.email && defaultBranch !== usuarioSucursales?.defaultBranch) {
+        toast.success('Sucursal por defecto actualizada. Cierra sesión y vuelve a entrar para que los cambios tomen efecto.')
+      }
+      return
+    }
     const payload: Partial<UpdateUsuarioDto> = {
       mobileNo: mobileNo || undefined,
       maxDiscountPct: maxDiscountPct > 0 ? maxDiscountPct : 0,
@@ -340,7 +458,7 @@ export default function UsuariosPage() {
     }
   }
 
-  const isMutating = inviteMutation.isPending || updateMutation.isPending
+  const isMutating = inviteMutation.isPending || updateMutation.isPending || saveV2Mutation.isPending
 
   return (
     <div className="page-container">
@@ -594,7 +712,39 @@ export default function UsuariosPage() {
                     </div>
                   )}
 
-                  <PerfilesChecklist perfiles={perfiles ?? []} isError={perfilesError} selected={selectedPerfiles} onToggle={togglePerfil} onSelectAll={setSelectedPerfiles} />
+                  {v2Activo ? (
+                    <div className="ff-wrap">
+                      <label className="ff-label ff-required">Perfiles de acceso</label>
+                      {perfilesAccesoError ? (
+                        <p style={{ fontSize: 13, color: 'var(--error-text)' }}>No se pudieron cargar los perfiles de acceso.</p>
+                      ) : (perfilesAcceso ?? []).length === 0 ? (
+                        <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>No hay perfiles de acceso. Crealos en Configuración → Acceso.</p>
+                      ) : (
+                        <div style={{
+                          display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, maxHeight: 192,
+                          overflowY: 'auto', border: '1px solid var(--border-default)',
+                          borderRadius: 'var(--radius-md)', padding: 12,
+                        }}>
+                          {(perfilesAcceso ?? []).map((p) => (
+                            <label key={p.id} className="ff-check-wrap" title={p.descripcion}>
+                              <input
+                                type="checkbox" className="ff-check"
+                                checked={selectedPerfilesAcceso.includes(p.id)}
+                                onChange={() => togglePerfilAcceso(p.id)}
+                              />
+                              <span style={{ fontSize: 13 }}>
+                                {p.nombre}
+                                {p.esSistema && <span className="badge badge-info" style={{ marginLeft: 6, fontSize: 10 }}>Sistema</span>}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      <p className="ff-hint">En modo activo el acceso va por perfiles, no por roles de ERPNext.</p>
+                    </div>
+                  ) : (
+                    <PerfilesChecklist perfiles={perfiles ?? []} isError={perfilesError} selected={selectedPerfiles} onToggle={togglePerfil} onSelectAll={setSelectedPerfiles} />
+                  )}
                 </div>
                 <div className="modal-foot">
                   <button type="button" className="btn btn-secondary" onClick={() => setLookupResult(null)}><ArrowLeft size={14} /> Volver</button>
@@ -621,6 +771,16 @@ export default function UsuariosPage() {
             </div>
             <form onSubmit={handleEditSubmit}>
               <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                <div className="tabs-bar" style={{ marginBottom: 16 }}>
+                  <button type="button" className={`tab-btn${editTab === 'datos' ? ' on' : ''}`} onClick={() => setEditTab('datos')}>
+                    Datos
+                  </button>
+                  <button type="button" className={`tab-btn${editTab === 'acceso' ? ' on' : ''}`} onClick={() => setEditTab('acceso')}>
+                    Acceso
+                  </button>
+                </div>
+                {editTab === 'datos' && (
+                <>
                 <div className="ff-wrap">
                   <label className="ff-label">Nombre</label>
                   <input className="ff-input" value={editingUser.fullName} disabled />
@@ -711,14 +871,35 @@ export default function UsuariosPage() {
                   </div>
                 )}
 
-                <PerfilesChecklist
-                  perfiles={perfiles ?? []}
-                  isError={perfilesError}
-                  selected={selectedPerfiles}
-                  onToggle={togglePerfil}
-                  onSelectAll={setSelectedPerfiles}
-                  hint={selectedPerfiles.length === 0 ? `Roles actuales: ${roles && editingUserDetail ? editingUserDetail.roles.join(', ') || 'Ninguno' : '…'} — selecciona un perfil para reemplazarlos.` : undefined}
-                />
+                </>
+                )}
+                {editTab === 'acceso' && (
+                <>
+                {v2Activo ? (
+                  <AccesoUsuarioTab
+                    email={editingUser.email}
+                    perfilesAcceso={perfilesAcceso ?? []}
+                    perfilesAccesoError={perfilesAccesoError}
+                    selected={selectedPerfilesAcceso}
+                    onToggle={togglePerfilAcceso}
+                    catalogo={catalogoAcceso ?? null}
+                    excepciones={excepciones}
+                    onExcepciones={(e) => { setExcepciones(e); setExcepcionesTocadas(true) }}
+                  />
+                ) : (
+                  <PerfilesChecklist
+                    perfiles={perfiles ?? []}
+                    isError={perfilesError}
+                    selected={selectedPerfiles}
+                    onToggle={togglePerfil}
+                    onSelectAll={setSelectedPerfiles}
+                    hint={selectedPerfiles.length === 0 ? `Roles actuales: ${roles && editingUserDetail ? editingUserDetail.roles.join(', ') || 'Ninguno' : '…'} — selecciona un perfil para reemplazarlos.` : undefined}
+                  />
+                )}
+                </>
+                )}
+                {editTab === 'datos' && (
+                <>
 
                 {isSystemManager ? (
                   <div className="ff-wrap">
@@ -813,6 +994,8 @@ export default function UsuariosPage() {
                       Según sus sucursales asignadas, este usuario tiene acceso a: {almacenesPermitidos.warehouses.join(', ')}.
                     </p>
                   </div>
+                )}
+                </>
                 )}
               </div>
               <div className="modal-foot">

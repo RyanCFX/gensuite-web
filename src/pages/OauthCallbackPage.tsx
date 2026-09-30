@@ -34,7 +34,7 @@ export default function OauthCallbackPage() {
     oauthExchange({ ticket })
       .then((result) => {
         applyAuthResult(result)
-        navigate(result.access_token ? '/dashboard' : '/login', { replace: true })
+        navigate(result.access_token ? '/' : '/login', { replace: true })
       })
       .catch((err) => {
         setError(isApiError(err) ? err.message : ERROR_MESSAGES.OAUTH_ERROR)

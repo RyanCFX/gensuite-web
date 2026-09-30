@@ -20,6 +20,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { ESTADO_FLUJO_BADGE, ESTADO_FLUJO_LABEL } from './estadoFlujo'
 import type { PedidoEstadoFlujo } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const COLUMNS = [
   { key: 'id', width: 100 },
@@ -43,6 +44,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function PedidosPage() {
+  const puedeCrear = usePuede('pedidos.crear')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [customerId, setCustomerId] = useState('')
@@ -112,10 +114,12 @@ export default function PedidosPage() {
           <h1 className="page-title"><span className="page-title-dot" />Pedidos de Venta</h1>
           <p className="page-sub">Cotización → Pedido → Factura</p>
         </div>
-        <button className="btn btn-navy" onClick={() => navigate('/pedidos/nuevo')}>
-          <Plus size={16} />
-          Nuevo Pedido
-        </button>
+        {puedeCrear && (
+          <button className="btn btn-navy" onClick={() => navigate('/pedidos/nuevo')}>
+            <Plus size={16} />
+            Nuevo Pedido
+          </button>
+        )}
       </div>
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
@@ -227,9 +231,11 @@ export default function PedidosPage() {
                   <div className="empty-state">
                     <div className="empty-title">Sin pedidos</div>
                     <p className="empty-sub">Crea el primer pedido de venta.</p>
-                    <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/pedidos/nuevo')}>
-                      <Plus size={14} /> Nuevo Pedido
-                    </button>
+                    {puedeCrear && (
+                      <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/pedidos/nuevo')}>
+                        <Plus size={14} /> Nuevo Pedido
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

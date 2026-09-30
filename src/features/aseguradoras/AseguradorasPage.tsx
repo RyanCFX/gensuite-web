@@ -14,6 +14,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { Permitido } from '@/components/shared/Permitido'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const PAGE_SIZE = 20
 
@@ -26,6 +27,7 @@ const COLUMNS = [
 ]
 
 export default function AseguradorasPage() {
+  const puedeCrear = usePuede('aseguradoras.crear')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -79,10 +81,12 @@ export default function AseguradorasPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <RecargarButton />
           <Permitido accion="aseguradoras.crear">
-            <button className="btn btn-navy" onClick={() => navigate('/farmacia/aseguradoras/nueva')}>
-              <Plus size={16} />
-              Nueva Aseguradora
-            </button>
+            {puedeCrear && (
+              <button className="btn btn-navy" onClick={() => navigate('/farmacia/aseguradoras/nueva')}>
+                <Plus size={16} />
+                Nueva Aseguradora
+              </button>
+            )}
           </Permitido>
         </div>
       </div>

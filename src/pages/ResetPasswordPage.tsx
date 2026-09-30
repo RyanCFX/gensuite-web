@@ -48,7 +48,7 @@ export default function ResetPasswordPage() {
     try {
       const result = await resetPassword({ token, newPassword: values.newPassword })
       applyAuthResult(result)
-      navigate(result.access_token ? '/dashboard' : '/login', { replace: true })
+      navigate(result.access_token ? '/' : '/login', { replace: true })
     } catch (error) {
       if (isApiError(error)) {
         setServerError(error.message)

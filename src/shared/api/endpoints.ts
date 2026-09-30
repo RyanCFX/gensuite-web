@@ -1,6 +1,7 @@
 export const ENDPOINTS = {
   me: {
     permissions: '/me/permissions',
+    acceso: '/me/acceso',
     permissionsByDoc: (doctype: string, name: string) =>
       `/me/permissions/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
     features: '/me/features',
@@ -299,6 +300,28 @@ export const ENDPOINTS = {
     perfiles: '/roles/perfiles',
     perfilByName: (name: string) => `/roles/perfiles/${encodeURIComponent(name)}`,
     byName: (name: string) => `/roles/${encodeURIComponent(name)}`,
+  },
+  // Selects mínimos para formularios/filtros (docs/tasks/PROMPT_PERMISOS_V2_Y_DASHBOARD_MODULAR_FRONTEND.md §5).
+  opciones: {
+    porRecurso: (recurso: string) => `/opciones/${encodeURIComponent(recurso.replace(/^lookup\./, ''))}`,
+  },
+  // Permisos v2 — administración de acceso (mismo doc §7). Gate: System Manager en el
+  // frontend hasta que el backend exponga la acción `config.acceso.gestionar`.
+  acceso: {
+    catalogo: '/acceso/catalogo',
+    plantillas: '/acceso/plantillas',
+    perfiles: '/acceso/perfiles',
+    perfil: (id: string) => `/acceso/perfiles/${encodeURIComponent(id)}`,
+    perfilGrants: (id: string) => `/acceso/perfiles/${encodeURIComponent(id)}/grants`,
+    usuario: (email: string) => `/acceso/usuarios/${encodeURIComponent(email)}`,
+    usuarioEfectivo: (email: string) => `/acceso/usuarios/${encodeURIComponent(email)}/efectivo`,
+    auditoria: '/acceso/auditoria',
+    migrar: '/acceso/migrar',
+    sincronizarRoles: '/acceso/sincronizar-roles',
+  },
+  dashboard: {
+    catalogo: '/dashboard/catalogo',
+    widget: (key: string) => `/dashboard/widgets/${encodeURIComponent(key)}`,
   },
   permisos: {
     catalogo: '/permisos/catalogo',

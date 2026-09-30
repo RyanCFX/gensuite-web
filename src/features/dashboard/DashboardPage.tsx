@@ -1,22 +1,29 @@
 import './Dashboard.css'
-import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
-import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState, type ComponentType } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { getDashboardCatalogo, getDashboardWidget, type DashboardPeriod } from '@/shared/api/dashboard'
+import type { ApiError, DashboardTipoReporte } from '@/shared/api/types'
+import { isApiErrorCode } from '@/shared/api/client'
+import LegacyDashboard from './LegacyDashboard'
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from 'recharts'
-import {
-  TrendingUp, TrendingDown, ShoppingCart, Box, Zap, Package, BarChart3, ArrowUp,
-} from 'lucide-react'
-import { formatMoney, formatShortDate, formatDateTime, formatNumber, daysSince, displayId } from '@/lib/formatters'
-import {
-  getDashboardData,
-  type DashboardPeriod,
-} from '@/shared/api/dashboard'
-import { listInvoices } from '@/shared/api/invoices'
-import { listInventory } from '@/shared/api/inventory'
-import { useFeature } from '@/shared/features/can'
+  type WidgetProps,
+  VentasTotalWidget,
+  VentasGraficoWidget,
+  TopProductosWidget,
+  TopClientesWidget,
+  ComprasTotalWidget,
+  GastosTotalWidget,
+  GastosMesWidget,
+  CxcSaldoWidget,
+  CobrosTotalWidget,
+  CobrosMesWidget,
+  UtilidadWidget,
+  IngresosGastosWidget,
+  BajoMinimoWidget,
+  ActividadRecienteWidget,
+  PendientesWidget,
+} from './widgets'
 
 const PERIOD_OPTIONS: { label: string; value: DashboardPeriod }[] = [
   { label: 'Hoy',      value: 'today' },
@@ -25,317 +32,184 @@ const PERIOD_OPTIONS: { label: string; value: DashboardPeriod }[] = [
   { label: 'Este año', value: 'year'  },
 ]
 
-const ACTIVITY_LABELS: Record<string, string> = {
-  invoice_created:     'Factura',
-  invoice_cancelled:   'Anulada',
-  payment_received:    'Cobro',
-  purchase_registered: 'Compra',
-  expense_registered:  'Gasto',
+/** Key del widget → visual. Una key del catálogo sin entrada se ignora (no rompe la página). */
+const WIDGETS: Record<string, ComponentType<WidgetProps>> = {
+  'dashboard.ventas.total': VentasTotalWidget,
+  'dashboard.ventas.grafico': VentasGraficoWidget,
+  'dashboard.ventas.top-productos': TopProductosWidget,
+  'dashboard.ventas.top-clientes': TopClientesWidget,
+  'dashboard.compras.total': ComprasTotalWidget,
+  'dashboard.gastos.total': GastosTotalWidget,
+  'dashboard.gastos.mes': GastosMesWidget,
+  'dashboard.cxc.saldo': CxcSaldoWidget,
+  'dashboard.cobros.total': CobrosTotalWidget,
+  'dashboard.cobros.mes': CobrosMesWidget,
+  'dashboard.finanzas.utilidad': UtilidadWidget,
+  'dashboard.finanzas.ingresos-gastos': IngresosGastosWidget,
+  'dashboard.inventario.bajo-minimo': BajoMinimoWidget,
+  'dashboard.actividad.reciente': ActividadRecienteWidget,
+  'dashboard.actividad.pendientes': PendientesWidget,
 }
 
-// Salidas de caja — se muestran en rojo en la tabla de actividad, el resto en el tono normal.
-const OUTFLOW_TYPES = new Set(['invoice_cancelled', 'purchase_registered', 'expense_registered'])
+/** Widgets chicos que se agrupan en la fila de KPIs de su sección. */
+const WIDGETS_KPI = new Set([
+  'dashboard.ventas.total',
+  'dashboard.compras.total',
+  'dashboard.gastos.total',
+  'dashboard.gastos.mes',
+  'dashboard.cxc.saldo',
+  'dashboard.cobros.total',
+  'dashboard.cobros.mes',
+  'dashboard.finanzas.utilidad',
+])
 
-function pct(numerator: number, denominator: number) {
-  if (!denominator) return 0
-  return (numerator / denominator) * 100
+/** Widgets de lista: el `limit` sí aplica (openapi: 1–20, default 5). */
+const WIDGETS_LISTA = new Set([
+  'dashboard.ventas.top-productos',
+  'dashboard.ventas.top-clientes',
+  'dashboard.inventario.bajo-minimo',
+  'dashboard.actividad.reciente',
+  'dashboard.actividad.pendientes',
+])
+
+function apiMessage(err: unknown, fallback: string): string {
+  return (err as ApiError)?.message ?? fallback
 }
 
-function ChartTooltipContent({ active, payload, label, currency }: {
-  active?: boolean
-  payload?: { name: string; value: number; color: string }[]
-  label?: string
-  /** Moneda base de la compañía (`kpis.currency`) — estos gráficos son agregados en moneda base, no por documento. */
-  currency?: string
+function statusCodeOf(err: unknown): number | undefined {
+  return (err as unknown as ApiError | null)?.statusCode
+}
+
+function WidgetCard({ widgetKey, titulo, period }: {
+  widgetKey: string
+  titulo: string
+  period: DashboardPeriod
 }) {
-  if (!active || !payload?.length) return null
-  return (
-    <div style={{ background: 'var(--dash-card-bg)', border: '1px solid var(--dash-border-2)', borderRadius: 10, padding: '8px 12px', boxShadow: 'var(--dash-shadow)', minWidth: 140 }}>
-      <p style={{ color: 'var(--dash-ink-400)', marginBottom: 6, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
-      {payload.map((p) => (
-        <p key={p.name} style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', fontSize: 13, color: p.color, marginBottom: 2 }}>
-          {p.name}: {formatMoney(Math.abs(p.value), currency)}
-        </p>
-      ))}
-    </div>
-  )
-}
+  const queryClient = useQueryClient()
+  // `limit` solo aplica a reportes de lista (tops, actividad, bajo mínimo): 20 para no
+  // truncar respecto al dashboard legacy. El resto usa el default del backend.
+  const limit = WIDGETS_LISTA.has(widgetKey) ? 20 : undefined
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['dashboard-widget', widgetKey, period, limit],
+    queryFn: () => getDashboardWidget(widgetKey, { period, limit }),
+    retry: false,
+  })
 
-function ChartPlaceholder({ title, sub }: { title: string; sub: string }) {
-  return (
-    <div className="dash-chart-placeholder">
-      <span className="dash-chart-placeholder-icon"><BarChart3 size={16} /></span>
-      <div className="dash-chart-placeholder-title">{title}</div>
-      <p className="dash-chart-placeholder-sub">{sub}</p>
-    </div>
-  )
-}
-
-// Gráfica divergente con HTML/CSS (no SVG): el SVG anterior usaba
-// `preserveAspectRatio="none"` y estiraba los números de los ejes y el radio de
-// las barras según el ancho del contenedor. Con layout HTML los labels nunca se
-// escalan y las barras son píldoras como la referencia (mint arriba / teal
-// abajo, con gap en la línea cero).
-// Etiqueta compacta del eje Y: nunca más de ~4 caracteres para que no se
-// desborde del gutter (ej. 8M en vez de 8000k, 2.5M, 500k).
-function formatAxisValue(v: number): string {
-  const a = Math.abs(v)
-  if (a >= 1_000_000) {
-    const m = v / 1_000_000
-    return `${Number.isInteger(m) ? m.toFixed(0) : m.toFixed(1)}M`
+  const Visual = WIDGETS[widgetKey]
+  if (!Visual) {
+    if (import.meta.env.DEV) console.debug(`[dashboard] widget sin visual registrado: ${widgetKey} — se ignora`)
+    return null
   }
-  if (a >= 1000) return `${(v / 1000).toFixed(0)}k`
-  return `${Math.round(v)}`
-}
-function DivergingBarChart({ data, height = 220, currency }: {
-  data: { label: string; ingresos: number; gastos: number }[]
-  height?: number
-  /** Moneda base de la compañía (`kpis.currency`). */
-  currency?: string
-}) {
-  const padLeft = 34
-  const padBottom = 28
-  // Sin gap: las barras nacen pegadas a la línea divisora (0k). El `overflow:
-  // hidden` de cada mitad impide que la crucen.
-  const gap = 0
-  const barW = 20
-  const plotH = height - padBottom
-  const halfH = plotH / 2
-  /** Alto disponible para la barra dentro de cada mitad (descontando el gap de la línea cero). */
-  const availH = halfH - gap
-  const midPct = 50
 
-  const rawMax = data.reduce((m, d) => Math.max(m, d.ingresos, d.gastos), 0)
-  const maxAbs = Math.ceil((rawMax || 1) / 1000) * 1000
+  if (isLoading) {
+    return WIDGETS_KPI.has(widgetKey)
+      ? (
+        <div className="kpi-card gap-50 w-200">
+          <div className="dash-skeleton" style={{ width: '55%', height: 10, marginBottom: 14 }} />
+          <div className="dash-skeleton" style={{ width: '75%', height: 22, marginBottom: 10 }} />
+          <div className="dash-skeleton" style={{ width: '60%', height: 10 }} />
+        </div>
+      )
+      : <div className="dash-skeleton" style={{ width: '100%', height: 240 }} />
+  }
 
-  const gridSteps = [-1, -2 / 3, -1 / 3, 0, 1 / 3, 2 / 3, 1]
-
-  return (
-    <div role="img" aria-label="Ingresos vs. Gastos" style={{ height, position: 'relative', paddingLeft: padLeft, paddingBottom: padBottom, boxSizing: 'border-box' }}>
-      {/* Líneas de grid + etiquetas del eje Y (HTML: nunca se distorsionan) */}
-      {gridSteps.map((step) => {
-        const topPct = midPct - step * 50
-        return (
-          <div key={step} style={{ position: 'absolute', left: 0, right: 0, top: `${(topPct / 100) * plotH}px`, display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
-            <span style={{ width: padLeft - 6, paddingRight: 6, textAlign: 'right', fontSize: 10, lineHeight: 1, color: 'var(--dash-ink-400)', flexShrink: 0, whiteSpace: 'nowrap' }}>
-              {formatAxisValue(step * maxAbs)}
-            </span>
-            <span style={{ flex: 1, borderTop: '1px dashed var(--dash-border)' }} />
+  if (isError) {
+    // 403 WIDGET_* → el interceptor ya refrescó el acceso; además se re-pide el catálogo
+    // por si el reporte dejó de estar visible/contratado. La tarjeta se oculta.
+    if (isApiErrorCode(error, 'WIDGET_NO_PERMITIDO') || isApiErrorCode(error, 'WIDGET_NO_CONTRATADO')) {
+      queryClient.invalidateQueries({ queryKey: ['dashboard-catalogo'] })
+      return null
+    }
+    return WIDGETS_KPI.has(widgetKey)
+      ? (
+        <div className="kpi-card gap-50 w-200">
+          <div className="dash-empty-title">No se pudo cargar</div>
+          <p className="dash-empty-sub">{apiMessage(error, 'Error al cargar el reporte.')}</p>
+          <button className="btn btn-ghost btn-size-sm" onClick={() => refetch()}>Reintentar</button>
+        </div>
+      )
+      : (
+        <div className="list-card">
+          <div className="dash-empty">
+            <div className="dash-empty-title">No se pudo cargar "{titulo}"</div>
+            <p className="dash-empty-sub">{apiMessage(error, 'Error al cargar el reporte.')}</p>
+            <button className="btn btn-ghost btn-size-sm" onClick={() => refetch()}>Reintentar</button>
           </div>
-        )
-      })}
-      {/* Columnas de barras (sin overflow aquí: las etiquetas del eje X van fuera de su caja) */}
-      <div style={{ position: 'relative', height: plotH, display: 'flex', alignItems: 'stretch' }}>
-        {data.map((d) => {
-          // Alturas en px (no en %): deterministas y siempre ancladas a la línea cero.
-          const ingresosPx = d.ingresos > 0 ? Math.max(6, (d.ingresos / maxAbs) * availH) : 0
-          const gastosPx = d.gastos > 0 ? Math.max(6, (d.gastos / maxAbs) * availH) : 0
-          return (
-            <div key={d.label} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
-              {/* Mitad superior: ingresos — anclada abajo (línea cero), con clip */}
-              <div style={{ height: halfH, width: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', paddingBottom: gap, boxSizing: 'border-box', overflow: 'hidden' }}>
-                {ingresosPx > 0 && (
-                  <div
-                    title={`Ingresos ${d.label}: ${formatMoney(d.ingresos, currency)}`}
-                    style={{
-                      width: barW,
-                      maxWidth: '50%',
-                      height: ingresosPx,
-                      flexShrink: 0,
-                      background: 'var(--dash-mint)',
-                      borderRadius: '999px 999px 3px 3px',
-                    }}
-                  />
-                )}
-              </div>
-              {/* Mitad inferior: gastos — anclada arriba (línea cero), con clip */}
-              <div style={{ height: halfH, width: '100%', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: gap, boxSizing: 'border-box', overflow: 'hidden' }}>
-                {gastosPx > 0 && (
-                  <div
-                    title={`Gastos ${d.label}: ${formatMoney(d.gastos, currency)}`}
-                    style={{
-                      width: barW,
-                      maxWidth: '50%',
-                      height: gastosPx,
-                      flexShrink: 0,
-                      background: 'var(--dash-teal)',
-                      borderRadius: '3px 3px 999px 999px',
-                    }}
-                  />
-                )}
-              </div>
-              {/* Etiqueta del eje X */}
-              <span style={{ position: 'absolute', bottom: -padBottom, left: '50%', transform: 'translateX(-50%)', fontSize: 10, lineHeight: `${padBottom}px`, color: 'var(--dash-ink-400)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {d.label}
-              </span>
-            </div>
-          )
-        })}
+        </div>
+      )
+  }
+
+  if (!data) return null
+  return <Visual data={data.data} meta={data.meta} titulo={titulo} />
+}
+
+function TipoSection({ tipo, period }: { tipo: DashboardTipoReporte; period: DashboardPeriod }) {
+  const conocidos = tipo.reportes.filter((r) => WIDGETS[r.key])
+  if (import.meta.env.DEV) {
+    for (const r of tipo.reportes) {
+      if (!WIDGETS[r.key]) console.debug(`[dashboard] reporte sin visual: ${r.key} — se ignora`)
+    }
+  }
+  if (conocidos.length === 0) return null
+  const kpis = conocidos.filter((r) => WIDGETS_KPI.has(r.key))
+  const grandes = conocidos.filter((r) => !WIDGETS_KPI.has(r.key))
+  return (
+    <section aria-label={tipo.nombre} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <h2 className="card-title-dash" style={{ margin: 0 }}>{tipo.nombre}</h2>
+        {tipo.descripcion && <p className="chart-subtitle" style={{ margin: '4px 0 0' }}>{tipo.descripcion}</p>}
       </div>
-    </div>
+      {kpis.length > 0 && (
+        <div className="kpi-grid">
+          {kpis.map((r) => (
+            <WidgetCard key={r.key} widgetKey={r.key} titulo={r.nombre} period={period} />
+          ))}
+        </div>
+      )}
+      {grandes.map((r) => (
+        <WidgetCard key={r.key} widgetKey={r.key} titulo={r.nombre} period={period} />
+      ))}
+    </section>
   )
 }
-
-interface PendingAction {
-  id: string
-  date?: string
-  tone: 'warning' | 'danger'
-  label: string
-  sublabel: string
-  href: string
-}
-
-const ACTIVITY_COLUMNS = [
-  { key: 'fecha', width: 90 },
-  { key: 'transaccion', width: 130 },
-  { key: 'detalle', width: 200 },
-  { key: 'monto', width: 110 },
-]
 
 export default function DashboardPage() {
   const [period, setPeriod] = useState<DashboardPeriod>('month')
-  const { widths: activityColWidths, startResize: startActivityResize } = useResizableColumns(ACTIVITY_COLUMNS)
-  // Widgets por módulo (§6): el Dashboard es núcleo, pero cada tarjeta se oculta según su
-  // feature — igual que una ruta de nivel superior.
-  const tieneGastos = useFeature('gastos')
-  const tieneCxC = useFeature('cuentasPorCobrar')
-  const tieneInventario = useFeature('inventario')
-  const tieneCompras = useFeature('compras')
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['dashboard', period],
-    queryFn: () => getDashboardData(period),
+  const { data: catalogo, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['dashboard-catalogo'],
+    queryFn: getDashboardCatalogo,
     retry: false,
+    staleTime: 60_000,
   })
 
-  // ── Acciones pendientes — 3 llamadas independientes, sin depender del `period` ──
-  const { data: dueSoonRes, isLoading: loadingDueSoon } = useQuery({
-    queryKey: ['dashboard-pending-invoices'],
-    queryFn: () => listInvoices({ status: 'submitted', paymentStatus: ['unpaid', 'partly_paid'], orderBy: 'dueDate', limit: 3 }),
-    retry: false,
-  })
-  const { data: draftRes, isLoading: loadingDrafts } = useQuery({
-    queryKey: ['dashboard-draft-invoices'],
-    queryFn: () => listInvoices({ status: 'draft', orderBy: '-postingDate', limit: 2 }),
-    retry: false,
-  })
-  const { data: lowStockRes, isLoading: loadingLowStock } = useQuery({
-    queryKey: ['dashboard-low-stock'],
-    queryFn: () => listInventory({ stockStatus: 'low_stock', limit: 2 }),
-    retry: false,
-    // Sin `inventario` contratado no se pide (evita un 403 esperado) — el widget se oculta abajo.
-    enabled: tieneInventario,
-  })
+  const header = (
+    <div className="dashboard-header">
+      <div className="dashboard-greeting">
+        <span className="dashboard-overline">Bienvenido de vuelta</span>
+        <h1 className="dashboard-title">Panel de Control</h1>
+      </div>
+      <div className="period-pills">
+        {PERIOD_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            className="period-pill"
+            data-active={period === opt.value ? '' : undefined}
+            onClick={() => setPeriod(opt.value)}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 
-  const pendingActions = useMemo<PendingAction[]>(() => {
-    const dueSoon: PendingAction[] = (dueSoonRes?.items ?? []).map((inv) => {
-      const diff = daysSince(inv.dueDate) ?? 0
-      const overdue = diff > 0
-      const abs = Math.abs(diff)
-      return {
-        id: `due-${inv.id}`,
-        date: formatShortDate(inv.dueDate),
-        tone: overdue ? 'danger' : 'warning',
-        label: `#${displayId(inv.id, inv.sequence)}`,
-        sublabel: overdue
-          ? `Vencida hace ${abs} ${abs === 1 ? 'día' : 'días'}`
-          : diff === 0 ? 'Vence hoy' : `Vence en ${abs} ${abs === 1 ? 'día' : 'días'}`,
-        href: `/facturas/${inv.id}`,
-      }
-    })
-    const drafts: PendingAction[] = (draftRes?.items ?? []).map((inv) => ({
-      id: `draft-${inv.id}`,
-      date: formatShortDate(inv.postingDate),
-      tone: 'warning',
-      label: `#${displayId(inv.id, inv.sequence)}`,
-      sublabel: 'Factura pendiente de aprobación',
-      href: `/facturas/${inv.id}`,
-    }))
-    const lowStock: PendingAction[] = tieneInventario
-      ? (lowStockRes?.items ?? []).map((item) => ({
-        id: `stock-${item.itemCode}-${item.warehouse}`,
-        tone: 'danger',
-        label: item.itemCode,
-        sublabel: `Stock crítico · ${formatNumber(item.actualQty)} unid. de ${item.itemName}`,
-        href: '/inventario/productos',
-      }))
-      : []
-    return [...dueSoon, ...drafts, ...lowStock]
-  }, [dueSoonRes, draftRes, lowStockRes, tieneInventario])
-
-  const pendingLoading = loadingDueSoon || loadingDrafts || loadingLowStock
-
-  const kpis = data?.kpis
-  const chart = data?.chart
-
-  const chartData = chart
-    ? chart.labels.map((label, i) => ({
-        label,
-        sales:   chart.sales[i]   ?? 0,
-        credits: chart.credits[i] ?? 0,
-      }))
-    : []
-  const hasSalesData = chartData.some((d) => d.sales > 0 || d.credits > 0)
-
-  const igChart = data?.ingresosGastosChart
-  const igChartData = igChart
-    ? igChart.labels.map((label, i) => ({
-        label,
-        ingresos: igChart.ingresos[i] ?? 0,
-        gastos:   igChart.gastos[i]   ?? 0,
-      }))
-    : []
-  const hasIgData = igChartData.some((d) => d.ingresos > 0 || d.gastos > 0)
-
-  // Moneda base real de la compañía (antes se asumía 'DOP' fijo) — ver
-  // docs/tasks/64_multimoneda_completo.md §6.2. Los KPIs y los gráficos agregados (ventas,
-  // ingresos/gastos, top productos) están en esta moneda; `recentActivity` es la excepción, cada
-  // fila trae su propia moneda porque es la ficha de un documento puntual, no un agregado.
-  // Actividad reciente: filtra las filas de módulos no contratados (§6 — cualquier fragmento
-  // de UI que muestre datos de un módulo gateado se oculta igual que la ruta de ese módulo).
-  const actividadVisible = (data?.recentActivity ?? []).filter((item) => {
-    if (item.type === 'purchase_registered' && !tieneCompras) return false
-    if (item.type === 'expense_registered' && !tieneGastos) return false
-    return true
-  })
-  const currency   = kpis?.currency
-  const ventas     = kpis?.totalVentas ?? 0
-  const cobrado    = kpis?.totalCobrado ?? 0
-  const gastos     = kpis?.totalGastos ?? 0
-  const pendiente  = kpis?.totalPendiente ?? 0
-  const utilidad   = kpis?.utilidad ?? 0
-  const numFacturas = kpis?.numFacturas ?? 0
-
-  const cobradoPct   = pct(cobrado, ventas)
-  const gastosPct    = pct(gastos, ventas)
-  const pendientePct = pct(pendiente, ventas)
-  const margenPct    = pct(utilidad, ventas)
-  const isPositive   = margenPct >= 0
+  // Backend anterior a v2 (sin /dashboard/catalogo): dashboard legacy con /dashboard/summary.
+  if (isError && statusCodeOf(error) === 404) return <LegacyDashboard />
 
   return (
     <div className="dashboard-page">
-
-      {/* ── Header ── */}
-      <div className="dashboard-header">
-        <div className="dashboard-greeting">
-          <span className="dashboard-overline">Bienvenido de vuelta</span>
-          <h1 className="dashboard-title">Panel de Control</h1>
-          <p className="dashboard-subtitle">{data?.periodLabel ?? 'Resumen de actividad del negocio'}</p>
-        </div>
-        <div className="period-pills">
-          {PERIOD_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              className="period-pill"
-              data-active={period === opt.value ? '' : undefined}
-              onClick={() => setPeriod(opt.value)}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
+      {header}
       {isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="kpi-grid">
@@ -347,338 +221,28 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-          <div className="dash-charts">
-            <div className="dash-chart-primary">
-              <div className="dash-skeleton" style={{ width: '100%', height: 240 }} />
-            </div>
-            <div className="dash-chart-secondary">
-              <div className="dash-skeleton" style={{ width: '100%', height: 240 }} />
-            </div>
-          </div>
+          <div className="dash-skeleton" style={{ width: '100%', height: 240 }} />
+        </div>
+      ) : isError ? (
+        <div className="dash-empty">
+          <div className="dash-empty-title">No se pudo cargar el dashboard</div>
+          <p className="dash-empty-sub">{apiMessage(error, 'Error al cargar el catálogo de reportes.')}</p>
+          <button className="btn btn-ghost btn-size-sm" onClick={() => refetch()}>Reintentar</button>
+        </div>
+      ) : (catalogo ?? []).length === 0 ? (
+        <div className="dash-empty">
+          <div className="dash-empty-title">Sin reportes disponibles</div>
+          <p className="dash-empty-sub">No tiene reportes disponibles en el dashboard. Pídale acceso a su administrador.</p>
         </div>
       ) : (
-        <>
-          {/* ── KPI cards — reales, sin deltas inventados ── */}
-          <div className="kpi-grid">
-            <div className="kpi-card gap-50 w-200" style={{ '--i': 0 } as React.CSSProperties}>
-              <div className="kpi-top">
-                <span className="kpi-icon"><TrendingUp size={14} /></span>
-                <span className="kpi-label">Total Ventas</span>
-              </div>
-              <div className="kpi-value">{formatMoney(ventas, currency)}</div>
-              <div className="kpi-caption">
-                <span className="kpi-caption-tone" data-tone="neutral">{numFacturas} {numFacturas === 1 ? 'factura' : 'facturas'}</span>
-                <span>del período</span>
-              </div>
-            </div>
-
-            <div className="kpi-card gap-50 w-200" style={{ '--i': 1 } as React.CSSProperties}>
-              <div className="kpi-top">
-                <span className="kpi-icon"><ShoppingCart size={14} /></span>
-                <span className="kpi-label">Ingresos</span>
-              </div>
-              <div className="kpi-value">{formatMoney(cobrado, currency)}</div>
-              <div className="kpi-caption">
-                <span className="kpi-caption-tone" data-tone="success"><TrendingUp size={11} />{cobradoPct.toFixed(1)}%</span>
-                <span>de ventas cobradas</span>
-              </div>
-            </div>
-
-            {tieneGastos && (
-            <div className="kpi-card gap-50 w-200" style={{ '--i': 2 } as React.CSSProperties}>
-              <div className="kpi-top">
-                <span className="kpi-icon" style={{ fontSize: 12, fontWeight: 700, lineHeight: 1, padding: '5px 6px' }}>$</span>
-                <span className="kpi-label">Gastos</span>
-              </div>
-              <div className="kpi-value">{formatMoney(gastos, currency)}</div>
-              <div className="kpi-caption">
-                <span className="kpi-caption-tone" data-tone="warning"><TrendingDown size={11} />{gastosPct.toFixed(1)}%</span>
-                <span>de ventas</span>
-              </div>
-            </div>
-            )}
-
-            {tieneCxC && (
-            <div className="kpi-card gap-50 w-200" style={{ '--i': 3 } as React.CSSProperties}>
-              <div className="kpi-top">
-                <span className="kpi-icon" style={{ fontSize: 12, fontWeight: 700, lineHeight: 1, padding: '5px 6px' }}>$</span>
-                <span className="kpi-label">Cuentas por Cobrar</span>
-              </div>
-              <div className="kpi-value">{formatMoney(pendiente, currency)}</div>
-              <div className="kpi-caption">
-                <span className="kpi-caption-tone" data-tone="warning"><TrendingUp size={11} />{pendientePct.toFixed(1)}%</span>
-                <span>de ventas pendiente</span>
-              </div>
-            </div>
-            )}
-
-            <div className="kpi-card gap-50 w-200" style={{ '--i': 4 } as React.CSSProperties}>
-              <div className="kpi-top">
-                <span className="kpi-icon"><Box size={14} /></span>
-                <span className="kpi-label">Utilidad</span>
-              </div>
-              <div className="kpi-value" data-colored={isPositive ? 'success' : 'error'}>{formatMoney(utilidad, currency)}</div>
-              <div className="kpi-caption">
-                <span className="kpi-caption-tone" data-tone={isPositive ? 'success' : 'error'}>
-                  {isPositive ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                  {margenPct.toFixed(1)}%
-                </span>
-                <span>margen</span>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Gráficos ── */}
-          <div className="dash-charts">
-            <div className="dash-chart-primary">
-              <div>
-                <div className="chart-header">
-                  <div className="chart-heading">
-                    <span className="chart-icon"><ShoppingCart size={20} /></span>
-                    <div>
-                      <h3 className="card-title-dash">Ventas vs. Créditos Pendientes</h3>
-                      <p className="chart-subtitle">Ventas emitidas vs. saldo pendiente de cobro</p>
-                    </div>
-                  </div>
-                  <div className="chart-legend">
-                    <span className="chart-legend-item"><span className="chart-legend-dot" data-tone="mint" />Ventas</span>
-                    <span className="chart-legend-item"><span className="chart-legend-dot" data-tone="teal" />Pendiente</span>
-                  </div>
-                </div>
-                {!hasSalesData ? (
-                  <ChartPlaceholder title="Sin datos de ventas" sub="No hay datos para el período seleccionado." />
-                ) : (
-                  <div className="chart-plot-wrap">
-                    <ResponsiveContainer width="100%" height={224}>
-                      <AreaChart data={chartData} margin={{ top: 4, right: 12, left: -16, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%"   stopColor="var(--dash-mint)" stopOpacity={0.25} />
-                            <stop offset="100%" stopColor="var(--dash-mint)" stopOpacity={0}    />
-                          </linearGradient>
-                          <linearGradient id="creditsGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%"   stopColor="var(--dash-teal)" stopOpacity={0.18} />
-                            <stop offset="100%" stopColor="var(--dash-teal)" stopOpacity={0}    />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--dash-border)" vertical={false} />
-                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'var(--dash-ink-400)' }} tickLine={false} axisLine={false} />
-                        <YAxis
-                          tick={{ fontSize: 10, fill: 'var(--dash-ink-400)' }}
-                          tickLine={false}
-                          axisLine={false}
-                          tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
-                          width={40}
-                        />
-                        <Tooltip content={<ChartTooltipContent currency={currency} />} cursor={{ stroke: 'var(--dash-border-2)', strokeWidth: 1, strokeDasharray: '4 2' }} />
-                        <Area
-                          type="monotone" dataKey="sales" name="Ventas"
-                          stroke="var(--dash-mint)" strokeWidth={2.5} fill="url(#salesGradient)"
-                          activeDot={{ r: 5, fill: 'var(--dash-mint)', stroke: 'var(--dash-card-bg)', strokeWidth: 2 }}
-                        />
-                        <Area
-                          type="monotone" dataKey="credits" name="Pendiente"
-                          stroke="var(--dash-teal)" strokeWidth={2} fill="url(#creditsGradient)"
-                          activeDot={{ r: 5, fill: 'var(--dash-teal)', stroke: 'var(--dash-card-bg)', strokeWidth: 2 }}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="dash-chart-secondary">
-              <div>
-                <div className="chart-header">
-                  <div className="chart-heading">
-                    <span className="chart-icon"><ShoppingCart size={20} /></span>
-                    <div>
-                      <h3 className="card-title-dash">Ingresos vs. Gastos</h3>
-                      <p className="chart-subtitle">{PERIOD_OPTIONS.find((opt) => opt.value === period)?.label ?? 'Período seleccionado'}</p>
-                    </div>
-                  </div>
-                  <Link to="/reportes/pl" className="btn-dash-primary">Ver Reportes</Link>
-                </div>
-                {!hasIgData ? (
-                  <ChartPlaceholder title="Sin datos" sub="No hay movimientos en este periodo." />
-                ) : (
-                  <div className="dash-chart-secondary-body">
-                    <div className="ig-chart-wrap">
-                      <DivergingBarChart data={igChartData} height={220} currency={currency} />
-                    </div>
-                    <div className="ig-summary">
-                      <div>
-                        <div className="ig-summary-value">{formatMoney(data?.totalGanancias ?? 0, currency)}</div>
-                        <div className="ig-summary-label">Total Ganancias</div>
-                      </div>
-                      <div className="ig-summary-row" data-tone="success">
-                        <div className="ig-summary-row-label">Ingresos este mes</div>
-                        <div className="ig-summary-row-value">{formatMoney(data?.ingresosEsteMes ?? 0, currency)}</div>
-                      </div>
-                      <div className="ig-summary-row" data-tone="dark">
-                        <div className="ig-summary-row-label">Gastos este mes</div>
-                        <div className="ig-summary-row-value">{formatMoney(data?.gastosEsteMes ?? 0, currency)}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ── Top Productos / Actividad Reciente / Acciones Pendientes ── */}
-          <div className="dash-bottom-grid">
-            <div className="list-card dash-col-products">
-              <div className="list-card-header">
-                <div className="list-card-heading">
-                  <span className="chart-icon chart-icon-sm"><Box size={16} /></span>
-                  <h3 className="card-title-sm">Top Productos Vendidos</h3>
-                </div>
-                <Link to="/inventario/productos" className="btn-dash-dark">Ver catálogo</Link>
-              </div>
-              {!data?.topProducts?.length ? (
-                <div className="dash-empty">
-                  <div className="dash-empty-title">Sin datos</div>
-                  <p className="dash-empty-sub">No hay productos en este período.</p>
-                </div>
-              ) : (
-                <>
-                  {(() => {
-                    const top3 = data.topProducts.slice(0, 3)
-                    return (
-                      <>
-                        <div className="top-bar">
-                          {data.topProducts.map((row, i) => (
-                            <span key={row.itemCode} className="top-bar-seg" data-rank={i + 1 <= 3 ? i + 1 : undefined} style={{ width: `${row.percentage}%` }} />
-                          ))}
-                        </div>
-                        <div className="top-bar-shares">
-                          {top3.map((row) => (
-                            <span key={row.itemCode} className="top-bar-share" style={{ width: `${row.percentage}%` }}>
-                              <ArrowUp size={10} aria-hidden="true" />
-                              {row.percentage.toFixed(1)}%
-                            </span>
-                          ))}
-                        </div>
-                      </>
-                    )
-                  })()}
-                  <div className="list-card-rows">
-                    {data.topProducts.map((row, i) => (
-                      <div key={row.itemCode} className="list-row" style={{ '--i': i } as React.CSSProperties}>
-                        <span className="list-row-bar" data-rank={i + 1 <= 3 ? String(i + 1) : undefined} />
-                        <div className="list-row-main">
-                          <div className="list-row-name">{row.itemName}</div>
-                          <div className="list-row-sub">{row.itemCode}</div>
-                        </div>
-                        <div className="list-row-meta">
-                          <div className="list-row-value">{formatMoney(row.amount, currency)}</div>
-                          <div className="list-row-sub">{formatNumber(row.qty)} unid. · {row.percentage.toFixed(1)}% del total</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="list-card dash-col-activity">
-              <div className="list-card-header">
-                <div className="list-card-heading">
-                  <span className="chart-icon chart-icon-sm"><Zap size={16} /></span>
-                  <h3 className="card-title-sm">Actividad Reciente</h3>
-                </div>
-                <Link to="/facturas" className="btn-dash-dark">Ver Facturación</Link>
-              </div>
-              {!actividadVisible?.length ? (
-                <div className="dash-empty">
-                  <div className="dash-empty-title">Sin actividad reciente</div>
-                  <p className="dash-empty-sub">Las transacciones recientes aparecerán aquí.</p>
-                </div>
-              ) : (
-                <div className="dash-table-wrap">
-                  <table className="dash-activity-table items-table-resizable">
-                    <colgroup>
-                      {ACTIVITY_COLUMNS.map((c) => <col key={c.key} style={{ width: activityColWidths[c.key] }} />)}
-                    </colgroup>
-                    <thead>
-                      <tr>
-                        <th>
-                          Fecha
-                          <span className="col-resize-handle" onMouseDown={startActivityResize('fecha')} />
-                        </th>
-                        <th>
-                          Transacción
-                          <span className="col-resize-handle" onMouseDown={startActivityResize('transaccion')} />
-                        </th>
-                        <th>
-                          Detalle
-                          <span className="col-resize-handle" onMouseDown={startActivityResize('detalle')} />
-                        </th>
-                        <th style={{ textAlign: 'right' }}>Monto</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {actividadVisible.map((item, idx) => {
-                        const isOutflow = OUTFLOW_TYPES.has(item.type)
-                        const [datePart, timePart] = formatDateTime(item.timestamp).split(' ')
-                        return (
-                          <tr key={idx}>
-                            <td style={{ color: 'var(--dash-ink-400)', lineHeight: 1.3, fontWeight: 400 }}>
-                              {datePart}<br /><span style={{ fontSize: 9 }}>{timePart}</span>
-                            </td>
-                            <td>
-                              <span className="dash-txn-badge">{ACTIVITY_LABELS[item.type] ?? item.type}</span>
-                            </td>
-                            <td style={{ color: 'var(--dash-ink-600)', fontWeight: 400, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {item.description}
-                            </td>
-                            <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: isOutflow ? 'var(--dash-rose)' : 'var(--dash-ink-800)' }}>
-                              {isOutflow ? '-' : ''}{formatMoney(item.amount, item.currency)}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            <div className="list-card dash-col-pending">
-              <div className="list-card-header">
-                <div className="list-card-heading">
-                  <span className="chart-icon chart-icon-sm"><Package size={16} /></span>
-                  <h3 className="card-title-sm">Acciones Pendientes</h3>
-                </div>
-              </div>
-              {pendingLoading ? (
-                <div className="dash-skeleton" style={{ width: '100%', height: 160 }} />
-              ) : !pendingActions.length ? (
-                <div className="dash-empty">
-                  <div className="dash-empty-title">Todo al día</div>
-                  <p className="dash-empty-sub">No hay facturas por vencer, aprobaciones ni stock crítico.</p>
-                </div>
-              ) : (
-                <div className="pending-list">
-                  {pendingActions.map((action) => (
-                    <Link key={action.id} to={action.href} className="pending-row">
-                      <span className="pending-row-date">{action.date ?? ''}</span>
-                      <span className="pending-row-rail">
-                        <span className="pending-row-dot" data-tone={action.tone} />
-                      </span>
-                      <div className="pending-row-main">
-                        <span className="pending-row-label">{action.label}</span>
-                        <p className="pending-row-sub">{action.sublabel}</p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+          {(catalogo ?? []).map((tipo) => (
+            <TipoSection key={tipo.key} tipo={tipo} period={period} />
+          ))}
+          <p style={{ fontSize: 12, color: 'var(--dash-ink-400)' }}>
+            ¿Falta un reporte? <Link to="/reportes/ventas">Ver todos los reportes</Link>
+          </p>
+        </div>
       )}
     </div>
   )

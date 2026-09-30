@@ -18,6 +18,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const COLUMNS = [
   { key: 'id', width: 120 },
@@ -42,6 +43,7 @@ const STATUS_LABEL: Record<string, string> = {
 type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
 
 export default function PagosPage() {
+  const puedeCrear = usePuede('cobros.pago.crear')
   const navigate = useNavigate()
 
   const [supplierId, setSupplierId] = useState('')
@@ -124,10 +126,12 @@ export default function PagosPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <RecargarButton />
-          <button className="btn btn-navy" onClick={() => navigate('/pagos/nuevo')}>
-            <Plus size={16} />
-            Registrar Pago
-          </button>
+          {puedeCrear && (
+            <button className="btn btn-navy" onClick={() => navigate('/pagos/nuevo')}>
+              <Plus size={16} />
+              Registrar Pago
+            </button>
+          )}
         </div>
       </div>
 

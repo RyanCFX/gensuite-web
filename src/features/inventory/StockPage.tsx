@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { listInventory, listWarehouses } from '@/shared/api/inventory'
-import { listSucursales } from '@/shared/api/sucursales'
+import { listInventory } from '@/shared/api/inventory'
 import { formatDOP, formatNumber } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -10,8 +9,9 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { useAuthStore } from '@/stores/auth.store'
 import { Select, SelectItem } from '@/components/ui/select'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { fallbackAlmacenes, fallbackSucursales } from '@/shared/api/opcionesFallback'
+import { useFiltrosPantalla } from '@/shared/permissions/useAcceso'
 import { FilterField } from '@/shared/ui/FilterField'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
@@ -41,35 +41,20 @@ export default function StockPage() {
   const { orderBy, sort } = useSortState()
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
-  const { data: warehouses } = useQuery({
-    queryKey: ['warehouses'],
-    queryFn: listWarehouses,
-  })
+  // Filtros protegidos v2 (pantalla `inventario.stock` = gate sin el último segmento).
+  const filtros = useFiltrosPantalla('inventario.stock')
 
-  const { data: sucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-  })
-
-  const [warehouseSearch, setWarehouseSearch] = useState('')
-  const warehouseOptions: SearchSelectOption[] = (warehouses ?? [])
-    .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
-    .map((w) => ({ value: w.name, label: w.name }))
-
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchOptions: SearchSelectOption[] = (sucursales?.items ?? [])
-    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((s) => ({ value: s.id, label: s.name }))
+  const rawParams = {
+    warehouse: warehouse !== 'all' ? warehouse : undefined,
+    branch: warehouse === 'all' ? (branch || undefined) : undefined,
+    limit: 100,
+    orderBy: orderBy || undefined,
+  }
+  const { limpios: params } = filtros.sanear(rawParams)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['inventory', { warehouse, branch, stockFilter, orderBy }],
-    queryFn: () =>
-      listInventory({
-        warehouse: warehouse !== 'all' ? warehouse : undefined,
-        branch: warehouse === 'all' ? (branch || undefined) : undefined,
-        limit: 100,
-        orderBy: orderBy || undefined,
-      }),
+    queryFn: () => listInventory(params),
   })
 
   const summary = data?.summary
@@ -154,25 +139,27 @@ export default function StockPage() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
+              {filtros.puedeFiltrar('warehouse') && (
               <FilterField label="Almacén" style={{ width: 200 }}>
-                <SearchSelect
+                <OpcionesSelect
+                  recurso="almacenes"
                   value={warehouse === 'all' ? '' : warehouse}
                   onChange={(val) => { setWarehouse(val || 'all'); if (val) setBranch('') }}
-                  options={warehouseOptions}
-                  onSearch={setWarehouseSearch}
                   selectedLabel={warehouse === 'all' ? '' : warehouse}
                   placeholder="Todos los almacenes"
+                  fallback={fallbackAlmacenes}
                 />
               </FilterField>
-              {warehouse === 'all' && (
+              )}
+              {warehouse === 'all' && filtros.puedeFiltrar('branch') && (
                 <FilterField label="Sucursal" style={{ width: 200 }}>
-                  <SearchSelect
+                  <OpcionesSelect
+                    recurso="sucursales"
                     value={branch}
                     onChange={setBranch}
-                    options={branchOptions}
-                    onSearch={setBranchSearch}
-                    selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
+                    selectedLabel={branch}
                     placeholder="Todas las sucursales"
+                    fallback={fallbackSucursales}
                   />
                 </FilterField>
               )}

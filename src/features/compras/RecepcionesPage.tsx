@@ -18,6 +18,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const PAGE_SIZE = 20
 
@@ -38,6 +39,7 @@ function PerBilledBadge({ perBilled }: { perBilled: number }) {
 }
 
 export default function RecepcionesPage() {
+  const puedeCrear = usePuede('compras.recepcion.crear')
   const navigate = useNavigate()
   const [supplier, setSupplier] = useState('')
   const [status, setStatus] = useState<string>('all')
@@ -98,10 +100,12 @@ export default function RecepcionesPage() {
         action={
           <>
             <RecargarButton />
-            <button className="btn btn-navy" onClick={() => navigate('/compras/recepciones/nueva')}>
-              <Plus size={16} />
-              Nueva Recepción
-            </button>
+            {puedeCrear && (
+              <button className="btn btn-navy" onClick={() => navigate('/compras/recepciones/nueva')}>
+                <Plus size={16} />
+                Nueva Recepción
+              </button>
+            )}
           </>
         }
       />
@@ -204,9 +208,11 @@ export default function RecepcionesPage() {
                                 </div>
                                 <p className="empty-title">Sin recepciones</p>
                                 <p className="empty-sub">No hay recepciones de mercancía registradas.</p>
-                                <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/compras/recepciones/nueva')}>
-                                  <Plus size={14} />Nueva Recepción
-                                </button>
+                                {puedeCrear && (
+                                  <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/compras/recepciones/nueva')}>
+                                    <Plus size={14} />Nueva Recepción
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>

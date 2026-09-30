@@ -1,4 +1,6 @@
-import { client } from './client'
+import { client, unwrap } from './client'
+import { ENDPOINTS } from './endpoints'
+import type { DashboardTipoReporte, DashboardWidgetResp } from './types'
 
 export type DashboardPeriod = 'today' | '7d' | 'month' | 'year'
 
@@ -79,4 +81,25 @@ export async function getDashboardData(period: DashboardPeriod): Promise<Dashboa
     params: { period },
   })
   return res.data.data
+}
+
+// ─── Dashboard modular (docs/tasks/PROMPT_PERMISOS_V2_Y_DASHBOARD_MODULAR_FRONTEND.md §6) ───
+// Visible = contratado ∩ permitido (el backend ya cruza). Una key desconocida del catálogo
+// se ignora en la UI. Nombres de campo de cada widget = los de /dashboard/summary.
+
+/** Tipos con al menos un reporte visible para el usuario, en orden. Gate: dashboard.ver. */
+export async function getDashboardCatalogo(): Promise<DashboardTipoReporte[]> {
+  const res = await client.get<{ success: true; data: DashboardTipoReporte[] }>(ENDPOINTS.dashboard.catalogo)
+  return unwrap(res)
+}
+
+export async function getDashboardWidget(
+  key: string,
+  params?: { period?: DashboardPeriod; limit?: number },
+): Promise<DashboardWidgetResp> {
+  const res = await client.get<{ success: true; data: DashboardWidgetResp['data']; meta: DashboardWidgetResp['meta'] }>(
+    ENDPOINTS.dashboard.widget(key),
+    { params },
+  )
+  return { data: res.data.data, meta: res.data.meta }
 }

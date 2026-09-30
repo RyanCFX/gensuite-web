@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listCompras } from '@/shared/api/compras-gastos'
-import { listSucursales } from '@/shared/api/sucursales'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -10,13 +9,15 @@ import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { fallbackSucursales } from '@/shared/api/opcionesFallback'
+import { useFiltrosPantalla } from '@/shared/permissions/useAcceso'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const PAGE_SIZE = 20
 
@@ -32,6 +33,7 @@ const COLUMNS = [
 ]
 
 export default function ComprasPage() {
+  const puedeCrear = usePuede('compras.factura.crear')
   const navigate = useNavigate()
   const [supplier, setSupplier] = useState('')
   const [status, setStatus] = useState<string>('all')
@@ -48,33 +50,27 @@ export default function ComprasPage() {
 
   const offset = (page - 1) * PAGE_SIZE
 
-  const { data: sucursalesData } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-  })
-  const sucursales = sucursalesData?.items ?? []
+  // Filtros protegidos v2 (pantalla `compras.factura` = gate sin el último segmento).
+  const filtros = useFiltrosPantalla('compras.factura')
 
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchOptions: SearchSelectOption[] = sucursales
-    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
+  const rawParams = {
+    supplier: supplier || undefined,
+    status: status !== 'all' ? status : undefined,
+    fromDate: fromDate || undefined,
+    toDate: toDate || undefined,
+    branch: branch || undefined,
+    ncf: ncf || undefined,
+    grandTotalMin: grandTotalMin ? Number(grandTotalMin) : undefined,
+    grandTotalMax: grandTotalMax ? Number(grandTotalMax) : undefined,
+    orderBy: orderBy || undefined,
+    limit: PAGE_SIZE,
+    offset,
+  }
+  const { limpios: params } = filtros.sanear(rawParams)
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['compras', { supplier, status, fromDate, toDate, branch, ncf, grandTotalMin, grandTotalMax, offset, orderBy }],
-    queryFn: () =>
-      listCompras({
-        supplier: supplier || undefined,
-        status: status !== 'all' ? status : undefined,
-        fromDate: fromDate || undefined,
-        toDate: toDate || undefined,
-        branch: branch || undefined,
-        ncf: ncf || undefined,
-        grandTotalMin: grandTotalMin ? Number(grandTotalMin) : undefined,
-        grandTotalMax: grandTotalMax ? Number(grandTotalMax) : undefined,
-        orderBy: orderBy || undefined,
-        limit: PAGE_SIZE,
-        offset,
-      }),
+    queryFn: () => listCompras(params),
   })
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
@@ -98,10 +94,12 @@ export default function ComprasPage() {
         action={
           <>
             <RecargarButton />
-            <button className="btn btn-navy" onClick={() => navigate('/compras/nueva')}>
-              <Plus size={16} />
-              Nueva Compra
-            </button>
+            {puedeCrear && (
+              <button className="btn btn-navy" onClick={() => navigate('/compras/nueva')}>
+                <Plus size={16} />
+                Nueva Compra
+              </button>
+            )}
           </>
         }
       />
@@ -120,6 +118,7 @@ export default function ComprasPage() {
                     onChange={(e) => { setSupplier(e.target.value); setPage(1) }}
                   />
                 </div>
+                {filtros.puedeFiltrar('status') && (
                 <FilterField label="Estado">
                   <Select
                     value={status}
@@ -131,16 +130,19 @@ export default function ComprasPage() {
                     <SelectItem value="Cancelled">Anulado</SelectItem>
                   </Select>
                 </FilterField>
+                )}
+                {filtros.puedeFiltrar('branch') && (
                 <FilterField label="Sucursal" style={{ width: 200 }}>
-                  <SearchSelect
+                  <OpcionesSelect
+                    recurso="sucursales"
                     value={branch}
                     onChange={(val) => { setBranch(val); setPage(1) }}
-                    options={branchOptions}
-                    onSearch={setBranchSearch}
                     selectedLabel={branch}
                     placeholder="Todas las sucursales"
+                    fallback={fallbackSucursales}
                   />
                 </FilterField>
+                )}
 
                 <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
                   <SlidersHorizontal size={13} />
@@ -205,9 +207,11 @@ export default function ComprasPage() {
                                 </div>
                                 <p className="empty-title">Sin compras</p>
                                 <p className="empty-sub">No hay compras registradas.</p>
-                                <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/compras/nueva')}>
-                                  <Plus size={14} />Nueva Compra
-                                </button>
+                                {puedeCrear && (
+                                  <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/compras/nueva')}>
+                                    <Plus size={14} />Nueva Compra
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -285,6 +289,7 @@ export default function ComprasPage() {
           </>
         }
       >
+        {(filtros.puedeFiltrar('fromDate') || filtros.puedeFiltrar('toDate')) && (
         <div className="ff-wrap">
           <label className="ff-label">Fecha</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -293,7 +298,9 @@ export default function ComprasPage() {
             <DatePicker className="ff-input" value={toDate} onChange={(v) => { setToDate(v); setPage(1) }} clearable />
           </div>
         </div>
+        )}
 
+        {filtros.puedeFiltrar('ncf') && (
         <div className="ff-wrap">
           <label className="ff-label">NCF</label>
           <input
@@ -303,7 +310,9 @@ export default function ComprasPage() {
             onChange={(e) => { setNcf(e.target.value); setPage(1) }}
           />
         </div>
+        )}
 
+        {(filtros.puedeFiltrar('grandTotalMin') || filtros.puedeFiltrar('grandTotalMax')) && (
         <div className="ff-wrap">
           <label className="ff-label">Total</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -324,6 +333,7 @@ export default function ComprasPage() {
             />
           </div>
         </div>
+        )}
       </Drawer>
     </div>
   )

@@ -16,6 +16,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const PAGE_SIZE = 20
 
@@ -29,6 +30,7 @@ const COLUMNS = [
 ]
 
 export default function SuppliersPage() {
+  const puedeCrear = usePuede('proveedores.crear')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -105,10 +107,12 @@ export default function SuppliersPage() {
         action={
           <>
             <RecargarButton />
-            <button className="btn btn-navy" onClick={() => navigate('/proveedores/nuevo')}>
-              <Plus size={16} />
-              Nuevo Proveedor
-            </button>
+            {puedeCrear && (
+              <button className="btn btn-navy" onClick={() => navigate('/proveedores/nuevo')}>
+                <Plus size={16} />
+                Nuevo Proveedor
+              </button>
+            )}
           </>
         }
       />

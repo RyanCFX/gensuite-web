@@ -22876,7 +22876,7 @@
         ]
       },
       "post": {
-        "description": "Si el correo ya existe en el sistema (ver GET /usuarios/lookup), se ignoran `firstName`/`lastName` — el nombre es de la persona. Envía SIEMPRE un correo con un link de invitación: a confirmar+fijar contraseña si es nuevo, o solo a confirmar si ya existía.",
+        "description": "Si el correo ya existe en el sistema (ver GET /usuarios/lookup), se ignoran `firstName`/`lastName` — el nombre es de la persona. Envía SIEMPRE un correo con un link de invitación: a confirmar+fijar contraseña si es nuevo, o solo a confirmar si ya existía.\n\nPermisos v2 en modo `activo`: mandar solo `perfilesAcceso` (al menos uno). `roles`/`perfiles` → 400 ACCESO_V2_ACTIVO; sin `perfilesAcceso` → 400 PERFIL_ACCESO_REQUERIDO. En `off`/`sombra`, como siempre (`perfilesAcceso` opcional, deja preparado el acceso v2).",
         "operationId": "UsuariosController_invite",
         "parameters": [
           {
@@ -22899,8 +22899,8 @@
           }
         },
         "responses": {
-          "201": {
-            "description": ""
+          "400": {
+            "description": "ACCESO_V2_ACTIVO · PERFIL_ACCESO_REQUERIDO · PERFIL_INEXISTENTE (id de perfilesAcceso inexistente) · validación"
           }
         },
         "security": [
@@ -22988,7 +22988,7 @@
         ]
       },
       "put": {
-        "description": "Nombre y apellido ya NO se editan acá — son de la persona (ver PATCH /me/profile). Esta ruta sigue controlando roles/perfiles, almacenes, sucursales, PIN y descuento máximo.",
+        "description": "Nombre y apellido ya NO se editan acá — son de la persona (ver PATCH /me/profile). Esta ruta sigue controlando roles/perfiles, almacenes, sucursales, PIN y descuento máximo.\n\nPermisos v2 en modo `activo`: no enviar `roles` ni `perfiles` (400 ACCESO_V2_ACTIVO); el acceso se edita con PUT /acceso/usuarios/:email.",
         "operationId": "UsuariosController_update",
         "parameters": [
           {
@@ -23019,8 +23019,8 @@
           }
         },
         "responses": {
-          "200": {
-            "description": ""
+          "400": {
+            "description": "ACCESO_V2_ACTIVO · validación"
           }
         },
         "security": [
@@ -23412,6 +23412,161 @@
           }
         ],
         "summary": "Perfiles de rol (Role Profile) disponibles, con los roles que agrupa cada uno",
+        "tags": [
+          "Usuarios"
+        ]
+      },
+      "post": {
+        "operationId": "RolesController_createPerfil",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear un Role Profile nuevo",
+        "tags": [
+          "Usuarios"
+        ]
+      }
+    },
+    "/api/v1/roles/perfiles/{name}": {
+      "get": {
+        "operationId": "RolesController_getPerfilDetalle",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un Role Profile: roles que agrupa",
+        "tags": [
+          "Usuarios"
+        ]
+      },
+      "put": {
+        "description": "ERPNext no soporta un \"append\" parcial del child table de roles vía REST — hay que mandar la lista completa deseada (los roles que ya tenía + el nuevo, si es para agregar).",
+        "operationId": "RolesController_updatePerfil",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoleProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reemplazar la lista de roles de un Role Profile",
+        "tags": [
+          "Usuarios"
+        ]
+      },
+      "delete": {
+        "operationId": "RolesController_deletePerfil",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar un Role Profile (ERPNext rechaza uno en uso)",
         "tags": [
           "Usuarios"
         ]
@@ -25331,9 +25486,138 @@
         ]
       }
     },
+    "/api/v1/dashboard/catalogo": {
+      "get": {
+        "description": "Solo trae lo contratado por el tenant (GenSuite Control) y permitido al usuario. El frontend arma el dashboard con esta lista y pide cada reporte a GET /dashboard/widgets/:key.",
+        "operationId": "DashboardController_catalogo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardCatalogoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tipos de reporte del dashboard y reportes que ESTE usuario puede ver",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/api/v1/dashboard/widgets/{key}": {
+      "get": {
+        "description": "key = clave del reporte (ej. dashboard.ventas.total). 403 WIDGET_NO_PERMITIDO / WIDGET_NO_CONTRATADO, 404 si no existe. `limit` aplica a los reportes de lista (tops, actividad, bajo mínimo).",
+        "operationId": "DashboardController_widget",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "description": "Período del resumen",
+            "schema": {
+              "default": "month",
+              "type": "string",
+              "enum": [
+                "today",
+                "7d",
+                "month",
+                "year"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 20,
+              "default": 5,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardWidgetEnvelopeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "WIDGET_NO_PERMITIDO (el usuario no tiene el reporte) · WIDGET_NO_CONTRATADO (el tenant no lo tiene) — details: { reporte, tipo } · PERMISO_INSUFICIENTE (sin dashboard.ver)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "La key no existe en el registro",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Datos de un reporte del dashboard",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
     "/api/v1/dashboard/summary": {
       "get": {
-        "description": "Todas las queries se ejecutan en paralelo (Promise.all). Período: today | 7d | month | year",
+        "description": "Los bloques de reportes no permitidos/no contratados vienen en null. `data.reportes` lista los reportes incluidos. Período: today | 7d | month | year. Preferir GET /dashboard/catalogo + /widgets/:key.",
         "operationId": "DashboardController_getSummary",
         "parameters": [
           {
@@ -25371,7 +25655,7 @@
             "bearer": []
           }
         ],
-        "summary": "KPIs del período: ventas, compras, gastos, cobros, utilidad + gráfico + tops",
+        "summary": "Resumen del dashboard (forma histórica) — solo con los reportes que el usuario puede ver",
         "tags": [
           "Dashboard"
         ]
@@ -25418,8 +25702,15 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": ""
+          "403": {
+            "description": "WIDGET_NO_PERMITIDO (el usuario no tiene el reporte) · WIDGET_NO_CONTRATADO (el tenant no lo tiene) — details: { reporte, tipo } · PERMISO_INSUFICIENTE (sin dashboard.ver)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -25427,7 +25718,7 @@
             "bearer": []
           }
         ],
-        "summary": "Top artículos por monto vendido en el período",
+        "summary": "Top artículos por monto vendido en el período (reporte dashboard.ventas.top-productos)",
         "tags": [
           "Dashboard"
         ]
@@ -25474,8 +25765,15 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": ""
+          "403": {
+            "description": "WIDGET_NO_PERMITIDO (el usuario no tiene el reporte) · WIDGET_NO_CONTRATADO (el tenant no lo tiene) — details: { reporte, tipo } · PERMISO_INSUFICIENTE (sin dashboard.ver)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -25483,7 +25781,7 @@
             "bearer": []
           }
         ],
-        "summary": "Top clientes por monto facturado en el período",
+        "summary": "Top clientes por monto facturado en el período (reporte dashboard.ventas.top-clientes)",
         "tags": [
           "Dashboard"
         ]
@@ -25511,8 +25809,15 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": ""
+          "403": {
+            "description": "WIDGET_NO_PERMITIDO (el usuario no tiene el reporte) · WIDGET_NO_CONTRATADO (el tenant no lo tiene) — details: { reporte, tipo } · PERMISO_INSUFICIENTE (sin dashboard.ver)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -25520,7 +25825,7 @@
             "bearer": []
           }
         ],
-        "summary": "Actividad reciente: facturas, cobros y compras del tenant",
+        "summary": "Actividad reciente (reporte dashboard.actividad.reciente) — solo de los tipos que el usuario ve",
         "tags": [
           "Dashboard"
         ]
@@ -30795,7 +31100,7 @@
     },
     "/api/v1/me/permissions": {
       "get": {
-        "description": "Devuelve `acciones` — el catálogo completo resuelto contra los permisos reales del usuario, un booleano por cada botón/pantalla — más `doctypes` con los flags crudos por si el frontend necesita razonar por su cuenta, y `roles`.\n\nNO refleja el estado del documento: `ventas.factura.someter` sale en `true` si el usuario tiene el permiso `submit`, sin importar si la factura que está viendo ya fue sometida. Para una pantalla de detalle, combinar con GET /me/permissions/:doctype/:name y con el `docstatus` del documento.",
+        "description": "Devuelve `acciones` — el catálogo completo resuelto contra los permisos reales del usuario, un booleano por cada botón/pantalla — más `doctypes` con los flags crudos por si el frontend necesita razonar por su cuenta, y `roles`.\n\nNO refleja el estado del documento: `ventas.factura.someter` sale en `true` si el usuario tiene el permiso `submit`, sin importar si la factura que está viendo ya fue sometida. Para una pantalla de detalle, combinar con GET /me/permissions/:doctype/:name y con el `docstatus` del documento.\n\n**Permisos v2** (`GET /me/acceso` → `modo`): en `off`/`sombra`, `acciones` se calcula desde DocPerm de ERPNext como siempre. En `activo`, `acciones` se calcula desde el acceso v2 del usuario (perfiles y grants): mismo contrato y mismas claves, otra fuente; `roles` y `doctypes` pasan a ser solo diagnóstico (el techo de ERPNext) y no deben decidir UI. Los filtros, recursos y widgets no están acá: ver GET /me/acceso.",
         "operationId": "MeController_getPermissions",
         "parameters": [
           {
@@ -30809,7 +31114,14 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MePermissionsEnvelopeDto"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -31252,6 +31564,966 @@
         "summary": "Desvincula una cuenta externa",
         "tags": [
           "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/acceso/catalogo": {
+      "get": {
+        "description": "Solo trae lo que el tenant tiene contratado (features, reportes y tipos/reportes de dashboard). Cada componente trae tipo (vista, accion, filtro, exportar, widget), el query param que protege si es filtro, sus requisitos, los recursos (lookups) que habilita y `otorgable` (anti-escalada).",
+        "operationId": "AccesoController_catalogo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "otorgable",
+            "required": false,
+            "in": "query",
+            "description": "true = marcar/filtrar solo lo que quien consulta puede otorgar (anti-escalada).",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogoAccesoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Catálogo Módulo → Pantalla → Componente disponible para ESTE tenant",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      }
+    },
+    "/api/v1/acceso/plantillas": {
+      "get": {
+        "operationId": "AccesoController_plantillas",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlantillasEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plantillas de perfil disponibles (de sistema y de GenSuite Control)",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      }
+    },
+    "/api/v1/acceso/perfiles": {
+      "get": {
+        "operationId": "AccesoController_perfiles",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerfilesEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Perfiles de acceso del tenant, con sus grants y cantidad de usuarios",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      },
+      "post": {
+        "operationId": "AccesoController_crearPerfil",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearPerfilDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerfilDetalleEnvelopeDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "CLAVE_INEXISTENTE, COMPONENTE_NO_CONTRATADO, GRANT_VENCIDO — details: { claves: string[] } · PLANTILLA_INEXISTENTE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ESCALADA_NO_PERMITIDA — details: { claves: string[] } (otorgó algo que quien edita no tiene) · PERMISO_INSUFICIENTE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "PERFIL_DUPLICADO (nombre repetido en el tenant)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear perfil (opcionalmente desde una plantilla)",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      }
+    },
+    "/api/v1/acceso/perfiles/{id}": {
+      "get": {
+        "operationId": "AccesoController_perfil",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerfilDetalleEnvelopeDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Perfil no encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un perfil: grants y usuarios asignados",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      },
+      "patch": {
+        "operationId": "AccesoController_actualizarPerfil",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarPerfilDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerfilDetalleEnvelopeDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "PERFIL_SISTEMA (el perfil Administrador no se edita)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Perfil no encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "PERFIL_DUPLICADO",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renombrar / cambiar descripción de un perfil",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      },
+      "delete": {
+        "operationId": "AccesoController_eliminarPerfil",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MensajeEnvelopeDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "PERFIL_SISTEMA",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Perfil no encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "PERFIL_EN_USO — details: { usuarios: number } (cantidad de usuarios asignados)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar perfil (409 PERFIL_EN_USO si tiene usuarios)",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      }
+    },
+    "/api/v1/acceso/perfiles/{id}/grants": {
+      "put": {
+        "description": "Lista completa. El perfil Administrador no se edita. Con v2 activo re-deriva los roles de ERPNext de sus usuarios.",
+        "operationId": "AccesoController_reemplazarGrants",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReemplazarGrantsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerfilDetalleEnvelopeDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "CLAVE_INEXISTENTE, COMPONENTE_NO_CONTRATADO, GRANT_VENCIDO — details: { claves: string[] } · PERFIL_SISTEMA (el perfil Administrador no se edita)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ESCALADA_NO_PERMITIDA — details: { claves: string[] } (otorgó algo que quien edita no tiene) · PERMISO_INSUFICIENTE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Perfil no encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reemplazar los permisos (grants) de un perfil",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      }
+    },
+    "/api/v1/acceso/usuarios/{email}": {
+      "get": {
+        "operationId": "AccesoController_usuario",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoUsuarioEnvelopeDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El email no pertenece al tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Perfiles y excepciones asignados a un usuario",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza perfiles (y excepciones si se envían). 409 ULTIMO_ADMINISTRADOR si se le quita el Administrador al último que lo tiene.",
+        "operationId": "AccesoController_asignar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccesoUsuarioDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoUsuarioEnvelopeDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "CLAVE_INEXISTENTE, COMPONENTE_NO_CONTRATADO, GRANT_VENCIDO — details: { claves: string[] } · PERFIL_INEXISTENTE (algún id de perfil no existe en el tenant)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "ESCALADA_NO_PERMITIDA — details: { claves: string[] } (otorgó algo que quien edita no tiene) · PERMISO_INSUFICIENTE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El email no pertenece al tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "ULTIMO_ADMINISTRADOR — no se puede quitar el perfil Administrador al último usuario que lo tiene",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Asignar perfiles y excepciones a un usuario",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      }
+    },
+    "/api/v1/acceso/usuarios/{email}/efectivo": {
+      "get": {
+        "description": "Con ?explicar=true, cada componente trae su estado (otorgado, no_contratado, denegado_usuario, denegado_perfil, requisito_faltante, sin_otorgar) y qué perfil lo causa.",
+        "operationId": "AccesoController_efectivo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "explicar",
+            "required": false,
+            "in": "query",
+            "description": "true = incluir la traza por componente (por qué está o no está).",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EfectivoUsuarioEnvelopeDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El email no pertenece al tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Acceso efectivo de un usuario, con explicación opcional",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      }
+    },
+    "/api/v1/acceso/auditoria": {
+      "get": {
+        "operationId": "AccesoController_auditoria",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 0,
+              "default": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditoriaEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Historial de cambios de permisos (paginado)",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      }
+    },
+    "/api/v1/acceso/migrar": {
+      "post": {
+        "description": "Reproduce el acceso actual (DocPerm) sin regresiones. Idempotente; con reemplazar=true pisa perfiles del mismo nombre.",
+        "operationId": "AccesoController_migrar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MigrarAccesoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MigrarEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear perfiles desde los Role Profiles actuales de ERPNext y asignarlos",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      }
+    },
+    "/api/v1/acceso/sincronizar-roles": {
+      "post": {
+        "operationId": "AccesoController_sincronizarRoles",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SincronizacionEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Re-derivar los roles de ERPNext de todos los usuarios (solo con v2 activo)",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      }
+    },
+    "/api/v1/me/acceso": {
+      "get": {
+        "description": "Módulos, pantallas, componentes y recursos efectivos del usuario, y los filtros que NO puede usar por pantalla. Con modo \"off\"/\"sombra\" se calcula igual (para previsualizar), pero lo que se aplica es GET /me/permissions. Siempre 200 para un usuario autenticado del tenant, en los tres modos.\n\nCon modo `activo`, CUALQUIER endpoint de listado/reporte responde 403 FILTRO_NO_PERMITIDO si recibe un query param de filtro bloqueado — details: { filtros: [{ parametro, componente }] }. Quitar esos parámetros y reintentar.",
+        "operationId": "MeAccesoController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeAccesoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mi acceso efectivo (permisos v2)",
+        "tags": [
+          "Permisos v2 (acceso)"
+        ]
+      }
+    },
+    "/api/v1/opciones/{recurso}": {
+      "get": {
+        "description": "recurso = clave sin el prefijo \"lookup.\" (ej. sucursales, almacenes, clientes, proveedores, articulos, usuarios, metodos-pago, departamentos, centros-costo, aseguradoras, categorias, marcas, monedas, cuentas-bancarias, grupos-clientes, grupos-proveedores, uom, listas-precio, roles, cuentas, cajas-pos). Permitido si alguno de sus componentes efectivos depende de él — NO requiere la pantalla de administración de esa entidad. `value` es siempre el `name` de ERPNext. Data-scope de sucursales/almacenes: solo los asignados al usuario ([] si no tiene ninguno), salvo System Manager que ve todos.",
+        "operationId": "OpcionesController_listar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "recurso",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Texto a buscar (nombre, código, RNC… según el recurso).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpcionesEnvelopeDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "El recurso no existe (clave mal escrita). No significa \"backend viejo\".",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccesoErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Opciones de un recurso (lookup) para selects/filtros",
+        "tags": [
+          "Permisos v2 (acceso)"
         ]
       }
     },
@@ -38526,7 +39798,7 @@
           "redondeoTotalDeshabilitado": {
             "type": "boolean",
             "default": false,
-            "description": "Espejo de `Accounts Settings.disable_rounded_total` de ERPNext (setting global, no es un campo propio de Facturacion Config) — aplica como default a toda factura/compra nueva del tenant. Si está en false (default de ERPNext), el `grand_total` con centavos se redondea a `rounded_total` y es ESE monto redondeado el que queda como `outstanding_amount`/ `amountDue` a cobrar (ej. grand_total=168.57 → se cobra 169.00) — pensado para efectivo, que no maneja denominaciones fraccionarias en RD. Si se activa (true), ERPNext deja de redondear: se cobra el grand_total exacto, con centavos — más apropiado si el negocio solo cobra con tarjeta/cheque/transferencia. Cambiar esto NO afecta facturas ya sometidas, solo las que se sometan después. NOTA: si se activa (redondeo deshabilitado a la creación) y luego la factura se cobra 100% en efectivo (al someterla o vía POST /cobros), el BFF redondea el monto cobrado a .00 al momento del cobro usando un write-off nativo de ERPNext (Company.write_off_account) — sin alterar el total real de la factura. Con este toggle en false (default), ERPNext ya redondeó al crear y ese write-off normalmente no tiene nada que absorber."
+            "description": "Espejo de `Accounts Settings.disable_rounded_total` de ERPNext (setting global, no es un campo propio de Facturacion Config) — aplica como default a toda factura/compra nueva del tenant. Si está en false (default de ERPNext), el `grand_total` con centavos se redondea a `rounded_total` y es ESE monto redondeado el que queda como `outstanding_amount`/ `amountDue` a cobrar (ej. grand_total=168.57 → se cobra 169.00) — pensado para efectivo, que no maneja denominaciones fraccionarias en RD. Si se activa (true), ERPNext deja de redondear: se cobra el grand_total exacto, con centavos — más apropiado si el negocio solo cobra con tarjeta/cheque/transferencia. Cambiar esto NO afecta facturas ya sometidas, solo las que se sometan después."
           },
           "tasaFijaCxc": {
             "type": "boolean",
@@ -44271,6 +45543,13 @@
               "type": "string"
             }
           },
+          "perfilesAcceso": {
+            "description": "Permisos v2 (tenant con acceso v2 en modo \"activo\"): IDs de perfiles de acceso (GET /acceso/perfiles). En ese modo reemplazan a `perfiles`/`roles` de ERPNext, que se rechazan: los roles de ERPNext se derivan solos del acceso otorgado.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "adminCode": {
             "type": "string",
             "example": "EMP-00231",
@@ -44381,6 +45660,40 @@
         },
         "required": [
           "branches"
+        ]
+      },
+      "CreateRoleProfileDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "description": "Nombre del Role Profile nuevo"
+          },
+          "roles": {
+            "description": "Roles que agrupa el perfil (puede quedar vacío y llenarse después con PUT)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "nombre"
+        ]
+      },
+      "UpdateRoleProfileDto": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "description": "Lista completa de roles del perfil — reemplaza el array existente, no lo suma. Para agregar un rol hay que mandar la lista completa (los actuales + el nuevo).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "roles"
         ]
       },
       "CreateRoleDto": {
@@ -44781,6 +46094,182 @@
           "customer",
           "postingDate",
           "items"
+        ]
+      },
+      "DashboardReporteCatalogoDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "dashboard.ventas.total"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "key",
+          "nombre",
+          "descripcion"
+        ]
+      },
+      "DashboardTipoCatalogoDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "dashboard.ventas"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "reportes": {
+            "description": "En el orden en que se deben mostrar.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardReporteCatalogoDto"
+            }
+          }
+        },
+        "required": [
+          "key",
+          "nombre",
+          "descripcion",
+          "reportes"
+        ]
+      },
+      "DashboardCatalogoEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "description": "Tipos con al menos un reporte visible (contratado ∩ permitido), en orden. Puede ser [].",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardTipoCatalogoDto"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "DashboardWidgetMetaDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "today",
+              "7d",
+              "month",
+              "year"
+            ]
+          },
+          "periodLabel": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "example": "2026-09-01"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-09-30"
+          },
+          "currency": {
+            "type": "string",
+            "example": "DOP",
+            "description": "Moneda base de la empresa."
+          }
+        },
+        "required": [
+          "key",
+          "period",
+          "periodLabel",
+          "from",
+          "to",
+          "currency"
+        ]
+      },
+      "DashboardWidgetEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "description": "Depende de la key (mismos nombres de campo que GET /dashboard/summary): ventas.total → { kpis: { totalVentas, numFacturas, totalVentasDeltaPct } }; ventas.grafico → { chart: { labels, sales, credits } }; ventas.top-productos → { topProducts: [{ itemCode, itemName, qty, amount, percentage }] }; ventas.top-clientes → { topCustomers: [{ customer, customerName, total, count }] }; compras.total → { kpis: { totalCompras, numCompras } }; gastos.total → { kpis: { totalGastos, totalGastosDeltaPct } }; gastos.mes → { gastosEsteMes }; cxc.saldo → { kpis: { totalPendiente, totalCuentasPorCobrar, numCuentasPorCobrar, cuentasPorCobrarDeltaCount } }; cobros.total → { kpis: { totalCobrado, totalIngresos, totalIngresosDeltaPct } }; cobros.mes → { ingresosEsteMes }; finanzas.utilidad → { kpis: { utilidad, utilidadDeltaPct } }; finanzas.ingresos-gastos → { ingresosGastosChart: { labels, ingresos, gastos }, totalGanancias }; inventario.bajo-minimo → { lowStockItems: [{ item_code, item_name }] }; actividad.reciente → { recentActivity: [{ type, id, description, amount, currency, timestamp }] }; actividad.pendientes → { pendingActions: [{ date, type, reference, description }] }. *DeltaPct puede ser null."
+          },
+          "meta": {
+            "description": "A nivel raíz del envelope, no dentro de data.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DashboardWidgetMetaDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ]
+      },
+      "AccesoErrorBodyDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Código estable. Ver la descripción de cada endpoint para los códigos posibles."
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensaje en español, listo para mostrar."
+          },
+          "statusCode": {
+            "type": "number"
+          },
+          "details": {
+            "type": "object",
+            "description": "Según el código: `{ claves: string[] }` (CLAVE_INEXISTENTE, COMPONENTE_NO_CONTRATADO, GRANT_VENCIDO, ESCALADA_NO_PERMITIDA), `{ usuarios: number }` (PERFIL_EN_USO), `{ recurso }` (RECURSO_NO_PERMITIDO), `{ reporte, tipo }` (WIDGET_*), `{ filtros: [{ parametro, componente }] }` (FILTRO_NO_PERMITIDO), `{ acciones, componentes? , requiere?, marcadores? }` (PERMISO_INSUFICIENTE)."
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "statusCode"
+        ]
+      },
+      "AccesoErrorDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "$ref": "#/components/schemas/AccesoErrorBodyDto"
+          }
+        },
+        "required": [
+          "success",
+          "error"
         ]
       },
       "CreateCuentaDto": {
@@ -46378,6 +47867,2516 @@
           "role"
         ]
       },
+      "MePermissionsAccionesDto": {
+        "type": "object",
+        "properties": {
+          "catalogo.dimensiones.listar": {
+            "type": "boolean",
+            "description": "Dimensiones de Inventario — Ver"
+          },
+          "catalogo.dimensiones.crear": {
+            "type": "boolean",
+            "description": "Dimensiones de Inventario — Crear dimensión"
+          },
+          "catalogo.dimensiones.editar": {
+            "type": "boolean",
+            "description": "Dimensiones de Inventario — Editar dimensión o valores"
+          },
+          "catalogo.items.listar": {
+            "type": "boolean",
+            "description": "Lista de Productos/Servicios — Ver"
+          },
+          "catalogo.items.eliminar": {
+            "type": "boolean",
+            "description": "Detalle de Artículo — Eliminar"
+          },
+          "catalogo.items.consultar-stock": {
+            "type": "boolean",
+            "description": "Detalle de Artículo — Ver existencias por almacén"
+          },
+          "catalogo.items.crear": {
+            "type": "boolean",
+            "description": "Lista de Productos/Servicios — Nuevo"
+          },
+          "catalogo.items.activar": {
+            "type": "boolean",
+            "description": "Lista de Productos/Servicios — Activar/Desactivar"
+          },
+          "catalogo.items.editar": {
+            "type": "boolean",
+            "description": "Detalle de Artículo — Editar"
+          },
+          "catalogo.items.actualizar-precios": {
+            "type": "boolean",
+            "description": "Detalle de Artículo — Actualizar Precios"
+          },
+          "catalogo.items.imprimir-etiqueta": {
+            "type": "boolean",
+            "description": "Detalle de Artículo — Imprimir etiqueta"
+          },
+          "catalogo.items.generar-variantes": {
+            "type": "boolean",
+            "description": "Detalle de Artículo — Agregar/Generar variantes"
+          },
+          "catalogo.items.asignar-ubicacion": {
+            "type": "boolean",
+            "description": "Detalle de Artículo — Asignar/Mover/Quitar ubicación"
+          },
+          "catalogo.categorias.listar": {
+            "type": "boolean",
+            "description": "Categorías — Ver"
+          },
+          "catalogo.categorias.crear": {
+            "type": "boolean",
+            "description": "Categorías — Nueva"
+          },
+          "catalogo.categorias.editar": {
+            "type": "boolean",
+            "description": "Categorías — Editar"
+          },
+          "catalogo.categorias.eliminar": {
+            "type": "boolean",
+            "description": "Categorías — Eliminar"
+          },
+          "catalogo.marcas.listar": {
+            "type": "boolean",
+            "description": "Marcas — Ver"
+          },
+          "catalogo.marcas.crear": {
+            "type": "boolean",
+            "description": "Marcas — Nueva"
+          },
+          "catalogo.marcas.editar": {
+            "type": "boolean",
+            "description": "Marcas — Editar"
+          },
+          "catalogo.marcas.eliminar": {
+            "type": "boolean",
+            "description": "Marcas — Eliminar"
+          },
+          "catalogo.atributos.listar": {
+            "type": "boolean",
+            "description": "Atributos — Ver"
+          },
+          "catalogo.atributos.crear": {
+            "type": "boolean",
+            "description": "Atributos — Nuevo"
+          },
+          "catalogo.atributos.editar": {
+            "type": "boolean",
+            "description": "Atributos — Editar"
+          },
+          "catalogo.descuentos.listar": {
+            "type": "boolean",
+            "description": "Descuentos — Ver"
+          },
+          "catalogo.descuentos.crear": {
+            "type": "boolean",
+            "description": "Descuentos — Nueva regla"
+          },
+          "catalogo.descuentos.editar": {
+            "type": "boolean",
+            "description": "Descuentos — Editar / Activar-Desactivar"
+          },
+          "catalogo.combos.listar": {
+            "type": "boolean",
+            "description": "Combos — Ver"
+          },
+          "catalogo.combos.eliminar": {
+            "type": "boolean",
+            "description": "Combos — Eliminar"
+          },
+          "catalogo.combos.crear": {
+            "type": "boolean",
+            "description": "Combos — Nuevo"
+          },
+          "catalogo.combos.editar": {
+            "type": "boolean",
+            "description": "Combos — Editar / Desactivar"
+          },
+          "catalogo.cuentas-pagar.crear": {
+            "type": "boolean",
+            "description": "Cuentas por Pagar (catálogo fiscal) — Nueva"
+          },
+          "catalogo.cuentas-pagar.listar": {
+            "type": "boolean",
+            "description": "Cuentas por Pagar (catálogo fiscal) — Ver"
+          },
+          "catalogo.cuentas-pagar.eliminar": {
+            "type": "boolean",
+            "description": "Cuentas por Pagar (catálogo fiscal) — Eliminar"
+          },
+          "catalogo.cuentas-pagar.editar": {
+            "type": "boolean",
+            "description": "Cuentas por Pagar (catálogo fiscal) — Editar / Deshabilitar"
+          },
+          "compras.factura.listar": {
+            "type": "boolean",
+            "description": "Compra — lista — Ver"
+          },
+          "compras.factura.crear": {
+            "type": "boolean",
+            "description": "Compra — lista — Nueva"
+          },
+          "compras.orden.listar": {
+            "type": "boolean",
+            "description": "Orden de Compra — Ver"
+          },
+          "compras.orden.eliminar": {
+            "type": "boolean",
+            "description": "Orden de Compra — Eliminar (borrador)"
+          },
+          "compras.orden.imprimir": {
+            "type": "boolean",
+            "description": "Orden de Compra — Descargar PDF"
+          },
+          "compras.recepcion.listar": {
+            "type": "boolean",
+            "description": "Recepción — Ver"
+          },
+          "compras.solicitud.listar": {
+            "type": "boolean",
+            "description": "Solicitud de Compra — Ver"
+          },
+          "compras.solicitud.eliminar": {
+            "type": "boolean",
+            "description": "Solicitud de Compra — Eliminar (borrador)"
+          },
+          "compras.solicitud.imprimir": {
+            "type": "boolean",
+            "description": "Solicitud de Compra — Descargar PDF"
+          },
+          "compras.factura.editar": {
+            "type": "boolean",
+            "description": "Detalle de Compra — Editar / Impacto contable (preview)"
+          },
+          "compras.factura.someter": {
+            "type": "boolean",
+            "description": "Detalle de Compra — Someter"
+          },
+          "compras.factura.eliminar": {
+            "type": "boolean",
+            "description": "Detalle de Compra — Eliminar (borrador)"
+          },
+          "compras.factura.imprimir": {
+            "type": "boolean",
+            "description": "Detalle de Compra — Ver / Descargar PDF"
+          },
+          "compras.factura.anular": {
+            "type": "boolean",
+            "description": "Detalle de Compra — Anular"
+          },
+          "compras.factura.enmendar": {
+            "type": "boolean",
+            "description": "Detalle de Compra — Enmendar"
+          },
+          "compras.factura.devolver": {
+            "type": "boolean",
+            "description": "Detalle de Compra — Devolución"
+          },
+          "compras.factura.ver-asientos": {
+            "type": "boolean",
+            "description": "Detalle de Compra — Ver asientos"
+          },
+          "compras.factura.aplicar-saldo": {
+            "type": "boolean",
+            "description": "Detalle de Compra — Aplicar/deshacer saldo a favor CxP"
+          },
+          "compras.factura.importar-lineas-oc": {
+            "type": "boolean",
+            "description": "Detalle de Compra — Importar líneas desde Orden de Compra"
+          },
+          "compras.recepcion.crear": {
+            "type": "boolean",
+            "description": "Recepción — Nueva"
+          },
+          "compras.recepcion.editar": {
+            "type": "boolean",
+            "description": "Recepción — Editar"
+          },
+          "compras.recepcion.someter": {
+            "type": "boolean",
+            "description": "Recepción — Someter"
+          },
+          "compras.recepcion.imprimir": {
+            "type": "boolean",
+            "description": "Recepción — Descargar PDF"
+          },
+          "compras.recepcion.imprimir-etiquetas": {
+            "type": "boolean",
+            "description": "Recepción — Imprimir etiquetas"
+          },
+          "compras.recepcion.facturar": {
+            "type": "boolean",
+            "description": "Recepción — Facturar"
+          },
+          "compras.recepcion.anular": {
+            "type": "boolean",
+            "description": "Recepción — Anular"
+          },
+          "compras.recepcion.enmendar": {
+            "type": "boolean",
+            "description": "Recepción — Enmendar"
+          },
+          "compras.solicitud.crear": {
+            "type": "boolean",
+            "description": "Solicitud de Compra — Nueva"
+          },
+          "compras.solicitud.editar": {
+            "type": "boolean",
+            "description": "Solicitud de Compra — Editar / Detener / Reanudar"
+          },
+          "compras.solicitud.someter": {
+            "type": "boolean",
+            "description": "Solicitud de Compra — Someter"
+          },
+          "compras.solicitud.generar-orden": {
+            "type": "boolean",
+            "description": "Solicitud de Compra — Generar Orden"
+          },
+          "compras.solicitud.anular": {
+            "type": "boolean",
+            "description": "Solicitud de Compra — Anular"
+          },
+          "compras.solicitud.enmendar": {
+            "type": "boolean",
+            "description": "Solicitud de Compra — Enmendar"
+          },
+          "compras.orden.crear": {
+            "type": "boolean",
+            "description": "Orden de Compra — Nueva"
+          },
+          "compras.orden.editar": {
+            "type": "boolean",
+            "description": "Orden de Compra — Editar / En Espera / Cerrar / Reabrir"
+          },
+          "compras.orden.someter": {
+            "type": "boolean",
+            "description": "Orden de Compra — Someter"
+          },
+          "compras.orden.recibir": {
+            "type": "boolean",
+            "description": "Orden de Compra — Recibir"
+          },
+          "compras.orden.facturar": {
+            "type": "boolean",
+            "description": "Orden de Compra — Facturar"
+          },
+          "compras.orden.anular": {
+            "type": "boolean",
+            "description": "Orden de Compra — Anular"
+          },
+          "compras.orden.enmendar": {
+            "type": "boolean",
+            "description": "Orden de Compra — Enmendar"
+          },
+          "compras.costos-importacion.listar": {
+            "type": "boolean",
+            "description": "Costos de Importación — Ver"
+          },
+          "compras.costos-importacion.crear": {
+            "type": "boolean",
+            "description": "Costos de Importación — Nuevo"
+          },
+          "compras.costos-importacion.someter": {
+            "type": "boolean",
+            "description": "Costos de Importación — Someter"
+          },
+          "compras.costos-importacion.anular": {
+            "type": "boolean",
+            "description": "Costos de Importación — Anular"
+          },
+          "gastos.listar": {
+            "type": "boolean",
+            "description": "Gasto — lista — Ver"
+          },
+          "gastos.crear": {
+            "type": "boolean",
+            "description": "Gasto — lista — Nuevo"
+          },
+          "gastos.editar": {
+            "type": "boolean",
+            "description": "Gasto — detalle — Editar / Impacto contable"
+          },
+          "gastos.someter": {
+            "type": "boolean",
+            "description": "Gasto — detalle — Someter"
+          },
+          "gastos.anular": {
+            "type": "boolean",
+            "description": "Gasto — detalle — Anular"
+          },
+          "gastos.enmendar": {
+            "type": "boolean",
+            "description": "Gasto — detalle — Enmendar"
+          },
+          "gastos.aplicar-saldo": {
+            "type": "boolean",
+            "description": "Gasto — detalle — Saldo a favor CxP (aplicar/deshacer)"
+          },
+          "gastos.ver-asientos": {
+            "type": "boolean",
+            "description": "Gasto — detalle — Ver asientos"
+          },
+          "ventas.factura.crear": {
+            "type": "boolean",
+            "description": "Factura — lista — Nueva"
+          },
+          "ventas.factura.listar": {
+            "type": "boolean",
+            "description": "Factura — lista — Ver"
+          },
+          "ventas.factura.editar": {
+            "type": "boolean",
+            "description": "Detalle de Factura — Editar / Cancelar borrador"
+          },
+          "ventas.factura.recalcular-cobertura": {
+            "type": "boolean",
+            "description": "Detalle de Factura — Recalcular cobertura ARS (vertical farmacia)"
+          },
+          "ventas.factura.someter": {
+            "type": "boolean",
+            "description": "Detalle de Factura — Someter"
+          },
+          "ventas.factura.aplicar-saldo": {
+            "type": "boolean",
+            "description": "Detalle de Factura — Aplicar/remover saldo a favor o Nota de Crédito"
+          },
+          "ventas.factura.imprimir": {
+            "type": "boolean",
+            "description": "Detalle de Factura — Ver / Descargar PDF / PDF-A (e-CF)"
+          },
+          "ventas.factura.imprimir-pos": {
+            "type": "boolean",
+            "description": "Detalle de Factura — Imprimir POS"
+          },
+          "ventas.factura.devolver": {
+            "type": "boolean",
+            "description": "Detalle de Factura — Devolver producto(s) / Emitir Nota de Crédito"
+          },
+          "ventas.factura.anular": {
+            "type": "boolean",
+            "description": "Detalle de Factura — Cancelar (con motivo DGII)"
+          },
+          "ventas.factura.enmendar": {
+            "type": "boolean",
+            "description": "Detalle de Factura — Enmendar"
+          },
+          "ventas.factura.ver-asientos": {
+            "type": "boolean",
+            "description": "Detalle de Factura — Ver asientos"
+          },
+          "ventas.nota-credito.crear": {
+            "type": "boolean",
+            "description": "Notas de Crédito — Nueva"
+          },
+          "ventas.nota-credito.listar": {
+            "type": "boolean",
+            "description": "Notas de Crédito — Ver"
+          },
+          "ventas.nota-credito.someter": {
+            "type": "boolean",
+            "description": "Notas de Crédito — Someter"
+          },
+          "ventas.nota-credito.reembolsar": {
+            "type": "boolean",
+            "description": "Notas de Crédito — Reembolsar"
+          },
+          "ventas.nota-credito.aplicar": {
+            "type": "boolean",
+            "description": "Notas de Crédito — Aplicar / Deshacer"
+          },
+          "ventas.nota-credito.imprimir": {
+            "type": "boolean",
+            "description": "Notas de Crédito — Descargar PDF"
+          },
+          "ventas.nota-debito.crear": {
+            "type": "boolean",
+            "description": "Notas de Débito — Nueva"
+          },
+          "ventas.nota-debito.listar": {
+            "type": "boolean",
+            "description": "Notas de Débito — Ver"
+          },
+          "ventas.nota-debito.someter": {
+            "type": "boolean",
+            "description": "Notas de Débito — Someter"
+          },
+          "ventas.nota-debito.imprimir": {
+            "type": "boolean",
+            "description": "Notas de Débito — Descargar PDF"
+          },
+          "ventas.devolucion.listar": {
+            "type": "boolean",
+            "description": "Devoluciones (ventas) — Ver"
+          },
+          "ventas.devolucion.crear": {
+            "type": "boolean",
+            "description": "Devoluciones (ventas) — Nueva"
+          },
+          "ventas.devolucion.imprimir": {
+            "type": "boolean",
+            "description": "Devoluciones (ventas) — Descargar PDF"
+          },
+          "ventas.devolucion.anular": {
+            "type": "boolean",
+            "description": "Devoluciones (ventas) — Cancelar"
+          },
+          "pedidos.crear": {
+            "type": "boolean",
+            "description": "Lista de Pedidos — Nuevo / Duplicar"
+          },
+          "pedidos.listar": {
+            "type": "boolean",
+            "description": "Lista de Pedidos — Ver"
+          },
+          "pedidos.editar": {
+            "type": "boolean",
+            "description": "Detalle de Pedido — Editar"
+          },
+          "pedidos.someter": {
+            "type": "boolean",
+            "description": "Detalle de Pedido — Someter / Someter Apartado"
+          },
+          "pedidos.anular": {
+            "type": "boolean",
+            "description": "Detalle de Pedido — Cancelar / Cancelar Apartado"
+          },
+          "pedidos.facturar": {
+            "type": "boolean",
+            "description": "Detalle de Pedido — Facturar Apartado"
+          },
+          "pedidos.enmendar": {
+            "type": "boolean",
+            "description": "Detalle de Pedido — Enmendar"
+          },
+          "pedidos.imprimir": {
+            "type": "boolean",
+            "description": "Detalle de Pedido — Descargar PDF"
+          },
+          "despachos.ver": {
+            "type": "boolean",
+            "description": "Despachos — Ver"
+          },
+          "despachos.crear": {
+            "type": "boolean",
+            "description": "Despachos — Nuevo / Desde Pedido / Desde Factura"
+          },
+          "despachos.editar": {
+            "type": "boolean",
+            "description": "Despachos — Editar Borrador"
+          },
+          "despachos.someter": {
+            "type": "boolean",
+            "description": "Despachos — Someter"
+          },
+          "despachos.cancelar": {
+            "type": "boolean",
+            "description": "Despachos — Cancelar (con motivo)"
+          },
+          "despachos.imprimir": {
+            "type": "boolean",
+            "description": "Despachos — Descargar PDF"
+          },
+          "despachos.facturar": {
+            "type": "boolean",
+            "description": "Despachos — Facturar"
+          },
+          "despachos.devolver": {
+            "type": "boolean",
+            "description": "Despachos — Crear Devolución"
+          },
+          "despachos.confirmar-stock": {
+            "type": "boolean",
+            "description": "Despachos — Confirmar stock (transferencia automática)"
+          },
+          "despachos.confirmaciones.ver": {
+            "type": "boolean",
+            "description": "Despachos — Confirmaciones — Ver cola de confirmación de despacho"
+          },
+          "despachos.confirmaciones.confirmar": {
+            "type": "boolean",
+            "description": "Despachos — Confirmaciones — Confirmar solicitud (transferencia automática)"
+          },
+          "cotizaciones.crear": {
+            "type": "boolean",
+            "description": "Lista de Cotizaciones — Nueva / Duplicar"
+          },
+          "cotizaciones.listar": {
+            "type": "boolean",
+            "description": "Lista de Cotizaciones — Ver"
+          },
+          "cotizaciones.enmendar": {
+            "type": "boolean",
+            "description": "Detalle de Cotización — Enmendar"
+          },
+          "cotizaciones.editar": {
+            "type": "boolean",
+            "description": "Detalle de Cotización — Editar"
+          },
+          "cotizaciones.someter": {
+            "type": "boolean",
+            "description": "Detalle de Cotización — Someter"
+          },
+          "cotizaciones.eliminar": {
+            "type": "boolean",
+            "description": "Detalle de Cotización — Eliminar"
+          },
+          "cotizaciones.anular": {
+            "type": "boolean",
+            "description": "Lista de Cotizaciones — Cancelar"
+          },
+          "cotizaciones.convertir-pedido": {
+            "type": "boolean",
+            "description": "Detalle de Cotización — Convertir a Pedido"
+          },
+          "cotizaciones.convertir-factura": {
+            "type": "boolean",
+            "description": "Detalle de Cotización — Convertir a Factura"
+          },
+          "cotizaciones.imprimir": {
+            "type": "boolean",
+            "description": "Detalle de Cotización — Descargar PDF"
+          },
+          "tesoreria.tipos-documento.crear": {
+            "type": "boolean",
+            "description": "Tipos de Documento — Nuevo"
+          },
+          "tesoreria.tipos-documento.listar": {
+            "type": "boolean",
+            "description": "Tipos de Documento — Ver"
+          },
+          "tesoreria.tipos-documento.editar": {
+            "type": "boolean",
+            "description": "Tipos de Documento — Editar / Deshabilitar"
+          },
+          "tesoreria.emision.crear": {
+            "type": "boolean",
+            "description": "Emisión (egreso) — Nueva"
+          },
+          "tesoreria.emision.listar": {
+            "type": "boolean",
+            "description": "Emisión (egreso) — Ver"
+          },
+          "tesoreria.emision.editar": {
+            "type": "boolean",
+            "description": "Emisión (egreso) — Editar"
+          },
+          "tesoreria.emision.someter": {
+            "type": "boolean",
+            "description": "Emisión (egreso) — Someter"
+          },
+          "tesoreria.emision.anular": {
+            "type": "boolean",
+            "description": "Emisión (egreso) — Anular"
+          },
+          "tesoreria.emision.imprimir": {
+            "type": "boolean",
+            "description": "Emisión (egreso) — Imprimir"
+          },
+          "tesoreria.deposito.crear": {
+            "type": "boolean",
+            "description": "Depósito (ingreso) — Nuevo"
+          },
+          "tesoreria.deposito.listar": {
+            "type": "boolean",
+            "description": "Depósito (ingreso) — Ver"
+          },
+          "tesoreria.deposito.editar": {
+            "type": "boolean",
+            "description": "Depósito (ingreso) — Editar"
+          },
+          "tesoreria.deposito.someter": {
+            "type": "boolean",
+            "description": "Depósito (ingreso) — Someter"
+          },
+          "tesoreria.deposito.anular": {
+            "type": "boolean",
+            "description": "Depósito (ingreso) — Anular"
+          },
+          "tesoreria.transferencia.crear": {
+            "type": "boolean",
+            "description": "Transferencia Interna — Nueva"
+          },
+          "tesoreria.transferencia.listar": {
+            "type": "boolean",
+            "description": "Transferencia Interna — Ver"
+          },
+          "tesoreria.transferencia.editar": {
+            "type": "boolean",
+            "description": "Transferencia Interna — Editar"
+          },
+          "tesoreria.transferencia.someter": {
+            "type": "boolean",
+            "description": "Transferencia Interna — Someter"
+          },
+          "tesoreria.transferencia.anular": {
+            "type": "boolean",
+            "description": "Transferencia Interna — Anular"
+          },
+          "tesoreria.movimientos-banco.listar": {
+            "type": "boolean",
+            "description": "Movimientos de Banco — Ver"
+          },
+          "tesoreria.cuentas-bancarias.listar": {
+            "type": "boolean",
+            "description": "Cuentas Bancarias — Ver"
+          },
+          "tesoreria.cuentas-bancarias.crear": {
+            "type": "boolean",
+            "description": "Cuentas Bancarias — Nueva"
+          },
+          "tesoreria.cuentas-bancarias.editar": {
+            "type": "boolean",
+            "description": "Cuentas Bancarias — Editar"
+          },
+          "tesoreria.cuentas-bancarias.eliminar": {
+            "type": "boolean",
+            "description": "Cuentas Bancarias — Eliminar"
+          },
+          "tesoreria.cuentas-bancarias.inconsistencias-moneda": {
+            "type": "boolean",
+            "description": "Cuentas Bancarias — Ver inconsistencias de moneda"
+          },
+          "tesoreria.cheques.imprimir": {
+            "type": "boolean",
+            "description": "Cheques — detalle — Imprimir"
+          },
+          "tesoreria.cheques.listar": {
+            "type": "boolean",
+            "description": "Cheques — Ver"
+          },
+          "tesoreria.cheques.anular": {
+            "type": "boolean",
+            "description": "Cheques — detalle — Anular"
+          },
+          "tesoreria.plantillas-cheque.crear": {
+            "type": "boolean",
+            "description": "Plantillas de Cheque — Nueva"
+          },
+          "tesoreria.plantillas-cheque.listar": {
+            "type": "boolean",
+            "description": "Plantillas de Cheque — Ver"
+          },
+          "tesoreria.plantillas-cheque.editar": {
+            "type": "boolean",
+            "description": "Plantillas de Cheque — Editar"
+          },
+          "caja.cobrar": {
+            "type": "boolean",
+            "description": "Caja — Pendientes de Cobro — Cobrar"
+          },
+          "caja.listar": {
+            "type": "boolean",
+            "description": "Caja — Pendientes de Cobro — Ver"
+          },
+          "caja.descartar": {
+            "type": "boolean",
+            "description": "Caja — Pendientes de Cobro — Descartar"
+          },
+          "pos.turno.listar": {
+            "type": "boolean",
+            "description": "Turnos POS — Ver turnos"
+          },
+          "pos.turno.cerrar": {
+            "type": "boolean",
+            "description": "Turnos POS — Cerrar turno"
+          },
+          "pos.turno.imprimir-cierre": {
+            "type": "boolean",
+            "description": "Turnos POS — Descargar PDF (cierre)"
+          },
+          "pos.turno.abrir": {
+            "type": "boolean",
+            "description": "Turnos POS — Abrir turno"
+          },
+          "cobros.pago.crear": {
+            "type": "boolean",
+            "description": "Registrar Pago — Guardar"
+          },
+          "cobros.pago.listar": {
+            "type": "boolean",
+            "description": "Cobros y Pagos — Ver"
+          },
+          "cobros.pago.editar": {
+            "type": "boolean",
+            "description": "Cobros y Pagos — Editar / Aplicar saldo a favor"
+          },
+          "cobros.pago.someter": {
+            "type": "boolean",
+            "description": "Detalle de Cobro/Pago — Someter"
+          },
+          "cobros.pago.imprimir": {
+            "type": "boolean",
+            "description": "Detalle de Cobro/Pago — Imprimir"
+          },
+          "cobros.pago.anular": {
+            "type": "boolean",
+            "description": "Detalle de Cobro/Pago — Cancelar"
+          },
+          "cobros.aging.exportar": {
+            "type": "boolean",
+            "description": "Aging de Cobros/Proveedores — Descargar PDF"
+          },
+          "contabilidad.cuentas.listar": {
+            "type": "boolean",
+            "description": "Plan de Cuentas — Ver"
+          },
+          "contabilidad.cuentas.crear": {
+            "type": "boolean",
+            "description": "Plan de Cuentas — Nueva cuenta"
+          },
+          "contabilidad.cuentas.editar": {
+            "type": "boolean",
+            "description": "Plan de Cuentas — Editar"
+          },
+          "contabilidad.asientos.crear": {
+            "type": "boolean",
+            "description": "Asientos — Nuevo / Guardar borrador"
+          },
+          "contabilidad.asientos.listar": {
+            "type": "boolean",
+            "description": "Asientos — Ver"
+          },
+          "contabilidad.asientos.someter": {
+            "type": "boolean",
+            "description": "Asientos — Someter"
+          },
+          "contabilidad.asientos.anular": {
+            "type": "boolean",
+            "description": "Asientos — Cancelar"
+          },
+          "contabilidad.cierre-periodo.listar": {
+            "type": "boolean",
+            "description": "Cierre de Período — Ver"
+          },
+          "contabilidad.cierre-periodo.crear": {
+            "type": "boolean",
+            "description": "Cierre de Período — Nuevo"
+          },
+          "contabilidad.cierre-periodo.confirmar": {
+            "type": "boolean",
+            "description": "Cierre de Período — Confirmar cierre"
+          },
+          "contabilidad.libros.ver": {
+            "type": "boolean",
+            "description": "Libro Diario / Libro Mayor — Ver"
+          },
+          "contabilidad.libros.imprimir": {
+            "type": "boolean",
+            "description": "Libro Diario / Libro Mayor — Descargar PDF"
+          },
+          "apertura.preparar.ver": {
+            "type": "boolean",
+            "description": "Migración de Saldos — Diagnóstico — Ver diagnóstico"
+          },
+          "apertura.preparar.ejecutar": {
+            "type": "boolean",
+            "description": "Migración de Saldos — Preparar — Preparar tenant (crear Ejercicios Fiscales/cuenta de apertura)"
+          },
+          "apertura.ventas.listar": {
+            "type": "boolean",
+            "description": "Facturas de Apertura (CxC) — Ver"
+          },
+          "apertura.ventas.crear": {
+            "type": "boolean",
+            "description": "Facturas de Apertura (CxC) — Cargar saldo de cliente"
+          },
+          "apertura.ventas.anular": {
+            "type": "boolean",
+            "description": "Facturas de Apertura (CxC) — Anular"
+          },
+          "apertura.compras.listar": {
+            "type": "boolean",
+            "description": "Facturas de Apertura (CxP) — Ver"
+          },
+          "apertura.compras.crear": {
+            "type": "boolean",
+            "description": "Facturas de Apertura (CxP) — Cargar saldo de proveedor"
+          },
+          "apertura.compras.anular": {
+            "type": "boolean",
+            "description": "Facturas de Apertura (CxP) — Anular"
+          },
+          "apertura.inventario.listar": {
+            "type": "boolean",
+            "description": "Apertura de Inventario — Ver"
+          },
+          "apertura.inventario.crear": {
+            "type": "boolean",
+            "description": "Apertura de Inventario — Nueva"
+          },
+          "apertura.inventario.anular": {
+            "type": "boolean",
+            "description": "Apertura de Inventario — Cancelar"
+          },
+          "apertura.resumen.ver": {
+            "type": "boolean",
+            "description": "Migración de Saldos — Cuadre — Ver cuadre"
+          },
+          "inventario.stock.consultar": {
+            "type": "boolean",
+            "description": "Inventario — Ver existencias"
+          },
+          "inventario.historial.consultar": {
+            "type": "boolean",
+            "description": "Inventario — Ver historial de movimientos"
+          },
+          "inventario.lotes.consultar": {
+            "type": "boolean",
+            "description": "Inventario — Ver lotes"
+          },
+          "inventario.seriales.consultar": {
+            "type": "boolean",
+            "description": "Inventario — Ver seriales"
+          },
+          "inventario.almacenes.listar": {
+            "type": "boolean",
+            "description": "Zonas y Ubicaciones — Ver"
+          },
+          "inventario.valuacion.consultar": {
+            "type": "boolean",
+            "description": "Recálculo de Valuación — Ver recálculos"
+          },
+          "inventario.conteos.listar": {
+            "type": "boolean",
+            "description": "Conteos Físicos — Ver"
+          },
+          "inventario.conteos.crear": {
+            "type": "boolean",
+            "description": "Conteos Físicos — Nuevo / Guardar borrador"
+          },
+          "inventario.conteos.someter": {
+            "type": "boolean",
+            "description": "Conteos Físicos — Someter"
+          },
+          "inventario.almacenes.crear": {
+            "type": "boolean",
+            "description": "Zonas y Ubicaciones — Nueva"
+          },
+          "inventario.almacenes.editar": {
+            "type": "boolean",
+            "description": "Zonas y Ubicaciones — Editar / Activar-Desactivar"
+          },
+          "inventario.almacenes.eliminar": {
+            "type": "boolean",
+            "description": "Zonas y Ubicaciones — Eliminar"
+          },
+          "inventario.valuacion.recalcular": {
+            "type": "boolean",
+            "description": "Recálculo de Valuación — Recalcular"
+          },
+          "inventario.transferencias.listar": {
+            "type": "boolean",
+            "description": "Transferencias entre Almacenes — Ver"
+          },
+          "inventario.transferencias.crear": {
+            "type": "boolean",
+            "description": "Transferencias entre Almacenes — Nueva"
+          },
+          "inventario.transferencias.someter": {
+            "type": "boolean",
+            "description": "Transferencias entre Almacenes — Confirmar"
+          },
+          "inventario.transferencias.anular": {
+            "type": "boolean",
+            "description": "Transferencias entre Almacenes — Cancelar"
+          },
+          "inventario.carga-inicial.listar": {
+            "type": "boolean",
+            "description": "Carga Inicial de Inventario — Ver"
+          },
+          "inventario.carga-inicial.crear": {
+            "type": "boolean",
+            "description": "Carga Inicial de Inventario — Nueva"
+          },
+          "inventario.carga-inicial.anular": {
+            "type": "boolean",
+            "description": "Carga Inicial de Inventario — Cancelar"
+          },
+          "inventario.ajustar": {
+            "type": "boolean",
+            "description": "Ajuste de Combinación — Ajustar"
+          },
+          "inventario.reclasificar": {
+            "type": "boolean",
+            "description": "Reclasificación de Combinación — Reclasificar"
+          },
+          "clientes.crear": {
+            "type": "boolean",
+            "description": "Clientes — Nuevo"
+          },
+          "clientes.listar": {
+            "type": "boolean",
+            "description": "Clientes — Ver"
+          },
+          "clientes.eliminar": {
+            "type": "boolean",
+            "description": "Clientes — Eliminar"
+          },
+          "clientes.grupos.listar": {
+            "type": "boolean",
+            "description": "Grupos de Clientes — Ver"
+          },
+          "clientes.grupos.crear": {
+            "type": "boolean",
+            "description": "Grupos de Clientes — Nuevo"
+          },
+          "clientes.grupos.editar": {
+            "type": "boolean",
+            "description": "Grupos de Clientes — Editar"
+          },
+          "clientes.grupos.eliminar": {
+            "type": "boolean",
+            "description": "Grupos de Clientes — Eliminar"
+          },
+          "clientes.editar": {
+            "type": "boolean",
+            "description": "Clientes — Editar / Desactivar"
+          },
+          "clientes.estado-cuenta.ver": {
+            "type": "boolean",
+            "description": "Clientes — Estado de Cuenta"
+          },
+          "clientes.estado-cuenta.imprimir": {
+            "type": "boolean",
+            "description": "Clientes — Descargar Estado de Cuenta"
+          },
+          "aseguradoras.crear": {
+            "type": "boolean",
+            "description": "Aseguradoras — Nueva"
+          },
+          "aseguradoras.listar": {
+            "type": "boolean",
+            "description": "Aseguradoras — Ver"
+          },
+          "aseguradoras.editar": {
+            "type": "boolean",
+            "description": "Aseguradoras — Editar / Desactivar"
+          },
+          "aseguradoras.eliminar": {
+            "type": "boolean",
+            "description": "Aseguradoras — Eliminar"
+          },
+          "proveedores.crear": {
+            "type": "boolean",
+            "description": "Proveedores — Nuevo"
+          },
+          "proveedores.listar": {
+            "type": "boolean",
+            "description": "Proveedores — Ver"
+          },
+          "proveedores.editar": {
+            "type": "boolean",
+            "description": "Proveedores — Editar / Desactivar"
+          },
+          "ecf.recibidos.listar": {
+            "type": "boolean",
+            "description": "e-CF Recibidos — Ver"
+          },
+          "ecf.recibidos.cargar-xml": {
+            "type": "boolean",
+            "description": "e-CF Recibidos — Cargar XML / Vincular"
+          },
+          "ecf.recibidos.aceptar-rechazar": {
+            "type": "boolean",
+            "description": "e-CF Recibidos — Aceptar / Rechazar"
+          },
+          "ecf.emitidos.listar": {
+            "type": "boolean",
+            "description": "e-CF Emitidos — Ver"
+          },
+          "ecf.emitidos.refrescar": {
+            "type": "boolean",
+            "description": "e-CF Emitidos — Refrescar estado"
+          },
+          "ecf.emitidos.imprimir": {
+            "type": "boolean",
+            "description": "e-CF Emitidos — Descargar PDF-A"
+          },
+          "ecf.emitidos.regenerar": {
+            "type": "boolean",
+            "description": "e-CF Emitidos — Regenerar e-CF rechazado"
+          },
+          "config.ecf.ver": {
+            "type": "boolean",
+            "description": "Configuración e-CF — Ver"
+          },
+          "ecf.ubicaciones.consultar": {
+            "type": "boolean",
+            "description": "Configuración e-CF — Consultar catálogo de provincias/municipios"
+          },
+          "config.ecf.editar": {
+            "type": "boolean",
+            "description": "Configuración e-CF — Editar"
+          },
+          "config.ecf.secuencias.administrar": {
+            "type": "boolean",
+            "description": "Secuencias e-CF — Crear / Editar / Anular rangos"
+          },
+          "config.ecf.contingencia.administrar": {
+            "type": "boolean",
+            "description": "Contingencia e-CF — Activar / Desactivar / Transmitir diferidos"
+          },
+          "config.farmacia.habilitar": {
+            "type": "boolean",
+            "description": "Configuración de Farmacia — Habilitar vertical Farmacia ARS"
+          },
+          "usuarios.crear": {
+            "type": "boolean",
+            "description": "Usuarios — Nuevo"
+          },
+          "usuarios.listar": {
+            "type": "boolean",
+            "description": "Usuarios — Ver"
+          },
+          "usuarios.editar": {
+            "type": "boolean",
+            "description": "Usuarios — Editar / Deshabilitar / Restablecer contraseña"
+          },
+          "usuarios.roles.listar": {
+            "type": "boolean",
+            "description": "Usuarios — Ver roles y perfiles disponibles (para asignar)"
+          },
+          "plantillas.impresion.listar": {
+            "type": "boolean",
+            "description": "Plantillas de Factura/Etiqueta — Ver"
+          },
+          "plantillas.impresion.crear": {
+            "type": "boolean",
+            "description": "Plantillas de Factura/Etiqueta — Nueva"
+          },
+          "plantillas.impresion.eliminar": {
+            "type": "boolean",
+            "description": "Plantillas de Factura/Etiqueta — Eliminar"
+          },
+          "plantillas.impresion.editar": {
+            "type": "boolean",
+            "description": "Plantillas de Factura/Etiqueta — Guardar / Usar plantilla"
+          },
+          "farmacia.lotes.listar": {
+            "type": "boolean",
+            "description": "Lotes de Facturación ARS — Ver"
+          },
+          "farmacia.lotes.crear": {
+            "type": "boolean",
+            "description": "Lotes de Facturación ARS — Nuevo"
+          },
+          "farmacia.lotes.recalcular": {
+            "type": "boolean",
+            "description": "Lotes de Facturación ARS — Recalcular totales"
+          },
+          "farmacia.lotes.marcar-en-revision": {
+            "type": "boolean",
+            "description": "Lotes de Facturación ARS — Marcar \"En Revisión\""
+          },
+          "farmacia.lotes.facturas-elegibles": {
+            "type": "boolean",
+            "description": "Lotes de Facturación ARS — Ver facturas elegibles"
+          },
+          "farmacia.lotes.vincular-facturas": {
+            "type": "boolean",
+            "description": "Lotes de Facturación ARS — Agregar / Quitar facturas"
+          },
+          "farmacia.lotes.facturar": {
+            "type": "boolean",
+            "description": "Lotes de Facturación ARS — Facturar (cerrar lote)"
+          },
+          "farmacia.lotes.imprimir": {
+            "type": "boolean",
+            "description": "Lotes de Facturación ARS — Imprimir factura consolidada"
+          },
+          "farmacia.reportes.lotes.listar": {
+            "type": "boolean",
+            "description": "Reportes Farmacia ARS — Ver — Listado de Lotes"
+          },
+          "farmacia.reportes.facturas-ars.listar": {
+            "type": "boolean",
+            "description": "Reportes Farmacia ARS — Ver — Facturas con cobertura ARS / Lote / NCF"
+          },
+          "farmacia.principios-activos.listar": {
+            "type": "boolean",
+            "description": "Principios Activos — Ver"
+          },
+          "farmacia.principios-activos.crear": {
+            "type": "boolean",
+            "description": "Principios Activos — Nuevo"
+          },
+          "farmacia.principios-activos.editar": {
+            "type": "boolean",
+            "description": "Principios Activos — Editar"
+          },
+          "farmacia.principios-activos.eliminar": {
+            "type": "boolean",
+            "description": "Principios Activos — Deshabilitar"
+          },
+          "farmacia.principios-activos.fusionar": {
+            "type": "boolean",
+            "description": "Principios Activos — Fusionar duplicados"
+          },
+          "catalogo.items.ver-composicion": {
+            "type": "boolean",
+            "description": "Detalle de Artículo — Ver composición"
+          },
+          "catalogo.items.editar-composicion": {
+            "type": "boolean",
+            "description": "Detalle de Artículo — Editar composición"
+          },
+          "farmacia.equivalentes.consultar": {
+            "type": "boolean",
+            "description": "Búsqueda / POS — Ver equivalentes sugeridos"
+          },
+          "config.empresa.ver": {
+            "type": "boolean",
+            "description": "Datos de la Empresa — Ver"
+          },
+          "config.empresa.editar": {
+            "type": "boolean",
+            "description": "Datos de la Empresa — Editar"
+          },
+          "config.accounts-settings.ver": {
+            "type": "boolean",
+            "description": "Ajustes de Contabilidad — Ver"
+          },
+          "config.accounts-settings.editar": {
+            "type": "boolean",
+            "description": "Ajustes de Contabilidad — Editar"
+          },
+          "config.buying-settings.ver": {
+            "type": "boolean",
+            "description": "Ajustes de Compras — Ver"
+          },
+          "config.buying-settings.editar": {
+            "type": "boolean",
+            "description": "Ajustes de Compras — Editar"
+          },
+          "config.selling-settings.ver": {
+            "type": "boolean",
+            "description": "Ajustes de Ventas — Ver"
+          },
+          "config.selling-settings.editar": {
+            "type": "boolean",
+            "description": "Ajustes de Ventas — Editar"
+          },
+          "config.stock-settings.ver": {
+            "type": "boolean",
+            "description": "Ajustes de Inventario — Ver"
+          },
+          "config.stock-settings.editar": {
+            "type": "boolean",
+            "description": "Ajustes de Inventario — Editar"
+          },
+          "config.seguridad.ver": {
+            "type": "boolean",
+            "description": "Seguridad — Ver"
+          },
+          "config.seguridad.editar": {
+            "type": "boolean",
+            "description": "Seguridad — Editar"
+          },
+          "config.facturacion.ver": {
+            "type": "boolean",
+            "description": "Configuración de Facturación — Ver"
+          },
+          "config.facturacion.editar": {
+            "type": "boolean",
+            "description": "Configuración de Facturación — Editar"
+          },
+          "config.pos.habilitar": {
+            "type": "boolean",
+            "description": "Configuración de Facturación — Habilitar módulo POS"
+          },
+          "config.pos.deshabilitar": {
+            "type": "boolean",
+            "description": "Configuración de Facturación — Deshabilitar módulo POS"
+          },
+          "config.despacho.habilitar": {
+            "type": "boolean",
+            "description": "Configuración de Facturación — Habilitar despacho (Delivery Note)"
+          },
+          "config.despacho.deshabilitar": {
+            "type": "boolean",
+            "description": "Configuración de Facturación — Deshabilitar despacho (Delivery Note)"
+          },
+          "config.despacho.configurar": {
+            "type": "boolean",
+            "description": "Configuración de Facturación — Configurar despacho a futuro"
+          },
+          "config.cobros.ver": {
+            "type": "boolean",
+            "description": "Configuración de Cobros — Ver"
+          },
+          "config.cobros.editar": {
+            "type": "boolean",
+            "description": "Configuración de Cobros — Editar"
+          },
+          "config.apartados.ver": {
+            "type": "boolean",
+            "description": "Configuración de Apartados — Ver"
+          },
+          "config.apartados.editar": {
+            "type": "boolean",
+            "description": "Configuración de Apartados — Editar"
+          },
+          "config.metodos-pago.listar": {
+            "type": "boolean",
+            "description": "Métodos de Pago — Ver"
+          },
+          "config.metodos-pago.crear": {
+            "type": "boolean",
+            "description": "Métodos de Pago — Nuevo"
+          },
+          "config.metodos-pago.editar": {
+            "type": "boolean",
+            "description": "Métodos de Pago — Editar"
+          },
+          "config.listas-precio.listar": {
+            "type": "boolean",
+            "description": "Listas de Precio — Ver"
+          },
+          "config.listas-precio.crear": {
+            "type": "boolean",
+            "description": "Listas de Precio — Nueva"
+          },
+          "config.listas-precio.editar": {
+            "type": "boolean",
+            "description": "Listas de Precio — Editar"
+          },
+          "config.listas-precio.eliminar": {
+            "type": "boolean",
+            "description": "Listas de Precio — Eliminar"
+          },
+          "config.grupos-proveedores.listar": {
+            "type": "boolean",
+            "description": "Grupos de Proveedores — Ver"
+          },
+          "config.grupos-proveedores.crear": {
+            "type": "boolean",
+            "description": "Grupos de Proveedores — Nuevo"
+          },
+          "config.grupos-proveedores.editar": {
+            "type": "boolean",
+            "description": "Grupos de Proveedores — Editar"
+          },
+          "config.grupos-proveedores.eliminar": {
+            "type": "boolean",
+            "description": "Grupos de Proveedores — Eliminar"
+          },
+          "config.uom.listar": {
+            "type": "boolean",
+            "description": "Unidades de Medida — Ver"
+          },
+          "config.uom.crear": {
+            "type": "boolean",
+            "description": "Unidades de Medida — Nueva"
+          },
+          "config.uom.editar": {
+            "type": "boolean",
+            "description": "Unidades de Medida — Editar"
+          },
+          "config.uom.eliminar": {
+            "type": "boolean",
+            "description": "Unidades de Medida — Eliminar"
+          },
+          "config.ncf.listar": {
+            "type": "boolean",
+            "description": "Secuencias NCF (físico) — Ver"
+          },
+          "config.ncf.crear": {
+            "type": "boolean",
+            "description": "Secuencias NCF (físico) — Nueva"
+          },
+          "config.ncf.editar": {
+            "type": "boolean",
+            "description": "Secuencias NCF (físico) — Editar / Habilitar / Deshabilitar"
+          },
+          "config.tasas-impuesto.listar": {
+            "type": "boolean",
+            "description": "Tasas de Impuesto — Ver"
+          },
+          "config.tasas-impuesto.crear": {
+            "type": "boolean",
+            "description": "Tasas de Impuesto — Nueva"
+          },
+          "config.tasas-impuesto.editar": {
+            "type": "boolean",
+            "description": "Tasas de Impuesto — Editar"
+          },
+          "config.tasas-impuesto.eliminar": {
+            "type": "boolean",
+            "description": "Tasas de Impuesto — Eliminar"
+          },
+          "config.retenciones.listar": {
+            "type": "boolean",
+            "description": "Retenciones — Ver"
+          },
+          "config.retenciones.crear": {
+            "type": "boolean",
+            "description": "Retenciones — Nueva"
+          },
+          "config.retenciones.editar": {
+            "type": "boolean",
+            "description": "Retenciones — Editar"
+          },
+          "config.retenciones.eliminar": {
+            "type": "boolean",
+            "description": "Retenciones — Eliminar"
+          },
+          "config.denominaciones.listar": {
+            "type": "boolean",
+            "description": "Denominaciones de Billetes — Ver"
+          },
+          "config.denominaciones.crear": {
+            "type": "boolean",
+            "description": "Denominaciones de Billetes — Nueva"
+          },
+          "config.denominaciones.editar": {
+            "type": "boolean",
+            "description": "Denominaciones de Billetes — Editar"
+          },
+          "config.item-tax-templates.ver": {
+            "type": "boolean",
+            "description": "Plantillas de Impuesto por Artículo — Ver"
+          },
+          "config.impuestos-ventas.ver": {
+            "type": "boolean",
+            "description": "Impuestos de Ventas — Ver"
+          },
+          "config.impuestos-compras.ver": {
+            "type": "boolean",
+            "description": "Impuestos de Compras — Ver"
+          },
+          "config.paises.ver": {
+            "type": "boolean",
+            "description": "Catálogo de Países — Ver"
+          },
+          "config.currencies.ver": {
+            "type": "boolean",
+            "description": "Catálogo de Monedas — Ver"
+          },
+          "monedas.ver": {
+            "type": "boolean",
+            "description": "Multimoneda — Ver monedas"
+          },
+          "monedas.habilitar": {
+            "type": "boolean",
+            "description": "Multimoneda — Habilitar/deshabilitar moneda"
+          },
+          "monedas.tasas.ver": {
+            "type": "boolean",
+            "description": "Multimoneda — Ver tasas de cambio"
+          },
+          "monedas.tasas.crear": {
+            "type": "boolean",
+            "description": "Multimoneda — Cargar tasa de cambio"
+          },
+          "monedas.tasas.editar": {
+            "type": "boolean",
+            "description": "Multimoneda — Editar tasa de cambio"
+          },
+          "monedas.tasas.eliminar": {
+            "type": "boolean",
+            "description": "Multimoneda — Eliminar tasa de cambio"
+          },
+          "monedas.tasas.sincronizar": {
+            "type": "boolean",
+            "description": "Multimoneda — Sincronizar tasas ahora"
+          },
+          "monedas.preview.ver": {
+            "type": "boolean",
+            "description": "Multimoneda — Previsualizar conversión bancaria"
+          },
+          "config.catalogos-fiscales.ver": {
+            "type": "boolean",
+            "description": "Catálogos Fiscales — Ver"
+          },
+          "config.bancos.ver": {
+            "type": "boolean",
+            "description": "Catálogo de Bancos — Ver"
+          },
+          "config.ejercicio-fiscal.listar": {
+            "type": "boolean",
+            "description": "Ejercicios Fiscales — Ver"
+          },
+          "config.ejercicio-fiscal.crear": {
+            "type": "boolean",
+            "description": "Ejercicios Fiscales — Nuevo"
+          },
+          "config.ejercicio-fiscal.editar": {
+            "type": "boolean",
+            "description": "Ejercicios Fiscales — Editar"
+          },
+          "config.ejercicio-fiscal.cerrar": {
+            "type": "boolean",
+            "description": "Ejercicios Fiscales — Cerrar"
+          },
+          "config.ejercicio-fiscal.reabrir": {
+            "type": "boolean",
+            "description": "Ejercicios Fiscales — Reabrir"
+          },
+          "notificaciones.tipos.listar": {
+            "type": "boolean",
+            "description": "Tipos de Notificación — Ver"
+          },
+          "notificaciones.tipos.editar": {
+            "type": "boolean",
+            "description": "Tipos de Notificación — Editar"
+          },
+          "notificaciones.tipos.probar": {
+            "type": "boolean",
+            "description": "Tipos de Notificación — Probar"
+          },
+          "notificaciones.logs.listar": {
+            "type": "boolean",
+            "description": "Historial de Notificaciones — Ver"
+          },
+          "notificaciones.canales-email.ver": {
+            "type": "boolean",
+            "description": "Canal de Email — Ver"
+          },
+          "notificaciones.canales-email.editar": {
+            "type": "boolean",
+            "description": "Canal de Email — Editar"
+          },
+          "inventario.ubicaciones.listar": {
+            "type": "boolean",
+            "description": "Ubicaciones de Inventario — Ver"
+          },
+          "inventario.ubicaciones.crear": {
+            "type": "boolean",
+            "description": "Ubicaciones de Inventario — Nueva"
+          },
+          "inventario.ubicaciones.editar": {
+            "type": "boolean",
+            "description": "Ubicaciones de Inventario — Editar"
+          },
+          "inventario.ubicaciones.eliminar": {
+            "type": "boolean",
+            "description": "Ubicaciones de Inventario — Eliminar"
+          },
+          "inventario.ubicaciones.asignar": {
+            "type": "boolean",
+            "description": "Ubicaciones de Inventario — Asignar artículo"
+          },
+          "inventario.ubicaciones.editar-asignacion": {
+            "type": "boolean",
+            "description": "Ubicaciones de Inventario — Editar asignación"
+          },
+          "inventario.ubicaciones.quitar-asignacion": {
+            "type": "boolean",
+            "description": "Ubicaciones de Inventario — Quitar asignación"
+          },
+          "inventario.ubicaciones.mover": {
+            "type": "boolean",
+            "description": "Ubicaciones de Inventario — Mover artículos entre ubicaciones"
+          },
+          "inventario.ubicaciones.distribuir": {
+            "type": "boolean",
+            "description": "Ubicaciones de Inventario — Distribuir entre ubicaciones"
+          },
+          "contabilidad.centros-costo.listar": {
+            "type": "boolean",
+            "description": "Centros de Costo — Ver"
+          },
+          "contabilidad.centros-costo.crear": {
+            "type": "boolean",
+            "description": "Centros de Costo — Nuevo"
+          },
+          "contabilidad.centros-costo.editar": {
+            "type": "boolean",
+            "description": "Centros de Costo — Editar"
+          },
+          "contabilidad.centros-costo.eliminar": {
+            "type": "boolean",
+            "description": "Centros de Costo — Eliminar"
+          },
+          "departamentos.listar": {
+            "type": "boolean",
+            "description": "Departamentos — Ver"
+          },
+          "departamentos.crear": {
+            "type": "boolean",
+            "description": "Departamentos — Nuevo"
+          },
+          "departamentos.editar": {
+            "type": "boolean",
+            "description": "Departamentos — Editar"
+          },
+          "departamentos.eliminar": {
+            "type": "boolean",
+            "description": "Departamentos — Eliminar"
+          },
+          "sucursales.listar": {
+            "type": "boolean",
+            "description": "Sucursales — Ver"
+          },
+          "sucursales.crear": {
+            "type": "boolean",
+            "description": "Sucursales — Nueva"
+          },
+          "sucursales.editar": {
+            "type": "boolean",
+            "description": "Sucursales — Editar"
+          },
+          "sucursales.eliminar": {
+            "type": "boolean",
+            "description": "Sucursales — Eliminar"
+          },
+          "inventario.zonas.listar": {
+            "type": "boolean",
+            "description": "Zonas de Almacén — Ver"
+          },
+          "inventario.zonas.crear": {
+            "type": "boolean",
+            "description": "Zonas de Almacén — Nueva"
+          },
+          "inventario.zonas.editar": {
+            "type": "boolean",
+            "description": "Zonas de Almacén — Editar"
+          },
+          "inventario.zonas.eliminar": {
+            "type": "boolean",
+            "description": "Zonas de Almacén — Eliminar"
+          },
+          "pos.cajas.listar": {
+            "type": "boolean",
+            "description": "Cajas POS — Ver"
+          },
+          "pos.cajas.crear": {
+            "type": "boolean",
+            "description": "Cajas POS — Nueva"
+          },
+          "pos.cajas.editar": {
+            "type": "boolean",
+            "description": "Cajas POS — Editar"
+          },
+          "pos.cajas.eliminar": {
+            "type": "boolean",
+            "description": "Cajas POS — Eliminar"
+          },
+          "tesoreria.bancos.listar": {
+            "type": "boolean",
+            "description": "Bancos — Ver"
+          },
+          "tesoreria.bancos.crear": {
+            "type": "boolean",
+            "description": "Bancos — Nuevo"
+          },
+          "tesoreria.bancos.editar": {
+            "type": "boolean",
+            "description": "Bancos — Editar"
+          },
+          "dashboard.ver": {
+            "type": "boolean",
+            "description": "Dashboard — Ver resumen, actividad reciente, top productos/clientes"
+          },
+          "dashboard.ventas.total": {
+            "type": "boolean",
+            "description": "Dashboard — Total de ventas"
+          },
+          "dashboard.ventas.grafico": {
+            "type": "boolean",
+            "description": "Dashboard — Gráfico de ventas"
+          },
+          "dashboard.ventas.top-productos": {
+            "type": "boolean",
+            "description": "Dashboard — Productos más vendidos"
+          },
+          "dashboard.ventas.top-clientes": {
+            "type": "boolean",
+            "description": "Dashboard — Mejores clientes"
+          },
+          "dashboard.compras.total": {
+            "type": "boolean",
+            "description": "Dashboard — Total de compras"
+          },
+          "dashboard.gastos.total": {
+            "type": "boolean",
+            "description": "Dashboard — Total de gastos"
+          },
+          "dashboard.gastos.mes": {
+            "type": "boolean",
+            "description": "Dashboard — Gastos del mes"
+          },
+          "dashboard.cxc.saldo": {
+            "type": "boolean",
+            "description": "Dashboard — Saldo por cobrar"
+          },
+          "dashboard.cobros.total": {
+            "type": "boolean",
+            "description": "Dashboard — Total cobrado"
+          },
+          "dashboard.cobros.mes": {
+            "type": "boolean",
+            "description": "Dashboard — Ingresos del mes"
+          },
+          "dashboard.finanzas.utilidad": {
+            "type": "boolean",
+            "description": "Dashboard — Utilidad"
+          },
+          "dashboard.finanzas.ingresos-gastos": {
+            "type": "boolean",
+            "description": "Dashboard — Ingresos vs gastos"
+          },
+          "dashboard.inventario.bajo-minimo": {
+            "type": "boolean",
+            "description": "Dashboard — Artículos bajo el mínimo"
+          },
+          "dashboard.actividad.reciente": {
+            "type": "boolean",
+            "description": "Dashboard — Actividad reciente"
+          },
+          "dashboard.actividad.pendientes": {
+            "type": "boolean",
+            "description": "Dashboard — Acciones pendientes"
+          },
+          "config.acceso.gestionar": {
+            "type": "boolean",
+            "description": "Permisos — Gestionar perfiles de acceso y permisos de usuarios"
+          },
+          "impresoras.listar": {
+            "type": "boolean",
+            "description": "Impresoras — Ver"
+          },
+          "impresoras.administrar": {
+            "type": "boolean",
+            "description": "Impresoras — Nueva / Editar / Eliminar"
+          },
+          "reportes.ventas.ver": {
+            "type": "boolean",
+            "description": "Reporte de Ventas — Ver"
+          },
+          "reportes.ventas.imprimir": {
+            "type": "boolean",
+            "description": "Reporte de Ventas — Descargar PDF"
+          },
+          "reportes.compras.analitica.ver": {
+            "type": "boolean",
+            "description": "Analítica de Compras — Ver"
+          },
+          "reportes.compras.analitica.imprimir": {
+            "type": "boolean",
+            "description": "Analítica de Compras — Descargar PDF"
+          },
+          "reportes.compras.registro.ver": {
+            "type": "boolean",
+            "description": "Registro de Compras — Ver"
+          },
+          "reportes.compras.registro.imprimir": {
+            "type": "boolean",
+            "description": "Registro de Compras — Descargar PDF"
+          },
+          "reportes.ventas.item-wise.ver": {
+            "type": "boolean",
+            "description": "Registro de Ventas por Artículo — Ver"
+          },
+          "reportes.ventas.item-wise.imprimir": {
+            "type": "boolean",
+            "description": "Registro de Ventas por Artículo — Descargar PDF"
+          },
+          "reportes.compras.item-wise.ver": {
+            "type": "boolean",
+            "description": "Registro de Compras por Artículo — Ver"
+          },
+          "reportes.compras.item-wise.imprimir": {
+            "type": "boolean",
+            "description": "Registro de Compras por Artículo — Descargar PDF"
+          },
+          "reportes.pedidos.analitica.ver": {
+            "type": "boolean",
+            "description": "Analítica de Pedidos — Ver"
+          },
+          "reportes.pedidos.analitica.imprimir": {
+            "type": "boolean",
+            "description": "Analítica de Pedidos — Descargar PDF"
+          },
+          "reportes.compras.ordenes-analitica.ver": {
+            "type": "boolean",
+            "description": "Analítica de Órdenes de Compra — Ver"
+          },
+          "reportes.compras.ordenes-analitica.imprimir": {
+            "type": "boolean",
+            "description": "Analítica de Órdenes de Compra — Descargar PDF"
+          },
+          "reportes.inventario.movimientos.ver": {
+            "type": "boolean",
+            "description": "Movimientos de Inventario — Ver"
+          },
+          "reportes.inventario.movimientos.imprimir": {
+            "type": "boolean",
+            "description": "Movimientos de Inventario — Descargar PDF"
+          },
+          "reportes.inventario.antiguedad.ver": {
+            "type": "boolean",
+            "description": "Antigüedad de Inventario — Ver"
+          },
+          "reportes.inventario.antiguedad.imprimir": {
+            "type": "boolean",
+            "description": "Antigüedad de Inventario — Descargar PDF"
+          },
+          "reportes.inventario.proyeccion.ver": {
+            "type": "boolean",
+            "description": "Proyección de Inventario — Ver"
+          },
+          "reportes.despacho.margen.ver": {
+            "type": "boolean",
+            "description": "Reportes de Despacho — Margen real (Gross Profit)"
+          },
+          "reportes.despacho.reservas.ver": {
+            "type": "boolean",
+            "description": "Reportes de Despacho — Reservas de stock (Reserved Stock)"
+          },
+          "reportes.despacho.faltantes.ver": {
+            "type": "boolean",
+            "description": "Reportes de Despacho — Faltantes (Item Shortage Report)"
+          },
+          "reportes.despacho.pendientes-compra.ver": {
+            "type": "boolean",
+            "description": "Reportes de Despacho — Pendientes de comprar (Pending SO Items)"
+          },
+          "reportes.inventario.proyeccion.imprimir": {
+            "type": "boolean",
+            "description": "Proyección de Inventario — Descargar PDF"
+          },
+          "reportes.inventario.valoracion.ver": {
+            "type": "boolean",
+            "description": "Valoración de Inventario — Ver"
+          },
+          "reportes.inventario.valoracion.imprimir": {
+            "type": "boolean",
+            "description": "Valoración de Inventario — Descargar PDF"
+          },
+          "reportes.contabilidad.balance-general.ver": {
+            "type": "boolean",
+            "description": "Balance General — Ver"
+          },
+          "reportes.contabilidad.balance-general.imprimir": {
+            "type": "boolean",
+            "description": "Balance General — Descargar PDF"
+          },
+          "reportes.contabilidad.flujo-efectivo.ver": {
+            "type": "boolean",
+            "description": "Flujo de Efectivo — Ver"
+          },
+          "reportes.contabilidad.flujo-efectivo.imprimir": {
+            "type": "boolean",
+            "description": "Flujo de Efectivo — Descargar PDF"
+          },
+          "reportes.contabilidad.ingresos-egresos.ver": {
+            "type": "boolean",
+            "description": "Ingresos y Egresos — Ver"
+          },
+          "reportes.contabilidad.ingresos-egresos.imprimir": {
+            "type": "boolean",
+            "description": "Ingresos y Egresos — Descargar PDF"
+          },
+          "reportes.caja.cuadre.ver": {
+            "type": "boolean",
+            "description": "Cuadre de Caja — Ver"
+          },
+          "reportes.caja.cuadre.imprimir": {
+            "type": "boolean",
+            "description": "Cuadre de Caja — Descargar PDF"
+          },
+          "reportes.pos.corte-caja-dia.ver": {
+            "type": "boolean",
+            "description": "Corte de Caja del Día — Ver"
+          },
+          "reportes.pos.corte-caja-dia.imprimir": {
+            "type": "boolean",
+            "description": "Corte de Caja del Día — Descargar PDF"
+          },
+          "reportes.pos.cuadre-turno.ver": {
+            "type": "boolean",
+            "description": "Cuadre de Turno POS — Ver"
+          },
+          "reportes.pos.cuadre-turno.imprimir": {
+            "type": "boolean",
+            "description": "Cuadre de Turno POS — Descargar PDF"
+          },
+          "reportes.dgii606.ver": {
+            "type": "boolean",
+            "description": "Reporte DGII 606 — Ver / Exportar"
+          },
+          "reportes.dgii607.ver": {
+            "type": "boolean",
+            "description": "Reporte DGII 607 — Ver / Exportar"
+          },
+          "reportes.dgii608.ver": {
+            "type": "boolean",
+            "description": "Reporte DGII 608 — Ver / Exportar"
+          },
+          "reportes.dgii.facturacion-fiscal.ver": {
+            "type": "boolean",
+            "description": "Facturación Fiscal — Ver"
+          },
+          "reportes.dgii.facturacion-fiscal.imprimir": {
+            "type": "boolean",
+            "description": "Facturación Fiscal — Descargar PDF"
+          },
+          "reportes.solicitudes.ver": {
+            "type": "boolean",
+            "description": "Reportes Solicitados — Ver"
+          },
+          "relaciones.directorio.buscar": {
+            "type": "boolean",
+            "description": "Nueva relación comercial — Buscar por RNC"
+          },
+          "relaciones.listar": {
+            "type": "boolean",
+            "description": "Relaciones comerciales — Ver"
+          },
+          "relaciones.ver": {
+            "type": "boolean",
+            "description": "Detalle de relación — Ver"
+          },
+          "relaciones.configurar": {
+            "type": "boolean",
+            "description": "Detalle de relación — Guardar configuración"
+          },
+          "relaciones.terminar": {
+            "type": "boolean",
+            "description": "Detalle de relación — Terminar relación"
+          },
+          "relaciones.invitacion.crear": {
+            "type": "boolean",
+            "description": "Nueva relación comercial — Enviar invitación"
+          },
+          "relaciones.invitacion.cancelar": {
+            "type": "boolean",
+            "description": "Relaciones comerciales — Cancelar invitación enviada"
+          },
+          "relaciones.invitacion.listar": {
+            "type": "boolean",
+            "description": "Invitaciones — Ver"
+          },
+          "relaciones.invitacion.responder": {
+            "type": "boolean",
+            "description": "Invitaciones — Aceptar / Rechazar"
+          },
+          "relaciones.bloqueo.listar": {
+            "type": "boolean",
+            "description": "Empresas bloqueadas — Ver"
+          },
+          "relaciones.bloqueo.crear": {
+            "type": "boolean",
+            "description": "Invitaciones — Bloquear empresa"
+          },
+          "relaciones.bloqueo.levantar": {
+            "type": "boolean",
+            "description": "Empresas bloqueadas — Desbloquear"
+          },
+          "relaciones.transacciones.listar": {
+            "type": "boolean",
+            "description": "Bandeja B2B — Ver"
+          },
+          "relaciones.transacciones.ver": {
+            "type": "boolean",
+            "description": "Detalle de transacción — Ver"
+          },
+          "relaciones.venta.enviar": {
+            "type": "boolean",
+            "description": "Detalle de factura — Enviar al cliente socio"
+          },
+          "relaciones.compra.enviar-a-proveedor": {
+            "type": "boolean",
+            "description": "Detalle de compra (borrador) — Enviar a proveedor"
+          },
+          "relaciones.transaccion.aceptar-compra": {
+            "type": "boolean",
+            "description": "Bandeja B2B — Aceptar (genera la compra)"
+          },
+          "relaciones.transaccion.aceptar-venta": {
+            "type": "boolean",
+            "description": "Bandeja B2B — Aceptar (genera la venta)"
+          },
+          "relaciones.transaccion.rechazar": {
+            "type": "boolean",
+            "description": "Bandeja B2B — Rechazar"
+          },
+          "relaciones.transaccion.reenviar": {
+            "type": "boolean",
+            "description": "Bandeja B2B — Reenviar"
+          },
+          "relaciones.compra.igualar": {
+            "type": "boolean",
+            "description": "Detalle de compra (borrador) — Igualar factura al proveedor"
+          },
+          "relaciones.venta.igualar": {
+            "type": "boolean",
+            "description": "Detalle de factura — Igualar factura al cliente"
+          },
+          "relaciones.mapeo.guardar": {
+            "type": "boolean",
+            "description": "Mapeo de artículos — Guardar mapeo"
+          },
+          "relaciones.mapeo.crear-articulo": {
+            "type": "boolean",
+            "description": "Mapeo de artículos — Crear artículo desde el socio"
+          },
+          "relaciones.mapeo.sincronizar-barcodes": {
+            "type": "boolean",
+            "description": "Mapeo de artículos — Sincronizar códigos de barra"
+          },
+          "relaciones.transaccion.enlazar-compra": {
+            "type": "boolean",
+            "description": "Bandeja B2B — Enlazar mi compra existente"
+          },
+          "relaciones.transaccion.enlazar-venta": {
+            "type": "boolean",
+            "description": "Bandeja B2B — Enlazar mi factura existente"
+          },
+          "relaciones.transaccion.buscar-candidatos": {
+            "type": "boolean",
+            "description": "Bandeja B2B — Buscar documento para enlazar"
+          },
+          "relaciones.compra.enlazar-y-enviar": {
+            "type": "boolean",
+            "description": "Detalle de compra (sometida) — Enviar al proveedor"
+          }
+        },
+        "required": [
+          "catalogo.dimensiones.listar",
+          "catalogo.dimensiones.crear",
+          "catalogo.dimensiones.editar",
+          "catalogo.items.listar",
+          "catalogo.items.eliminar",
+          "catalogo.items.consultar-stock",
+          "catalogo.items.crear",
+          "catalogo.items.activar",
+          "catalogo.items.editar",
+          "catalogo.items.actualizar-precios",
+          "catalogo.items.imprimir-etiqueta",
+          "catalogo.items.generar-variantes",
+          "catalogo.items.asignar-ubicacion",
+          "catalogo.categorias.listar",
+          "catalogo.categorias.crear",
+          "catalogo.categorias.editar",
+          "catalogo.categorias.eliminar",
+          "catalogo.marcas.listar",
+          "catalogo.marcas.crear",
+          "catalogo.marcas.editar",
+          "catalogo.marcas.eliminar",
+          "catalogo.atributos.listar",
+          "catalogo.atributos.crear",
+          "catalogo.atributos.editar",
+          "catalogo.descuentos.listar",
+          "catalogo.descuentos.crear",
+          "catalogo.descuentos.editar",
+          "catalogo.combos.listar",
+          "catalogo.combos.eliminar",
+          "catalogo.combos.crear",
+          "catalogo.combos.editar",
+          "catalogo.cuentas-pagar.crear",
+          "catalogo.cuentas-pagar.listar",
+          "catalogo.cuentas-pagar.eliminar",
+          "catalogo.cuentas-pagar.editar",
+          "compras.factura.listar",
+          "compras.factura.crear",
+          "compras.orden.listar",
+          "compras.orden.eliminar",
+          "compras.orden.imprimir",
+          "compras.recepcion.listar",
+          "compras.solicitud.listar",
+          "compras.solicitud.eliminar",
+          "compras.solicitud.imprimir",
+          "compras.factura.editar",
+          "compras.factura.someter",
+          "compras.factura.eliminar",
+          "compras.factura.imprimir",
+          "compras.factura.anular",
+          "compras.factura.enmendar",
+          "compras.factura.devolver",
+          "compras.factura.ver-asientos",
+          "compras.factura.aplicar-saldo",
+          "compras.factura.importar-lineas-oc",
+          "compras.recepcion.crear",
+          "compras.recepcion.editar",
+          "compras.recepcion.someter",
+          "compras.recepcion.imprimir",
+          "compras.recepcion.imprimir-etiquetas",
+          "compras.recepcion.facturar",
+          "compras.recepcion.anular",
+          "compras.recepcion.enmendar",
+          "compras.solicitud.crear",
+          "compras.solicitud.editar",
+          "compras.solicitud.someter",
+          "compras.solicitud.generar-orden",
+          "compras.solicitud.anular",
+          "compras.solicitud.enmendar",
+          "compras.orden.crear",
+          "compras.orden.editar",
+          "compras.orden.someter",
+          "compras.orden.recibir",
+          "compras.orden.facturar",
+          "compras.orden.anular",
+          "compras.orden.enmendar",
+          "compras.costos-importacion.listar",
+          "compras.costos-importacion.crear",
+          "compras.costos-importacion.someter",
+          "compras.costos-importacion.anular",
+          "gastos.listar",
+          "gastos.crear",
+          "gastos.editar",
+          "gastos.someter",
+          "gastos.anular",
+          "gastos.enmendar",
+          "gastos.aplicar-saldo",
+          "gastos.ver-asientos",
+          "ventas.factura.crear",
+          "ventas.factura.listar",
+          "ventas.factura.editar",
+          "ventas.factura.recalcular-cobertura",
+          "ventas.factura.someter",
+          "ventas.factura.aplicar-saldo",
+          "ventas.factura.imprimir",
+          "ventas.factura.imprimir-pos",
+          "ventas.factura.devolver",
+          "ventas.factura.anular",
+          "ventas.factura.enmendar",
+          "ventas.factura.ver-asientos",
+          "ventas.nota-credito.crear",
+          "ventas.nota-credito.listar",
+          "ventas.nota-credito.someter",
+          "ventas.nota-credito.reembolsar",
+          "ventas.nota-credito.aplicar",
+          "ventas.nota-credito.imprimir",
+          "ventas.nota-debito.crear",
+          "ventas.nota-debito.listar",
+          "ventas.nota-debito.someter",
+          "ventas.nota-debito.imprimir",
+          "ventas.devolucion.listar",
+          "ventas.devolucion.crear",
+          "ventas.devolucion.imprimir",
+          "ventas.devolucion.anular",
+          "pedidos.crear",
+          "pedidos.listar",
+          "pedidos.editar",
+          "pedidos.someter",
+          "pedidos.anular",
+          "pedidos.facturar",
+          "pedidos.enmendar",
+          "pedidos.imprimir",
+          "despachos.ver",
+          "despachos.crear",
+          "despachos.editar",
+          "despachos.someter",
+          "despachos.cancelar",
+          "despachos.imprimir",
+          "despachos.facturar",
+          "despachos.devolver",
+          "despachos.confirmar-stock",
+          "despachos.confirmaciones.ver",
+          "despachos.confirmaciones.confirmar",
+          "cotizaciones.crear",
+          "cotizaciones.listar",
+          "cotizaciones.enmendar",
+          "cotizaciones.editar",
+          "cotizaciones.someter",
+          "cotizaciones.eliminar",
+          "cotizaciones.anular",
+          "cotizaciones.convertir-pedido",
+          "cotizaciones.convertir-factura",
+          "cotizaciones.imprimir",
+          "tesoreria.tipos-documento.crear",
+          "tesoreria.tipos-documento.listar",
+          "tesoreria.tipos-documento.editar",
+          "tesoreria.emision.crear",
+          "tesoreria.emision.listar",
+          "tesoreria.emision.editar",
+          "tesoreria.emision.someter",
+          "tesoreria.emision.anular",
+          "tesoreria.emision.imprimir",
+          "tesoreria.deposito.crear",
+          "tesoreria.deposito.listar",
+          "tesoreria.deposito.editar",
+          "tesoreria.deposito.someter",
+          "tesoreria.deposito.anular",
+          "tesoreria.transferencia.crear",
+          "tesoreria.transferencia.listar",
+          "tesoreria.transferencia.editar",
+          "tesoreria.transferencia.someter",
+          "tesoreria.transferencia.anular",
+          "tesoreria.movimientos-banco.listar",
+          "tesoreria.cuentas-bancarias.listar",
+          "tesoreria.cuentas-bancarias.crear",
+          "tesoreria.cuentas-bancarias.editar",
+          "tesoreria.cuentas-bancarias.eliminar",
+          "tesoreria.cuentas-bancarias.inconsistencias-moneda",
+          "tesoreria.cheques.imprimir",
+          "tesoreria.cheques.listar",
+          "tesoreria.cheques.anular",
+          "tesoreria.plantillas-cheque.crear",
+          "tesoreria.plantillas-cheque.listar",
+          "tesoreria.plantillas-cheque.editar",
+          "caja.cobrar",
+          "caja.listar",
+          "caja.descartar",
+          "pos.turno.listar",
+          "pos.turno.cerrar",
+          "pos.turno.imprimir-cierre",
+          "pos.turno.abrir",
+          "cobros.pago.crear",
+          "cobros.pago.listar",
+          "cobros.pago.editar",
+          "cobros.pago.someter",
+          "cobros.pago.imprimir",
+          "cobros.pago.anular",
+          "cobros.aging.exportar",
+          "contabilidad.cuentas.listar",
+          "contabilidad.cuentas.crear",
+          "contabilidad.cuentas.editar",
+          "contabilidad.asientos.crear",
+          "contabilidad.asientos.listar",
+          "contabilidad.asientos.someter",
+          "contabilidad.asientos.anular",
+          "contabilidad.cierre-periodo.listar",
+          "contabilidad.cierre-periodo.crear",
+          "contabilidad.cierre-periodo.confirmar",
+          "contabilidad.libros.ver",
+          "contabilidad.libros.imprimir",
+          "apertura.preparar.ver",
+          "apertura.preparar.ejecutar",
+          "apertura.ventas.listar",
+          "apertura.ventas.crear",
+          "apertura.ventas.anular",
+          "apertura.compras.listar",
+          "apertura.compras.crear",
+          "apertura.compras.anular",
+          "apertura.inventario.listar",
+          "apertura.inventario.crear",
+          "apertura.inventario.anular",
+          "apertura.resumen.ver",
+          "inventario.stock.consultar",
+          "inventario.historial.consultar",
+          "inventario.lotes.consultar",
+          "inventario.seriales.consultar",
+          "inventario.almacenes.listar",
+          "inventario.valuacion.consultar",
+          "inventario.conteos.listar",
+          "inventario.conteos.crear",
+          "inventario.conteos.someter",
+          "inventario.almacenes.crear",
+          "inventario.almacenes.editar",
+          "inventario.almacenes.eliminar",
+          "inventario.valuacion.recalcular",
+          "inventario.transferencias.listar",
+          "inventario.transferencias.crear",
+          "inventario.transferencias.someter",
+          "inventario.transferencias.anular",
+          "inventario.carga-inicial.listar",
+          "inventario.carga-inicial.crear",
+          "inventario.carga-inicial.anular",
+          "inventario.ajustar",
+          "inventario.reclasificar",
+          "clientes.crear",
+          "clientes.listar",
+          "clientes.eliminar",
+          "clientes.grupos.listar",
+          "clientes.grupos.crear",
+          "clientes.grupos.editar",
+          "clientes.grupos.eliminar",
+          "clientes.editar",
+          "clientes.estado-cuenta.ver",
+          "clientes.estado-cuenta.imprimir",
+          "aseguradoras.crear",
+          "aseguradoras.listar",
+          "aseguradoras.editar",
+          "aseguradoras.eliminar",
+          "proveedores.crear",
+          "proveedores.listar",
+          "proveedores.editar",
+          "ecf.recibidos.listar",
+          "ecf.recibidos.cargar-xml",
+          "ecf.recibidos.aceptar-rechazar",
+          "ecf.emitidos.listar",
+          "ecf.emitidos.refrescar",
+          "ecf.emitidos.imprimir",
+          "ecf.emitidos.regenerar",
+          "config.ecf.ver",
+          "ecf.ubicaciones.consultar",
+          "config.ecf.editar",
+          "config.ecf.secuencias.administrar",
+          "config.ecf.contingencia.administrar",
+          "config.farmacia.habilitar",
+          "usuarios.crear",
+          "usuarios.listar",
+          "usuarios.editar",
+          "usuarios.roles.listar",
+          "plantillas.impresion.listar",
+          "plantillas.impresion.crear",
+          "plantillas.impresion.eliminar",
+          "plantillas.impresion.editar",
+          "farmacia.lotes.listar",
+          "farmacia.lotes.crear",
+          "farmacia.lotes.recalcular",
+          "farmacia.lotes.marcar-en-revision",
+          "farmacia.lotes.facturas-elegibles",
+          "farmacia.lotes.vincular-facturas",
+          "farmacia.lotes.facturar",
+          "farmacia.lotes.imprimir",
+          "farmacia.reportes.lotes.listar",
+          "farmacia.reportes.facturas-ars.listar",
+          "farmacia.principios-activos.listar",
+          "farmacia.principios-activos.crear",
+          "farmacia.principios-activos.editar",
+          "farmacia.principios-activos.eliminar",
+          "farmacia.principios-activos.fusionar",
+          "catalogo.items.ver-composicion",
+          "catalogo.items.editar-composicion",
+          "farmacia.equivalentes.consultar",
+          "config.empresa.ver",
+          "config.empresa.editar",
+          "config.accounts-settings.ver",
+          "config.accounts-settings.editar",
+          "config.buying-settings.ver",
+          "config.buying-settings.editar",
+          "config.selling-settings.ver",
+          "config.selling-settings.editar",
+          "config.stock-settings.ver",
+          "config.stock-settings.editar",
+          "config.seguridad.ver",
+          "config.seguridad.editar",
+          "config.facturacion.ver",
+          "config.facturacion.editar",
+          "config.pos.habilitar",
+          "config.pos.deshabilitar",
+          "config.despacho.habilitar",
+          "config.despacho.deshabilitar",
+          "config.despacho.configurar",
+          "config.cobros.ver",
+          "config.cobros.editar",
+          "config.apartados.ver",
+          "config.apartados.editar",
+          "config.metodos-pago.listar",
+          "config.metodos-pago.crear",
+          "config.metodos-pago.editar",
+          "config.listas-precio.listar",
+          "config.listas-precio.crear",
+          "config.listas-precio.editar",
+          "config.listas-precio.eliminar",
+          "config.grupos-proveedores.listar",
+          "config.grupos-proveedores.crear",
+          "config.grupos-proveedores.editar",
+          "config.grupos-proveedores.eliminar",
+          "config.uom.listar",
+          "config.uom.crear",
+          "config.uom.editar",
+          "config.uom.eliminar",
+          "config.ncf.listar",
+          "config.ncf.crear",
+          "config.ncf.editar",
+          "config.tasas-impuesto.listar",
+          "config.tasas-impuesto.crear",
+          "config.tasas-impuesto.editar",
+          "config.tasas-impuesto.eliminar",
+          "config.retenciones.listar",
+          "config.retenciones.crear",
+          "config.retenciones.editar",
+          "config.retenciones.eliminar",
+          "config.denominaciones.listar",
+          "config.denominaciones.crear",
+          "config.denominaciones.editar",
+          "config.item-tax-templates.ver",
+          "config.impuestos-ventas.ver",
+          "config.impuestos-compras.ver",
+          "config.paises.ver",
+          "config.currencies.ver",
+          "monedas.ver",
+          "monedas.habilitar",
+          "monedas.tasas.ver",
+          "monedas.tasas.crear",
+          "monedas.tasas.editar",
+          "monedas.tasas.eliminar",
+          "monedas.tasas.sincronizar",
+          "monedas.preview.ver",
+          "config.catalogos-fiscales.ver",
+          "config.bancos.ver",
+          "config.ejercicio-fiscal.listar",
+          "config.ejercicio-fiscal.crear",
+          "config.ejercicio-fiscal.editar",
+          "config.ejercicio-fiscal.cerrar",
+          "config.ejercicio-fiscal.reabrir",
+          "notificaciones.tipos.listar",
+          "notificaciones.tipos.editar",
+          "notificaciones.tipos.probar",
+          "notificaciones.logs.listar",
+          "notificaciones.canales-email.ver",
+          "notificaciones.canales-email.editar",
+          "inventario.ubicaciones.listar",
+          "inventario.ubicaciones.crear",
+          "inventario.ubicaciones.editar",
+          "inventario.ubicaciones.eliminar",
+          "inventario.ubicaciones.asignar",
+          "inventario.ubicaciones.editar-asignacion",
+          "inventario.ubicaciones.quitar-asignacion",
+          "inventario.ubicaciones.mover",
+          "inventario.ubicaciones.distribuir",
+          "contabilidad.centros-costo.listar",
+          "contabilidad.centros-costo.crear",
+          "contabilidad.centros-costo.editar",
+          "contabilidad.centros-costo.eliminar",
+          "departamentos.listar",
+          "departamentos.crear",
+          "departamentos.editar",
+          "departamentos.eliminar",
+          "sucursales.listar",
+          "sucursales.crear",
+          "sucursales.editar",
+          "sucursales.eliminar",
+          "inventario.zonas.listar",
+          "inventario.zonas.crear",
+          "inventario.zonas.editar",
+          "inventario.zonas.eliminar",
+          "pos.cajas.listar",
+          "pos.cajas.crear",
+          "pos.cajas.editar",
+          "pos.cajas.eliminar",
+          "tesoreria.bancos.listar",
+          "tesoreria.bancos.crear",
+          "tesoreria.bancos.editar",
+          "dashboard.ver",
+          "dashboard.ventas.total",
+          "dashboard.ventas.grafico",
+          "dashboard.ventas.top-productos",
+          "dashboard.ventas.top-clientes",
+          "dashboard.compras.total",
+          "dashboard.gastos.total",
+          "dashboard.gastos.mes",
+          "dashboard.cxc.saldo",
+          "dashboard.cobros.total",
+          "dashboard.cobros.mes",
+          "dashboard.finanzas.utilidad",
+          "dashboard.finanzas.ingresos-gastos",
+          "dashboard.inventario.bajo-minimo",
+          "dashboard.actividad.reciente",
+          "dashboard.actividad.pendientes",
+          "config.acceso.gestionar",
+          "impresoras.listar",
+          "impresoras.administrar",
+          "reportes.ventas.ver",
+          "reportes.ventas.imprimir",
+          "reportes.compras.analitica.ver",
+          "reportes.compras.analitica.imprimir",
+          "reportes.compras.registro.ver",
+          "reportes.compras.registro.imprimir",
+          "reportes.ventas.item-wise.ver",
+          "reportes.ventas.item-wise.imprimir",
+          "reportes.compras.item-wise.ver",
+          "reportes.compras.item-wise.imprimir",
+          "reportes.pedidos.analitica.ver",
+          "reportes.pedidos.analitica.imprimir",
+          "reportes.compras.ordenes-analitica.ver",
+          "reportes.compras.ordenes-analitica.imprimir",
+          "reportes.inventario.movimientos.ver",
+          "reportes.inventario.movimientos.imprimir",
+          "reportes.inventario.antiguedad.ver",
+          "reportes.inventario.antiguedad.imprimir",
+          "reportes.inventario.proyeccion.ver",
+          "reportes.despacho.margen.ver",
+          "reportes.despacho.reservas.ver",
+          "reportes.despacho.faltantes.ver",
+          "reportes.despacho.pendientes-compra.ver",
+          "reportes.inventario.proyeccion.imprimir",
+          "reportes.inventario.valoracion.ver",
+          "reportes.inventario.valoracion.imprimir",
+          "reportes.contabilidad.balance-general.ver",
+          "reportes.contabilidad.balance-general.imprimir",
+          "reportes.contabilidad.flujo-efectivo.ver",
+          "reportes.contabilidad.flujo-efectivo.imprimir",
+          "reportes.contabilidad.ingresos-egresos.ver",
+          "reportes.contabilidad.ingresos-egresos.imprimir",
+          "reportes.caja.cuadre.ver",
+          "reportes.caja.cuadre.imprimir",
+          "reportes.pos.corte-caja-dia.ver",
+          "reportes.pos.corte-caja-dia.imprimir",
+          "reportes.pos.cuadre-turno.ver",
+          "reportes.pos.cuadre-turno.imprimir",
+          "reportes.dgii606.ver",
+          "reportes.dgii607.ver",
+          "reportes.dgii608.ver",
+          "reportes.dgii.facturacion-fiscal.ver",
+          "reportes.dgii.facturacion-fiscal.imprimir",
+          "reportes.solicitudes.ver",
+          "relaciones.directorio.buscar",
+          "relaciones.listar",
+          "relaciones.ver",
+          "relaciones.configurar",
+          "relaciones.terminar",
+          "relaciones.invitacion.crear",
+          "relaciones.invitacion.cancelar",
+          "relaciones.invitacion.listar",
+          "relaciones.invitacion.responder",
+          "relaciones.bloqueo.listar",
+          "relaciones.bloqueo.crear",
+          "relaciones.bloqueo.levantar",
+          "relaciones.transacciones.listar",
+          "relaciones.transacciones.ver",
+          "relaciones.venta.enviar",
+          "relaciones.compra.enviar-a-proveedor",
+          "relaciones.transaccion.aceptar-compra",
+          "relaciones.transaccion.aceptar-venta",
+          "relaciones.transaccion.rechazar",
+          "relaciones.transaccion.reenviar",
+          "relaciones.compra.igualar",
+          "relaciones.venta.igualar",
+          "relaciones.mapeo.guardar",
+          "relaciones.mapeo.crear-articulo",
+          "relaciones.mapeo.sincronizar-barcodes",
+          "relaciones.transaccion.enlazar-compra",
+          "relaciones.transaccion.enlazar-venta",
+          "relaciones.transaccion.buscar-candidatos",
+          "relaciones.compra.enlazar-y-enviar"
+        ]
+      },
+      "MePermissionsDataDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "vertical": {
+            "type": "string",
+            "nullable": true
+          },
+          "roles": {
+            "description": "Roles de ERPNext del usuario. Con permisos v2 \"activo\" son solo diagnóstico (el techo derivado).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "doctypes": {
+            "type": "object",
+            "description": "Flags crudos por doctype ({ \"Sales Invoice\": { read: 1, write: 0, … } }). Solo diagnóstico en v2 \"activo\"."
+          },
+          "acciones": {
+            "$ref": "#/components/schemas/MePermissionsAccionesDto"
+          }
+        },
+        "required": [
+          "email",
+          "vertical",
+          "roles",
+          "doctypes",
+          "acciones"
+        ]
+      },
+      "MePermissionsEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MePermissionsDataDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
       "FeaturesMapDto": {
         "type": "object",
         "properties": {
@@ -46573,6 +50572,1104 @@
         },
         "required": [
           "code"
+        ]
+      },
+      "CatalogoComponenteDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "ventas.factura.filtro.customer"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "vista",
+              "accion",
+              "filtro",
+              "exportar",
+              "widget"
+            ]
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "parametro": {
+            "type": "string",
+            "nullable": true,
+            "description": "Solo en tipo \"filtro\": el query param exacto que protege."
+          },
+          "incluirEnCompleta": {
+            "type": "boolean",
+            "description": "false = no se incluye al otorgar la pantalla/módulo completo; hay que marcarlo a mano."
+          },
+          "sensible": {
+            "type": "boolean"
+          },
+          "requiere": {
+            "description": "Claves de componentes que este necesita para ser efectivo.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recursos": {
+            "description": "Recursos (lookup.*) que habilita.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "otorgable": {
+            "type": "boolean",
+            "description": "Si QUIEN CONSULTA puede otorgarlo (anti-escalada). Con ?otorgable=true los no otorgables directamente no vienen; sin el parámetro vienen todos, marcados."
+          }
+        },
+        "required": [
+          "key",
+          "tipo",
+          "nombre",
+          "descripcion",
+          "parametro",
+          "incluirEnCompleta",
+          "sensible",
+          "requiere",
+          "recursos",
+          "otorgable"
+        ]
+      },
+      "CatalogoPantallaDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "ventas.factura"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "operativa",
+              "reporte",
+              "config",
+              "dashboard"
+            ]
+          },
+          "componentes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogoComponenteDto"
+            }
+          }
+        },
+        "required": [
+          "key",
+          "nombre",
+          "tipo",
+          "componentes"
+        ]
+      },
+      "CatalogoModuloDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "ventas"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "pantallas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogoPantallaDto"
+            }
+          }
+        },
+        "required": [
+          "key",
+          "nombre",
+          "descripcion",
+          "pantallas"
+        ]
+      },
+      "RecursoResumenDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "lookup.sucursales"
+          },
+          "nombre": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "nombre"
+        ]
+      },
+      "CatalogoAccesoDataDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "example": "236",
+            "description": "Versión del CATÁLOGO (string opaco, comparar por igualdad). No es la misma que `/me/acceso.version`, que además incluye los cambios de perfiles/grants del tenant."
+          },
+          "modulos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogoModuloDto"
+            }
+          },
+          "recursos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecursoResumenDto"
+            }
+          }
+        },
+        "required": [
+          "version",
+          "modulos",
+          "recursos"
+        ]
+      },
+      "CatalogoAccesoEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CatalogoAccesoDataDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "GrantResponseDto": {
+        "type": "object",
+        "properties": {
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "modulo",
+              "pantalla",
+              "componente"
+            ]
+          },
+          "clave": {
+            "type": "string"
+          },
+          "efecto": {
+            "type": "string",
+            "enum": [
+              "permitir",
+              "denegar"
+            ]
+          },
+          "expiraEn": {
+            "type": "string",
+            "description": "ISO. Ausente = sin vencimiento."
+          }
+        },
+        "required": [
+          "nivel",
+          "clave",
+          "efecto"
+        ]
+      },
+      "PlantillaAccesoDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "cajero-pos"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "esSistema": {
+            "type": "boolean"
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantResponseDto"
+            }
+          }
+        },
+        "required": [
+          "key",
+          "nombre",
+          "descripcion",
+          "esSistema",
+          "grants"
+        ]
+      },
+      "PlantillasEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlantillaAccesoDto"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "PerfilAccesoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "plantilla": {
+            "type": "string",
+            "nullable": true,
+            "description": "Plantilla de origen, si se creó desde una."
+          },
+          "esSistema": {
+            "type": "boolean",
+            "description": "true = perfil Administrador: no se edita ni se elimina."
+          },
+          "totalUsuarios": {
+            "type": "number"
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantResponseDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "descripcion",
+          "plantilla",
+          "esSistema",
+          "totalUsuarios",
+          "grants"
+        ]
+      },
+      "PerfilesEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PerfilAccesoDto"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "UsuarioDePerfilDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "email",
+          "firstName",
+          "lastName"
+        ]
+      },
+      "PerfilAccesoDetalleDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "plantilla": {
+            "type": "string",
+            "nullable": true,
+            "description": "Plantilla de origen, si se creó desde una."
+          },
+          "esSistema": {
+            "type": "boolean",
+            "description": "true = perfil Administrador: no se edita ni se elimina."
+          },
+          "totalUsuarios": {
+            "type": "number"
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantResponseDto"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "usuarios": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UsuarioDePerfilDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "descripcion",
+          "plantilla",
+          "esSistema",
+          "totalUsuarios",
+          "grants",
+          "createdAt",
+          "updatedAt",
+          "usuarios"
+        ]
+      },
+      "PerfilDetalleEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/PerfilAccesoDetalleDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "GrantDto": {
+        "type": "object",
+        "properties": {
+          "nivel": {
+            "type": "string",
+            "enum": [
+              "modulo",
+              "pantalla",
+              "componente"
+            ],
+            "description": "Nivel del catálogo al que aplica. Módulo y pantalla incluyen todo lo de abajo, también lo que se agregue en el futuro (salvo componentes con incluirEnCompleta=false)."
+          },
+          "clave": {
+            "type": "string",
+            "description": "Clave del módulo/pantalla/componente tal como la devuelve GET /acceso/catalogo (ej. \"ventas\", \"ventas.factura\", \"ventas.factura.filtro.branch\")."
+          },
+          "efecto": {
+            "type": "string",
+            "enum": [
+              "permitir",
+              "denegar"
+            ],
+            "description": "\"denegar\" en un perfil excluye dentro de ESE perfil (\"todo Facturas menos el filtro Sucursal\"); en un usuario es global y gana sobre todos sus perfiles."
+          },
+          "expiraEn": {
+            "type": "string",
+            "description": "Fecha/hora ISO de vencimiento (permisos temporales). Vencido = se ignora."
+          }
+        },
+        "required": [
+          "nivel",
+          "clave",
+          "efecto"
+        ]
+      },
+      "CrearPerfilDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "Cajero sucursal Norte"
+          },
+          "descripcion": {
+            "type": "string"
+          },
+          "plantilla": {
+            "type": "string",
+            "description": "Clave de una plantilla (GET /acceso/plantillas) cuyos grants se copian. Se combinan con `grants` si también se envían."
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantDto"
+            }
+          }
+        },
+        "required": [
+          "nombre"
+        ]
+      },
+      "ActualizarPerfilDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string"
+          },
+          "descripcion": {
+            "type": "string"
+          }
+        }
+      },
+      "ReemplazarGrantsDto": {
+        "type": "object",
+        "properties": {
+          "grants": {
+            "description": "Lista COMPLETA de grants del perfil — reemplaza la actual.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantDto"
+            }
+          },
+          "motivo": {
+            "type": "string",
+            "description": "Motivo del cambio (queda en la auditoría)."
+          }
+        },
+        "required": [
+          "grants"
+        ]
+      },
+      "MensajeDataDto": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      },
+      "MensajeEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MensajeDataDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "PerfilAsignadoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "esSistema": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "esSistema"
+        ]
+      },
+      "AccesoUsuarioDataDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "perfiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PerfilAsignadoDto"
+            }
+          },
+          "grants": {
+            "description": "Excepciones del usuario (denegar = global).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantResponseDto"
+            }
+          }
+        },
+        "required": [
+          "email",
+          "perfiles",
+          "grants"
+        ]
+      },
+      "AccesoUsuarioEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AccesoUsuarioDataDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "AccesoUsuarioDto": {
+        "type": "object",
+        "properties": {
+          "perfiles": {
+            "description": "IDs de perfiles de acceso del tenant (GET /acceso/perfiles). Reemplaza los asignados.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "grants": {
+            "description": "Excepciones del usuario (reemplaza las actuales). Si se omite, no se tocan.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrantDto"
+            }
+          },
+          "motivo": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "perfiles"
+        ]
+      },
+      "TrazaComponenteDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "pantalla": {
+            "type": "string"
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "vista",
+              "accion",
+              "filtro",
+              "exportar",
+              "widget"
+            ]
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "otorgado",
+              "no_contratado",
+              "denegado_usuario",
+              "denegado_perfil",
+              "requisito_faltante",
+              "sin_otorgar"
+            ]
+          },
+          "fuentes": {
+            "description": "Nombres de los perfiles que lo causan (otorgado / denegado_perfil).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "key",
+          "pantalla",
+          "nombre",
+          "tipo",
+          "estado",
+          "fuentes"
+        ]
+      },
+      "EfectivoUsuarioDataDto": {
+        "type": "object",
+        "properties": {
+          "modulos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pantallas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "componentes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recursos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "traza": {
+            "description": "Solo con ?explicar=true. Un item por componente del catálogo.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrazaComponenteDto"
+            }
+          }
+        },
+        "required": [
+          "modulos",
+          "pantallas",
+          "componentes",
+          "recursos"
+        ]
+      },
+      "EfectivoUsuarioEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EfectivoUsuarioDataDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "AuditoriaAccesoDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actorEmail": {
+            "type": "string",
+            "description": "Email del actor, o \"gensuite-control\" si lo hizo la plataforma."
+          },
+          "accion": {
+            "type": "string",
+            "enum": [
+              "perfil.crear",
+              "perfil.actualizar",
+              "perfil.grants",
+              "perfil.eliminar",
+              "usuario.acceso",
+              "usuario.administrador"
+            ],
+            "description": "Lista cerrada hoy; tratá un valor desconocido de forma genérica (pueden agregarse)."
+          },
+          "sujetoTipo": {
+            "type": "string",
+            "enum": [
+              "perfil",
+              "usuario"
+            ]
+          },
+          "sujetoId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "antes": {
+            "type": "object",
+            "nullable": true
+          },
+          "despues": {
+            "type": "object",
+            "nullable": true
+          },
+          "motivo": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "actorEmail",
+          "accion",
+          "sujetoTipo",
+          "sujetoId",
+          "antes",
+          "despues",
+          "motivo",
+          "createdAt"
+        ]
+      },
+      "PaginacionMetaDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "offset",
+          "hasMore"
+        ]
+      },
+      "AuditoriaEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditoriaAccesoDto"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginacionMetaDto"
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ]
+      },
+      "MigrarAccesoDto": {
+        "type": "object",
+        "properties": {
+          "reemplazar": {
+            "type": "boolean",
+            "default": false,
+            "description": "Si ya existen perfiles con el mismo nombre, reemplazar sus grants (por defecto se dejan como están)."
+          }
+        }
+      },
+      "MigrarResumenDto": {
+        "type": "object",
+        "properties": {
+          "perfiles": {
+            "description": "Nombres de los perfiles creados/actualizados.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "usuarios": {
+            "type": "number",
+            "description": "Usuarios a los que se les asignaron perfiles."
+          },
+          "personalizados": {
+            "type": "number",
+            "description": "Usuarios con roles sueltos (fuera de un Role Profile) a los que se les creó un perfil \"Personalizado: \u003Cemail\u003E\". Revisar."
+          }
+        },
+        "required": [
+          "perfiles",
+          "usuarios",
+          "personalizados"
+        ]
+      },
+      "MigrarEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MigrarResumenDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "RequisitoErpnextDto": {
+        "type": "object",
+        "properties": {
+          "doctype": {
+            "type": "string"
+          },
+          "ptype": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "doctype",
+          "ptype"
+        ]
+      },
+      "SincronizacionDetalleDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "perfilesErpnext": {
+            "description": "Role Profiles de ERPNext derivados y aplicados.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sinCubrir": {
+            "description": "Permisos de ERPNext que el acceso v2 necesita y ningún Role Profile del site cubre.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequisitoErpnextDto"
+            }
+          }
+        },
+        "required": [
+          "email",
+          "perfilesErpnext",
+          "sinCubrir"
+        ]
+      },
+      "SincronizacionDataDto": {
+        "type": "object",
+        "properties": {
+          "usuarios": {
+            "type": "number",
+            "description": "Usuarios encolados para sincronizar. 0 si el modo no es \"activo\"."
+          },
+          "detalle": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SincronizacionDetalleDto"
+            }
+          }
+        },
+        "required": [
+          "usuarios",
+          "detalle"
+        ]
+      },
+      "SincronizacionEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SincronizacionDataDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "MeAccesoResponseDataDto": {
+        "type": "object",
+        "properties": {
+          "modo": {
+            "type": "string",
+            "enum": [
+              "off",
+              "sombra",
+              "activo"
+            ],
+            "description": "Modo de permisos v2 del tenant. En \"off\"/\"sombra\" lo que se aplica es GET /me/permissions."
+          },
+          "version": {
+            "type": "string",
+            "example": "236.61",
+            "description": "String opaco (catálogo.tenant). Cambia cuando cambia cualquier cosa que afecte el acceso. Comparar por igualdad; no parsear."
+          },
+          "modulos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pantallas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "componentes": {
+            "description": "Componentes efectivos (vistas, acciones, filtros, exportaciones, widgets). Incluye el virtual \"dashboard.ver\".",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recursos": {
+            "description": "Recursos habilitados para GET /opciones/:recurso (con prefijo \"lookup.\").",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filtrosBloqueados": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "example": {
+              "ventas.factura": [
+                "branch"
+              ]
+            },
+            "description": "Por pantalla EFECTIVA del usuario, los query params de filtro que NO puede enviar. Una pantalla sin acceso no aparece."
+          }
+        },
+        "required": [
+          "modo",
+          "version",
+          "modulos",
+          "pantallas",
+          "componentes",
+          "recursos",
+          "filtrosBloqueados"
+        ]
+      },
+      "MeAccesoEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/MeAccesoResponseDataDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "OpcionDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "description": "El `name` de ERPNext del registro: el valor exacto que aceptan los query params/body de los endpoints de negocio (branch, warehouse, customer…). Es así para TODOS los recursos."
+          },
+          "label": {
+            "type": "string",
+            "description": "Texto a mostrar (cae a `value` si está vacío)."
+          },
+          "tax_id": {
+            "type": "string",
+            "description": "Campos extra de despliegue según el recurso: clientes/proveedores `tax_id`; artículos `stock_uom`, `item_group`; cuentas-bancarias `bank`; cuentas `account_number`, `root_type`."
+          }
+        },
+        "required": [
+          "value",
+          "label"
+        ]
+      },
+      "OpcionesEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpcionDto"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "data"
         ]
       },
       "CreateCuentaBancariaDto": {

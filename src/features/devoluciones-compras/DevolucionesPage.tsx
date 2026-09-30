@@ -22,6 +22,7 @@ import { Drawer } from '@/shared/ui/Drawer'
 import { ApplyToCxpModal } from './ApplyToCxpModal'
 import type { DevolucionCompra } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const PAGE_SIZE = 20
 
@@ -37,6 +38,7 @@ const DEVOLUCIONES_COLUMNS = [
 ]
 
 export default function DevolucionesPage() {
+  const puedeCrear = usePuede('compras.factura.crear')
   const navigate = useNavigate()
   const [supplier, setSupplier] = useState('')
   const [status, setStatus] = useState<string>('all')
@@ -108,10 +110,12 @@ export default function DevolucionesPage() {
         action={
           <>
             <RecargarButton />
-            <button className="btn btn-navy" onClick={() => navigate('/devoluciones-compras/nueva')}>
-              <Plus size={16} />
-              Nueva Devolución
-            </button>
+            {puedeCrear && (
+              <button className="btn btn-navy" onClick={() => navigate('/devoluciones-compras/nueva')}>
+                <Plus size={16} />
+                Nueva Devolución
+              </button>
+            )}
           </>
         }
       />
@@ -213,9 +217,11 @@ export default function DevolucionesPage() {
                                 <div className="empty-icon"><Plus size={20} /></div>
                                 <p className="empty-title">Sin devoluciones</p>
                                 <p className="empty-sub">No hay devoluciones de compras registradas.</p>
-                                <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/devoluciones-compras/nueva')}>
-                                  <Plus size={14} />Nueva Devolución
-                                </button>
+                                {puedeCrear && (
+                                  <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/devoluciones-compras/nueva')}>
+                                    <Plus size={14} />Nueva Devolución
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>

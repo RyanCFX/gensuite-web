@@ -69,7 +69,7 @@ export default function InvitationPage() {
     try {
       const result = await acceptInvitation(token, detail.requiresPassword ? { password } : {})
       applyAuthResult(result)
-      navigate('/dashboard', { replace: true })
+      navigate('/', { replace: true })
     } catch (err) {
       setFormError(isApiError(err) ? err.message : 'Error al conectar con el servidor.')
     } finally {

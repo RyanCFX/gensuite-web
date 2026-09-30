@@ -326,10 +326,10 @@ function TabsProviderInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!multiTab) return
     const pathname = location.pathname
-    if (pathname === EMPTY_STATE_PATH) {
-      // Pantalla de "sin pestañas" — no es una pestaña en sí, solo el destino cuando se cierra
-      // la última. Si se convirtiera en pestaña, el usuario nunca vería la barra vacía.
-      setActiveId(null)
+    if (pathname === EMPTY_STATE_PATH || pathname === '/') {
+      // Ni la pantalla de "sin pestañas" ni el índice post-login (`/`, que redirige con
+      // `replace` a /dashboard o /inicio) son pestañas en sí.
+      if (pathname === EMPTY_STATE_PATH) setActiveId(null)
       return
     }
     const fullPath = pathname + (location.search || '')

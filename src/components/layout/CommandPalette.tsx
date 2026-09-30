@@ -16,7 +16,7 @@ import {
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
   Shield, Building2, UserCog, BookOpen, BookText, ClipboardList, MapPin,
   Tag, Percent, Calendar, Lock, Coins, Bell, DollarSign, Clock,
-  ShieldCheck, LayoutTemplate, Landmark, ArrowRightLeft, Printer, Wrench,
+  ShieldCheck, KeyRound, LayoutTemplate, Landmark, ArrowRightLeft, Printer, Wrench,
   ScrollText, Pill,
   Search, ArrowRight,
 } from 'lucide-react'
@@ -186,6 +186,7 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'cfg-notificaciones', label: 'Notificaciones', group: 'Configuración', path: '/config/notificaciones',       icon: <Bell size={15} />, keywords: 'notifications notificaciones alertas' },
   { id: 'cfg-grupos-clientes', label: 'Grupos de Clientes', group: 'Configuración', path: '/config/grupos-clientes', icon: <Users size={15} />, keywords: 'customer group grupo cliente' },
   { id: 'cfg-farmacia', label: 'Farmacia ARS (Configuración)', group: 'Configuración', path: '/config/farmacia',     icon: <Pill size={15} />, keywords: 'farmacia ars configuracion vertical' },
+  { id: 'cfg-acceso',    label: 'Acceso (permisos v2)', group: 'Configuración', path: '/config/acceso',               icon: <KeyRound size={15} />, keywords: 'acceso permisos perfiles pantallas' },
   { id: 'cfg-permisos', label: 'Permisos',             group: 'Configuración', path: '/config/permisos',             icon: <Lock size={15} />, keywords: 'permissions permisos roles acciones' },
   { id: 'cfg-roles',    label: 'Roles',                group: 'Configuración', path: '/config/roles',                icon: <ShieldCheck size={15} />, keywords: 'roles permisos' },
   { id: 'cfg-auditoria-pin', label: 'Auditoría de PIN', group: 'Configuración', path: '/config/auditoria-pin',       icon: <ScrollText size={15} />, keywords: 'audit auditoria pin log' },

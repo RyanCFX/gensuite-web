@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
+import { useAccesoV2Activo } from '@/shared/permissions/useAcceso'
 import {
   getPermisosCatalogo, getPermisos, assignPermiso, deletePermiso, resetPermisos,
   PERMISO_PTYPES, PERMISO_PTYPE_LABELS,
@@ -25,8 +26,20 @@ function apiMessage(err: unknown, fallback: string): string {
   return (err as ApiError)?.message ?? fallback
 }
 
+/** Clave de la celda (rol-nivel-ptype) cuyo toggle está en vuelo. El DTO de un
+ *  toggle trae exactamente un flag booleano (el del modal "Agregar rol" trae
+ *  varios) — solo en ese caso se marca la celda para el spinner puntual. */
+function pendingCellKey(dto: AssignPermisoDto): string | null {
+  const pts = PERMISO_PTYPES.filter((pt) => typeof dto[pt] === 'boolean')
+  if (pts.length !== 1) return null
+  return `${dto.role}-${dto.permlevel ?? 0}-${pts[0]}`
+}
+
 export default function PermisosPage() {
   const isSystemManager = useIsSystemManager()
+  // Permisos v2 activo: esta matriz DocPerm la deriva el backend desde los perfiles de
+  // acceso — queda como vista avanzada (§7 del prompt v2).
+  const v2Activo = useAccesoV2Activo()
   const queryClient = useQueryClient()
 
   // Al salir de la pantalla de administración de permisos, refrescar los permisos de la sesión
@@ -43,6 +56,7 @@ export default function PermisosPage() {
   const [showAddRole, setShowAddRole] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
   const [rowToDelete, setRowToDelete] = useState<PermisoRow | null>(null)
+  const [pendingCell, setPendingCell] = useState<string | null>(null)
 
   const catalogoQuery = useQuery({
     queryKey: ['permisos-catalogo'],
@@ -68,13 +82,21 @@ export default function PermisosPage() {
 
   const assignMutation = useMutation({
     mutationFn: (dto: AssignPermisoDto) => assignPermiso(dto),
-    onSuccess: (row) => {
-      queryClient.setQueryData<PermisoRow[]>(['permisos', doctype], (rows) => {
-        if (!rows) return rows
-        const idx = rows.findIndex((r) => r.role === row.role && r.permlevel === row.permlevel)
-        if (idx === -1) return [...rows, row]
-        const next = [...rows]
-        next[idx] = row
+    onMutate: (dto) => setPendingCell(pendingCellKey(dto)),
+    onSettled: (_data, _err, dto) =>
+      setPendingCell((cur) => {
+        const key = pendingCellKey(dto)
+        return key !== null && cur === key ? null : cur
+      }),
+    onSuccess: (rows) => {
+      queryClient.setQueryData<PermisoRow[]>(['permisos', doctype], (existing) => {
+        if (!existing) return rows
+        const next = [...existing]
+        for (const row of rows) {
+          const idx = next.findIndex((r) => r.role === row.role && r.permlevel === row.permlevel)
+          if (idx === -1) next.push(row)
+          else next[idx] = row
+        }
         return next
       })
     },
@@ -105,6 +127,14 @@ export default function PermisosPage() {
     assignMutation.mutate({ doctype, role: row.role, permlevel: row.permlevel, [ptype]: value } as AssignPermisoDto)
   }
 
+  const PERMISOS_MATRIX_COLUMNS = [
+    { key: 'rol', width: 200 },
+    { key: 'nivel', width: 90 },
+    ...PERMISO_PTYPES.map((pt) => ({ key: pt, width: 100 })),
+    { key: 'actions', width: 48 },
+  ]
+  const { widths: colWidths, startResize } = useResizableColumns(PERMISOS_MATRIX_COLUMNS)
+
   if (!isSystemManager) {
     return (
       <div className="page-container">
@@ -117,14 +147,6 @@ export default function PermisosPage() {
       </div>
     )
   }
-
-  const PERMISOS_MATRIX_COLUMNS = [
-    { key: 'rol', width: 200 },
-    { key: 'nivel', width: 90 },
-    ...PERMISO_PTYPES.map((pt) => ({ key: pt, width: 100 })),
-    { key: 'actions', width: 48 },
-  ]
-  const { widths: colWidths, startResize } = useResizableColumns(PERMISOS_MATRIX_COLUMNS)
 
   const rows = permisosQuery.data ?? []
   const usedRoles = new Set(rows.map((r) => r.role))
@@ -151,6 +173,13 @@ export default function PermisosPage() {
         description="Control fino de permisos por DocType y Rol"
         action={<RecargarButton />}
       />
+
+      {v2Activo && (
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+          Vista avanzada: los permisos se asignan desde los perfiles de acceso
+          (Configuración → Acceso) y el sistema los refleja acá solo.
+        </div>
+      )}
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
         <div className="card-body">
@@ -236,16 +265,27 @@ export default function PermisosPage() {
                     <tr key={`${row.role}-${row.permlevel}`}>
                       <td style={{ fontWeight: 500 }}>{row.role_label_es ?? row.role}</td>
                       <td className="td-muted" style={{ textAlign: 'center' }}>{row.permlevel}</td>
-                      {PERMISO_PTYPES.map((pt) => (
-                        <td key={pt} style={{ textAlign: 'center' }}>
-                          <input
-                            type="checkbox"
-                            checked={row[pt]}
-                            onChange={(e) => toggleFlag(row, pt, e.target.checked)}
-                            disabled={assignMutation.isPending}
-                          />
-                        </td>
-                      ))}
+                      {PERMISO_PTYPES.map((pt) => {
+                        const cellKey = `${row.role}-${row.permlevel}-${pt}`
+                        const cellPending = pendingCell === cellKey
+                        return (
+                          <td key={pt} style={{ textAlign: 'center' }}>
+                            <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20 }}>
+                              <input
+                                type="checkbox"
+                                checked={row[pt]}
+                                onChange={(e) => toggleFlag(row, pt, e.target.checked)}
+                                disabled={cellPending}
+                                style={cellPending ? { opacity: 0.35 } : undefined}
+                                aria-busy={cellPending || undefined}
+                              />
+                              {cellPending && (
+                                <span className="spinner spinner-brand spinner-sm" role="status" aria-label="Guardando…" style={{ position: 'absolute' }} />
+                              )}
+                            </span>
+                          </td>
+                        )
+                      })}
                       <td className="actions-cell">
                         <button
                           className="btn btn-ghost btn-size-icon-sm"
@@ -269,9 +309,9 @@ export default function PermisosPage() {
           doctype={doctype}
           roles={availableRolesForAdd}
           onClose={() => setShowAddRole(false)}
-          onAssigned={(row) => {
+          onAssigned={(rows) => {
             queryClient.setQueryData<PermisoRow[]>(['permisos', doctype], (existing) =>
-              existing ? [...existing, row] : [row],
+              existing ? [...existing, ...rows] : rows,
             )
             setShowAddRole(false)
           }}
@@ -346,7 +386,7 @@ function AddRoleModal({
   doctype: string
   roles: PermisoCatalogoItem[]
   onClose: () => void
-  onAssigned: (row: PermisoRow) => void
+  onAssigned: (rows: PermisoRow[]) => void
 }) {
   const [role, setRole] = useState('')
   const [roleSearch, setRoleSearch] = useState('')
@@ -362,9 +402,10 @@ function AddRoleModal({
 
   const mutation = useMutation({
     mutationFn: (dto: AssignPermisoDto) => assignPermiso(dto),
-    onSuccess: (row) => {
-      toast.success(`Rol ${row.role_label_es ?? row.role} agregado a ${doctype}`)
-      onAssigned(row)
+    onSuccess: (rows) => {
+      const first = rows[0]
+      toast.success(`Rol ${first?.role ?? role} agregado a ${doctype}`)
+      onAssigned(rows)
     },
     onError: (err) => toast.error(apiMessage(err, 'No se pudo agregar el rol')),
   })

@@ -298,9 +298,14 @@ const supplierSrc = read('src/features/suppliers/SupplierDetail.tsx')
 ok(supplierSrc.includes(`useFeature('cuentasPorPagar')`), 'SupplierDetail gatea Historial de Pagos por cuentasPorPagar')
 ok(supplierSrc.includes(`useFeature('compras')`), 'SupplierDetail gatea Compras Recientes por compras')
 const dashSrc = read('src/features/dashboard/DashboardPage.tsx')
-ok(dashSrc.includes(`useFeature('gastos')`) && dashSrc.includes(`useFeature('cuentasPorCobrar')`), 'Dashboard gatea KPIs Gastos/CxC')
-ok(dashSrc.includes(`useFeature('inventario')`), 'Dashboard gatea Stock bajo por inventario')
-ok(dashSrc.includes('actividadVisible'), 'Dashboard filtra Actividad Reciente por módulo')
+const dashLegacySrc = read('src/features/dashboard/LegacyDashboard.tsx')
+// Dashboard modular (Permisos v2 §6): visible = contratado ∩ permitido, el backend ya cruza
+// en /dashboard/catalogo — el frontend NO filtra por features (ver PROMPT_PERMISOS_V2 §12).
+ok(dashSrc.includes('getDashboardCatalogo') && !dashSrc.includes('useFeature('), 'Dashboard modular arma por catálogo (sin cruce de features)')
+// Compatibilidad pre-v2: el legacy conserva los gates por feature de siempre.
+ok(dashLegacySrc.includes(`useFeature('gastos')`) && dashLegacySrc.includes(`useFeature('cuentasPorCobrar')`), 'Dashboard legacy gatea KPIs Gastos/CxC')
+ok(dashLegacySrc.includes(`useFeature('inventario')`), 'Dashboard legacy gatea Stock bajo por inventario')
+ok(dashLegacySrc.includes('actividadVisible'), 'Dashboard legacy filtra Actividad Reciente por módulo')
 ok(catalogSrc.includes("'/config/cajas'") && catalogSrc.includes("'/config/cobros'") && catalogSrc.includes("'/config/bancos'"), 'Config Caja/Cobros/Tesorería gateadas por feature')
 ok(catalogSrc.includes("'/config/centros-costo'"), 'Config Centros de Costo gateada por contabilidad')
 

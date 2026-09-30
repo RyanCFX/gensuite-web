@@ -18,6 +18,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FilterField } from '@/shared/ui/FilterField'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const COLUMNS = [
   { key: 'origen', width: 160 },
@@ -47,6 +48,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function TransferenciasPage() {
+  const puedeCrear = usePuede('inventario.transferencias.crear')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [status, setStatus] = useState<string>('all')
@@ -146,10 +148,12 @@ export default function TransferenciasPage() {
         action={
           <>
             <RecargarButton />
-            <button className="btn btn-primary" onClick={() => navigate('/transferencias/nueva')}>
-              <Plus size={16} />
-              Nueva Transferencia
-            </button>
+            {puedeCrear && (
+              <button className="btn btn-primary" onClick={() => navigate('/transferencias/nueva')}>
+                <Plus size={16} />
+                Nueva Transferencia
+              </button>
+            )}
           </>
         }
       />
@@ -233,9 +237,11 @@ export default function TransferenciasPage() {
                   <div className="empty-state">
                     <div className="empty-title">Sin transferencias</div>
                     <p className="empty-sub">Crea la primera transferencia entre almacenes.</p>
-                    <button className="btn btn-primary btn-size-sm" onClick={() => navigate('/transferencias/nueva')}>
-                      <Plus size={14} /> Nueva Transferencia
-                    </button>
+                    {puedeCrear && (
+                      <button className="btn btn-primary btn-size-sm" onClick={() => navigate('/transferencias/nueva')}>
+                        <Plus size={14} /> Nueva Transferencia
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

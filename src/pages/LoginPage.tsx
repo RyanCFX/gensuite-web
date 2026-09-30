@@ -34,7 +34,7 @@ type Step = { kind: 'credentials' } | { kind: 'mfa'; mfa: MfaRequiredResult; ten
 export default function LoginPage() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
-  const next = params.get('next') ?? '/dashboard'
+  const next = params.get('next') ?? '/'
 
   const applyAuthResult = useAuthStore((s) => s.applyAuthResult)
   const applySwitchTenantResult = useAuthStore((s) => s.applySwitchTenantResult)

@@ -3680,6 +3680,10 @@ export interface InviteUsuarioDto {
   perfiles?: string[];
   roles?: string[];
   adminCode?: string;
+  /** Permisos v2 (docs/tasks/PROMPT_PERMISOS_V2_Y_DASHBOARD_MODULAR_FRONTEND.md §8):
+   *  ids de perfiles de acceso (`GET /acceso/perfiles`). En modo `activo` es la ÚNICA
+   *  forma aceptada (al menos uno; mandar `roles`/`perfiles` → 400 ACCESO_V2_ACTIVO). */
+  perfilesAcceso?: string[];
 }
 
 export interface InviteUsuarioResult {
@@ -3833,6 +3837,201 @@ export interface CreateRoleDto {
 export interface UpdateRoleDto {
   disabled?: boolean;
   deskAccess?: boolean;
+}
+
+// ─── Permisos v2 (acceso por pantallas/componentes/filtros) ────────────────────
+// docs/tasks/PROMPT_PERMISOS_V2_Y_DASHBOARD_MODULAR_FRONTEND.md. El openapi.json del
+// repo todavía NO documenta estos endpoints (sin tag "Permisos v2 (acceso)"): los shapes
+// de abajo siguen los ejemplos del documento. Si el documento contradice al openapi en
+// un DTO, gana el openapi; en reglas de UI, gana el documento.
+
+export type AccesoModo = 'off' | 'sombra' | 'activo';
+
+/** GET /me/acceso — acceso efectivo del usuario logueado. */
+export interface MeAcceso {
+  modo: AccesoModo;
+  /** String opaco: cambia ante cualquier cambio de acceso. Comparar por igualdad. */
+  version: string;
+  modulos: string[];
+  pantallas: string[];
+  componentes: string[];
+  recursos: string[];
+  /** Por pantalla efectiva, los query params que el usuario NO puede enviar. */
+  filtrosBloqueados: Record<string, string[]>;
+}
+
+/** GET /opciones/:recurso — lista mínima para selects `{value,label}`. */
+export interface OpcionItem {
+  value: string;
+  label: string;
+}
+
+export type GrantNivel = 'modulo' | 'pantalla' | 'componente';
+export type GrantEfecto = 'permitir' | 'denegar';
+
+export interface Grant {
+  nivel: GrantNivel;
+  clave: string;
+  efecto: GrantEfecto;
+  /** ISO opcional (permisos temporales). Vencido = se ignora; no se puede guardar vencido. */
+  expiraEn?: string;
+}
+
+export type AccesoComponenteTipo = 'vista' | 'accion' | 'filtro' | 'exportar' | 'widget';
+export type AccesoPantallaTipo = 'operativa' | 'reporte' | 'config' | 'dashboard';
+
+export interface AccesoCatalogoComponente {
+  key: string;
+  tipo: AccesoComponenteTipo;
+  nombre: string;
+  descripcion: string | null;
+  parametro: string | null;
+  incluirEnCompleta: boolean;
+  sensible: boolean;
+  requiere: string[];
+  recursos: string[];
+  otorgable: boolean;
+}
+
+export interface AccesoCatalogoPantalla {
+  key: string;
+  nombre: string;
+  tipo: AccesoPantallaTipo;
+  componentes: AccesoCatalogoComponente[];
+}
+
+export interface AccesoCatalogoModulo {
+  key: string;
+  nombre: string;
+  descripcion: string;
+  pantallas: AccesoCatalogoPantalla[];
+}
+
+export interface AccesoCatalogoRecurso {
+  key: string;
+  nombre: string;
+}
+
+/** GET /acceso/catalogo — solo lo contratado por el tenant. */
+export interface AccesoCatalogo {
+  version: number;
+  modulos: AccesoCatalogoModulo[];
+  recursos: AccesoCatalogoRecurso[];
+}
+
+export interface PlantillaAcceso {
+  key: string;
+  nombre: string;
+  descripcion: string;
+  esSistema: boolean;
+  grants: Grant[];
+}
+
+export interface PerfilAccesoResumen {
+  id: string;
+  nombre: string;
+  esSistema: boolean;
+}
+
+export interface PerfilAcceso {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  plantilla?: string;
+  esSistema: boolean;
+  totalUsuarios: number;
+  grants: Grant[];
+}
+
+export interface PerfilAccesoUsuario {
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
+export interface PerfilAccesoDetail extends PerfilAcceso {
+  createdAt: string;
+  updatedAt: string;
+  usuarios: PerfilAccesoUsuario[];
+}
+
+export interface UsuarioAcceso {
+  email: string;
+  perfiles: PerfilAccesoResumen[];
+  grants: Grant[];
+}
+
+export type TrazaEstado =
+  | 'otorgado'
+  | 'denegado_perfil'
+  | 'denegado_usuario'
+  | 'requisito_faltante'
+  | 'sin_otorgar'
+  | 'no_contratado';
+
+export interface TrazaItem {
+  key: string;
+  pantalla: string;
+  nombre: string;
+  tipo: string;
+  estado: TrazaEstado;
+  fuentes: string[];
+}
+
+/** GET /acceso/usuarios/:email/efectivo — con `?explicar=true` incluye `traza`. */
+export interface AccesoEfectivo {
+  modulos: string[];
+  pantallas: string[];
+  componentes: string[];
+  recursos: string[];
+  traza?: TrazaItem[];
+}
+
+export interface AuditoriaAccesoEntry {
+  id: string;
+  actorEmail: string;
+  accion: string;
+  sujetoTipo: string;
+  sujetoId: string;
+  antes: unknown;
+  despues: unknown;
+  motivo: string | null;
+  createdAt: string;
+}
+
+export interface AuditoriaAccesoPage {
+  items: AuditoriaAccesoEntry[];
+  meta: { total: number; limit: number; offset: number; hasMore: boolean };
+}
+
+// ─── Dashboard modular ─────────────────────────────────────────────────────────
+// Mismos nombres de campo que GET /dashboard/summary para reutilizar visuales.
+
+export interface DashboardTipoReporteItem {
+  key: string;
+  nombre: string;
+  descripcion: string;
+}
+
+export interface DashboardTipoReporte {
+  key: string;
+  nombre: string;
+  descripcion: string;
+  reportes: DashboardTipoReporteItem[];
+}
+
+export interface DashboardWidgetMeta {
+  key: string;
+  period: string;
+  periodLabel: string;
+  from: string;
+  to: string;
+  currency: string;
+}
+
+export interface DashboardWidgetResp {
+  data: Record<string, unknown>;
+  meta: DashboardWidgetMeta;
 }
 
 // ─── Tax Templates ────────────────────────────────────────────────────────────

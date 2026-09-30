@@ -49,6 +49,15 @@ function shouldToastPermiso(message: string): boolean {
   return true
 }
 
+// Debounce del refresco de acceso tras 403 de v2 (§9 del prompt de Permisos v2): si fallan
+// varias tarjetas/queries a la vez, un solo refresh de /me/acceso + /me/permissions.
+let ultimoRefreshAcceso = 0
+function refreshAccesoDebounced() {
+  if (Date.now() - ultimoRefreshAcceso < 5000) return
+  ultimoRefreshAcceso = Date.now()
+  import('@/stores/permissions.store').then((m) => m.usePermissionsStore.getState().refreshSilencioso())
+}
+
 function normalizeOrderBy(orderBy: string): string {
   if (orderBy.startsWith('-')) return `${orderBy.slice(1)} desc`
   if (!orderBy.includes(' ')) return `${orderBy} asc`
@@ -263,6 +272,28 @@ client.interceptors.response.use(
     // viene de ERPNext más abajo y puede ser un permiso más fino: solo se informa.
     // Import dinámico a propósito: un import estático de vuelta crearía un ciclo real
     // (client.ts → permissions.store.ts → me.ts → client.ts).
+    // 403 de Permisos v2 (docs/tasks/PROMPT_PERMISOS_V2_Y_DASHBOARD_MODULAR_FRONTEND.md §9):
+    // el acceso pudo haber cambiado — refresco silencioso con debounce (no tormenta si fallan
+    // varias queries a la vez). FILTRO_NO_PERMITIDO además reintenta UNA vez sin los params
+    // bloqueados (desfase de versión): quita details.filtros[].parametro de la query y reintenta.
+    if (!isAuthEndpoint && errorCode && ['FILTRO_NO_PERMITIDO', 'RECURSO_NO_PERMITIDO', 'WIDGET_NO_PERMITIDO', 'WIDGET_NO_CONTRATADO'].includes(errorCode)) {
+      refreshAccesoDebounced()
+      if (errorCode === 'FILTRO_NO_PERMITIDO') {
+        const config = error.config as (typeof error.config & { _filtroRetried?: boolean }) | undefined
+        const filtros = (data?.error as { details?: { filtros?: Array<{ parametro?: string }> } })?.details?.filtros
+        const params = (config?.params ?? {}) as Record<string, unknown>
+        const aQuitar = (filtros ?? []).map((f) => f?.parametro).filter((p): p is string => !!p && p in params)
+        if (config && !config._filtroRetried && aQuitar.length > 0 && (config.method ?? 'get').toLowerCase() === 'get') {
+          config._filtroRetried = true
+          for (const p of aQuitar) delete params[p]
+          const msg = `Se quitó el filtro ${aQuitar.join(', ')}: no tiene permiso para usarlo.`
+          if (shouldToastPermiso(msg)) toast.warning(msg)
+          return client(config)
+        }
+      }
+      return Promise.reject(data.error)
+    }
+
     if (!isAuthEndpoint && (errorCode === 'PERMISO_INSUFICIENTE' || errorCode === 'FORBIDDEN')) {
       // Toast throttleado: un mismo mensaje puede llegar en ráfaga (react-query reintenta,
       // varias queries fallan a la vez) — no spamear al usuario con el mismo aviso.
@@ -454,6 +485,25 @@ export const ERROR_CODES = {
   // Factura con e-CF no aceptado por la DGII — GET /invoices/:id/pdf responde 400 en vez de
   // generar el PDF (docs/tasks/81 §6). La UI muestra un mensaje claro, no un error crudo.
   ECF_NOT_ACCEPTED: 'ECF_NOT_ACCEPTED',
+
+  // Permisos v2 (docs/tasks/PROMPT_PERMISOS_V2_Y_DASHBOARD_MODULAR_FRONTEND.md §9) —
+  // 403 de acceso (manejados centralmente arriba) y validaciones de la admin de acceso.
+  FILTRO_NO_PERMITIDO: 'FILTRO_NO_PERMITIDO',
+  RECURSO_NO_PERMITIDO: 'RECURSO_NO_PERMITIDO',
+  WIDGET_NO_PERMITIDO: 'WIDGET_NO_PERMITIDO',
+  WIDGET_NO_CONTRATADO: 'WIDGET_NO_CONTRATADO',
+  ESCALADA_NO_PERMITIDA: 'ESCALADA_NO_PERMITIDA',
+  CLAVE_INEXISTENTE: 'CLAVE_INEXISTENTE',
+  COMPONENTE_NO_CONTRATADO: 'COMPONENTE_NO_CONTRATADO',
+  GRANT_VENCIDO: 'GRANT_VENCIDO',
+  PERFIL_SISTEMA: 'PERFIL_SISTEMA',
+  PERFIL_DUPLICADO: 'PERFIL_DUPLICADO',
+  PERFIL_EN_USO: 'PERFIL_EN_USO',
+  PERFIL_INEXISTENTE: 'PERFIL_INEXISTENTE',
+  PLANTILLA_INEXISTENTE: 'PLANTILLA_INEXISTENTE',
+  ULTIMO_ADMINISTRADOR: 'ULTIMO_ADMINISTRADOR',
+  ACCESO_V2_ACTIVO: 'ACCESO_V2_ACTIVO',
+  PERFIL_ACCESO_REQUERIDO: 'PERFIL_ACCESO_REQUERIDO',
 
   // ─── Estados de tenant y sesión (§3) — nunca un toast, son pantallas/redirecciones completas.
   // Manejados centralmente en el interceptor de abajo, no en cada `onError` de pantalla. ─────────

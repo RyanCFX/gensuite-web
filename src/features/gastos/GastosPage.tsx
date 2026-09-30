@@ -16,7 +16,9 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
+import { useFiltrosPantalla } from '@/shared/permissions/useAcceso'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const PAGE_SIZE = 20
 
@@ -52,6 +54,7 @@ function normalizeResumen(raw: unknown): { totalDeducible: number; totalNoDeduci
 }
 
 export default function GastosPage() {
+  const puedeCrear = usePuede('gastos.crear')
   const navigate = useNavigate()
 
   const currentMonth = new Date().toISOString().substring(0, 7)
@@ -87,23 +90,28 @@ export default function GastosPage() {
     queryFn: () => getGastoResumen(month),
   })
 
+  // Filtros protegidos v2 (pantalla `gastos` = gate sin el último segmento).
+  const filtros = useFiltrosPantalla('gastos')
+
+  const rawParams = {
+    supplier: supplier || undefined,
+    status: status !== 'all' ? status : undefined,
+    tipoComprobante: tipoComprobante !== 'all' ? tipoComprobante : undefined,
+    esDeducible: esDeducible !== 'all' ? esDeducible === 'true' : undefined,
+    fromDate: fromDate || undefined,
+    toDate: toDate || undefined,
+    ncfProveedor: ncfProveedor || undefined,
+    grandTotalMin: grandTotalMin ? Number(grandTotalMin) : undefined,
+    grandTotalMax: grandTotalMax ? Number(grandTotalMax) : undefined,
+    orderBy: orderBy || undefined,
+    limit: PAGE_SIZE,
+    offset,
+  }
+  const { limpios: params } = filtros.sanear(rawParams)
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ['gastos', { supplier, status, tipoComprobante, esDeducible, fromDate, toDate, ncfProveedor, grandTotalMin, grandTotalMax, offset, orderBy }],
-    queryFn: () =>
-      listGastos({
-        supplier: supplier || undefined,
-        status: status !== 'all' ? status : undefined,
-        tipoComprobante: tipoComprobante !== 'all' ? tipoComprobante : undefined,
-        esDeducible: esDeducible !== 'all' ? esDeducible === 'true' : undefined,
-        fromDate: fromDate || undefined,
-        toDate: toDate || undefined,
-        ncfProveedor: ncfProveedor || undefined,
-        grandTotalMin: grandTotalMin ? Number(grandTotalMin) : undefined,
-        grandTotalMax: grandTotalMax ? Number(grandTotalMax) : undefined,
-        orderBy: orderBy || undefined,
-        limit: PAGE_SIZE,
-        offset,
-      }),
+    queryFn: () => listGastos(params),
   })
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
@@ -130,10 +138,12 @@ export default function GastosPage() {
         action={
           <>
             <RecargarButton />
-            <button className="btn btn-navy" onClick={() => navigate('/gastos/nuevo')}>
-              <Plus size={16} />
-              Nuevo Gasto
-            </button>
+            {puedeCrear && (
+              <button className="btn btn-navy" onClick={() => navigate('/gastos/nuevo')}>
+                <Plus size={16} />
+                Nuevo Gasto
+              </button>
+            )}
           </>
         }
       />
@@ -188,6 +198,7 @@ export default function GastosPage() {
                     onChange={(e) => { setSupplier(e.target.value); setPage(1) }}
                   />
                 </div>
+                {filtros.puedeFiltrar('status') && (
                 <FilterField label="Estado">
                   <Select value={status} onValueChange={(val) => { setStatus(val); setPage(1) }}>
                     <SelectItem value="all">Todos</SelectItem>
@@ -196,6 +207,8 @@ export default function GastosPage() {
                     <SelectItem value="cancelled">Anulado</SelectItem>
                   </Select>
                 </FilterField>
+                )}
+                {filtros.puedeFiltrar('tipoComprobante') && (
                 <FilterField label="Tipo NCF" style={{ width: 200 }}>
                   <SearchSelect
                     value={tipoComprobante === 'all' ? '' : tipoComprobante}
@@ -206,6 +219,7 @@ export default function GastosPage() {
                     placeholder="Todos los NCF"
                   />
                 </FilterField>
+                )}
 
                 <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
                   <SlidersHorizontal size={13} />
@@ -306,9 +320,11 @@ export default function GastosPage() {
                                 <div className="empty-icon"><Plus size={20} /></div>
                                 <p className="empty-title">Sin gastos</p>
                                 <p className="empty-sub">No hay gastos registrados.</p>
-                                <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/gastos/nuevo')}>
-                                  <Plus size={14} />Nuevo Gasto
-                                </button>
+                                {puedeCrear && (
+                                  <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/gastos/nuevo')}>
+                                    <Plus size={14} />Nuevo Gasto
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -376,6 +392,7 @@ export default function GastosPage() {
           </>
         }
       >
+        {filtros.puedeFiltrar('esDeducible') && (
         <div className="ff-wrap">
           <label className="ff-label">Deducible</label>
           <Select value={esDeducible} onValueChange={(val) => { setEsDeducible(val); setPage(1) }}>
@@ -384,7 +401,9 @@ export default function GastosPage() {
             <SelectItem value="false">No deducibles</SelectItem>
           </Select>
         </div>
+        )}
 
+        {(filtros.puedeFiltrar('fromDate') || filtros.puedeFiltrar('toDate')) && (
         <div className="ff-wrap">
           <label className="ff-label">Fecha</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -393,7 +412,9 @@ export default function GastosPage() {
             <DatePicker className="ff-input" value={toDate} onChange={(v) => { setToDate(v); setPage(1) }} clearable />
           </div>
         </div>
+        )}
 
+        {filtros.puedeFiltrar('ncfProveedor') && (
         <div className="ff-wrap">
           <label className="ff-label">NCF del proveedor</label>
           <input
@@ -403,7 +424,9 @@ export default function GastosPage() {
             onChange={(e) => { setNcfProveedor(e.target.value); setPage(1) }}
           />
         </div>
+        )}
 
+        {(filtros.puedeFiltrar('grandTotalMin') || filtros.puedeFiltrar('grandTotalMax')) && (
         <div className="ff-wrap">
           <label className="ff-label">Total</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -424,6 +447,7 @@ export default function GastosPage() {
             />
           </div>
         </div>
+        )}
       </Drawer>
     </div>
   )

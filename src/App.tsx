@@ -1,4 +1,5 @@
 import { BrowserRouter, Route, Navigate } from 'react-router-dom'
+import { usePermissionsStore } from '@/stores/permissions.store'
 import { SentryRoutes as Routes } from '@/lib/sentry'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { RequireAccion } from '@/components/RequireAccion'
@@ -148,6 +149,7 @@ const AjustesAvanzadosPage = lazy(() => import('@/features/config/AjustesAvanzad
 const RepostValuacionPage  = lazy(() => import('@/features/inventory/RepostValuacionPage'))
 const NotificacionesPage   = lazy(() => import('@/features/config/NotificacionesPage'))
 const PermisosPage         = lazy(() => import('@/features/config/PermisosPage'))
+const AccesoPage           = lazy(() => import('@/features/acceso/AccesoPage'))
 const MiCuentaPage         = lazy(() => import('@/pages/MiCuentaPage'))
 const RolesPage            = lazy(() => import('@/features/config/RolesPage'))
 const RoleDetailPage       = lazy(() => import('@/features/config/RoleDetailPage'))
@@ -197,6 +199,19 @@ function PageLoader() {
   )
 }
 
+/**
+ * Índice post-login (Permisos v2 §4.2): sin `dashboard.ver` el usuario no debe caer en
+ * SinAcceso — va a /inicio (ruta neutral, sin acción). Con dashboard.ver, al dashboard.
+ * Vive DENTRO de ProtectedRoute: necesita los permisos ya cargados (`fetch` solo se
+ * dispara ahí; fuera, el estado se quedaba en `idle` y el loader giraba para siempre).
+ */
+function IndicePostLogin() {
+  const status = usePermissionsStore((s) => s.status)
+  const puedeDashboard = usePermissionsStore((s) => s.acciones['dashboard.ver'] === true)
+  if (status !== 'ready') return <PageLoader />
+  return <Navigate to={puedeDashboard ? '/dashboard' : '/inicio'} replace />
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -207,11 +222,11 @@ export default function App() {
         <Route path="/invitacion" element={<InvitationPage />} />
         <Route path="/relaciones/invitacion" element={<RelacionInvitacionPublicPage />} />
         <Route path="/oauth/callback" element={<OauthCallbackPage />} />
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
            <Route element={<RequireAccion />}>
+            <Route path="/" element={<IndicePostLogin />} />
             <Route path="/dashboard" element={<Suspense fallback={<PageLoader />}><DashboardPage /></Suspense>} />
             <Route path="/inicio" element={<StartPage />} />
 
@@ -463,6 +478,7 @@ export default function App() {
             <Route path="/config/recalculo-valuacion" element={<Suspense fallback={<PageLoader />}><RepostValuacionPage /></Suspense>} />
             <Route path="/config/notificaciones" element={<Suspense fallback={<PageLoader />}><NotificacionesPage /></Suspense>} />
             <Route path="/config/permisos" element={<Suspense fallback={<PageLoader />}><PermisosPage /></Suspense>} />
+            <Route path="/config/acceso" element={<Suspense fallback={<PageLoader />}><AccesoPage /></Suspense>} />
             <Route path="/mi-cuenta" element={<Suspense fallback={<PageLoader />}><MiCuentaPage /></Suspense>} />
             <Route path="/config/roles" element={<Suspense fallback={<PageLoader />}><RolesPage /></Suspense>} />
             <Route path="/config/roles/:name" element={<Suspense fallback={<PageLoader />}><RoleDetailPage /></Suspense>} />

@@ -15,6 +15,7 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { usePuede } from '@/shared/permissions/can'
 
 const COLUMNS = [
   { key: 'fecha', width: 100 },
@@ -38,6 +39,7 @@ const STATUS_LABEL: Record<TesoreriaEstado, string> = {
 type EstadoFilter = TesoreriaEstado | 'all'
 
 export default function TransferenciasInternasPage() {
+  const puedeCrear = usePuede('tesoreria.transferencia.crear')
   const navigate = useNavigate()
   const [cuentaBancaria, setCuentaBancaria] = useState('')
   const [estado, setEstado] = useState<EstadoFilter>('all')
@@ -70,10 +72,12 @@ export default function TransferenciasInternasPage() {
         action={
           <>
             <RecargarButton />
-            <button className="btn btn-navy" onClick={() => navigate('/tesoreria/transferencias/nueva')}>
-              <Plus size={16} />
-              Nueva Transferencia
-            </button>
+            {puedeCrear && (
+              <button className="btn btn-navy" onClick={() => navigate('/tesoreria/transferencias/nueva')}>
+                <Plus size={16} />
+                Nueva Transferencia
+              </button>
+            )}
           </>
         }
       />

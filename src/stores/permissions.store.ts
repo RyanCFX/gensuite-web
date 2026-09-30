@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { getMePermissions } from '@/shared/api/me'
-import type { MePermissions } from '@/shared/api/types'
+import { getMiAcceso } from '@/shared/api/acceso'
+import type { MeAcceso, MePermissions } from '@/shared/api/types'
+import { ACCESO_VACIO, type Acceso } from '@/shared/permissions/acceso'
 
 type PermissionsStatus = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -12,6 +14,9 @@ interface PermissionsState {
   doctypes: MePermissions['doctypes']
   acciones: Record<string, boolean>
   vertical: 'general' | 'farmacia'
+  /** Permisos v2 (docs/tasks/PROMPT_PERMISOS_V2_Y_DASHBOARD_MODULAR_FRONTEND.md §2):
+   *  pantallas, componentes (filtros/widgets), recursos y filtros bloqueados. */
+  acceso: Acceso
   /** Carga inicial: muestra el estado de carga hasta tener respuesta (docs/PROMPT_PERMISOS_FRONTEND.md §5.1). */
   fetch: () => Promise<void>
   /**
@@ -30,6 +35,7 @@ const INITIAL = {
   doctypes: {} as MePermissions['doctypes'],
   acciones: {} as Record<string, boolean>,
   vertical: 'general' as const,
+  acceso: ACCESO_VACIO,
 }
 
 // No persistir en localStorage a propósito (docs/PROMPT_PERMISOS_FRONTEND.md §5.2): es
@@ -47,6 +53,46 @@ function aplicar(set: (partial: Partial<PermissionsState>) => void, data: MePerm
   })
 }
 
+function aplicarAcceso(set: (partial: Partial<PermissionsState>) => void, n: MeAcceso) {
+  set({
+    acceso: {
+      modo: n.modo,
+      version: n.version,
+      modulos: new Set(n.modulos),
+      pantallas: new Set(n.pantallas),
+      componentes: new Set(n.componentes),
+      recursos: new Set(n.recursos),
+      filtrosBloqueados: n.filtrosBloqueados,
+    },
+  })
+  ultimoAccesoFetch = Date.now()
+}
+
+// /me/acceso puede no existir en un backend anterior a v2 (404): no debe romper el
+// login — se queda en modo `off` (comportamiento viejo). Solo se pide una vez por
+// sesión/tenant; los refrescos posteriores van por refreshSilencioso.
+async function pedirAcceso(): Promise<MeAcceso | null> {
+  try {
+    return await getMiAcceso()
+  } catch {
+    return null
+  }
+}
+
+// Throttle del refresco por foco (§2.1): la ventana recupera el foco y pasaron >60 s.
+let ultimoAccesoFetch = 0
+let focoSuscrito = false
+
+/** Registra (una sola vez) el refresco de acceso al recuperar el foco. Llamar desde ProtectedRoute. */
+export function sincronizarAccesoEnFoco() {
+  if (focoSuscrito || typeof window === 'undefined') return
+  focoSuscrito = true
+  window.addEventListener('focus', () => {
+    if (Date.now() - ultimoAccesoFetch < 60_000) return
+    usePermissionsStore.getState().refreshSilencioso()
+  })
+}
+
 export const usePermissionsStore = create<PermissionsState>((set, get) => ({
   ...INITIAL,
 
@@ -55,8 +101,9 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
     // estábamos 'ready' (ej. al salir del admin de permisos) no debe re-montar la app.
     if (get().status !== 'ready') set({ status: 'loading', error: null })
     try {
-      const data = await getMePermissions()
+      const [data, acceso] = await Promise.all([getMePermissions(), pedirAcceso()])
       aplicar(set, data)
+      if (acceso) aplicarAcceso(set, acceso)
       set({ status: 'ready', error: null })
     } catch (err) {
       if (get().status === 'ready') return // ya teníamos permisos válidos: no romper la sesión
@@ -69,8 +116,9 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
     if (refreshEnCurso) return refreshEnCurso
     refreshEnCurso = (async () => {
       try {
-        const data = await getMePermissions()
+        const [data, acceso] = await Promise.all([getMePermissions(), pedirAcceso()])
         aplicar(set, data)
+        if (acceso) aplicarAcceso(set, acceso)
         if (get().status !== 'ready') set({ status: 'ready', error: null })
       } catch {
         // Silencioso a propósito: si falla, se mantienen los permisos que ya había.
