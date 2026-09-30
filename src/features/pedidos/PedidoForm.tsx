@@ -1255,12 +1255,6 @@ try {
 
         <div className="card">
           <div className="items-table-wrap">
-            {algunBloqueoPrecio && (
-              <div className="inline-alert inline-alert-info" style={{ margin: 12, marginBottom: 0 }}>
-                <Lock size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
-                <span>Edición manual de precio deshabilitada para {tiposPrecioBloqueados} — esas líneas se venden a su precio de catálogo (A/B/C).</span>
-              </div>
-            )}
             <table className="items-table navy-table items-table-resizable">
               <colgroup>
                 {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}

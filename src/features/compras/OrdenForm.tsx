@@ -7,7 +7,7 @@ import { useTabs } from '@/contexts/TabsContext'
 import { createOrdenCompra, updateOrdenCompra, getOrdenCompra } from '@/shared/api/ordenes-compra'
 import { listSuppliers } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listAlmacenes, getFacturacionConfig, listImpuestosCompras } from '@/shared/api/config'
+import { listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateOrdenCompraDto, Item, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
@@ -102,8 +102,6 @@ export default function OrdenForm() {
   const [scheduleDate, setScheduleDate] = useState('')
   const [currency, setCurrency] = useState('DOP')
   const [conversionRate, setConversionRate] = useState(1)
-  const [taxesTemplate, setTaxesTemplate] = useState('')
-  const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem(defaultWh)])
   const ITEMS_COLUMNS = [
     { key: 'articulo', width: 220 },
@@ -139,15 +137,6 @@ export default function OrdenForm() {
     label: s.supplierName,
     sublabel: s.rnc ?? s.cedula,
   }))
-
-  const { data: taxesTemplates } = useQuery({
-    queryKey: ['impuestos-compras'],
-    queryFn: listImpuestosCompras,
-    staleTime: 5 * 60_000,
-  })
-  const taxesTemplateOptions: SearchSelectOption[] = (taxesTemplates ?? [])
-    .filter((t) => !taxesTemplateSearch || t.title.toLowerCase().includes(taxesTemplateSearch.toLowerCase()))
-    .map((t) => ({ value: String(t.id), label: t.title }))
 
   const { data: warehousesAll } = useQuery({
     queryKey: ['warehouses'],
@@ -259,7 +248,6 @@ export default function OrdenForm() {
     scheduleDate,
     currency,
     conversionRate,
-    taxesTemplate,
     items,
     branch,
     department,
@@ -352,7 +340,7 @@ export default function OrdenForm() {
       scheduleDate: scheduleDate || undefined,
       currency: currency || undefined,
       conversionRate: currency !== 'DOP' ? conversionRate : undefined,
-      taxesTemplate: taxesTemplate || undefined,
+      taxesTemplate: undefined,
       branch: branch || undefined,
       department: usaDepartamentos ? (department || undefined) : undefined,
       items: mergeIdenticalDimensionLines(items).filter((i) => i.itemCode).map((i) => ({
@@ -492,18 +480,6 @@ export default function OrdenForm() {
                     />
                   </div>
                 )}
-
-                <div className="ff-wrap">
-                  <label className="ff-label">Impuesto del Documento</label>
-                  <SearchSelect
-                    value={taxesTemplate}
-                    onChange={setTaxesTemplate}
-                    options={taxesTemplateOptions}
-                    onSearch={setTaxesTemplateSearch}
-                    selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
-                    placeholder="Usar default del proveedor/compañía"
-                  />
-                </div>
 
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal</label>

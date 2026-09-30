@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, Fragment } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueries, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createInvoice, updateInvoice, getInvoice } from '@/shared/api/invoices'
 import { usePermissionsStore } from '@/stores/permissions.store'
@@ -16,10 +16,11 @@ import { esCoberturaCompleta } from '@/shared/api/types'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
-import { listImpuestosVentas, listAlmacenes, getCatalogosFiscales, getStockSettings, getFacturacionConfig } from '@/shared/api/config'
+import { listAlmacenes, getCatalogosFiscales, getStockSettings, getFacturacionConfig } from '@/shared/api/config'
 import { getItemUbicaciones } from '@/shared/api/ubicaciones'
 import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
-import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
+import { DimensionAxisCell, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
+import { useDimensionesInventario } from '@/shared/hooks/useDimensionesInventario'
 import { mergeLineasIguales } from '@/shared/lib/mergeLineasIguales'
 import { getTasaVigente } from '@/shared/api/monedas'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
@@ -332,8 +333,6 @@ export default function InvoiceForm() {
   const [branchError, setBranchError] = useState(false)
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
   const [branchSearch, setBranchSearch] = useState('')
-  const [taxesTemplate, setTaxesTemplate] = useState('')
-  const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
   // '' = automático (Cliente.defaultCurrency → moneda base). Al editar (PATCH), se hidrata con
   // la moneda/tasa que la factura ya tenía — reenviarla es equivalente a omitirla.
@@ -370,13 +369,10 @@ export default function InvoiceForm() {
     staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
-  const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
   // ── Multimoneda (docs/tasks/64_multimoneda_completo.md §3.1) ──────────────
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
   const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
-  /** Una factura con cobertura ARS no puede llevar impuestos (§3.7): se oculta el selector. */
-  const mostrarImpuestoDocumento = usaImpuestoDocumento && !(esFarmacia && arsEnabled)
   // Candados "Permitir Modificar Precio Libremente" (servicios/productos por separado) — con
   // el toggle correspondiente apagado, el precio de la línea debe ser exactamente uno de los
   // precios de catálogo (A/B/C). El input ya es de solo lectura salvo edición manual habilitada
@@ -518,19 +514,6 @@ export default function InvoiceForm() {
     const q = ncfTypeSearch.toLowerCase()
     return (catalogos?.ncfTypes ?? []).filter((t) => !q || t.label.toLowerCase().includes(q))
   }, [catalogos, ncfTypeSearch])
-
-  // ── Impuesto del documento (Sales Taxes and Charges Template) ────────────
-  const { data: taxesTemplates } = useQuery({
-    queryKey: ['impuestos-ventas'],
-    queryFn: listImpuestosVentas,
-    staleTime: 5 * 60_000,
-  })
-  const taxesTemplateOptions: SearchSelectOption[] = useMemo(() => {
-    const q = taxesTemplateSearch.toLowerCase()
-    return (taxesTemplates ?? [])
-      .filter((t) => !q || t.title.toLowerCase().includes(q))
-      .map((t) => ({ value: String(t.id), label: t.title }))
-  }, [taxesTemplates, taxesTemplateSearch])
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
@@ -883,7 +866,6 @@ export default function InvoiceForm() {
     notes,
     branch,
     department,
-    taxesTemplate,
     arsEnabled,
     ars,
     currency,
@@ -916,8 +898,6 @@ export default function InvoiceForm() {
       setArsEnabled(true)
       setArs(aseguradoraFormFromInvoice(inv.aseguradora))
     }
-    // El impuesto del documento (taxesTemplate) no viene en GET /invoices/:id; si se deja sin tocar
-    // el PATCH reusa el default de la compañía. El usuario puede re-seleccionarlo si aplica.
   }, [isEdit, editingInvoice])
 
   // Fase 2: líneas. Espera a tener los almacenes de la sucursal cargados para que el efecto que
@@ -1301,21 +1281,42 @@ export default function InvoiceForm() {
 
   // ── Cobertura ARS: armado del payload (§3.2/§3.3) ─────────────────────────
   const arsActiva = esFarmacia && arsEnabled
-  /** 11 columnas base + las 5 de cobertura ARS — para los `colSpan` de las filas especiales. */
-  const columnCount = (arsActiva ? 17 : 12) - (almacenVentaSucursal ? 1 : 0)
+
+  // ── Columnas condicionales de la tabla de líneas ──────────────────────────
+  // Código: ancho según el código más largo presente, para no reservar espacio de más por
+  // defecto ni depender de que el usuario lo redimensione a mano.
+  const codigoAutoWidth = Math.min(160, Math.max(60, Math.max(0, ...items.map((i) => i.itemCode?.length ?? 0)) * 7.5 + 28))
+
+  // Dimensión: una columna por cada eje que declare AL MENOS un artículo de la factura (no todas
+  // las dimensiones del catálogo del tenant), a la derecha de "Artículo".
+  const dimensionCodes = Array.from(new Set(items.flatMap((i) => i._itemDimensiones?.map((d) => d.dimension) ?? [])))
+  const { etiquetaDe: dimensionEtiquetaDe } = useDimensionesInventario()
+
+  // Ubicación: solo si algún artículo tiene más de una ubicación asignada en su almacén — con 0 o
+  // 1 no hay nada real que elegir (mismo criterio que `LineUbicacionCell` para ocultar la celda).
+  const ubicacionQueries = useQueries({
+    queries: items.map((i) => ({
+      queryKey: ['item-ubicaciones', i.itemCode, i.warehouse],
+      queryFn: () => getItemUbicaciones(i.itemCode, i.warehouse!),
+      enabled: !!i.itemCode && !!i.warehouse,
+    })),
+  })
+  const showUbicacionColumn = ubicacionQueries.some((q) => (q.data?.items?.length ?? 0) > 1)
+
+  // Descuento: solo si algún artículo agregado acepta descuento.
+  const showDescuentoColumn = items.some((i) => i.itemCode && i.allowsDiscount !== false)
 
   const itemsColumnDefs: { key: string; width: number }[] = [
-    { key: 'codigo', width: 100 },
     { key: 'articulo', width: 220 },
+    ...dimensionCodes.map((code) => ({ key: `dim:${code}`, width: 140 })),
     { key: 'cant', width: 80 },
     { key: 'udm', width: 100 },
     { key: 'precio', width: 120 },
-    { key: 'descuento', width: 140 },
+    ...(showDescuentoColumn ? [{ key: 'descuento', width: 140 }] : []),
     { key: 'itbis', width: 80 },
     { key: 'subtotal', width: 120 },
     ...(!almacenVentaSucursal ? [{ key: 'almacen', width: 160 }] : []),
-    { key: 'ubicacion', width: 140 },
-    { key: 'combination', width: 160 },
+    ...(showUbicacionColumn ? [{ key: 'ubicacion', width: 140 }] : []),
     ...(arsActiva ? [
       { key: 'pctTeorico', width: 100 },
       { key: 'coberturaArs', width: 130 },
@@ -1326,6 +1327,9 @@ export default function InvoiceForm() {
     { key: 'actions', width: 70 },
   ]
   const { widths: colWidths, startResize } = useResizableColumns(itemsColumnDefs)
+  /** Columnas totales visibles, incluyendo "Código" (que se maneja aparte por su ancho
+   *  automático) — para los `colSpan` de las filas especiales de la tabla. */
+  const columnCount = itemsColumnDefs.length + 1
 
   /**
    * Campos ARS de una línea. Solo se envían si el usuario realmente los tocó: si NINGUNA línea
@@ -1494,7 +1498,7 @@ persistInvoice(buildInvoiceDto())
       ncfType,
       items: itemsDto,
       notes: notes || undefined,
-      taxesTemplate: mostrarImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+      taxesTemplate: undefined,
       currency: currency || undefined,
       conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
       despachoFuturo: mostrarSelectorDespachoFuturo ? despachoFuturo : undefined,
@@ -1746,35 +1750,6 @@ persistInvoice(buildInvoiceDto())
                 </div>
               )}
 
-              {usaImpuestoDocumento && !mostrarImpuestoDocumento && (
-                <div className="ff-wrap">
-                  <label className="ff-label">
-                    Impuesto del Documento
-                    <FieldTooltip>
-                      No aplica: una factura con cobertura ARS no puede llevar impuestos (Ley 253-12).
-                      Los medicamentos deben estar configurados como exentos de ITBIS en el catálogo.
-                    </FieldTooltip>
-                  </label>
-                </div>
-              )}
-              {mostrarImpuestoDocumento && (
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="taxesTemplate">
-                    Impuesto del Documento
-                    <FieldTooltip>Impuesto aplicado al total de la factura (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</FieldTooltip>
-                  </label>
-                  <SearchSelect
-                    id="taxesTemplate"
-                    value={taxesTemplate}
-                    onChange={(val) => setTaxesTemplate(val)}
-                    options={taxesTemplateOptions}
-                    onSearch={setTaxesTemplateSearch}
-                    selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
-                    placeholder="Usar el default de la compañía"
-                    className="ff-select"
-                  />
-                </div>
-              )}
             </div>
 
             {semaforo?.semaforo === 'rojo' && (
@@ -1813,26 +1788,26 @@ persistInvoice(buildInvoiceDto())
             </div>
           )}
           <div className="items-table-wrap">
-            {algunBloqueoPrecio && (
-              <div className="inline-alert inline-alert-info" style={{ margin: 12, marginBottom: 0 }}>
-                <Lock size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
-                <span>Edición manual de precio deshabilitada para {tiposPrecioBloqueados} — esas líneas se venden a su precio de catálogo (A/B/C).</span>
-              </div>
-            )}
             <table className="items-table navy-table items-table-resizable">
               <colgroup>
+                <col style={{ width: codigoAutoWidth }} />
                 {itemsColumnDefs.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
               </colgroup>
               <thead>
                 <tr>
                   <th>
                     Código
-                    <span className="col-resize-handle" onMouseDown={startResize('codigo')} />
                   </th>
                   <th>
                     Artículo
                     <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
                   </th>
+                  {dimensionCodes.map((code) => (
+                    <th key={code}>
+                      {dimensionEtiquetaDe(code)}
+                      <span className="col-resize-handle" onMouseDown={startResize(`dim:${code}`)} />
+                    </th>
+                  ))}
                   <th style={{ textAlign: 'right' }}>
                     Cant.
                     <span className="col-resize-handle" onMouseDown={startResize('cant')} />
@@ -1848,11 +1823,13 @@ persistInvoice(buildInvoiceDto())
                     )}
                     <span className="col-resize-handle" onMouseDown={startResize('precio')} />
                   </th>
-                  <th style={{ textAlign: 'right' }}>
-                  Descuento
-                  <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} />
-                  <span className="col-resize-handle" onMouseDown={startResize('descuento')} />
-                </th>
+                  {showDescuentoColumn && (
+                    <th style={{ textAlign: 'right' }}>
+                      Descuento
+                      <Info size={11} style={{ marginLeft: 2, verticalAlign: 'middle', color: 'var(--text-tertiary)' }} />
+                      <span className="col-resize-handle" onMouseDown={startResize('descuento')} />
+                    </th>
+                  )}
                   <th style={{ textAlign: 'right' }}>
                     ITBIS
                     <span className="col-resize-handle" onMouseDown={startResize('itbis')} />
@@ -1867,14 +1844,12 @@ persistInvoice(buildInvoiceDto())
                       <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
                     </th>
                   )}
-                  <th>
-                    Ubicación
-                    <span className="col-resize-handle" onMouseDown={startResize('ubicacion')} />
-                  </th>
-                  <th>
-                    Dimensión
-                    <span className="col-resize-handle" onMouseDown={startResize('combination')} />
-                  </th>
+                  {showUbicacionColumn && (
+                    <th>
+                      Ubicación
+                      <span className="col-resize-handle" onMouseDown={startResize('ubicacion')} />
+                    </th>
+                  )}
                   {arsActiva && (
                     <>
                       <th style={{ textAlign: 'right' }} title="Peso de esta línea en el reparto automático de la cobertura. Vacío en todas = partes iguales.">
@@ -1938,6 +1913,31 @@ persistInvoice(buildInvoiceDto())
                           onQueryChange={esFarmacia ? setBusquedaAsistidaQuery : undefined}
                         />
                       </td>
+
+                      {/* Dimensión — una celda por eje declarado por ALGÚN artículo de la factura
+                          (§0/§5/§7.1/§10); vacía si este artículo no declara ese eje. */}
+                      {dimensionCodes.map((code) => (
+                        <td key={code}>
+                          {item.itemCode && item._usaDimensiones && item._itemDimensiones?.some((d) => d.dimension === code) ? (
+                            <>
+                              <DimensionAxisCell
+                                itemDimensiones={item._itemDimensiones}
+                                codigo={code}
+                                value={item.dimensiones ?? {}}
+                                onChange={(next) => updateItem(index, { dimensiones: next, _dimensionesPendientesReseleccion: undefined })}
+                              />
+                              {item._dimensionesPendientesReseleccion && code === dimensionCodes.find((c) => item._itemDimensiones?.some((d) => d.dimension === c)) && (
+                                <span style={{ fontSize: 11, color: 'var(--color-warning)', display: 'block', whiteSpace: 'normal', maxWidth: 160 }}>
+                                  Vuelva a seleccionar la dimensión antes de guardar
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                          )}
+                        </td>
+                      ))}
+
                       <td>
                         {(() => {
                           const stockError = validateLineStock(item, stockMap)
@@ -1996,6 +1996,7 @@ persistInvoice(buildInvoiceDto())
                           style={{ textAlign: 'right' }}
                         />
                       </td>
+                       {showDescuentoColumn && (
                        <td>
                          {(() => {
                            const autoPct = item.autoDiscountPct ?? 0
@@ -2082,6 +2083,7 @@ persistInvoice(buildInvoiceDto())
                            )
                          })()}
                        </td>
+                       )}
                       <td style={{ textAlign: 'right' }}>
                         {item.salesTaxPct > 0 ? (
                           <span className="td-muted" style={{ fontSize: 12 }}>
@@ -2105,6 +2107,7 @@ persistInvoice(buildInvoiceDto())
                           />
                         </td>
                       )}
+                      {showUbicacionColumn && (
                       <td>
                         {item.itemCode && item.warehouse ? (
                           <LineUbicacionCell
@@ -2118,25 +2121,7 @@ persistInvoice(buildInvoiceDto())
                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
                         )}
                       </td>
-                      <td>
-                        {item.itemCode && item._usaDimensiones && item._itemDimensiones ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <CombinacionDimensionSelector
-                              itemDimensiones={item._itemDimensiones}
-                              value={item.dimensiones ?? {}}
-                              onChange={(next) => updateItem(index, { dimensiones: next, _dimensionesPendientesReseleccion: undefined })}
-                              compact
-                            />
-                            {item._dimensionesPendientesReseleccion && (
-                              <span style={{ fontSize: 11, color: 'var(--color-warning)', display: 'block', whiteSpace: 'normal', maxWidth: 160 }}>
-                                Esta línea usa dimensión de inventario — vuelva a seleccionarla antes de guardar
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
-                        )}
-                      </td>
+                      )}
                       {arsActiva && (
                         <>
                           <td>

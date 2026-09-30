@@ -621,6 +621,11 @@ export default function InvoiceDetail() {
    *  la factura responde 409/400. La única salida es una devolución (§3.8). */
   const arsFacturado = estadoArs === "Facturado";
   const puedeRecalcularCobertura = usePuede("ventas.factura.recalcular-cobertura");
+  /** Acceso a la cola de Caja/cobro — sin esto, un usuario que somete una factura con POS activo
+   *  no debe ser arrastrado a `/caja/por-cobrar` (esa ruta ya exige `caja.listar`, terminaría en
+   *  un 403/pantalla de acceso denegado). Se queda en esta pantalla; la factura igual quedó en
+   *  la cola en el servidor, solo que otro usuario con acceso a Caja la cobrará después. */
+  const puedeAccederCaja = usePuede("caja.listar", "caja.cobrar");
 
   const ITEMS_COLUMNS = [
     { key: "codigo", width: 110 },
@@ -758,10 +763,16 @@ export default function InvoiceDetail() {
       setDirectoMop("");
       setDirectoAmount("");
 
-      // Nuevo flujo POS: la factura va a "por cobrar" sin NCF — redirigir a Caja
+      // Nuevo flujo POS: la factura va a "por cobrar" sin NCF — redirigir a Caja. Si el usuario
+      // no tiene acceso a Caja, se queda en esta pantalla (la factura ya quedó en la cola en el
+      // servidor de todos modos; alguien con permiso la cobrará después).
       if ("status" in updated && updated.status === "pendiente_cobro") {
-        toast.success(updated.message);
-        navigate(`/caja/por-cobrar?invoiceId=${updated.invoiceId}`);
+        if (puedeAccederCaja) {
+          toast.success(updated.message);
+          navigate(`/caja/por-cobrar?invoiceId=${updated.invoiceId}`);
+        } else {
+          toast.success("Factura sometida — pendiente de cobro en Caja.");
+        }
         return;
       }
 

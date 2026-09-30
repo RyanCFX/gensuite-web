@@ -7,7 +7,7 @@ import { useTabs } from '@/contexts/TabsContext'
 import { createCompra, updateCompra, getCompra } from '@/shared/api/compras-gastos'
 import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listAlmacenes, listImpuestosCompras, getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
+import { listAlmacenes, getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
 import { listMonedas, getTasaVigente } from '@/shared/api/monedas'
 import type { MonedaCode } from '@/shared/api/types'
 import { listRetenciones } from '@/shared/api/retenciones'
@@ -828,17 +828,6 @@ export default function CompraForm() {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
   }, [myBranches])
 
-  // ── Impuesto del documento (Purchase Taxes and Charges Template) ────────
-  const { data: taxesTemplates } = useQuery({
-    queryKey: ['impuestos-compras'],
-    queryFn: listImpuestosCompras,
-    staleTime: 5 * 60_000,
-  })
-  const impuestosOptions: MultiSearchSelectOption[] = useMemo(
-    () => (taxesTemplates ?? []).map((t) => ({ id: String(t.id), label: t.title })),
-    [taxesTemplates],
-  )
-
   // ── Catálogos de retenciones (multiselect) ─────────────────────────────────
   const { data: retencionesData } = useQuery({
     queryKey: ['retenciones-all'],
@@ -893,17 +882,6 @@ export default function CompraForm() {
       ? `Los retenciones por defecto del proveedor${
           retencionesDefaultHint.length > 0 ? `: ${retencionesDefaultHint
             .map((d) => `${retencionLabelMap.get(d.id) ?? d.id} (${d.tasa}%)`)
-            .join(', ')}` : ''
-        }.`
-      : null
-
-  // Igual que arriba, pero para impuestos (taxesTemplate / impuestoComprasDefault del proveedor).
-  const impuestoComprasDefaultHint = supplierDetail?.impuestoComprasDefault ?? []
-  const pendingImpuestosHint =
-    taxesTemplate.length === 0 && impuestoComprasDefaultHint.length > 0
-      ? `Los impuestos por defecto del proveedor${
-          impuestoComprasDefaultHint.length > 0 ? `: ${impuestoComprasDefaultHint
-            .map((d) => `${impuestosOptions.find((o) => o.id === d.id)?.label ?? d.id} (${d.tasa}%)`)
             .join(', ')}` : ''
         }.`
       : null
@@ -1598,25 +1576,6 @@ export default function CompraForm() {
               </div>
             )}
             <div className="form-row form-row-3" style={{ borderTop: '1px solid var(--border-subtle)', marginTop: 16, paddingTop: 16 }}>
-              {usaImpuestoDocumento && (
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="taxesTemplate">
-                    Impuesto del Documento
-                    <FieldTooltip>Si no eliges ninguno, se usa el template por defecto del proveedor o de la compañía.</FieldTooltip>
-                  </label>
-                  <MultiSearchSelect
-                    id="taxesTemplate"
-                    value={taxesTemplate}
-                    onChange={setTaxesTemplate}
-                    options={impuestosOptions}
-                    placeholder="Buscar plantilla…"
-                    emptyLabel="No hay plantillas configuradas."
-                    disabled={isReturn}
-                  />
-                  {pendingImpuestosHint && <p className="ff-hint">{pendingImpuestosHint}</p>}
-                </div>
-              )}
-
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="retenciones">
                   Retenciones

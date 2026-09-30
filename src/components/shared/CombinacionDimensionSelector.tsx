@@ -169,3 +169,58 @@ export function useCombinacionResumen(itemDimensiones: ItemDimensionDeclarada[],
     .filter(Boolean)
     .join(' / ')
 }
+
+/**
+ * Selector de una sola dimensión, para tablas que muestran una columna por dimensión en vez de
+ * una sola columna "Dimensión" con todos los selectores juntos (ej. Facturación). Recibe el mismo
+ * `itemDimensiones`/`value`/`onChange` que `CombinacionDimensionSelector` — la cascada padre/hijo
+ * (§3.6) se resuelve igual, solo que cada eje se renderiza en su propia celda. `null` si el
+ * artículo de esta línea no declara la dimensión `codigo` (la celda queda vacía).
+ */
+export function DimensionAxisCell({
+  itemDimensiones,
+  codigo,
+  value,
+  onChange,
+  disabled,
+}: {
+  itemDimensiones: ItemDimensionDeclarada[]
+  codigo: string
+  value: DimensionesLinea
+  onChange: (value: DimensionesLinea) => void
+  disabled?: boolean
+}) {
+  const { porCodigo, etiquetaDe } = useDimensionesInventario()
+  const d = itemDimensiones.find((x) => x.dimension === codigo)
+  if (!d) return null
+
+  const catalogo = porCodigo.get(d.dimension)
+  const padreCodigo = catalogo?.dimensionPadre
+
+  function handleChange(nuevoValor: string) {
+    const next = { ...value }
+    if (nuevoValor) next[codigo] = nuevoValor
+    else delete next[codigo]
+    // Igual que en CombinacionDimensionSelector: cambiar una dimensión padre limpia sus hijas
+    // declaradas por el artículo, para no dejar una combinación huérfana (§3.6).
+    for (const dd of itemDimensiones) {
+      const hijoCatalogo = porCodigo.get(dd.dimension)
+      if (hijoCatalogo?.dimensionPadre === codigo) delete next[dd.dimension]
+    }
+    onChange(next)
+  }
+
+  return (
+    <DimensionValueSelect
+      codigo={d.dimension}
+      etiqueta={etiquetaDe(d.dimension)}
+      valoresPermitidos={d.valoresPermitidos}
+      dimensionPadre={padreCodigo}
+      valorPadreElegido={padreCodigo ? value[padreCodigo] : undefined}
+      value={value[d.dimension] ?? ''}
+      onChange={handleChange}
+      disabled={disabled}
+      compact
+    />
+  )
+}

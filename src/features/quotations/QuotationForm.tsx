@@ -7,7 +7,7 @@ import { useTabs } from '@/contexts/TabsContext'
 import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSource } from '@/shared/api/quotations'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getDefaultPriceTier } from '@/shared/api/catalog'
-import { listImpuestosVentas, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
+import { listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
 import type { CreateQuotationDto, ItemPrices, Bundle, Customer, MonedaCode } from '@/shared/api/types'
 import type { Item, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
@@ -184,8 +184,6 @@ export default function QuotationForm() {
   const [initialized, setInitialized] = useState(false)
   const [branch, setBranch] = useState('')
   const [branchSearch, setBranchSearch] = useState('')
-  const [taxesTemplate, setTaxesTemplate] = useState('')
-  const [taxesTemplateSearch, setTaxesTemplateSearch] = useState('')
   // '' = automático (Cliente.defaultCurrency → moneda base). Al editar, se hidrata con la
   // moneda/tasa existente — reenviarla es equivalente a omitirla (docs/tasks/64_multimoneda_completo.md §3.2).
   const [currency, setCurrency] = useState('')
@@ -196,7 +194,6 @@ export default function QuotationForm() {
     queryFn: getFacturacionConfig,
     staleTime: 5 * 60_000,
   })
-  const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
   // Candados "Permitir Modificar Precio Libremente" (servicios/productos por separado) — con el
   // toggle correspondiente apagado, el precio de la línea debe ser exactamente uno de los precios
   // de catálogo (A/B/C). Se decide por línea según el tipo de artículo; el 400 se maneja en
@@ -543,19 +540,6 @@ useEffect(() => {
     )
   }, [branchWarehouses])
 
-  // ── Impuesto del documento (Sales Taxes and Charges Template) ────────────
-  const { data: taxesTemplates } = useQuery({
-    queryKey: ['impuestos-ventas'],
-    queryFn: listImpuestosVentas,
-    staleTime: 5 * 60_000,
-  })
-  const taxesTemplateOptions: SearchSelectOption[] = useMemo(() => {
-    const q = taxesTemplateSearch.toLowerCase()
-    return (taxesTemplates ?? [])
-      .filter((t) => !q || t.title.toLowerCase().includes(q))
-      .map((t) => ({ value: String(t.id), label: t.title }))
-  }, [taxesTemplates, taxesTemplateSearch])
-
   const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
     value: c.id,
     label: c.customerName,
@@ -655,7 +639,7 @@ function buildDto(): CreateQuotationDto {
          dimensiones: i.dimensiones && Object.keys(i.dimensiones).length > 0 ? i.dimensiones : undefined,
        })),
        notes: notes || undefined,
-       taxesTemplate: usaImpuestoDocumento ? (taxesTemplate || undefined) : undefined,
+       taxesTemplate: undefined,
      }
    }
 
@@ -982,7 +966,6 @@ function buildDto(): CreateQuotationDto {
     items,
     notes,
     branch,
-    taxesTemplate,
     currency,
     conversionRate,
   }, isEdit || duplicateId ? initialized : true)
@@ -1258,23 +1241,6 @@ if (esClienteOcasional) {
                 />
               </div>
 
-              {usaImpuestoDocumento && (
-                <div className="ff-wrap">
-                  <label className="ff-label" htmlFor="taxesTemplate">
-                    Impuesto del Documento
-                    <FieldTooltip>Impuesto aplicado al total del documento (ej. ITBIS 18%). Si no eliges ninguno, se usa el template marcado como default, si existe.</FieldTooltip>
-                  </label>
-                  <SearchSelect
-                    id="taxesTemplate"
-                    value={taxesTemplate}
-                    onChange={(val) => setTaxesTemplate(val)}
-                    options={taxesTemplateOptions}
-                    onSearch={setTaxesTemplateSearch}
-                    selectedLabel={taxesTemplates?.find((t) => String(t.id) === taxesTemplate)?.title ?? ''}
-                    placeholder="Usar el default de la compañía"
-                  />
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -1282,12 +1248,6 @@ if (esClienteOcasional) {
         {/* ── Artículos ───────────────────────────────────────────────────── */}
         <div className="card">
           <div className="items-table-wrap">
-            {algunBloqueoPrecio && (
-              <div className="inline-alert inline-alert-info" style={{ margin: 12, marginBottom: 0 }}>
-                <Lock size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
-                <span>Edición manual de precio deshabilitada para {tiposPrecioBloqueados} — esas líneas se venden a su precio de catálogo (A/B/C).</span>
-              </div>
-            )}
             <table className="items-table navy-table items-table-resizable">
               <colgroup>
                 {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
