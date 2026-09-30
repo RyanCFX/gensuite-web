@@ -1,6 +1,6 @@
 import { client, unwrap } from './client'
 import { ENDPOINTS } from './endpoints'
-import type { RoleDetail, RolePerfil, CreateRoleDto, UpdateRoleDto } from './types'
+import type { RoleDetail, RolePerfil, CreateRoleDto, UpdateRoleDto, CreatePerfilDto, UpdatePerfilRolesDto } from './types'
 
 // CRUD de roles "admin" (detalle con usuarios asignados, crear/editar/eliminar).
 // El listado simple de nombres (`GET /roles` → string[]) sigue viviendo en
@@ -13,6 +13,29 @@ export async function getPerfiles(): Promise<RolePerfil[]> {
   // que el resto del front pueda seguir tipando `RolePerfil.name` sin sorpresas.
   const res = await client.get<{ success: true; data: { nombre: string; roles: string[]; rolesEs?: string[] }[] }>(ENDPOINTS.roles.perfiles)
   return unwrap(res).map(({ nombre, roles, rolesEs }) => ({ name: nombre, roles, rolesEs }))
+}
+
+export async function getPerfilDetail(name: string): Promise<RolePerfil> {
+  // El backend responde con la clave `nombre` — se normaliza a `name` igual que getPerfiles.
+  const res = await client.get<{ success: true; data: { nombre: string; roles: string[]; rolesEs?: string[] } }>(ENDPOINTS.roles.perfilByName(name))
+  const { nombre, roles, rolesEs } = unwrap(res)
+  return { name: nombre, roles, rolesEs }
+}
+
+export async function createPerfil(dto: CreatePerfilDto): Promise<RolePerfil> {
+  const res = await client.post<{ success: true; data: { nombre: string; roles: string[]; rolesEs?: string[] } }>(ENDPOINTS.roles.perfiles, dto)
+  const { nombre, roles, rolesEs } = unwrap(res)
+  return { name: nombre, roles, rolesEs }
+}
+
+export async function updatePerfilRoles(name: string, dto: UpdatePerfilRolesDto): Promise<RolePerfil> {
+  const res = await client.put<{ success: true; data: { nombre: string; roles: string[]; rolesEs?: string[] } }>(ENDPOINTS.roles.perfilByName(name), dto)
+  const { nombre, roles, rolesEs } = unwrap(res)
+  return { name: nombre, roles, rolesEs }
+}
+
+export async function deletePerfil(name: string) {
+  await client.delete(ENDPOINTS.roles.perfilByName(name))
 }
 
 export async function getRoleDetail(name: string): Promise<RoleDetail> {

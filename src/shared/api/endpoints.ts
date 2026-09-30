@@ -297,6 +297,7 @@ export const ENDPOINTS = {
     list: '/roles',
     // Debe ir declarado ANTES que byName para no interpretarse como el nombre de un rol.
     perfiles: '/roles/perfiles',
+    perfilByName: (name: string) => `/roles/perfiles/${encodeURIComponent(name)}`,
     byName: (name: string) => `/roles/${encodeURIComponent(name)}`,
   },
   permisos: {

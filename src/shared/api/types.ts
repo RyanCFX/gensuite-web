@@ -3806,6 +3806,17 @@ export interface RolePerfil {
   rolesEs?: string[];
 }
 
+/** POST /roles/perfiles — `roles` opcional, el perfil puede crearse vacío. */
+export interface CreatePerfilDto {
+  nombre: string;
+  roles?: string[];
+}
+
+/** PUT /roles/perfiles/:name — reemplazo TOTAL del array de roles, no aditivo. */
+export interface UpdatePerfilRolesDto {
+  roles: string[];
+}
+
 export interface RoleDetail {
   roleName: string;
   disabled: boolean;
