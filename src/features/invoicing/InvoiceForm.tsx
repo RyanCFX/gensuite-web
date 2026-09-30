@@ -504,8 +504,8 @@ export default function InvoiceForm() {
   }, [branchOptions, branchSearch])
 
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
+    queryKey: ['catalogos-fiscales', { type: 'venta' }],
+    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
     staleTime: 60 * 60_000,
   })
 
@@ -674,10 +674,14 @@ export default function InvoiceForm() {
   // docs/tasks/81 §5 — el `ncfTypeDefault` del cliente (si tiene) gana sobre la heurística
   // histórica (gobierno → B15, con RNC → B01, resto → B02). Es solo prellenado: el usuario
   // puede cambiarlo libremente después.
+  // docs/tasks/PROMPT_NCF_DEFAULT_REGIMENES_ESPECIALES_REDONDEO_FRONTEND.md §1.5 — orden de
+  // prioridad: `Customer.ncfTypeDefault` > `FacturacionConfig.ncfTipoVentaDefault` > heurística.
   useEffect(() => {
     if (!selectedCustomer || !customerTouchedRef.current) return
     if (selectedCustomer.ncfTypeDefault) {
       setNcfType(selectedCustomer.ncfTypeDefault)
+    } else if (facturacionConfig?.ncfTipoVentaDefault) {
+      setNcfType(facturacionConfig.ncfTipoVentaDefault)
     } else if (selectedCustomer.isGovernment) {
       setNcfType('B15')
     } else if (selectedCustomer.rnc) {
@@ -685,7 +689,7 @@ export default function InvoiceForm() {
     } else {
       setNcfType('B02')
     }
-  }, [selectedCustomer])
+  }, [selectedCustomer, facturacionConfig?.ncfTipoVentaDefault])
 
   // La búsqueda de clientes (list) puede no traer `ncfTypeDefault` — se enriquece con el
   // detalle completo para que el prellenado de arriba aplique igual en ese caso.
@@ -704,14 +708,20 @@ export default function InvoiceForm() {
   }, [customerId])
 
   // ── Auto-select NCF type for ocasional customers ────────────────────────
+  // docs/tasks/PROMPT_NCF_DEFAULT_REGIMENES_ESPECIALES_REDONDEO_FRONTEND.md §1.5 — el default
+  // del tenant (`ncfTipoVentaDefault`) gana sobre la heurística (con RNC → B01, resto → B02).
   useEffect(() => {
     if (!esClienteOcasional || !customerTouchedRef.current) return
+    if (facturacionConfig?.ncfTipoVentaDefault) {
+      setNcfType(facturacionConfig.ncfTipoVentaDefault)
+      return
+    }
     if (clienteOcasionalRnc.trim()) {
       setNcfType('B01')
     } else {
       setNcfType('B02')
     }
-  }, [esClienteOcasional, clienteOcasionalRnc])
+  }, [esClienteOcasional, clienteOcasionalRnc, facturacionConfig?.ncfTipoVentaDefault])
 
   // ── Sugerir cédula/teléfono del paciente en el panel de ARS a partir del cliente de
   // "Información General" (vertical farmacia, factura con seguro). Es solo una sugerencia — igual
@@ -811,6 +821,13 @@ export default function InvoiceForm() {
         return
       }
       if (tryResolveUbicacionAmbiguity(msg)) return
+      // docs/tasks/PROMPT_NCF_DEFAULT_REGIMENES_ESPECIALES_REDONDEO_FRONTEND.md §2.4 — tenant sin
+      // catálogo RD provisionado al someter B14/E44. No es un error del formulario: se muestra
+      // el mensaje del backend (ya invita a contactar soporte) con duración larga.
+      if (msg.includes('ITBIS Exento')) {
+        toast.error(msg || 'Tenant sin catálogo RD provisionado — contacte a soporte', { duration: 10000 })
+        return
+      }
       if (msg.toLowerCase().includes('ubicac')) {
         toast.error(msg || 'Error al crear la factura', {
           action: {
@@ -1275,7 +1292,14 @@ export default function InvoiceForm() {
   const subtotal = items.reduce((s, i) => s + i.amount, 0)
   const grossTotal = items.reduce((s, i) => s + i.qty * i.rate, 0)
   const totalDiscount = grossTotal - subtotal
-  const taxTotal = items.reduce((s, i) => s + (i.amount * i.salesTaxPct / 100), 0)
+  // docs/tasks/PROMPT_NCF_DEFAULT_REGIMENES_ESPECIALES_REDONDEO_FRONTEND.md §2 — B14/E44
+  // (Régimen Especial) se somete siempre sin ITBIS: el preview fuerza el impuesto a 0 para
+  // que coincida con lo que el backend va a someter. Al cambiar a otro NCF, el cálculo
+  // normal se restaura solo. Los impuestos configurados se siguen mandando tal cual (§2.2.3).
+  const esRegimenEspecial = ncfType === 'B14' || ncfType === 'E44'
+  const taxTotal = esRegimenEspecial
+    ? 0
+    : items.reduce((s, i) => s + (i.amount * i.salesTaxPct / 100), 0)
   const total = subtotal + taxTotal
 
   // ── Cobertura ARS: armado del payload (§3.2/§3.3) ─────────────────────────
@@ -1703,12 +1727,18 @@ persistInvoice(buildInvoiceDto())
                      B01 requiere RNC del cliente
                    </p>
                  )}
-                 {ncfType === 'B01' && esClienteOcasional && (
-                   <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
-                     B01 requiere RNC del cliente ocasional
-                   </p>
-                 )}
-               </div>
+                  {ncfType === 'B01' && esClienteOcasional && (
+                    <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
+                      B01 requiere RNC del cliente ocasional
+                    </p>
+                  )}
+                  {(ncfType === 'B14' || ncfType === 'E44') && (
+                    <p className="ff-hint" style={{ color: 'var(--text-secondary)' }}>
+                      Este tipo de comprobante (Régimen Especial de Tributación) se emite siempre sin
+                      ITBIS — cualquier impuesto configurado se ignora.
+                    </p>
+                  )}
+                </div>
 
                {esClienteOcasional && (
                  <div className="ff-wrap">
@@ -2083,15 +2113,17 @@ persistInvoice(buildInvoiceDto())
                          })()}
                        </td>
                        )}
-                      <td style={{ textAlign: 'right' }}>
-                        {item.salesTaxPct > 0 ? (
-                          <span className="td-muted" style={{ fontSize: 12 }}>
-                            {item.salesTaxPct}%
-                          </span>
-                        ) : (
-                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
-                        )}
-                      </td>
+                       <td style={{ textAlign: 'right' }}>
+                         {esRegimenEspecial ? (
+                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                         ) : item.salesTaxPct > 0 ? (
+                           <span className="td-muted" style={{ fontSize: 12 }}>
+                             {item.salesTaxPct}%
+                           </span>
+                         ) : (
+                           <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                         )}
+                       </td>
                       <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.amount, currency || monedaBase, { trimZeros: true })}</td>
                       {!almacenVentaSucursal && (
                         <td>

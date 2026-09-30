@@ -129,7 +129,7 @@ export default function GastoForm() {
   const [proveedorOcasionalNombre, setProveedorOcasionalNombre] = useState('')
   const [proveedorOcasionalRnc, setProveedorOcasionalRnc] = useState('')
   const [supplierQuery, setSupplierQuery] = useState('')
-  const [postingDate, setPostingDate] = useState(new Date().toISOString().split('T')[0])
+  const [postingDate, setPostingDate] = useState(formatDateFns(new Date(), 'yyyy-MM-dd'))
   const [dueDate, setDueDate] = useState('')
   // Una vez que el usuario edita "Fecha Vencimiento" a mano dejamos de recalcularla
   // automáticamente al cambiar de proveedor.
@@ -324,8 +324,8 @@ export default function GastoForm() {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
+    queryKey: ['catalogos-fiscales', { type: 'compra' }],
+    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
     staleTime: 60 * 60_000,
   })
   const [tipoComprobanteSearch, setTipoComprobanteSearch] = useState('')

@@ -105,7 +105,7 @@ export default function DevolucionesPage() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
+    queryFn: () => getCatalogosFiscales(),
     staleTime: 60 * 60_000,
   })
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')

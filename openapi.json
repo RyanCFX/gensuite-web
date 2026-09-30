@@ -9530,7 +9530,7 @@
     },
     "/api/v1/config/catalogos-fiscales": {
       "get": {
-        "description": "Fuente única de verdad — lee las opciones reales de los Select de Sales Invoice/Purchase Invoice en ERPNext (respeta Property Setters). Reemplaza cualquier constante hardcodeada equivalente en el frontend. Si la facturación electrónica está habilitada en el tenant, `ncfTypes` devuelve los comprobantes electrónicos (E31, E32, …) que el tenant emite; si no, los tipos NCF físicos actuales — en ambos casos ordenados por el número del comprobante. El flag `facturacionElectronicaHabilitada` indica cuál de los dos se está devolviendo. `ncfTypesFisicos` siempre trae el catálogo físico (B0x) de venta — úsese solo para poblar el selector de tipo al crear una secuencia fiscal (`/config/ncf`), que siempre trabaja con NCF físico sin importar el estado de e-CF. `ncfTypesCompra` siempre incluye ambos mundos (B0x y su equivalente E0x).",
+        "description": "Fuente única de verdad — lee las opciones reales de los Select de Sales Invoice/Purchase Invoice en ERPNext (respeta Property Setters). Reemplaza cualquier constante hardcodeada equivalente en el frontend. Si la facturación electrónica está habilitada en el tenant, `ncfTypes` devuelve los comprobantes electrónicos (E31, E32, …) que el tenant emite; si no, los tipos NCF físicos actuales — en ambos casos ordenados por el número del comprobante. El flag `facturacionElectronicaHabilitada` indica cuál de los dos se está devolviendo. `ncfTypesFisicos` siempre trae el catálogo físico (B0x) de venta — úsese solo para poblar el selector de tipo al crear una secuencia fiscal (`/config/ncf`), que siempre trabaja con NCF físico sin importar el estado de e-CF. `ncfTypesCompra` siempre incluye ambos mundos (B0x y su equivalente E0x). Use `?type=venta` o `?type=compra` para pedir solo uno de los dos bloques — sin el parámetro, se devuelven ambos (comportamiento actual).",
         "operationId": "ConfigController_getCatalogosFiscales",
         "parameters": [
           {
@@ -9539,6 +9539,19 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Si se omite (default), la respuesta trae ambos bloques (venta y compra), igual que hoy — compatibilidad hacia atrás. \"venta\" devuelve solo ncfTypes/ncfTypesFisicos; \"compra\" devuelve solo ncfTypesCompra.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "venta",
+                "compra"
+              ]
             }
           }
         ],
@@ -37887,10 +37900,6 @@
             "example": 60.5,
             "description": "Tasa de cambio explícita (moneda de la factura → moneda de la compañía). Solo aplica si `currency` es distinta a la de la compañía. Si se omite, ERPNext la resuelve contra las tasas cargadas en /monedas/tasas — si no hay ninguna, la factura falla al crearse."
           },
-          "dueDate": {
-            "type": "string",
-            "description": "Fecha de vencimiento del pago. Default: la fecha de creación de la factura (hoy)."
-          },
           "ncfType": {
             "type": "string",
             "enum": [
@@ -38011,10 +38020,6 @@
             "type": "number",
             "example": 60.5,
             "description": "Tasa de cambio explícita (moneda de la factura → moneda de la compañía). Solo aplica si `currency` es distinta a la de la compañía. Si se omite, ERPNext la resuelve contra las tasas cargadas en /monedas/tasas — si no hay ninguna, la factura falla al crearse."
-          },
-          "dueDate": {
-            "type": "string",
-            "description": "Fecha de vencimiento del pago. Default: la fecha de creación de la factura (hoy)."
           },
           "ncfType": {
             "type": "string",
@@ -38504,6 +38509,10 @@
             "default": 50,
             "description": "Cuando a una Secuencia NCF le queden este número de comprobantes o menos: GET /config/ncf y GET /config/ncf/:id marcan esa serie con alertaActiva=true, y el disparador programado de notificaciones envía el correo configurado en el tipo \"facturacion_ncf_secuencia_baja\" (una sola vez por día por serie)."
           },
+          "ncfTipoVentaDefault": {
+            "type": "string",
+            "description": "Tipo de comprobante (NCF) que el frontend preselecciona al facturar a un cliente ocasional — valor sugerido, no restrictivo, el operador puede cambiarlo en cada venta. Mientras la facturación electrónica esté deshabilitada, debe ser un tipo físico (B0x); nunca un E0x (se rechaza con 400). Al habilitarse la facturación electrónica, este valor se migra automáticamente a su equivalente electrónico. Ver GET /config/catalogos-fiscales para las opciones vigentes."
+          },
           "requiereSerialLoteCompra": {
             "type": "boolean",
             "default": false,
@@ -38517,7 +38526,7 @@
           "redondeoTotalDeshabilitado": {
             "type": "boolean",
             "default": false,
-            "description": "Espejo de `Accounts Settings.disable_rounded_total` de ERPNext (setting global, no es un campo propio de Facturacion Config) — aplica como default a toda factura/compra nueva del tenant. Si está en false (default de ERPNext), el `grand_total` con centavos se redondea a `rounded_total` y es ESE monto redondeado el que queda como `outstanding_amount`/ `amountDue` a cobrar (ej. grand_total=168.57 → se cobra 169.00) — pensado para efectivo, que no maneja denominaciones fraccionarias en RD. Si se activa (true), ERPNext deja de redondear: se cobra el grand_total exacto, con centavos — más apropiado si el negocio solo cobra con tarjeta/cheque/transferencia. Cambiar esto NO afecta facturas ya sometidas, solo las que se sometan después."
+            "description": "Espejo de `Accounts Settings.disable_rounded_total` de ERPNext (setting global, no es un campo propio de Facturacion Config) — aplica como default a toda factura/compra nueva del tenant. Si está en false (default de ERPNext), el `grand_total` con centavos se redondea a `rounded_total` y es ESE monto redondeado el que queda como `outstanding_amount`/ `amountDue` a cobrar (ej. grand_total=168.57 → se cobra 169.00) — pensado para efectivo, que no maneja denominaciones fraccionarias en RD. Si se activa (true), ERPNext deja de redondear: se cobra el grand_total exacto, con centavos — más apropiado si el negocio solo cobra con tarjeta/cheque/transferencia. Cambiar esto NO afecta facturas ya sometidas, solo las que se sometan después. NOTA: si se activa (redondeo deshabilitado a la creación) y luego la factura se cobra 100% en efectivo (al someterla o vía POST /cobros), el BFF redondea el monto cobrado a .00 al momento del cobro usando un write-off nativo de ERPNext (Company.write_off_account) — sin alterar el total real de la factura. Con este toggle en false (default), ERPNext ya redondeó al crear y ese write-off normalmente no tiene nada que absorber."
           },
           "tasaFijaCxc": {
             "type": "boolean",

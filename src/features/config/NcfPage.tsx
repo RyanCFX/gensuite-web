@@ -12,7 +12,8 @@ import type { NcfSerie, CreateNcfSerieDto, UpdateNcfSerieDto } from '@/shared/ap
 type NcfType = CreateNcfSerieDto['ncfType']
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { formatDate } from '@/lib/formatters'
+import { addYears, format } from 'date-fns'
+import { formatDate, todayIso } from '@/lib/formatters'
 import {
   AlertTriangle, AlertCircle, Plus, Eye, Pencil,
   XCircle, RefreshCw, ChevronRight,
@@ -160,7 +161,7 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
+    queryFn: () => getCatalogosFiscales(),
     staleTime: 60 * 60_000,
   })
   const ncfTypeOptions = catalogos?.ncfTypesFisicos ?? []
@@ -179,10 +180,10 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   })
 
   const preview = formatNcfPreview(ncfType, start)
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIso()
   // La DGII suele emitir resoluciones con vigencia de hasta ~5 años — el calendario debe
   // permitir navegar hasta ese límite en vez de quedar atado al año en curso.
-  const maxExpiration = new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().slice(0, 10)
+  const maxExpiration = format(addYears(new Date(), 5), 'yyyy-MM-dd')
 
   const isDirty = useDirtyCheck({ ncfType, start, end, expiration }, true)
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
@@ -318,11 +319,11 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
   const [formError, setFormError] = useState('')
   // La DGII suele emitir resoluciones con vigencia de hasta ~5 años — el calendario debe
   // permitir navegar hasta ese límite en vez de quedar atado al año en curso.
-  const maxExpiration = new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().slice(0, 10)
+  const maxExpiration = format(addYears(new Date(), 5), 'yyyy-MM-dd')
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
+    queryFn: () => getCatalogosFiscales(),
     staleTime: 60 * 60_000,
   })
   const ncfTypeOptions = catalogos?.ncfTypesFisicos ?? []
@@ -493,7 +494,7 @@ function DetailDrawer({ serieId }: { serieId: number; onClose?: () => void }) {
   })
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
+    queryFn: () => getCatalogosFiscales(),
     staleTime: 60 * 60_000,
   })
 
@@ -759,7 +760,7 @@ export default function NcfPage() {
   })
 
   // ── Proactive alerts ───────────────────────────────────────────────────────
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIso()
   const lowAlerts = (series ?? []).filter((s) => s.alertaActiva)
 
   const expiredActive = (series ?? []).filter(

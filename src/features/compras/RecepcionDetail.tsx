@@ -70,7 +70,7 @@ export default function RecepcionDetail() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
+    queryFn: () => getCatalogosFiscales(),
     staleTime: 60 * 60_000,
   })
 

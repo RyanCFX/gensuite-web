@@ -95,7 +95,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
+    queryFn: () => getCatalogosFiscales(),
     staleTime: 60 * 60_000,
   })
   const [defaultTipoBienes606Search, setDefaultTipoBienes606Search] = useState('')

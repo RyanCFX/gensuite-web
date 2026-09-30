@@ -24,7 +24,7 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { esClienteEmisorNoEncontrado } from '@/lib/ecfErrors'
-import { formatDate, formatMoney } from '@/lib/formatters'
+import { formatDate, formatMoney, todayIso } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -157,7 +157,7 @@ export default function CreditNotesPage() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
+    queryFn: () => getCatalogosFiscales(),
     staleTime: 60 * 60_000,
   })
 
@@ -394,7 +394,7 @@ export default function CreditNotesPage() {
 
     const dto: CreateCreditNoteDto = {
       originalInvoice: selectedInvoice.id,
-      postingDate: new Date().toISOString().slice(0, 10),
+      postingDate: todayIso(),
       reason,
       items: noteItems.map((i) => ({
         itemCode: i.itemCode,

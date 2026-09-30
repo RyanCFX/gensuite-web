@@ -177,7 +177,7 @@ export default function RelacionDetail() {
 
   const { data: catalogosFiscales } = useQuery({
     queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
+    queryFn: () => getCatalogosFiscales(),
     staleTime: 60 * 60_000,
   })
   const [cfgTipoBienes606Search, setCfgTipoBienes606Search] = useState('')

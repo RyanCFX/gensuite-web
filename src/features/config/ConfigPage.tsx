@@ -29,6 +29,7 @@ import {
   actualizarDespachoFuturo,
   habilitarFarmacia,
   getEcfConfig, updateEcfConfig,
+  getCatalogosFiscales,
 } from '@/shared/api/config'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
@@ -2851,6 +2852,10 @@ function FacturacionConfigSection() {
    const { data: metodosPago } = useQuery({ queryKey: ['metodos-pago-config'], queryFn: listMetodosPago, staleTime: 5 * 60_000 })
    const { data: plantillasVentas } = useQuery({ queryKey: ['impuestos-ventas'], queryFn: listImpuestosVentas, staleTime: 5 * 60_000 })
    const { data: plantillasCompras } = useQuery({ queryKey: ['impuestos-compras'], queryFn: listImpuestosCompras, staleTime: 5 * 60_000 })
+  // docs/tasks/PROMPT_NCF_DEFAULT_REGIMENES_ESPECIALES_REDONDEO_FRONTEND.md §1 — catálogo de
+  // NCF de venta para el selector de "Tipo de Comprobante por Defecto" (mismo que usa Nueva
+  // Factura; ya viene filtrado a físicos o electrónicos según el tenant).
+  const { data: catalogosVenta } = useQuery({ queryKey: ['catalogos-fiscales', { type: 'venta' }], queryFn: () => getCatalogosFiscales({ type: 'venta' }), staleTime: 5 * 60_000 })
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [posWarehouseSearch, setPosWarehouseSearch] = useState('')
   const posWarehouseOptions: SearchSelectOption[] = (almacenes ?? [])
@@ -2896,7 +2901,11 @@ function FacturacionConfigSection() {
    const [formatoImpresionDefault, setFormatoImpresionDefault] = useState<FormatoImpresion>("a4")
    const [formatosPermitidos, setFormatosPermitidos] = useState<FormatoImpresion[]>(ALL_FORMATOS_IMPRESION)
     const [turnoMaxHoras, setTurnoMaxHoras] = useState(24)
-   const [ncfAlertaMinimo, setNcfAlertaMinimo] = useState(50)
+    const [ncfAlertaMinimo, setNcfAlertaMinimo] = useState(50)
+  // docs/tasks/PROMPT_NCF_DEFAULT_REGIMENES_ESPECIALES_REDONDEO_FRONTEND.md §1 — NCF sugerido
+  // al facturar a cliente ocasional. '' = sin sugerencia (se guarda como "" para quitarlo).
+  const [ncfTipoVentaDefault, setNcfTipoVentaDefault] = useState('')
+  const [ncfTipoVentaDefaultSearch, setNcfTipoVentaDefaultSearch] = useState('')
    const [modoPagoCaja, setModoPagoCaja] = useState<string | null>(null)
    const [modoPagoCajaUsd, setModoPagoCajaUsd] = useState<string | null>(null)
    const [modoPagoCajaEur, setModoPagoCajaEur] = useState<string | null>(null)
@@ -2935,6 +2944,7 @@ function FacturacionConfigSection() {
         setFormatosPermitidos(data.formatosPermitidos && data.formatosPermitidos.length > 0 ? data.formatosPermitidos : ALL_FORMATOS_IMPRESION)
         setTurnoMaxHoras(data.turnoMaxHoras ?? 24)
         setNcfAlertaMinimo(data.ncfAlertaMinimo ?? 50)
+        setNcfTipoVentaDefault(data.ncfTipoVentaDefault ?? '')
         setModoPagoCaja(data.modoPagoCaja ?? null)
         setModoPagoCajaUsd(data.modoPagoCajaUsd ?? null)
         setModoPagoCajaEur(data.modoPagoCajaEur ?? null)
@@ -3800,6 +3810,27 @@ function FacturacionConfigSection() {
 
         <div className="ff-wrap">
           <label className="ff-label">
+            Tipo de Comprobante por Defecto (ventas)
+            <FieldTooltip>
+              Se preselecciona automáticamente al facturar a un cliente ocasional (típicamente B02 -
+              Consumo). Es solo una sugerencia: el vendedor puede cambiarlo en cada venta. Dejarlo
+              vacío quita la sugerencia.
+            </FieldTooltip>
+          </label>
+          <SearchSelect
+            value={ncfTipoVentaDefault}
+            onChange={setNcfTipoVentaDefault}
+            options={(catalogosVenta?.ncfTypes ?? [])
+              .filter((t) => !ncfTipoVentaDefaultSearch || t.label.toLowerCase().includes(ncfTipoVentaDefaultSearch.toLowerCase()))
+              .map((t) => ({ value: t.value, label: t.label }))}
+            onSearch={setNcfTipoVentaDefaultSearch}
+            selectedLabel={(catalogosVenta?.ncfTypes ?? []).find((t) => t.value === ncfTipoVentaDefault)?.label ?? ''}
+            placeholder="Sin sugerencia"
+          />
+        </div>
+
+        <div className="ff-wrap">
+          <label className="ff-label">
             Mínimo de comprobantes para alertar
             <FieldTooltip>
               Cuando a una secuencia NCF le queden este número de comprobantes o menos, se marcará como "por agotarse"
@@ -3943,6 +3974,7 @@ function FacturacionConfigSection() {
                 formatosPermitidos,
                 turnoMaxHoras,
                 ncfAlertaMinimo,
+                ncfTipoVentaDefault: ncfTipoVentaDefault || '',
                 modoPagoCaja,
                 modoPagoCajaUsd,
                 modoPagoCajaEur,
@@ -4197,6 +4229,12 @@ function EcfConfigSection() {
       toast.success('Configuración de facturación electrónica actualizada')
       setCertRequiredMsg('')
       queryClient.invalidateQueries({ queryKey: ['ecf-config'] })
+      // docs/tasks/PROMPT_NCF_DEFAULT_REGIMENES_ESPECIALES_REDONDEO_FRONTEND.md §1.4 — al
+      // habilitar e-CF el backend migra ncfTipoVentaDefault a su equivalente electrónico:
+      // se refresca la config de facturación para mostrar el valor ya migrado.
+      if (!data?.habilitado && habilitado) {
+        queryClient.invalidateQueries({ queryKey: ['facturacion-config'] })
+      }
     },
     onError: (err: ApiError) => {
       if (err?.statusCode === 400 && /certificaci[oó]n/i.test(err.message ?? '')) {

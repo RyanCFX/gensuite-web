@@ -133,7 +133,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
   // mismas opciones/etiquetas que el selector de ncfType de facturas.
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
+    queryFn: () => getCatalogosFiscales(),
     staleTime: 60 * 60_000,
   })
   const [ncfDefaultSearch, setNcfDefaultSearch] = useState('')

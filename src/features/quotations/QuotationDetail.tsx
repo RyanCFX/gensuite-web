@@ -104,8 +104,8 @@ export default function QuotationDetail() {
   }, [relatedOpen])
 
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: getCatalogosFiscales,
+    queryKey: ['catalogos-fiscales', { type: 'venta' }],
+    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
     staleTime: 60 * 60_000,
   })
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
@@ -611,6 +611,12 @@ export default function QuotationDetail() {
               {quotation?.esClienteOcasional && selectedNcfType === 'B01' && !quotation.clienteOcasionalRnc && (
                 <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
                   Falta el RNC del comprador ocasional. Crédito Fiscal (B01) lo requiere — podrás completarlo en la factura recién creada antes de someterla.
+                </p>
+              )}
+              {(selectedNcfType === 'B14' || selectedNcfType === 'E44') && (
+                <p className="ff-hint" style={{ color: 'var(--text-secondary)' }}>
+                  Este tipo de comprobante (Régimen Especial de Tributación) se emite siempre sin
+                  ITBIS — cualquier impuesto de la cotización se ignora en la factura resultante.
                 </p>
               )}
             </div>

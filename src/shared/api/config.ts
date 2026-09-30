@@ -436,13 +436,21 @@ export interface CatalogoFiscalItem {
 export interface CatalogosFiscales {
   ncfTypes: CatalogoFiscalItem[]
   ncfTypesFisicos: CatalogoFiscalItem[]
-  ncfTypesCompra: CatalogoFiscalItem[]
+  /** Ausente cuando se pide con `?type=venta` (docs/tasks/
+   *  PROMPT_NCF_DEFAULT_REGIMENES_ESPECIALES_REDONDEO_FRONTEND.md §3). */
+  ncfTypesCompra?: CatalogoFiscalItem[]
   tipoBienes606: CatalogoFiscalItem[]
   formaPago606: CatalogoFiscalItem[]
+  /** El backend siempre lo devuelve, sin importar el valor de `type` (§3). */
+  facturacionElectronicaHabilitada?: boolean
 }
 
-export async function getCatalogosFiscales() {
-  const res = await client.get<{ success: true; data: CatalogosFiscales }>(ENDPOINTS.config.catalogosFiscales)
+export type CatalogosFiscalesType = 'venta' | 'compra'
+
+export async function getCatalogosFiscales(params?: { type?: CatalogosFiscalesType }) {
+  const res = await client.get<{ success: true; data: CatalogosFiscales }>(ENDPOINTS.config.catalogosFiscales, {
+    params: params?.type ? { type: params.type } : undefined,
+  })
   return unwrap(res)
 }
 

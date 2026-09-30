@@ -4007,6 +4007,11 @@ export interface FacturacionConfig {
   usaImpuestoDocumento?: boolean;
   /** Name de la plantilla dedicada de Sales Taxes and Charges Template (generada desde config/tasas-impuesto) marcada como default de ventas para la compañía. null para quitar el default. */
   plantillaImpuestoVentasDefault?: string | null;
+  /** Tipo de comprobante (NCF) que el frontend preselecciona al facturar a un cliente
+   *  ocasional — valor sugerido, no restrictivo (docs/tasks/
+   *  PROMPT_NCF_DEFAULT_REGIMENES_ESPECIALES_REDONDEO_FRONTEND.md §1). `null`/ausente =
+   *  sin sugerencia. Para quitarlo se manda `""` en el PUT. */
+  ncfTipoVentaDefault?: string | null;
   /** Name de la plantilla dedicada de Purchase Taxes and Charges Template (generada desde config/tasas-impuesto) marcada como default de compras para la compañía. null para quitar el default. */
   plantillaImpuestoComprasDefault?: string | null;
   /** true si el módulo POS (turnos de caja) está activo para este tenant. */
