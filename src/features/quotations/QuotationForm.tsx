@@ -7,7 +7,7 @@ import { useTabs } from '@/contexts/TabsContext'
 import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSource } from '@/shared/api/quotations'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getDefaultPriceTier } from '@/shared/api/catalog'
-import { listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
+import { listAlmacenes, getFacturacionConfig, getStockSettings } from '@/shared/api/config'
 import type { CreateQuotationDto, ItemPrices, Bundle, Customer, MonedaCode } from '@/shared/api/types'
 import type { Item, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
@@ -92,7 +92,10 @@ interface LineItem {
   itemDimensionesDeclaradas?: ItemDimensionDeclarada[]
 }
 
-function validateLineStock(row: LineItem): string | undefined {
+function validateLineStock(row: LineItem, allowNegativeStock?: boolean): string | undefined {
+  // Tenant con "Permitir stock negativo" activo (Stock Settings) — ERPNext deja cotizar por
+  // debajo de disponible, así que bloquear acá sería más estricto que el propio backend.
+  if (allowNegativeStock) return undefined
   if (!row.warehouse || !row._stockByWarehouse) return undefined
   const available = row._stockByWarehouse[row.warehouse] ?? 0
   if (row.qty > available) {
@@ -194,6 +197,11 @@ export default function QuotationForm() {
     queryFn: getFacturacionConfig,
     staleTime: 5 * 60_000,
   })
+  const { data: stockSettings } = useQuery({
+    queryKey: ['stock-settings'],
+    queryFn: getStockSettings,
+    staleTime: 5 * 60_000,
+  })
   // Candados "Permitir Modificar Precio Libremente" (servicios/productos por separado) — con el
   // toggle correspondiente apagado, el precio de la línea debe ser exactamente uno de los precios
   // de catálogo (A/B/C). Se decide por línea según el tipo de artículo; el 400 se maneja en
@@ -203,10 +211,6 @@ export default function QuotationForm() {
   const algunBloqueoPrecio = bloqueoPrecioServicios || bloqueoPrecioProductos
   const precioBloqueadoPara = (itemType: string | undefined) =>
     precioBloqueadoParaLinea(itemType, facturacionConfig ?? undefined)
-  const tiposPrecioBloqueados = [
-    ...(bloqueoPrecioServicios ? ['servicios'] : []),
-    ...(bloqueoPrecioProductos ? ['productos'] : []),
-  ].join(' y ')
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
   const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
@@ -534,7 +538,7 @@ useEffect(() => {
       prev.map((row) => {
         if (!row.itemCode || row.warehouse) return row
         const updated = { ...row, warehouse: onlyId }
-        updated.stockError = validateLineStock(updated)
+        updated.stockError = validateLineStock(updated, stockSettings?.allowNegativeStock)
         return updated
       }),
     )
@@ -743,7 +747,7 @@ function buildDto(): CreateQuotationDto {
             : calcAmount(updated.qty, updated.rate, updated.discountPct)
         }
         if ('qty' in patch || 'warehouse' in patch) {
-          updated.stockError = validateLineStock(updated)
+          updated.stockError = validateLineStock(updated, stockSettings?.allowNegativeStock)
         }
         return updated
       }),

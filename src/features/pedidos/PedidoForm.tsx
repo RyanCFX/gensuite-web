@@ -6,7 +6,7 @@ import { useTabs } from '@/contexts/TabsContext'
 import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from '@/shared/api/pedidos'
 import { listCustomers, getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
-import { getLayawayConfig, listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
+import { getLayawayConfig, listAlmacenes, getFacturacionConfig, getStockSettings } from '@/shared/api/config'
 import type { Item, ItemPrices, CreatePedidoDto, Bundle, Customer, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { mergeLineasIguales } from '@/shared/lib/mergeLineasIguales'
@@ -90,7 +90,10 @@ interface LineItem {
 // docs/tasks/73_alertas_stock_disponible_reservado.md §4.2. Esta es la única barrera real contra
 // prometer stock que ya está reservado para otro cliente (Apartado) o que simplemente no alcanza.
 // Compara siempre contra `disponible` (físico − reservado), nunca contra el físico a secas.
-function validateLineStock(row: LineItem, stockMap: Map<string, ItemStock>): string | undefined {
+function validateLineStock(row: LineItem, stockMap: Map<string, ItemStock>, allowNegativeStock?: boolean): string | undefined {
+  // Tenant con "Permitir stock negativo" activo (Stock Settings) — ERPNext deja vender por
+  // debajo de disponible, así que bloquear acá sería más estricto que el propio backend.
+  if (allowNegativeStock) return undefined
   if (!row.warehouse || !row.itemCode || row.itemType === 'service' || row.itemType === 'combo') return undefined
   const info = resolveDisponible(stockMap.get(row.itemCode), row.warehouse)
   if (!info) return undefined // stock del artículo aún no cargado — no bloquear con datos incompletos
@@ -185,6 +188,11 @@ const [customerId, setCustomerId] = useState('')
     staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
+  const { data: stockSettings } = useQuery({
+    queryKey: ['stock-settings'],
+    queryFn: getStockSettings,
+    staleTime: 5 * 60_000,
+  })
   // Candados "Permitir Modificar Precio Libremente" (servicios/productos por separado) — con el
   // toggle correspondiente apagado, el precio de la línea debe ser exactamente uno de los precios
   // de catálogo (A/B/C). Se decide por línea según el tipo de artículo; el 400 se maneja en
@@ -194,10 +202,6 @@ const [customerId, setCustomerId] = useState('')
   const algunBloqueoPrecio = bloqueoPrecioServicios || bloqueoPrecioProductos
   const precioBloqueadoPara = (itemType: string | undefined) =>
     precioBloqueadoParaLinea(itemType, facturacionConfig ?? undefined)
-  const tiposPrecioBloqueados = [
-    ...(bloqueoPrecioServicios ? ['servicios'] : []),
-    ...(bloqueoPrecioProductos ? ['productos'] : []),
-  ].join(' y ')
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
   const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
@@ -997,7 +1001,7 @@ try {
           toast.error(`Línea ${num}: el descuento supera el límite de ${effectiveLimit}%`)
           return
         }
-        const stockError = validateLineStock(item, stockMap)
+        const stockError = validateLineStock(item, stockMap, stockSettings?.allowNegativeStock)
         if (stockError && !despachoHabilitado) {
           toast.error(`Línea ${num}: ${stockError}`)
           return
@@ -1322,7 +1326,7 @@ try {
                       </td>
                       <td>
                         {(() => {
-                          const stockError = validateLineStock(item, stockMap)
+                          const stockError = validateLineStock(item, stockMap, stockSettings?.allowNegativeStock)
                           const info = item.itemCode && item.warehouse ? resolveDisponible(stockMap.get(item.itemCode), item.warehouse) : undefined
                           const invItem = item.itemCode && item.warehouse ? inventoryMap.get(`${item.itemCode}::${item.warehouse}`) : undefined
                           const enPedido = invItem?.reservedQty ?? 0

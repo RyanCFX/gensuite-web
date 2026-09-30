@@ -136,7 +136,10 @@ interface LineItem {
 // (docs/tasks/73_alertas_stock_disponible_reservado.md §4.2) — esta es la única barrera real
 // contra prometer stock que ya está reservado para otro cliente (Apartado) o que simplemente no
 // alcanza. Compara siempre contra `disponible` (físico − reservado), nunca contra el físico a secas.
-function validateLineStock(row: LineItem, stockMap: Map<string, ItemStock>): string | undefined {
+function validateLineStock(row: LineItem, stockMap: Map<string, ItemStock>, allowNegativeStock?: boolean): string | undefined {
+  // Tenant con "Permitir stock negativo" activo (Stock Settings) — ERPNext deja vender por
+  // debajo de disponible, así que bloquear acá sería más estricto que el propio backend.
+  if (allowNegativeStock) return undefined
   if (!row.warehouse || !row.itemCode || row.itemType === 'service' || row.itemType === 'combo') return undefined
   const info = resolveDisponible(stockMap.get(row.itemCode), row.warehouse)
   if (!info) return undefined // stock del artículo aún no cargado — no bloquear con datos incompletos
@@ -383,10 +386,6 @@ export default function InvoiceForm() {
   const algunBloqueoPrecio = bloqueoPrecioServicios || bloqueoPrecioProductos
   const precioBloqueadoPara = (itemType: string | undefined) =>
     precioBloqueadoParaLinea(itemType, facturacionConfig ?? undefined)
-  const tiposPrecioBloqueados = [
-    ...(bloqueoPrecioServicios ? ['servicios'] : []),
-    ...(bloqueoPrecioProductos ? ['productos'] : []),
-  ].join(' y ')
 
   // Búsqueda asistida de mostrador (vertical Farmacia) — docs/tasks/
   // PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §9. Sigue el texto tecleado en CUALQUIER fila del
@@ -1405,7 +1404,7 @@ if (esClienteOcasional) {
       // El chequeo real de stock físico al someter solo aplica a ventas inmediatas (§4.1 de
       // docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md) — una venta a futuro no descuenta
       // inventario al someterse, así que no tiene sentido bloquear la creación por esto acá.
-      const stockError = validateLineStock(item, stockMap)
+      const stockError = validateLineStock(item, stockMap, stockSettings?.allowNegativeStock)
       if (stockError && esInmediata) {
         toast.error(`Línea ${i + 1}: ${stockError}`)
         return
@@ -1940,7 +1939,7 @@ persistInvoice(buildInvoiceDto())
 
                       <td>
                         {(() => {
-                          const stockError = validateLineStock(item, stockMap)
+                          const stockError = validateLineStock(item, stockMap, stockSettings?.allowNegativeStock)
                           const info = item.itemCode && item.warehouse ? resolveDisponible(stockMap.get(item.itemCode), item.warehouse) : undefined
                           const invItem = item.itemCode && item.warehouse ? inventoryMap.get(`${item.itemCode}::${item.warehouse}`) : undefined
                           // "En pedido" es puramente informativo — nunca bloquea, no confundir con
