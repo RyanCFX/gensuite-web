@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createJournalEntry, submitJournalEntry } from '@/shared/api/journal-entry'
 import { getFacturacionConfig } from '@/shared/api/config'
+import { todayIso } from '@/lib/formatters'
 import type { CreateJournalEntryDto, JournalEntryLine, ItemProps } from '@/shared/api/types'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -57,7 +58,7 @@ export default function JournalForm() {
   const queryClient = useQueryClient()
   const { multiTab, activeId, closeTab } = useTabs()
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIso()
   const [postingDate, setPostingDate] = useState(today)
   const [remarks, setRemarks] = useState('')
   const [rows, setRows] = useState<EntryRow[]>(defaultRows)

@@ -20,7 +20,7 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { Save, X, Building2, FileText, Undo2, Check, AlertTriangle } from 'lucide-react'
-import { formatDOP, formatDate, daysSince } from '@/lib/formatters'
+import { formatDOP, formatDate, daysSince, todayIso } from '@/lib/formatters'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -127,7 +127,7 @@ export default function DevolucionForm() {
       sublabel: `${formatDate(c.postingDate)} — ${formatDOP(c.grandTotal)}`,
     }))
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIso()
   // Por índice de línea, no por itemCode — una compra puede tener dos líneas del mismo artículo
   // (p. ej. mismo producto a costos distintos), y ambas deben poder devolverse de forma
   // independiente en vez de compartir la misma cantidad tecleada.

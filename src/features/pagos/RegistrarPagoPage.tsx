@@ -14,7 +14,7 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { CheckCircle2, AlertTriangle, Wallet } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { formatDOP } from '@/lib/formatters'
+import { formatDOP, todayIso } from '@/lib/formatters'
 import { getUsuarioSucursales } from '@/shared/api/usuarios'
 import { listSucursales } from '@/shared/api/sucursales'
 import { getCachedUser } from '@/shared/api/storage'
@@ -59,7 +59,7 @@ export default function RegistrarPagoPage() {
   const referenceNoTocado = useRef(false)
   const [referenceDate, setReferenceDate] = useState('')
   const [remarks, setRemarks] = useState('')
-  const [postingDate, setPostingDate] = useState(new Date().toISOString().slice(0, 10))
+  const [postingDate, setPostingDate] = useState(todayIso())
   const [referencias, setReferencias] = useState<ReferenciaRow[]>([])
   const [manualRefs, setManualRefs] = useState<Record<string, number>>({})
   const [advancePayment, setAdvancePayment] = useState(false)

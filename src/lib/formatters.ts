@@ -1,6 +1,14 @@
 import { format, parseISO, differenceInCalendarDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 
+/** Fecha de hoy en `yyyy-MM-dd`, en la hora LOCAL del navegador — nunca usar
+ *  `new Date().toISOString().split('T')[0]` para esto: `toISOString()` convierte a UTC, así que
+ *  en cualquier zona horaria detrás de UTC (ej. RD, UTC-4) esto se adelanta un día entre la
+ *  medianoche local y la medianoche UTC (ej. 8pm local del 29 ya es 30 en UTC). */
+export function todayIso(): string {
+  return format(new Date(), 'yyyy-MM-dd')
+}
+
 export function formatDate(isoDate?: string | null): string {
   if (!isoDate) return '—'
   try {

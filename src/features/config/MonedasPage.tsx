@@ -27,6 +27,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { usePuede } from '@/shared/permissions/can'
+import { todayIso } from '@/lib/formatters'
 import { formatDate, formatNumber } from '@/lib/formatters'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
@@ -48,10 +49,6 @@ const TASAS_COLUMNS = [
 ]
 
 const MONEDA_OPTIONS: MonedaCode[] = ['DOP', 'USD', 'EUR']
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10)
-}
 
 // ─── Catálogo de monedas ────────────────────────────────────────────────────
 

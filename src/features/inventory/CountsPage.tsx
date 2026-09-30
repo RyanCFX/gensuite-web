@@ -6,7 +6,7 @@ import { listWarehouses } from '@/shared/api/inventory'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listAlmacenes } from '@/shared/api/config'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
-import { formatDate, formatNumber } from '@/lib/formatters'
+import { formatDate, formatNumber, todayIso } from '@/lib/formatters'
 import type { InventoryCount } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -170,7 +170,7 @@ export default function CountsPage() {
 
   function handleSaveDraft() {
     if (!selectedWarehouse) return
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayIso()
     createMutation.mutate({
       postingDate: today,                         // required by BFF
       branch: branch || undefined,

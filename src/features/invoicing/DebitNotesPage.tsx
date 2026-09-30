@@ -19,7 +19,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { Plus, Loader2, Trash2, Download, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
 import { esClienteEmisorNoEncontrado } from '@/lib/ecfErrors'
-import { formatDate, formatMoney } from '@/lib/formatters'
+import { formatDate, formatMoney, todayIso } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -285,7 +285,7 @@ export default function DebitNotesPage() {
 
     const dto: CreateDebitNoteDto = {
       customer: selectedInvoice.customer,
-      postingDate: new Date().toISOString().slice(0, 10),
+      postingDate: todayIso(),
       notes: reason || undefined,
       branch: branch || undefined,
       department: department || undefined,

@@ -43,7 +43,8 @@ import { listItems } from '@/shared/api/catalog'
 import { getFacturacionConfig, listAlmacenes } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { formatDate, formatDateTime, formatDOP, formatMoney } from '@/lib/formatters'
+import { format } from 'date-fns'
+import { formatDate, formatDateTime, formatDOP, formatMoney, todayIso } from '@/lib/formatters'
 import { BarChart3, AlertCircle, Download, FileText, Loader2, RefreshCw } from 'lucide-react'
 import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -153,8 +154,8 @@ const REPORT_META: Record<string, { label: string; description: string }> = {
 
 function thisYear() { return new Date().getFullYear() }
 function thisMonth() { return new Date().getMonth() + 1 }
-function today() { return new Date().toISOString().slice(0, 10) }
-function monthStart() { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10) }
+function today() { return todayIso() }
+function monthStart() { const d = new Date(); d.setDate(1); return format(d, 'yyyy-MM-dd') }
 
 type ApiError = { statusCode?: number; message?: string }
 

@@ -15,7 +15,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
-import { formatDate, formatDOP } from '@/lib/formatters'
+import { formatDate, formatDOP, todayIso } from '@/lib/formatters'
 import { Plus, ChevronLeft, ChevronRight, Search, Trash2 } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
@@ -53,10 +53,6 @@ interface FormValues {
   purchaseReceipts: { receiptDocumentType: ReceiptDocumentType; receiptDocument: string }[]
   taxes: { description: string; amount: number; expenseAccount: string }[]
   distributeChargesBasedOn: 'Qty' | 'Amount' | 'Distribute Manually'
-}
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
 }
 
 // Solo documentos sometidos tienen sentido para prorratear costos de importación.
@@ -134,7 +130,7 @@ function ReceiptDocumentCell({
 
 function defaultValues(): FormValues {
   return {
-    postingDate: todayISO(),
+    postingDate: todayIso(),
     purchaseReceipts: [{ receiptDocumentType: 'Purchase Receipt', receiptDocument: '' }],
     taxes: [{ description: '', amount: 0, expenseAccount: '' }],
     distributeChargesBasedOn: 'Amount',

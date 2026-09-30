@@ -9,13 +9,14 @@ import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { AlertTriangle, AlertCircle, Plus, Pencil, Trash2, Info, Ban } from 'lucide-react'
+import { addYears, format } from 'date-fns'
 import { getEcfConfig } from '@/shared/api/config'
 import {
   listEcfSequences, createEcfSequence, updateEcfSequence, deleteEcfSequence, voidEcfRanges,
 } from '@/shared/api/ecf'
 import type { EcfSequence, EcfTipoElectronico } from '@/shared/api/types'
 import { ECF_TIPOS, ECF_ENV_LABELS, ecfTipoLabel } from '@/lib/dgii'
-import { formatDate } from '@/lib/formatters'
+import { formatDate, todayIso } from '@/lib/formatters'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
@@ -82,8 +83,8 @@ function CreateModal({ company, onClose }: { company: string; onClose: () => voi
   const [expireAt, setExpireAt] = useState('')
   const [error, setError] = useState('')
 
-  const today = new Date().toISOString().slice(0, 10)
-  const maxExpire = new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().slice(0, 10)
+  const today = todayIso()
+  const maxExpire = format(addYears(new Date(), 5), 'yyyy-MM-dd')
 
   const isDirty = useDirtyCheck({ typeId, startOn, stopOn, expireAt }, true)
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
@@ -179,8 +180,8 @@ function EditModal({ company, seq, onClose }: { company: string; seq: EcfSequenc
   const [expireAt, setExpireAt] = useState(seq.expireAt ?? '')
   const [error, setError] = useState('')
 
-  const today = new Date().toISOString().slice(0, 10)
-  const maxExpire = new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().slice(0, 10)
+  const today = todayIso()
+  const maxExpire = format(addYears(new Date(), 5), 'yyyy-MM-dd')
 
   const isDirty = useDirtyCheck({ stopOn, expireAt }, true)
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
