@@ -97,10 +97,10 @@ function validateLineStock(row: LineItem, allowNegativeStock?: boolean): string 
   // debajo de disponible, así que bloquear acá sería más estricto que el propio backend.
   if (allowNegativeStock) return undefined
   if (!row.warehouse || !row._stockByWarehouse) return undefined
-  const available = row._stockByWarehouse[row.warehouse] ?? 0
-  if (row.qty > available) {
-    return `Stock insuficiente en ${row.warehouse}. Disponible: ${available}`
-  }
+  // const available = row._stockByWarehouse[row.warehouse] ?? 0
+  // if (row.qty > available) {
+  //   return `Stock insuficiente en ${row.warehouse}. Disponible: ${available}`
+  // }
   return undefined
 }
 
