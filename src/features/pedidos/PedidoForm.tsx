@@ -97,11 +97,11 @@ function validateLineStock(row: LineItem, stockMap: Map<string, ItemStock>, allo
   if (!row.warehouse || !row.itemCode || row.itemType === 'service' || row.itemType === 'combo') return undefined
   const info = resolveDisponible(stockMap.get(row.itemCode), row.warehouse)
   if (!info) return undefined // stock del artículo aún no cargado — no bloquear con datos incompletos
-  if (row.qty > info.disponible) {
-    return info.reservedStock > 0
-      ? `Solo hay ${info.disponible} disponibles de este artículo en ${row.warehouse} (${info.reservedStock} reservadas para otro cliente)`
-      : `Stock insuficiente en ${row.warehouse}. Disponible: ${info.disponible}`
-  }
+  // if (row.qty > info.disponible) {
+  //   return info.reservedStock > 0
+  //     ? `Solo hay ${info.disponible} disponibles de este artículo en ${row.warehouse} (${info.reservedStock} reservadas para otro cliente)`
+  //     : `Stock insuficiente en ${row.warehouse}. Disponible: ${info.disponible}`
+  // }
   return undefined
 }
 
