@@ -72,6 +72,41 @@ const WIDGETS_LISTA = new Set([
   'dashboard.actividad.pendientes',
 ])
 
+/** Widgets "grandes" que son gráficos (van en la fila `.dash-charts`, 2 columnas) — el resto de
+ *  los no-KPI son listas (van en `.dash-bottom-grid`, 3 columnas). Cada componente en widgets.tsx
+ *  ya se renderiza con la clase de grilla correcta (dash-chart-primary/secondary,
+ *  dash-col-products/activity/pending) — mismas clases que usaba el dashboard legacy
+ *  (LegacyDashboard.tsx), así que alcanza con agruparlos en el contenedor correcto. */
+const WIDGETS_CHART = new Set([
+  'dashboard.ventas.grafico',
+  'dashboard.finanzas.ingresos-gastos',
+])
+
+/** Orden fijo dentro de cada fila, igual al dashboard legacy — un tenant con el catálogo
+ *  "estándar" (los 8 KPI / 2 gráficos / 5 listas de arriba) queda idéntico a como se veía antes.
+ *  Cualquier key fuera de este mapa simplemente va al final, en el orden que la mande el catálogo. */
+const ORDEN_WIDGET: Record<string, number> = {
+  'dashboard.ventas.total': 0,
+  'dashboard.cobros.total': 1,
+  'dashboard.gastos.total': 2,
+  'dashboard.cxc.saldo': 3,
+  'dashboard.finanzas.utilidad': 4,
+  'dashboard.compras.total': 5,
+  'dashboard.gastos.mes': 6,
+  'dashboard.cobros.mes': 7,
+  'dashboard.ventas.grafico': 0,
+  'dashboard.finanzas.ingresos-gastos': 1,
+  'dashboard.ventas.top-productos': 0,
+  'dashboard.actividad.reciente': 1,
+  'dashboard.actividad.pendientes': 2,
+  'dashboard.ventas.top-clientes': 3,
+  'dashboard.inventario.bajo-minimo': 4,
+}
+
+function ordenar<T extends { key: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => (ORDEN_WIDGET[a.key] ?? 99) - (ORDEN_WIDGET[b.key] ?? 99))
+}
+
 function apiMessage(err: unknown, fallback: string): string {
   return (err as ApiError)?.message ?? fallback
 }
@@ -143,34 +178,16 @@ function WidgetCard({ widgetKey, titulo, period }: {
   return <Visual data={data.data} meta={data.meta} titulo={titulo} />
 }
 
-function TipoSection({ tipo, period }: { tipo: DashboardTipoReporte; period: DashboardPeriod }) {
-  const conocidos = tipo.reportes.filter((r) => WIDGETS[r.key])
+/** Reportes conocidos (con visual registrado) de todo el catálogo, sin importar el tipo/módulo al
+ *  que pertenezcan — el layout de la página es fijo (KPIs / gráficos / listas), no por módulo. */
+function reportesConocidos(catalogo: DashboardTipoReporte[]) {
+  const todos = catalogo.flatMap((tipo) => tipo.reportes)
   if (import.meta.env.DEV) {
-    for (const r of tipo.reportes) {
+    for (const r of todos) {
       if (!WIDGETS[r.key]) console.debug(`[dashboard] reporte sin visual: ${r.key} — se ignora`)
     }
   }
-  if (conocidos.length === 0) return null
-  const kpis = conocidos.filter((r) => WIDGETS_KPI.has(r.key))
-  const grandes = conocidos.filter((r) => !WIDGETS_KPI.has(r.key))
-  return (
-    <section aria-label={tipo.nombre} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div>
-        <h2 className="card-title-dash" style={{ margin: 0 }}>{tipo.nombre}</h2>
-        {tipo.descripcion && <p className="chart-subtitle" style={{ margin: '4px 0 0' }}>{tipo.descripcion}</p>}
-      </div>
-      {kpis.length > 0 && (
-        <div className="kpi-grid">
-          {kpis.map((r) => (
-            <WidgetCard key={r.key} widgetKey={r.key} titulo={r.nombre} period={period} />
-          ))}
-        </div>
-      )}
-      {grandes.map((r) => (
-        <WidgetCard key={r.key} widgetKey={r.key} titulo={r.nombre} period={period} />
-      ))}
-    </section>
-  )
+  return todos.filter((r) => WIDGETS[r.key])
 }
 
 export default function DashboardPage() {
@@ -221,7 +238,14 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-          <div className="dash-skeleton" style={{ width: '100%', height: 240 }} />
+          <div className="dash-charts">
+            <div className="dash-chart-primary">
+              <div className="dash-skeleton" style={{ width: '100%', height: 240 }} />
+            </div>
+            <div className="dash-chart-secondary">
+              <div className="dash-skeleton" style={{ width: '100%', height: 240 }} />
+            </div>
+          </div>
         </div>
       ) : isError ? (
         <div className="dash-empty">
@@ -234,16 +258,48 @@ export default function DashboardPage() {
           <div className="dash-empty-title">Sin reportes disponibles</div>
           <p className="dash-empty-sub">No tiene reportes disponibles en el dashboard. Pídale acceso a su administrador.</p>
         </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-          {(catalogo ?? []).map((tipo) => (
-            <TipoSection key={tipo.key} tipo={tipo} period={period} />
-          ))}
-          <p style={{ fontSize: 12, color: 'var(--dash-ink-400)' }}>
-            ¿Falta un reporte? <Link to="/reportes/ventas">Ver todos los reportes</Link>
-          </p>
-        </div>
-      )}
+      ) : (() => {
+        const conocidos = reportesConocidos(catalogo ?? [])
+        const kpis = ordenar(conocidos.filter((r) => WIDGETS_KPI.has(r.key)))
+        const charts = ordenar(conocidos.filter((r) => WIDGETS_CHART.has(r.key)))
+        const listas = ordenar(conocidos.filter((r) => !WIDGETS_KPI.has(r.key) && !WIDGETS_CHART.has(r.key)))
+        if (conocidos.length === 0) {
+          return (
+            <div className="dash-empty">
+              <div className="dash-empty-title">Sin reportes disponibles</div>
+              <p className="dash-empty-sub">No tiene reportes disponibles en el dashboard. Pídale acceso a su administrador.</p>
+            </div>
+          )
+        }
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {kpis.length > 0 && (
+              <div className="kpi-grid">
+                {kpis.map((r) => (
+                  <WidgetCard key={r.key} widgetKey={r.key} titulo={r.nombre} period={period} />
+                ))}
+              </div>
+            )}
+            {charts.length > 0 && (
+              <div className="dash-charts">
+                {charts.map((r) => (
+                  <WidgetCard key={r.key} widgetKey={r.key} titulo={r.nombre} period={period} />
+                ))}
+              </div>
+            )}
+            {listas.length > 0 && (
+              <div className="dash-bottom-grid">
+                {listas.map((r) => (
+                  <WidgetCard key={r.key} widgetKey={r.key} titulo={r.nombre} period={period} />
+                ))}
+              </div>
+            )}
+            <p style={{ fontSize: 12, color: 'var(--dash-ink-400)' }}>
+              ¿Falta un reporte? <Link to="/reportes/ventas">Ver todos los reportes</Link>
+            </p>
+          </div>
+        )
+      })()}
     </div>
   )
 }
