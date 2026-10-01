@@ -98,14 +98,22 @@ export default function ConversionDimensionForm() {
     .map((a) => ({ value: a.id, label: a.name }))
 
   // Stock sin combinación disponible en el almacén elegido (§7.3 paso 2) — campo `sinEspecificar`
-  // de stock-por-dimensión. Informativo: la autoridad real es el servidor (§7.5).
+  // de stock-por-dimensión. Informativo: la autoridad real es el servidor (§7.5). Se toma el máximo
+  // entre el campo y la suma de las filas con `valores` vacío: en el backend medido (2026-10-01) el
+  // campo viene en 0 y el stock sin-dimensión aparece como fila `{}` en `items` — con el máximo la
+  // UI muestra el valor correcto en ambos shapes, sin doble conteo si el servidor lo corrige.
   const { data: stockSinCombinacion } = useQuery({
     queryKey: ['stock-sin-combinacion', item?.id, warehouse],
     queryFn: () => getStockPorDimension(item!.id, { warehouse }),
     enabled: !!item && !!warehouse,
     staleTime: 30_000,
   })
-  const sinEspecificar = stockSinCombinacion?.data.sinEspecificar
+  const sinEspecificar = Math.max(
+    stockSinCombinacion?.data.sinEspecificar ?? 0,
+    (stockSinCombinacion?.data.items ?? [])
+      .filter((r) => Object.keys(r.valores ?? {}).length === 0)
+      .reduce((s, r) => s + (r.disponible ?? 0), 0),
+  )
 
   const itemDimensiones = item?.dimensiones ?? []
   const combinacionLista = combinacionCompleta(itemDimensiones, combinacion)
@@ -227,7 +235,7 @@ export default function ConversionDimensionForm() {
                   placeholder="Almacén"
                   disabled={!item}
                 />
-                {sinEspecificar !== undefined && (
+                {item && warehouse && (
                   <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
                     Stock disponible sin combinación en este almacén: {sinEspecificar} unidades
                   </span>
