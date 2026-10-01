@@ -60,6 +60,9 @@ interface ItemRow {
   dimensiones?: DimensionesLinea
   /** Dimensiones que el artículo de esta línea declara — ver misma nota en CompraForm.tsx. */
   itemDimensionesDeclaradas?: ItemDimensionDeclarada[]
+  /** `Item.permiteCompraSinDimension` del artículo (docs/tasks/PROMPT_CONVERSION_DIMENSION_FRONTEND.md
+   *  §4) — con esto activo, la combinación de esta línea es opcional al recibir. */
+  permiteCompraSinDimension?: boolean
 }
 
 function emptyItem(defaultWh?: string): ItemRow {
@@ -294,6 +297,11 @@ function SerialBatchRow({
               onChange={(v) => updateDimensiones(idx, v)}
               compact
             />
+          )}
+          {item.permiteCompraSinDimension && (item.itemDimensionesDeclaradas?.length ?? 0) > 0 && (
+            <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2 }}>
+              Combinación opcional al recibir — vacío entra sin dimensión
+            </span>
           )}
         </td>
         <td style={{ textAlign: 'center' }}>
@@ -654,7 +662,7 @@ export default function RecepcionForm() {
         const catalogItem = catalogItems[idx]
         const ri = receiptData.items[idx]
         return catalogItem?.usaDimensiones
-          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones, dimensiones: ri?.dimensiones ?? row.dimensiones }
+          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones, permiteCompraSinDimension: catalogItem.permiteCompraSinDimension ?? false, dimensiones: ri?.dimensiones ?? row.dimensiones }
           : row
       }))
     })
@@ -738,9 +746,10 @@ export default function RecepcionForm() {
   const conduceRequerido = esStandalone
   const [conduceError, setConduceError] = useState(false)
 
-  // Red de seguridad — ver misma nota en CompraForm.tsx.
+  // Red de seguridad — ver misma nota en CompraForm.tsx. Con `permiteCompraSinDimension` activo
+  // la línea puede ir sin combinación a propósito, así que no se avisa en ese caso.
   const lineasRequierenReingresoDimension = isEdit && items.some(
-    (i) => (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
+    (i) => !i.permiteCompraSinDimension && (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
   )
 
   function handleSubmit(e: React.FormEvent) {
@@ -843,6 +852,7 @@ export default function RecepcionForm() {
         batches: [],
         // Un artículo nuevo en la fila implica una combinación nueva.
         itemDimensionesDeclaradas: catalogItem.usaDimensiones ? catalogItem.dimensiones : undefined,
+        permiteCompraSinDimension: catalogItem.permiteCompraSinDimension ?? false,
         dimensiones: undefined,
       }
     }))
@@ -850,7 +860,7 @@ export default function RecepcionForm() {
 
   const clearCatalogItem = useCallback((idx: number) => {
     setItems((prev) => prev.map((row, i) =>
-      i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0, trackingType: 'none', serials: [], batches: [], itemDimensionesDeclaradas: undefined, dimensiones: undefined } : row,
+      i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0, trackingType: 'none', serials: [], batches: [], itemDimensionesDeclaradas: undefined, permiteCompraSinDimension: undefined, dimensiones: undefined } : row,
     ))
   }, [])
 
@@ -895,6 +905,7 @@ export default function RecepcionForm() {
         ordenCompra: line.ordenCompra,
         ordenCompraItem: line.ordenCompraItem,
         itemDimensionesDeclaradas: catalogItem?.usaDimensiones ? catalogItem.dimensiones : undefined,
+        permiteCompraSinDimension: catalogItem?.permiteCompraSinDimension ?? false,
       }
     }))
     setItems((prev) => [...prev, emptyItem(defaultWh)])

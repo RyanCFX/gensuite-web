@@ -1,4 +1,5 @@
-import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { usePermissionsStore } from '@/stores/permissions.store'
 import { useFeaturesStore } from '@/stores/features.store'
 import { SYSTEM_MANAGER_ROLE } from '@/shared/hooks/useIsSystemManager'
@@ -22,7 +23,29 @@ import ModuloNoContratadoPage from '@/features/_shared/ModuloNoContratadoPage'
  * 3. Meta-administración: por rol `System Manager`, no por acción (§15 permisos).
  * 4. Resto: si la acción de lectura mapeada es `false` → pantalla "sin acceso".
  * 5. Ruta sin entrada en ningún mapa: se deja pasar (fail-open) y se avisa en DEV.
+ *
+ * IMPORTANTE: nunca uses <Navigate> directo acá — este guard vive dentro del <KeepAlive> de
+ * AppLayout, que no desmonta de verdad las pantallas ya visitadas (solo las esconde). Un
+ * <Navigate> montado ahí queda "fantasma" vivo para siempre: `useLocation()` es contexto, así
+ * que sigue propagando incluso a un árbol "congelado", y el efecto interno de <Navigate>
+ * depende de la referencia de `useNavigate()` — que cambia en cada navegación futura a
+ * cualquier otra pantalla — así que se re-dispara el mismo redirect y secuestra la navegación
+ * hasta recargar la página. Usá `RedirectOnDenial` en su lugar: su efecto depende de `pathname`
+ * (que para un fantasma congelado nunca vuelve a cambiar), no de `navigate`. Los redirects de
+ * una sola vez para rutas fijas (/, /reportes, /config) viven en App.tsx fuera de AppLayout.
  */
+function RedirectOnDenial({ to }: { to: string }) {
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  useEffect(() => {
+    navigate(to, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a propósito: no depender de
+    // `navigate` (cambia de referencia en cada navegación futura, en cualquier pantalla, y
+    // volvería a disparar este efecto en un ghost congelado por KeepAlive — ver comentario arriba).
+  }, [pathname, to])
+  return null
+}
+
 export function RequireAccion() {
   const { pathname } = useLocation()
   const acciones = usePermissionsStore((s) => s.acciones)
@@ -42,7 +65,7 @@ export function RequireAccion() {
   }
 
   if (ruta.soloFarmacia && vertical !== 'farmacia') {
-    return <Navigate to="/dashboard" replace />
+    return <RedirectOnDenial to="/dashboard" />
   }
 
   // Features (§5) — solo cuando ya resolvieron; mientras cargan, fail-open (ProtectedRoute de
@@ -64,7 +87,7 @@ export function RequireAccion() {
   }
 
   if (ruta.soloSystemManager && !roles.includes(SYSTEM_MANAGER_ROLE)) {
-    return <Navigate to="/dashboard" replace />
+    return <RedirectOnDenial to="/dashboard" />
   }
 
   if (ruta.accion && acciones[ruta.accion] !== true) {

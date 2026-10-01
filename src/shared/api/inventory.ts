@@ -164,9 +164,9 @@ export async function reclasificarDimension(data: ReclasificacionDimensionDto) {
   return unwrap(res)
 }
 
-/** Consume N unidades de un ítem genérico (sin dimensiones) y produce N unidades de un ítem
- *  dimensionado, asignando la combinación — docs/tasks/
- *  PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §4. */
+/** Convierte N unidades del stock SIN combinación de un artículo a una combinación puntual del
+ *  MISMO artículo — docs/tasks/PROMPT_CONVERSION_DIMENSION_FRONTEND.md §7. No hay dos ítems en
+ *  este flujo: un solo `itemCode` en todo el request. */
 export async function convertirDimension(data: ConversionDimensionDto) {
   const res = await client.post<{ success: true; data: ConversionDimensionResult }>(
     ENDPOINTS.inventory.conversionDimension,

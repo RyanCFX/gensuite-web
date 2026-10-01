@@ -1585,6 +1585,27 @@ export default function ItemDetail() {
         <StockPorDimensionPanel itemCode={item.id} />
       )}
 
+      {/* Compra sin dimensión (docs/tasks/PROMPT_CONVERSION_DIMENSION_FRONTEND.md §4) — flag del
+          propio artículo, sin vínculos con otros ítems. Solo informativo. */}
+      {item.type === 'product' && !item.hasVariants && item.usaDimensiones === true && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header">
+            <h2 className="card-title">Dimensiones de inventario</h2>
+          </div>
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
+              <span style={{ color: 'var(--text-tertiary)' }}>Permite comprar/recibir sin dimensión:</span>
+              <strong style={{ color: 'var(--text-secondary)' }}>{item.permiteCompraSinDimension ? 'sí' : 'no'}</strong>
+              {item.permiteCompraSinDimension && (
+                <span style={{ color: 'var(--text-tertiary)' }}>
+                  — se puede comprar sin combinación; al venderla, la combinación sigue siendo obligatoria.
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {item.type === 'product' && !item.hasVariants && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header">

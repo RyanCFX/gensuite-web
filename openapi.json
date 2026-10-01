@@ -13204,7 +13204,7 @@
             "bearer": []
           }
         ],
-        "summary": "Convierte N unidades de un ítem genérico (sin dimensiones) en N unidades de un ítem dimensionado, asignando la combinación en ese momento — permite comprar un artículo sin conocer la combinación exacta y decidirla recién antes de venderlo. Configuración por producto (Item.custom_item_generico_origen), nunca de tenant.",
+        "summary": "Convierte N unidades de un ítem, DENTRO DEL MISMO artículo, de stock sin dimensión a stock de una combinación puntual, asignando la combinación en ese momento — permite comprar un artículo sin conocer la combinación exacta y decidirla recién antes de venderlo. Configuración por producto (Item.custom_permite_compra_sin_dimension), nunca de tenant.",
         "tags": [
           "Inventario"
         ]
@@ -23725,6 +23725,43 @@
         "summary": "Eliminar un rol custom (ERPNext rechaza roles estándar o en uso)",
         "tags": [
           "Usuarios"
+        ]
+      }
+    },
+    "/api/v1/me/configuracion-operativa": {
+      "get": {
+        "description": "Banderas que deciden qué se muestra y cómo se opera, para cualquier usuario autenticado del tenant — sin exigir los permisos de administración de GET /config/facturacion ni GET /ecf. Usar esto (no /config/facturacion) para decidir la visibilidad del menú de Caja/Turnos (`facturacion.usaModuloPos`), el flujo de cobro, precios editables, e-CF, etc.",
+        "operationId": "ConfiguracionOperativaController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfiguracionOperativaEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configuración operativa del tenant (facturación, caja, e-CF)",
+        "tags": [
+          "Me"
         ]
       }
     },
@@ -41466,14 +41503,10 @@
       "CreateConversionDimensionDto": {
         "type": "object",
         "properties": {
-          "itemOrigen": {
+          "itemCode": {
             "type": "string",
-            "description": "Ítem genérico de origen (sin dimensiones). Si se omite, se resuelve desde Item.custom_item_generico_origen del itemDestino — si tampoco está configurado ahí, se rechaza con 400."
-          },
-          "itemDestino": {
-            "type": "string",
-            "example": "BUMPER-DIM",
-            "description": "Ítem dimensionado destino de la conversión."
+            "example": "BUMPER",
+            "description": "Ítem a convertir. Debe declarar dimensiones de inventario y tener `Item.custom_permite_compra_sin_dimension` activo."
           },
           "warehouse": {
             "type": "string",
@@ -41490,7 +41523,7 @@
               "anio": "ANIO-2024",
               "color": "COLOR-ROJO"
             },
-            "description": "Combinación completa a asignar al ítem destino — TODAS las dimensiones que declara ese artículo.",
+            "description": "Combinación completa a asignar — TODAS las dimensiones que declara este artículo.",
             "additionalProperties": {
               "type": "string"
             }
@@ -41508,7 +41541,7 @@
           }
         },
         "required": [
-          "itemDestino",
+          "itemCode",
           "warehouse",
           "qty",
           "dimensiones"
@@ -43527,20 +43560,20 @@
               "$ref": "#/components/schemas/ReglaCombinacionDto"
             }
           },
-          "itemGenericoOrigen": {
-            "type": "string",
-            "example": "BUMPER-GEN",
-            "description": "Ítem SIN dimensiones (plano) del que se obtiene este ítem mediante conversión (POST /inventory/conversion-dimension) — habilita comprar el genérico sin dimensión y convertirlo asignando la combinación recién antes de vender. Solo tiene sentido en un ítem que declara \"dimensiones\" arriba. El ítem indicado acá debe ser plano (sin ninguna dimensión propia) — ERPNext rechaza con 400 si no lo es. Enviar \"\" para quitar la configuración (el ítem deja de participar del flujo de conversión)."
-          },
           "isSalesItem": {
             "type": "boolean",
             "default": true,
-            "description": "Campo NATIVO de Item (is_sales_item). Default true. Poné en false para un ítem que nunca debe venderse directo (ej. el ítem GENÉRICO de un flujo de conversión de dimensión — se compra, nunca se vende sin antes convertirlo)."
+            "description": "Campo NATIVO de Item (is_sales_item). Default true. Poné en false para un ítem que nunca debe venderse directo."
           },
           "isPurchaseItem": {
             "type": "boolean",
             "default": true,
-            "description": "Campo NATIVO de Item (is_purchase_item). Default true. Poné en false para un ítem que nunca debe comprarse directo (ej. el ítem DIMENSIONADO de un flujo de conversión — solo se obtiene convirtiendo su ítem genérico, nunca se compra tal cual)."
+            "description": "Campo NATIVO de Item (is_purchase_item). Default true. Poné en false para un ítem que nunca debe comprarse directo."
+          },
+          "permiteCompraSinDimension": {
+            "type": "boolean",
+            "default": false,
+            "description": "Solo tiene efecto si el ítem declara \"dimensiones\" arriba. Con esto activo, este MISMO ítem se puede comprar/recibir SIN indicar la combinación (año, color, etc.) — queda en un stock \"sin dimensión\" del artículo. Al venderlo, la combinación sigue siendo obligatoria: el BFF convierte automáticamente (POST /inventory/conversion-dimension por debajo), solo el faltante que no cubra el stock que ya exista en esa combinación puntual — transparente para el cajero. Desactivado (default): el ítem exige su dimensión también al comprarlo, igual que hoy."
           }
         },
         "required": [
@@ -43777,20 +43810,20 @@
               "$ref": "#/components/schemas/ReglaCombinacionDto"
             }
           },
-          "itemGenericoOrigen": {
-            "type": "string",
-            "example": "BUMPER-GEN",
-            "description": "Ítem SIN dimensiones (plano) del que se obtiene este ítem mediante conversión (POST /inventory/conversion-dimension) — habilita comprar el genérico sin dimensión y convertirlo asignando la combinación recién antes de vender. Solo tiene sentido en un ítem que declara \"dimensiones\" arriba. El ítem indicado acá debe ser plano (sin ninguna dimensión propia) — ERPNext rechaza con 400 si no lo es. Enviar \"\" para quitar la configuración (el ítem deja de participar del flujo de conversión)."
-          },
           "isSalesItem": {
             "type": "boolean",
             "default": true,
-            "description": "Campo NATIVO de Item (is_sales_item). Default true. Poné en false para un ítem que nunca debe venderse directo (ej. el ítem GENÉRICO de un flujo de conversión de dimensión — se compra, nunca se vende sin antes convertirlo)."
+            "description": "Campo NATIVO de Item (is_sales_item). Default true. Poné en false para un ítem que nunca debe venderse directo."
           },
           "isPurchaseItem": {
             "type": "boolean",
             "default": true,
-            "description": "Campo NATIVO de Item (is_purchase_item). Default true. Poné en false para un ítem que nunca debe comprarse directo (ej. el ítem DIMENSIONADO de un flujo de conversión — solo se obtiene convirtiendo su ítem genérico, nunca se compra tal cual)."
+            "description": "Campo NATIVO de Item (is_purchase_item). Default true. Poné en false para un ítem que nunca debe comprarse directo."
+          },
+          "permiteCompraSinDimension": {
+            "type": "boolean",
+            "default": false,
+            "description": "Solo tiene efecto si el ítem declara \"dimensiones\" arriba. Con esto activo, este MISMO ítem se puede comprar/recibir SIN indicar la combinación (año, color, etc.) — queda en un stock \"sin dimensión\" del artículo. Al venderlo, la combinación sigue siendo obligatoria: el BFF convierte automáticamente (POST /inventory/conversion-dimension por debajo), solo el faltante que no cubra el stock que ya exista en esa combinación puntual — transparente para el cajero. Desactivado (default): el ítem exige su dimensión también al comprarlo, igual que hoy."
           }
         }
       },
@@ -45845,6 +45878,240 @@
             "description": "Si el rol tiene acceso al Desk de ERPNext"
           }
         }
+      },
+      "FacturacionOperativaDto": {
+        "type": "object",
+        "properties": {
+          "usaModuloPos": {
+            "type": "boolean",
+            "description": "Módulo POS (turnos de caja). Decide si se muestra el grupo Caja/Turnos."
+          },
+          "flujoCobro": {
+            "type": "string",
+            "enum": [
+              "directo",
+              "caja"
+            ]
+          },
+          "turnoMaxHoras": {
+            "type": "number"
+          },
+          "arqueoEfectivoRequerido": {
+            "type": "boolean"
+          },
+          "posProfileDefault": {
+            "type": "string",
+            "nullable": true
+          },
+          "modoPagoCaja": {
+            "type": "string",
+            "nullable": true
+          },
+          "modoPagoCajaUsd": {
+            "type": "string",
+            "nullable": true
+          },
+          "modoPagoCajaEur": {
+            "type": "string",
+            "nullable": true
+          },
+          "requiereUbicacionVenta": {
+            "type": "boolean"
+          },
+          "usaDepartamentos": {
+            "type": "boolean"
+          },
+          "usaImpuestoDocumento": {
+            "type": "boolean"
+          },
+          "plantillaImpuestoVentasDefault": {
+            "type": "string",
+            "nullable": true
+          },
+          "plantillaImpuestoComprasDefault": {
+            "type": "string",
+            "nullable": true
+          },
+          "formatoImpresionDefault": {
+            "type": "string",
+            "nullable": true
+          },
+          "formatosPermitidos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "despachoHabilitado": {
+            "type": "boolean"
+          },
+          "despachoFuturoHabilitado": {
+            "type": "boolean"
+          },
+          "despachoFuturoBloqueaVenta": {
+            "type": "boolean"
+          },
+          "pedidoRequiereConfirmacionDespacho": {
+            "type": "boolean"
+          },
+          "pedidoConduceIncluyePrecios": {
+            "type": "boolean"
+          },
+          "pedirPinPrecioMinimoServicios": {
+            "type": "boolean"
+          },
+          "pedirPinPrecioMinimoProductos": {
+            "type": "boolean"
+          },
+          "permitirModificarPrecioServicios": {
+            "type": "boolean"
+          },
+          "permitirModificarPrecioProductos": {
+            "type": "boolean"
+          },
+          "ncfTipoVentaDefault": {
+            "type": "string",
+            "nullable": true
+          },
+          "requiereSerialLoteCompra": {
+            "type": "boolean"
+          },
+          "redondeoTotalDeshabilitado": {
+            "type": "boolean"
+          },
+          "tasaFijaCxc": {
+            "type": "boolean"
+          },
+          "tasaFijaCxp": {
+            "type": "boolean"
+          },
+          "permitirPagoMonedaDistintaBanco": {
+            "type": "boolean"
+          },
+          "monedaBase": {
+            "type": "string"
+          },
+          "monedasHabilitadas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "multimonedaHabilitada": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "usaModuloPos",
+          "flujoCobro",
+          "turnoMaxHoras",
+          "arqueoEfectivoRequerido",
+          "posProfileDefault",
+          "modoPagoCaja",
+          "modoPagoCajaUsd",
+          "modoPagoCajaEur",
+          "requiereUbicacionVenta",
+          "usaDepartamentos",
+          "usaImpuestoDocumento",
+          "plantillaImpuestoVentasDefault",
+          "plantillaImpuestoComprasDefault",
+          "formatoImpresionDefault",
+          "formatosPermitidos",
+          "despachoHabilitado",
+          "despachoFuturoHabilitado",
+          "despachoFuturoBloqueaVenta",
+          "pedidoRequiereConfirmacionDespacho",
+          "pedidoConduceIncluyePrecios",
+          "pedirPinPrecioMinimoServicios",
+          "pedirPinPrecioMinimoProductos",
+          "permitirModificarPrecioServicios",
+          "permitirModificarPrecioProductos",
+          "ncfTipoVentaDefault",
+          "requiereSerialLoteCompra",
+          "redondeoTotalDeshabilitado",
+          "tasaFijaCxc",
+          "tasaFijaCxp",
+          "permitirPagoMonedaDistintaBanco",
+          "monedaBase",
+          "monedasHabilitadas",
+          "multimonedaHabilitada"
+        ]
+      },
+      "EcfOperativoDto": {
+        "type": "object",
+        "properties": {
+          "habilitado": {
+            "type": "boolean",
+            "description": "Configurado como habilitado en el tenant."
+          },
+          "operativo": {
+            "type": "boolean",
+            "description": "Habilitado Y operativo en Vega: las facturas de los tipos electrónicos se emiten como e-CF."
+          },
+          "tiposElectronicos": {
+            "example": [
+              "31",
+              "32"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "contingenciaActiva": {
+            "type": "boolean"
+          },
+          "emitirAlSometer": {
+            "type": "boolean"
+          },
+          "tipoPagoDefault": {
+            "type": "number",
+            "nullable": true
+          },
+          "tipoIngresosDefault": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "habilitado",
+          "operativo",
+          "tiposElectronicos",
+          "contingenciaActiva",
+          "emitirAlSometer",
+          "tipoPagoDefault",
+          "tipoIngresosDefault"
+        ]
+      },
+      "ConfiguracionOperativaDataDto": {
+        "type": "object",
+        "properties": {
+          "facturacion": {
+            "$ref": "#/components/schemas/FacturacionOperativaDto"
+          },
+          "ecf": {
+            "$ref": "#/components/schemas/EcfOperativoDto"
+          }
+        },
+        "required": [
+          "facturacion",
+          "ecf"
+        ]
+      },
+      "ConfiguracionOperativaEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConfiguracionOperativaDataDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
       },
       "UpdateMonedaDto": {
         "type": "object",

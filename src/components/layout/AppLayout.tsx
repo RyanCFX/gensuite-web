@@ -259,9 +259,9 @@ const NAV_OPS: NavEntry[] = [
         path: "/inventario/reclasificaciones",
       },
       {
-        // Conversión de Ítem Genérico a Ítem Dimensionado — docs/tasks/
-        // PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §4.
-        label: "Conversión a Ítem Dimensionado",
+        // Conversión de combinación (mismo ítem) — docs/tasks/
+        // PROMPT_CONVERSION_DIMENSION_FRONTEND.md §7.
+        label: "Conversión de combinación",
         icon: <Repeat size={14} />,
         path: "/inventario/conversion-dimension",
       },

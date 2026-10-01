@@ -225,9 +225,21 @@ export default function App() {
         <Route path="/oauth/callback" element={<OauthCallbackPage />} />
 
         <Route element={<ProtectedRoute />}>
+          {/* Redirects de una sola vez — fuera de AppLayout/KeepAlive a propósito: KeepAlive
+              (ver `<KeepAlive>` en AppLayout.tsx) nunca desmonta de verdad una pantalla ya
+              visitada, solo la esconde (su `enableActivity` está en false, el default de la
+              librería) — un <Navigate> montado ahí adentro queda "fantasma" viva para siempre.
+              Como `useNavigate()` se memoiza por `location.pathname` (ver react-router-dom),
+              cada vez que la ruta cambia en cualquier otra pestaña, ese fantasma recibe una
+              referencia nueva de `navigate` → su propio efecto se reevalúa → vuelve a disparar
+              el mismo <Navigate>, secuestrando la navegación hacia el destino viejo en cada
+              click posterior hasta recargar la página entera (que es la única forma de destruir
+              el fantasma). Por eso estas 3 rutas van acá, antes de AppLayout, donde nunca se cachean. */}
+          <Route path="/" element={<IndicePostLogin />} />
+          <Route path="/reportes" element={<Navigate to="/reportes/606" replace />} />
+          <Route path="/config" element={<Navigate to="/config/empresa" replace />} />
           <Route element={<AppLayout />}>
            <Route element={<RequireAccion />}>
-            <Route path="/" element={<IndicePostLogin />} />
             <Route path="/dashboard" element={<Suspense fallback={<PageLoader />}><DashboardPage /></Suspense>} />
             <Route path="/inicio" element={<StartPage />} />
 
@@ -407,9 +419,8 @@ export default function App() {
             {/* Usuarios */}
             <Route path="/usuarios" element={<Suspense fallback={<PageLoader />}><UsuariosPage /></Suspense>} />
 
-            {/* Reportes */}
+            {/* Reportes — el redirect de "/reportes" sin :tipo vive fuera de AppLayout (ver arriba) */}
             <Route path="/reportes/:tipo" element={<Suspense fallback={<PageLoader />}><ReportesPage /></Suspense>} />
-            <Route path="/reportes" element={<Navigate to="/reportes/606" replace />} />
 
             {/* Contabilidad — Plan de Cuentas */}
             <Route path="/cuentas" element={<Suspense fallback={<PageLoader />}><CuentasPage /></Suspense>} />
@@ -485,8 +496,8 @@ export default function App() {
             <Route path="/config/roles" element={<Suspense fallback={<PageLoader />}><RolesPage /></Suspense>} />
             <Route path="/config/roles/:name" element={<Suspense fallback={<PageLoader />}><RoleDetailPage /></Suspense>} />
             <Route path="/config/auditoria-pin" element={<Suspense fallback={<PageLoader />}><AdminPinLogPage /></Suspense>} />
+            {/* El redirect de "/config" sin sección vive fuera de AppLayout (ver arriba) */}
             <Route path="/config/:seccion" element={<Suspense fallback={<PageLoader />}><ConfigPage /></Suspense>} />
-            <Route path="/config" element={<Navigate to="/config/empresa" replace />} />
            </Route>
 
           </Route>

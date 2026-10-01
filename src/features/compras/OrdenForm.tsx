@@ -49,6 +49,9 @@ interface ItemRow {
   dimensiones?: DimensionesLinea
   /** Dimensiones que el artículo de esta línea declara — ver misma nota en CompraForm.tsx. */
   itemDimensionesDeclaradas?: ItemDimensionDeclarada[]
+  /** `Item.permiteCompraSinDimension` del artículo (docs/tasks/PROMPT_CONVERSION_DIMENSION_FRONTEND.md
+   *  §4) — con esto activo, la combinación de esta línea es opcional al ordenar/recibir. */
+  permiteCompraSinDimension?: boolean
 }
 
 function emptyItem(defaultWh?: string): ItemRow {
@@ -278,7 +281,7 @@ export default function OrdenForm() {
         const catalogItem = catalogItems[idx]
         const oi = ordenData.items[idx]
         return catalogItem?.usaDimensiones
-          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones, dimensiones: oi?.dimensiones ?? row.dimensiones }
+          ? { ...row, itemDimensionesDeclaradas: catalogItem.dimensiones, permiteCompraSinDimension: catalogItem.permiteCompraSinDimension ?? false, dimensiones: oi?.dimensiones ?? row.dimensiones }
           : row
       }))
     })
@@ -339,9 +342,10 @@ export default function OrdenForm() {
 
   const grandTotal = items.reduce((sum, i) => sum + i.qty * i.rate * (1 - (i.discountPct || 0) / 100), 0)
 
-  // Ver misma nota en CompraForm.tsx (§10.2, opción (b)).
+  // Ver misma nota en CompraForm.tsx (§10.2, opción (b)). Con `permiteCompraSinDimension` activo
+  // la línea puede ir sin combinación a propósito, así que no se avisa en ese caso.
   const lineasRequierenReingresoDimension = isEdit && items.some(
-    (i) => (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
+    (i) => !i.permiteCompraSinDimension && (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
   )
 
   function handleSubmit(e: React.FormEvent) {
@@ -361,12 +365,14 @@ export default function OrdenForm() {
     }
     if (hasError) return
 
-    // Dimensiones (§5/§11 del doc): toda línea cuyo artículo USE dimensiones exige la combinación
-    // completa antes de guardar — si falta, el servidor rechaza con un 400 por línea.
+    // Dimensiones (§5/§11 del doc base): toda línea cuyo artículo USE dimensiones exige la
+    // combinación completa antes de guardar — si falta, el servidor rechaza con un 400 por línea.
+    // Excepción: artículo con `permiteCompraSinDimension` activo (docs/tasks/
+    // PROMPT_CONVERSION_DIMENSION_FRONTEND.md §1.1) — la combinación pasa a ser opcional.
     let hasDimensionError = false
     items.forEach((item, itemIdx) => {
       const declaradas = item.itemDimensionesDeclaradas ?? []
-      if (item.itemCode && declaradas.length > 0 && !combinacionCompleta(declaradas, item.dimensiones ?? {})) {
+      if (item.itemCode && !item.permiteCompraSinDimension && declaradas.length > 0 && !combinacionCompleta(declaradas, item.dimensiones ?? {})) {
         hasDimensionError = true
         const faltantes = declaradas.filter((d) => !(item.dimensiones ?? {})[d.dimension]).map((d) => d.dimension).join(', ')
         setItems((prev) => prev.map((r, i) => i === itemIdx ? { ...r, lineError: `Fila ${itemIdx + 1}: indique la dimensión completa${faltantes ? ` (falta: ${faltantes})` : ''}` } : r))
@@ -419,6 +425,7 @@ export default function OrdenForm() {
         uom: catalogItem.stockUom ?? row.uom,
         // Un artículo nuevo en la fila implica una combinación nueva.
         itemDimensionesDeclaradas: catalogItem.usaDimensiones ? catalogItem.dimensiones : undefined,
+        permiteCompraSinDimension: catalogItem.permiteCompraSinDimension ?? false,
         dimensiones: undefined,
       }
     }))
@@ -429,7 +436,7 @@ export default function OrdenForm() {
         if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
         setItems((prev) => prev.map((row, i) =>
           i === idx && row.itemCode === catalogItem.id && !(row.itemDimensionesDeclaradas?.length)
-            ? { ...row, itemDimensionesDeclaradas: detail.dimensiones }
+            ? { ...row, itemDimensionesDeclaradas: detail.dimensiones, permiteCompraSinDimension: detail.permiteCompraSinDimension ?? false }
             : row,
         ))
       }).catch(() => {})
@@ -437,7 +444,7 @@ export default function OrdenForm() {
   }, [])
 
   const clearCatalogItem = useCallback((idx: number) => {
-    updateItem(idx, { itemCode: '', itemLabel: undefined, description: '', rate: 0, itemDimensionesDeclaradas: undefined, dimensiones: undefined })
+    updateItem(idx, { itemCode: '', itemLabel: undefined, description: '', rate: 0, itemDimensionesDeclaradas: undefined, permiteCompraSinDimension: undefined, dimensiones: undefined })
   }, [updateItem])
 
   if (isEdit && loadingEdit) {
@@ -701,6 +708,11 @@ export default function OrdenForm() {
                                 onChange={(v) => updateItem(idx, { dimensiones: v })}
                                 compact
                               />
+                            )}
+                            {item.permiteCompraSinDimension && (item.itemDimensionesDeclaradas?.length ?? 0) > 0 && (
+                              <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2 }}>
+                                Combinación opcional al ordenar — vacío entra sin dimensión
+                              </span>
                             )}
                           </td>
                           <td>

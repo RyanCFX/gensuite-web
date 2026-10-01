@@ -1529,12 +1529,14 @@ export interface Item {
    *  etiqueta legible (§10.4) — resolver contra el catálogo de GET /catalog/dimensiones-inventario. */
   dimensiones?: ItemDimensionDeclarada[];
   reglasCombinacion?: ReglaCombinacion[];
-  // ─── Conversión de Ítem Genérico a Ítem Dimensionado — docs/tasks/
-  // PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §3 ───────────────────────────
-  /** Ítem SIN dimensiones (plano) del que se obtiene este ítem mediante conversión
-   *  (`POST /inventory/conversion-dimension`). Solo tiene sentido en un ítem con
-   *  `usaDimensiones: true`. `null`/ausente si no está configurado. */
-  itemGenericoOrigen?: string | null;
+  // ─── Compra sin dimensión, venta con dimensión (mismo ítem) — docs/tasks/
+  // PROMPT_CONVERSION_DIMENSION_FRONTEND.md §4 ────────────────────────────────────
+  /** Con esto activo, este MISMO ítem se puede comprar/recibir SIN indicar la combinación —
+   *  queda en un stock "sin dimensión" del artículo. Al venderlo, la combinación sigue siendo
+   *  obligatoria (el servidor convierte solo el faltante, transparente para el cajero). Solo tiene
+   *  efecto si el ítem declara `dimensiones` (`usaDimensiones: true`). Default `false`; se puede
+   *  prender/apagar en cualquier momento, incluso con historia (no es inmutable como `dimensiones`). */
+  permiteCompraSinDimension?: boolean;
   /** Nativo de ERPNext (`is_sales_item`). Default `true` si se omite — ningún artículo existente
    *  cambia de comportamiento. */
   isSalesItem?: boolean;
@@ -1839,10 +1841,10 @@ export interface CreateItemDto {
    *  configuración (§0.3, §4.5) — el servidor rechaza el intento con un mensaje dedicado. */
   dimensiones?: { dimension: string; valoresPermitidos?: string[] }[];
   reglasCombinacion?: ReglaCombinacion[];
-  /** Ítem genérico de origen para conversión (§3.1 de PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md).
-   *  `''` quita el vínculo — mismo patrón que `purchaseTaxTemplate`. El servidor rechaza con 400 si
-   *  el ítem elegido tiene dimensiones propias, o si apunta al propio artículo. */
-  itemGenericoOrigen?: string;
+  /** Con esto activo, este MISMO ítem se puede comprar/recibir SIN indicar la combinación
+   *  (docs/tasks/PROMPT_CONVERSION_DIMENSION_FRONTEND.md §4). Solo tiene efecto si el ítem declara
+   *  dimensiones. `boolean` puro: `false` explícito desactiva. Omitido en edición = no toca el valor. */
+  permiteCompraSinDimension?: boolean;
   /** Nativo de ERPNext (`is_sales_item`) — default `true` si se omite. */
   isSalesItem?: boolean;
   /** Nativo de ERPNext (`is_purchase_item`) — default `true` si se omite. */
@@ -2057,18 +2059,19 @@ export interface ReclasificacionDimensionResult {
   branch?: string;
 }
 
-// ─── Conversión de Ítem Genérico a Ítem Dimensionado — docs/tasks/
-// PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §4 ───────────────────────────
+// ─── Conversión de combinación (mismo ítem) — docs/tasks/
+// PROMPT_CONVERSION_DIMENSION_FRONTEND.md §7 ─────────────────────────────────────
+// Convierte N unidades del stock SIN combinación de un artículo a una combinación puntual del
+// MISMO artículo. No hay dos ítems en este flujo: un solo `itemCode` en todo el formulario.
 export interface ConversionDimensionDto {
-  /** Opcional — si se omite, el servidor lo resuelve desde `Item.itemGenericoOrigen` del
-   *  `itemDestino`. Indicarlo explícito solo para usar un genérico distinto al configurado. */
-  itemOrigen?: string;
-  /** El ítem DIMENSIONADO al que se convierte. */
-  itemDestino: string;
-  /** Mismo almacén para la salida del genérico y la entrada del dimensionado. */
+  /** El código del artículo a convertir. Debe declarar dimensiones (`usaDimensiones: true`) y
+   *  tener `permiteCompraSinDimension: true` — si no, el servidor rechaza con 400 (§7.5). */
+  itemCode: string;
+  /** El almacén donde está el stock sin combinación Y donde queda el convertido — mismo almacén
+   *  en ambos lados, esto NO es una transferencia. */
   warehouse: string;
   qty: number;
-  /** La combinación completa a asignar — NO puede venir vacío. */
+  /** La combinación COMPLETA a asignar — NO puede venir vacía. */
   dimensiones: DimensionesLinea;
   postingDate?: string;
   remarks?: string;
@@ -2078,8 +2081,7 @@ export interface ConversionDimensionDto {
 export interface ConversionDimensionResult {
   id: string;
   tipo: string;
-  itemOrigen: string;
-  itemDestino: string;
+  itemCode: string;
   warehouse: string;
   qty: number;
   postingDate: string;

@@ -86,6 +86,10 @@ interface ItemRow {
    *  selector de combinación sin tener que re-pedirlo. Vacío/undefined si el artículo no usa
    *  dimensiones. */
   itemDimensionesDeclaradas?: ItemDimensionDeclarada[]
+  /** `Item.permiteCompraSinDimension` del artículo (docs/tasks/PROMPT_CONVERSION_DIMENSION_FRONTEND.md
+   *  §4) — con esto activo, la combinación de esta línea pasa a ser OPCIONAL al comprar: el stock
+   *  entra "sin combinación". Al vender sigue siendo obligatoria (eso lo valida la factura, no esto). */
+  permiteCompraSinDimension?: boolean
 }
 
 function emptyItem(defaultWh?: string): ItemRow {
@@ -368,6 +372,11 @@ function SerialBatchRow({
               disabled={isReturn}
               compact
             />
+          )}
+          {item.permiteCompraSinDimension && (item.itemDimensionesDeclaradas?.length ?? 0) > 0 && (
+            <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2 }}>
+              Combinación opcional al comprar — vacío entra sin dimensión
+            </span>
           )}
         </td>
         <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ position: 'relative', verticalAlign: 'middle' }}>
@@ -997,7 +1006,7 @@ export default function CompraForm() {
           itemLabel: catalogItem.itemName,
           description: catalogItem.internalDescription ?? catalogItem.itemName,
           ...(catalogItem.usaDimensiones
-            ? { itemDimensionesDeclaradas: catalogItem.dimensiones, dimensiones: ci?.dimensiones ?? row.dimensiones }
+            ? { itemDimensionesDeclaradas: catalogItem.dimensiones, permiteCompraSinDimension: catalogItem.permiteCompraSinDimension ?? false, dimensiones: ci?.dimensiones ?? row.dimensiones }
             : {}),
         }
       }))
@@ -1093,9 +1102,10 @@ export default function CompraForm() {
   // efecto de arriba la precarga sola. Esto solo dispara si, por alguna razón (línea muy vieja
   // guardada antes de este cambio, o el artículo cambió su configuración de dimensiones), la
   // fila queda incompleta — si no se avisa, el PUT la reenviaría vacía y el servidor rechazaría
-  // esa línea (§11).
+  // esa línea (§11). Con `permiteCompraSinDimension` activo la línea puede ir sin combinación a
+  // propósito (docs/tasks/PROMPT_CONVERSION_DIMENSION_FRONTEND.md §1.1), así que no se avisa.
   const lineasRequierenReingresoDimension = isEdit && items.some(
-    (i) => (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
+    (i) => !i.permiteCompraSinDimension && (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
   )
 
   const ncfValid = !ncfProveedor || NCF_REGEX.test(ncfProveedor)
@@ -1161,12 +1171,15 @@ export default function CompraForm() {
     }
     if (hasTrackingError) return
 
-    // Dimensiones (§5/§11 del doc): toda línea cuyo artículo USE dimensiones exige la combinación
-    // completa antes de someter — si falta, el servidor rechaza la compra con un 400 por línea.
+    // Dimensiones (§5/§11 del doc base): toda línea cuyo artículo USE dimensiones exige la
+    // combinación completa antes de someter — si falta, el servidor rechaza la compra con un 400
+    // por línea. Excepción: artículo con `permiteCompraSinDimension` activo (docs/tasks/
+    // PROMPT_CONVERSION_DIMENSION_FRONTEND.md §1.1) — la combinación pasa a ser opcional al
+    // comprar y el stock entra "sin combinación".
     let hasDimensionError = false
     items.forEach((item, itemIdx) => {
       const declaradas = item.itemDimensionesDeclaradas ?? []
-      if (declaradas.length > 0 && !combinacionCompleta(declaradas, item.dimensiones ?? {})) {
+      if (!item.permiteCompraSinDimension && declaradas.length > 0 && !combinacionCompleta(declaradas, item.dimensiones ?? {})) {
         hasDimensionError = true
         const faltantes = declaradas.filter((d) => !(item.dimensiones ?? {})[d.dimension]).map((d) => d.dimension).join(', ')
         setItems((prev) => prev.map((r, rIdx) =>
@@ -1261,6 +1274,7 @@ export default function CompraForm() {
           // Un artículo nuevo en la fila implica una combinación nueva — nunca arrastramos la
           // combinación del artículo anterior (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §5).
           itemDimensionesDeclaradas: catalogItem.usaDimensiones ? catalogItem.dimensiones : undefined,
+          permiteCompraSinDimension: catalogItem.permiteCompraSinDimension ?? false,
           dimensiones: undefined,
         }
         // Detecta componentes del combo con tracking de serial/lote
@@ -1300,7 +1314,7 @@ export default function CompraForm() {
         if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
         setItems((prev) => prev.map((row, i) =>
           i === idx && row.itemCode === catalogItem.id && !(row.itemDimensionesDeclaradas?.length)
-            ? { ...row, itemDimensionesDeclaradas: detail.dimensiones }
+            ? { ...row, itemDimensionesDeclaradas: detail.dimensiones, permiteCompraSinDimension: detail.permiteCompraSinDimension ?? false }
             : row,
         ))
       }).catch(() => {})
@@ -1310,7 +1324,7 @@ export default function CompraForm() {
 
   const clearCatalogItem = useCallback((idx: number) => {
     setItems((prev) => prev.map((row, i) =>
-      i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0, trackingType: 'none', serials: [], batches: [], _comboComponents: undefined, componentTracking: undefined, itemDimensionesDeclaradas: undefined, dimensiones: undefined } : row,
+      i === idx ? { ...row, itemCode: '', itemLabel: undefined, description: '', rate: 0, trackingType: 'none', serials: [], batches: [], _comboComponents: undefined, componentTracking: undefined, itemDimensionesDeclaradas: undefined, permiteCompraSinDimension: undefined, dimensiones: undefined } : row,
     ))
   }, [])
 
@@ -1361,8 +1375,10 @@ export default function CompraForm() {
         ordenCompra: line.ordenCompra,
         ordenCompraItem: line.ordenCompraItem,
         // La orden no ecoa la combinación elegida en su línea (§10.2) — el artículo declara sus
-        // dimensiones igual, así que se muestra el selector para que el usuario la reingrese.
+        // dimensiones igual, así que se muestra el selector para que el usuario la reingrese
+        // (salvo que el artículo permita comprar sin dimensión, ver flag abajo).
         itemDimensionesDeclaradas: catalogItem?.usaDimensiones ? catalogItem.dimensiones : undefined,
+        permiteCompraSinDimension: catalogItem?.permiteCompraSinDimension ?? false,
       }
     }))
     setItems((prev) => [...prev, emptyItem(defaultWh)])

@@ -1,7 +1,8 @@
-// Conversión a Ítem Dimensionado — docs/tasks/PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §4.
-// Consume N unidades de un ítem GENÉRICO (sin dimensiones) y produce N unidades de un ítem
-// DIMENSIONADO, asignando la combinación elegida en ese momento — permite comprar un artículo sin
-// conocer todavía la combinación exacta (año/color/talla/...) y decidirla recién antes de venderlo.
+// Conversión de combinación (mismo ítem) — docs/tasks/PROMPT_CONVERSION_DIMENSION_FRONTEND.md §7.
+// Convierte N unidades del stock SIN combinación de un artículo a una combinación puntual del
+// MISMO artículo — permite preparar stock con anticipación sin esperar a que el top-up automático
+// de la venta lo haga. No hay dos artículos en este flujo (§1.2): un solo `itemCode` en todo el
+// formulario (nada de "origen"/"destino").
 //
 // Mismo lugar y mismo nivel que Ajuste de Combinación y Reclasificación de Combinación (§8.5/§8.6
 // de PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md) — clona ese patrón de pantalla.
@@ -10,27 +11,25 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ArrowLeft, ArrowRight, Info } from 'lucide-react'
-import { listItems } from '@/shared/api/catalog'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
+import { listItems, getItem } from '@/shared/api/catalog'
 import { listAlmacenes } from '@/shared/api/config'
-import { convertirDimension } from '@/shared/api/inventory'
+import { convertirDimension, getStockPorDimension } from '@/shared/api/inventory'
 import type { Item, DimensionesLinea } from '@/shared/api/types'
 import { mostrarErrorApi } from '@/lib/apiErrors'
 import { usePuede } from '@/shared/permissions/can'
-import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { todayIso } from '@/lib/formatters'
 
-/** Picker de artículo DESTINO restringido a ítems dimensionados (`usaDimensiones: true`) que
- *  además tienen un `itemGenericoOrigen` configurado — solo esos tienen sentido acá (§4.1 punto 1).
- *  `ItemSelect` no expone este filtro combinado, así que se filtra la respuesta acá, igual que
+/** Picker de artículo restringido a ítems que declaran dimensiones (`usaDimensiones: true`) Y
+ *  tienen `permiteCompraSinDimension: true` — solo esos participan del flujo (§7.3 paso 1).
+ *  `ItemSelect` no expone ese filtro combinado, así que se filtra la respuesta acá, igual que
  *  `ItemDimensionadoSelect` de Ajuste/Reclasificación de Combinación. */
-function ItemDestinoConversionSelect({
+function ItemConversionSelect({
   value,
   selectedLabel,
   onSelect,
@@ -44,14 +43,14 @@ function ItemDestinoConversionSelect({
   const [query, setQuery] = useState('')
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['itemSearch-conversion-destino', query],
+    queryKey: ['itemSearch-conversion', query],
     queryFn: () => listItems({ search: query || undefined, disabled: 'false', type: 'product', limit: 20 }),
     staleTime: 30_000,
   })
 
-  const itemsDestino = (data?.items ?? []).filter((i) => i.usaDimensiones === true && !!i.itemGenericoOrigen)
+  const itemsElegibles = (data?.items ?? []).filter((i) => i.usaDimensiones === true && i.permiteCompraSinDimension === true)
 
-  const options: SearchSelectOption[] = itemsDestino.map((item) => ({
+  const options: SearchSelectOption[] = itemsElegibles.map((item) => ({
     value: item.id,
     label: item.itemName,
     sublabel: item.id !== item.itemName ? item.id : undefined,
@@ -63,14 +62,14 @@ function ItemDestinoConversionSelect({
       selectedLabel={selectedLabel}
       onChange={(val) => {
         if (!val) { onClear(); return }
-        const found = itemsDestino.find((i) => i.id === val)
+        const found = itemsElegibles.find((i) => i.id === val)
         if (found) onSelect(found)
       }}
       options={options}
       onSearch={setQuery}
       onOpen={() => refetch()}
       loading={isLoading}
-      placeholder="Buscar artículo dimensionado con ítem genérico configurado…"
+      placeholder="Buscar artículo con compra sin dimensión…"
     />
   )
 }
@@ -79,11 +78,7 @@ export default function ConversionDimensionForm() {
   const navigate = useNavigate()
   const puedeConvertir = usePuede('inventario.convertir-dimension')
 
-  const [itemDestino, setItemDestino] = useState<Item | null>(null)
-  // Override opcional del genérico a consumir (§4.1 punto 2 / §4.2) — por default se resuelve
-  // automáticamente en el servidor desde `itemDestino.itemGenericoOrigen`, no se manda `itemOrigen`.
-  const [usarOtroOrigen, setUsarOtroOrigen] = useState(false)
-  const [itemOrigenOverride, setItemOrigenOverride] = useState<Item | null>(null)
+  const [item, setItem] = useState<Item | null>(null)
   const [warehouse, setWarehouse] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
   const [qty, setQty] = useState<number | ''>('')
@@ -91,7 +86,7 @@ export default function ConversionDimensionForm() {
   const [postingDate, setPostingDate] = useState(todayIso())
   const [remarks, setRemarks] = useState('')
   const [branch, setBranch] = useState('')
-  const [resultado, setResultado] = useState<{ itemOrigen: string; itemDestino: string; qty: number } | null>(null)
+  const [resultado, setResultado] = useState<{ itemCode: string; warehouse: string; qty: number } | null>(null)
 
   const { data: almacenes } = useQuery({
     queryKey: ['almacenes-all'],
@@ -102,25 +97,46 @@ export default function ConversionDimensionForm() {
     .filter((a) => !a.disabled && (!warehouseSearch || a.name.toLowerCase().includes(warehouseSearch.toLowerCase())))
     .map((a) => ({ value: a.id, label: a.name }))
 
-  // El genérico que se va a consumir: el override explícito si el usuario lo activó, si no el
-  // configurado en el artículo destino (§3.1/§4.2) — puramente informativo del lado del cliente,
-  // la resolución real cuando se omite `itemOrigen` la hace el servidor.
-  const itemOrigenCodigo = usarOtroOrigen ? (itemOrigenOverride?.id ?? '') : (itemDestino?.itemGenericoOrigen ?? '')
-  const itemOrigenLabel = usarOtroOrigen ? itemOrigenOverride?.itemName : undefined
+  // Stock sin combinación disponible en el almacén elegido (§7.3 paso 2) — campo `sinEspecificar`
+  // de stock-por-dimensión. Informativo: la autoridad real es el servidor (§7.5).
+  const { data: stockSinCombinacion } = useQuery({
+    queryKey: ['stock-sin-combinacion', item?.id, warehouse],
+    queryFn: () => getStockPorDimension(item!.id, { warehouse }),
+    enabled: !!item && !!warehouse,
+    staleTime: 30_000,
+  })
+  const sinEspecificar = stockSinCombinacion?.data.sinEspecificar
 
-  // Saldo disponible del genérico en el almacén elegido (§4.1 punto 4) — el genérico no tiene
-  // dimensiones, así que es el mismo stock plano por artículo que cualquier otra pantalla, no
-  // stock-por-dimensión.
-  const stockMap = useItemsStock([itemOrigenCodigo || undefined])
-  const disponibleOrigen = itemOrigenCodigo && warehouse ? resolveDisponible(stockMap.get(itemOrigenCodigo), warehouse) : undefined
+  const itemDimensiones = item?.dimensiones ?? []
+  const combinacionLista = combinacionCompleta(itemDimensiones, combinacion)
 
-  const itemDestinoDimensiones = itemDestino?.dimensiones ?? []
-  const combinacionLista = combinacionCompleta(itemDestinoDimensiones, combinacion)
+  async function handleSelectItem(seleccionado: Item) {
+    setItem(seleccionado)
+    setCombinacion({})
+    // El picker puede no traer `dimensiones`/`permiteCompraSinDimension` — solo el detalle los
+    // garantiza. Si faltan, se completan para habilitar la combinación.
+    if (!seleccionado.dimensiones || seleccionado.dimensiones.length === 0) {
+      try {
+        const detail = await getItem(seleccionado.id)
+        if (detail?.usaDimensiones && detail.dimensiones?.length) {
+          setItem((prev) => prev?.id === seleccionado.id
+            ? { ...prev, usaDimensiones: true, dimensiones: detail.dimensiones, permiteCompraSinDimension: detail.permiteCompraSinDimension }
+            : prev)
+        }
+      } catch {
+        // Sin detalle la línea sigue editable; el servidor valida al someter (§7.5).
+      }
+    }
+  }
+
+  function handleClearItem() {
+    setItem(null)
+    setCombinacion({})
+  }
 
   const conversionMutation = useMutation({
     mutationFn: () => convertirDimension({
-      ...(usarOtroOrigen && itemOrigenOverride ? { itemOrigen: itemOrigenOverride.id } : {}),
-      itemDestino: itemDestino!.id,
+      itemCode: item!.id,
       warehouse,
       qty: qty as number,
       dimensiones: combinacion,
@@ -129,16 +145,14 @@ export default function ConversionDimensionForm() {
       branch: branch || undefined,
     }),
     onSuccess: (data) => {
-      setResultado({ itemOrigen: data.itemOrigen, itemDestino: data.itemDestino, qty: data.qty })
-      toast.success(`Conversión aplicada — ${data.qty} unidades de "${data.itemOrigen}" convertidas en "${data.itemDestino}".`)
+      setResultado({ itemCode: data.itemCode, warehouse: data.warehouse, qty: data.qty })
+      toast.success(`Se convirtieron ${data.qty} unidades de ${data.itemCode} a la combinación elegida en ${data.warehouse}.`)
     },
-    onError: (err: unknown) => mostrarErrorApi(err, 'Error al convertir la dimensión'),
+    onError: (err: unknown) => mostrarErrorApi(err, 'Error al convertir la combinación'),
   })
 
   function resetForm() {
-    setItemDestino(null)
-    setUsarOtroOrigen(false)
-    setItemOrigenOverride(null)
+    setItem(null)
     setWarehouse('')
     setQty('')
     setCombinacion({})
@@ -150,18 +164,15 @@ export default function ConversionDimensionForm() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!itemDestino) { toast.error('Selecciona el artículo dimensionado al que se va a convertir'); return }
-    // §4.4 — mismo mensaje exacto del spec, por si el catálogo cambió entre que se cargó la
-    // pantalla (filtrada a ítems con genérico configurado) y que se envía el formulario.
-    if (!usarOtroOrigen && !itemDestino.itemGenericoOrigen) {
-      toast.error(
-        `El ítem "${itemDestino.id}" no tiene configurado un ítem genérico de origen (Item.custom_item_generico_origen) — indique "itemOrigen" explícitamente, o configure ese campo en el ítem destino antes de convertir.`,
-      )
+    if (!item) { toast.error('Selecciona el artículo a convertir'); return }
+    // §7.5 — el filtro del selector ya debería impedirlo, pero el catálogo pudo cambiar; el
+    // mensaje exacto del servidor se muestra tal cual si igual llega.
+    if (!item.permiteCompraSinDimension) {
+      toast.error(`El ítem "${item.id}" no tiene activo "permite compra sin dimensión" (Item.custom_permite_compra_sin_dimension) — no participa del flujo de conversión.`)
       return
     }
-    if (usarOtroOrigen && !itemOrigenOverride) { toast.error('Selecciona el ítem de origen a consumir'); return }
     if (!warehouse) { toast.error('Selecciona un almacén'); return }
-    if (!combinacionLista) { toast.error('Completa la combinación completa a asignar en el ítem destino'); return }
+    if (!combinacionLista) { toast.error('Completa la combinación a asignar'); return }
     if (qty === '' || qty <= 0) { toast.error('Indica la cantidad a convertir (> 0)'); return }
     conversionMutation.mutate()
   }
@@ -172,7 +183,7 @@ export default function ConversionDimensionForm() {
         <div className="card">
           <div className="empty-state">
             <p className="empty-title">Sin acceso</p>
-            <p className="empty-sub">No tienes permiso para convertir ítems a dimensionados.</p>
+            <p className="empty-sub">No tienes permiso para convertir combinaciones.</p>
           </div>
         </div>
       </div>
@@ -186,57 +197,23 @@ export default function ConversionDimensionForm() {
       </a>
 
       <PageHeader
-        title="Conversión a Ítem Dimensionado"
-        description='Convierte N unidades de un ítem genérico (sin dimensiones) en N unidades de un ítem dimensionado, asignando la combinación — ej. 10 "Bumper genérico" en "Bumper" (2024, Rojo).'
+        title="Conversión de combinación"
+        description="Convierte N unidades del stock sin combinación de un artículo a una combinación puntual del mismo artículo — ej. 10 “Bumper” sin año/color en “Bumper” (2024, Rojo)."
       />
 
       <form onSubmit={handleSubmit}>
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Artículo destino y origen</h2></div>
+          <div className="card-header"><h2 className="card-title">Artículo y combinación</h2></div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="ff-wrap">
-              <label className="ff-label ff-required">Artículo destino (dimensionado)</label>
-              <ItemDestinoConversionSelect
-                value={itemDestino?.id ?? ''}
-                selectedLabel={itemDestino?.itemName}
-                onSelect={(i) => { setItemDestino(i); setCombinacion({}) }}
-                onClear={() => { setItemDestino(null); setCombinacion({}) }}
+              <label className="ff-label ff-required">Artículo</label>
+              <ItemConversionSelect
+                value={item?.id ?? ''}
+                selectedLabel={item?.itemName}
+                onSelect={handleSelectItem}
+                onClear={handleClearItem}
               />
             </div>
-
-            {itemDestino && (
-              <div className="ff-wrap">
-                <label className="ff-label">Ítem genérico de origen</label>
-                {usarOtroOrigen ? (
-                  <ItemSelect
-                    value={itemOrigenOverride?.id ?? ''}
-                    selectedLabel={itemOrigenOverride?.itemName}
-                    onSelect={setItemOrigenOverride}
-                    onClear={() => setItemOrigenOverride(null)}
-                    excludeDimensioned
-                    placeholder="Buscar ítem genérico…"
-                  />
-                ) : itemDestino.itemGenericoOrigen ? (
-                  <div className="ff-input" style={{ color: 'var(--text-secondary)', cursor: 'default', background: 'var(--bg-muted)' }}>
-                    {itemDestino.itemGenericoOrigen}
-                  </div>
-                ) : (
-                  <div className="inline-alert inline-alert-error">
-                    <Info size={14} />
-                    Este artículo no tiene configurado un ítem genérico de origen — configúralo en
-                    Catálogo → Artículos antes de convertir, o usa otro ítem de origen abajo.
-                  </div>
-                )}
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-size-sm"
-                  style={{ alignSelf: 'flex-start', marginTop: 4 }}
-                  onClick={() => { setUsarOtroOrigen((v) => !v); setItemOrigenOverride(null) }}
-                >
-                  {usarOtroOrigen ? 'Usar el genérico configurado en el artículo' : 'Usar otro ítem de origen'}
-                </button>
-              </div>
-            )}
 
             <div className="form-row form-row-3">
               <div className="ff-wrap">
@@ -248,11 +225,11 @@ export default function ConversionDimensionForm() {
                   onSearch={setWarehouseSearch}
                   selectedLabel={warehouseOptions.find((w) => w.value === warehouse)?.label ?? ''}
                   placeholder="Almacén"
-                  disabled={!itemDestino}
+                  disabled={!item}
                 />
-                {disponibleOrigen && (
+                {sinEspecificar !== undefined && (
                   <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                    Disponible de "{itemOrigenLabel ?? itemOrigenCodigo}" en este almacén: {disponibleOrigen.disponible}
+                    Stock disponible sin combinación en este almacén: {sinEspecificar} unidades
                   </span>
                 )}
               </div>
@@ -270,14 +247,14 @@ export default function ConversionDimensionForm() {
               </div>
             </div>
 
-            {itemDestino && itemDestinoDimensiones.length > 0 && (
+            {item && itemDimensiones.length > 0 && (
               <div className="ff-wrap">
                 <label className="ff-label ff-required">
                   Combinación a asignar
                   <ArrowRight size={12} style={{ verticalAlign: 'middle', margin: '0 4px' }} />
                 </label>
                 <CombinacionDimensionSelector
-                  itemDimensiones={itemDestinoDimensiones}
+                  itemDimensiones={itemDimensiones}
                   value={combinacion}
                   onChange={setCombinacion}
                 />
@@ -318,7 +295,7 @@ export default function ConversionDimensionForm() {
             className="btn btn-navy"
             disabled={
               conversionMutation.isPending ||
-              !itemDestino ||
+              !item ||
               !warehouse ||
               !combinacionLista ||
               qty === '' ||
@@ -333,7 +310,7 @@ export default function ConversionDimensionForm() {
       {resultado && (
         <div className="inline-alert inline-alert-success" style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>
-            Conversión aplicada: <strong>{resultado.qty}</strong> unidades de <strong>{resultado.itemOrigen}</strong> → <strong>{resultado.itemDestino}</strong>.
+            Conversión aplicada: <strong>{resultado.qty}</strong> unidades de <strong>{resultado.itemCode}</strong> → combinación elegida en <strong>{resultado.warehouse}</strong>.
           </span>
           <button type="button" className="btn btn-ghost btn-size-sm" onClick={resetForm}>Hacer otra conversión</button>
         </div>
