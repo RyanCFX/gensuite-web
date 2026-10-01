@@ -1227,6 +1227,7 @@ es un `Customer`, así que los permisos ERPNext son los de `Customer`.
 | `inventario.seriales.consultar` | Ver seriales | `Serial No.read` | — |
 | `inventario.ajustar` | Ajustar combinación (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §8.5) | `Stock Entry.create` | — |
 | `inventario.reclasificar` | Reclasificar combinación (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §8.6) | `Stock Entry.create` | — |
+| `inventario.convertir-dimension` | Conversión a Ítem Dimensionado — Convertir (docs/tasks/PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §4) | `Stock Entry.create` | — |
 
 #### Libro Diario / Libro Mayor
 

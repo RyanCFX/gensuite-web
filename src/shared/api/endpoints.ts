@@ -195,6 +195,7 @@ export const ENDPOINTS = {
     repostValuacion: '/inventory/repost-valuacion',
     ajustesDimension: '/inventory/ajustes-dimension',
     reclasificaciones: '/inventory/reclasificaciones',
+    conversionDimension: '/inventory/conversion-dimension',
     stockPorDimension: (itemCode: string) => `/inventory/items/${itemCode}/stock-por-dimension`,
     verificarStockPorDimension: '/inventory/stock-por-dimension/verificar',
   },

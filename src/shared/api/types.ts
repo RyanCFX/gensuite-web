@@ -1529,6 +1529,17 @@ export interface Item {
    *  etiqueta legible (§10.4) — resolver contra el catálogo de GET /catalog/dimensiones-inventario. */
   dimensiones?: ItemDimensionDeclarada[];
   reglasCombinacion?: ReglaCombinacion[];
+  // ─── Conversión de Ítem Genérico a Ítem Dimensionado — docs/tasks/
+  // PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §3 ───────────────────────────
+  /** Ítem SIN dimensiones (plano) del que se obtiene este ítem mediante conversión
+   *  (`POST /inventory/conversion-dimension`). Solo tiene sentido en un ítem con
+   *  `usaDimensiones: true`. `null`/ausente si no está configurado. */
+  itemGenericoOrigen?: string | null;
+  /** Nativo de ERPNext (`is_sales_item`). Default `true` si se omite — ningún artículo existente
+   *  cambia de comportamiento. */
+  isSalesItem?: boolean;
+  /** Nativo de ERPNext (`is_purchase_item`). Default `true` si se omite. */
+  isPurchaseItem?: boolean;
 }
 
 /** Lista CERRADA — únicos valores válidos (§6.2). */
@@ -1828,6 +1839,14 @@ export interface CreateItemDto {
    *  configuración (§0.3, §4.5) — el servidor rechaza el intento con un mensaje dedicado. */
   dimensiones?: { dimension: string; valoresPermitidos?: string[] }[];
   reglasCombinacion?: ReglaCombinacion[];
+  /** Ítem genérico de origen para conversión (§3.1 de PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md).
+   *  `''` quita el vínculo — mismo patrón que `purchaseTaxTemplate`. El servidor rechaza con 400 si
+   *  el ítem elegido tiene dimensiones propias, o si apunta al propio artículo. */
+  itemGenericoOrigen?: string;
+  /** Nativo de ERPNext (`is_sales_item`) — default `true` si se omite. */
+  isSalesItem?: boolean;
+  /** Nativo de ERPNext (`is_purchase_item`) — default `true` si se omite. */
+  isPurchaseItem?: boolean;
 }
 
 export type UpdateItemDto = Partial<CreateItemDto>;
@@ -2036,6 +2055,36 @@ export interface ReclasificacionDimensionResult {
   qty: number;
   postingDate: string;
   branch?: string;
+}
+
+// ─── Conversión de Ítem Genérico a Ítem Dimensionado — docs/tasks/
+// PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §4 ───────────────────────────
+export interface ConversionDimensionDto {
+  /** Opcional — si se omite, el servidor lo resuelve desde `Item.itemGenericoOrigen` del
+   *  `itemDestino`. Indicarlo explícito solo para usar un genérico distinto al configurado. */
+  itemOrigen?: string;
+  /** El ítem DIMENSIONADO al que se convierte. */
+  itemDestino: string;
+  /** Mismo almacén para la salida del genérico y la entrada del dimensionado. */
+  warehouse: string;
+  qty: number;
+  /** La combinación completa a asignar — NO puede venir vacío. */
+  dimensiones: DimensionesLinea;
+  postingDate?: string;
+  remarks?: string;
+  branch?: string;
+}
+
+export interface ConversionDimensionResult {
+  id: string;
+  tipo: string;
+  itemOrigen: string;
+  itemDestino: string;
+  warehouse: string;
+  qty: number;
+  postingDate: string;
+  branch?: string;
+  remarks?: string;
 }
 
 // ─── Cuentas por Pagar (catálogo de conceptos recurrentes de gasto) ───────────

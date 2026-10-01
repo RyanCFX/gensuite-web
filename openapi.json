@@ -13171,6 +13171,45 @@
         ]
       }
     },
+    "/api/v1/inventory/conversion-dimension": {
+      "post": {
+        "operationId": "ConversionDimensionController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConversionDimensionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Convierte N unidades de un ítem genérico (sin dimensiones) en N unidades de un ítem dimensionado, asignando la combinación en ese momento — permite comprar un artículo sin conocer la combinación exacta y decidirla recién antes de venderlo. Configuración por producto (Item.custom_item_generico_origen), nunca de tenant.",
+        "tags": [
+          "Inventario"
+        ]
+      }
+    },
     "/api/v1/catalog/dimensiones-inventario": {
       "get": {
         "description": "Incluye cuántos espacios quedan libres: el número de dimensiones tiene un tope por empresa que se fija al darla de alta, porque cada una agrega una columna indexada al libro de inventario.",
@@ -41424,6 +41463,57 @@
           "qty"
         ]
       },
+      "CreateConversionDimensionDto": {
+        "type": "object",
+        "properties": {
+          "itemOrigen": {
+            "type": "string",
+            "description": "Ítem genérico de origen (sin dimensiones). Si se omite, se resuelve desde Item.custom_item_generico_origen del itemDestino — si tampoco está configurado ahí, se rechaza con 400."
+          },
+          "itemDestino": {
+            "type": "string",
+            "example": "BUMPER-DIM",
+            "description": "Ítem dimensionado destino de la conversión."
+          },
+          "warehouse": {
+            "type": "string",
+            "example": "ALM-01"
+          },
+          "qty": {
+            "type": "number",
+            "example": 10,
+            "description": "Cantidad a convertir."
+          },
+          "dimensiones": {
+            "type": "object",
+            "example": {
+              "anio": "ANIO-2024",
+              "color": "COLOR-ROJO"
+            },
+            "description": "Combinación completa a asignar al ítem destino — TODAS las dimensiones que declara ese artículo.",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "postingDate": {
+            "type": "string",
+            "description": "Fecha contable. Default: hoy."
+          },
+          "remarks": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string",
+            "description": "Sucursal del documento. Si se omite, se resuelve en cascada (usuario → dimensión por defecto → única sucursal existente), igual que el resto de los módulos de inventario."
+          }
+        },
+        "required": [
+          "itemDestino",
+          "warehouse",
+          "qty",
+          "dimensiones"
+        ]
+      },
       "CreateDimensionDto": {
         "type": "object",
         "properties": {
@@ -43436,6 +43526,21 @@
             "items": {
               "$ref": "#/components/schemas/ReglaCombinacionDto"
             }
+          },
+          "itemGenericoOrigen": {
+            "type": "string",
+            "example": "BUMPER-GEN",
+            "description": "Ítem SIN dimensiones (plano) del que se obtiene este ítem mediante conversión (POST /inventory/conversion-dimension) — habilita comprar el genérico sin dimensión y convertirlo asignando la combinación recién antes de vender. Solo tiene sentido en un ítem que declara \"dimensiones\" arriba. El ítem indicado acá debe ser plano (sin ninguna dimensión propia) — ERPNext rechaza con 400 si no lo es. Enviar \"\" para quitar la configuración (el ítem deja de participar del flujo de conversión)."
+          },
+          "isSalesItem": {
+            "type": "boolean",
+            "default": true,
+            "description": "Campo NATIVO de Item (is_sales_item). Default true. Poné en false para un ítem que nunca debe venderse directo (ej. el ítem GENÉRICO de un flujo de conversión de dimensión — se compra, nunca se vende sin antes convertirlo)."
+          },
+          "isPurchaseItem": {
+            "type": "boolean",
+            "default": true,
+            "description": "Campo NATIVO de Item (is_purchase_item). Default true. Poné en false para un ítem que nunca debe comprarse directo (ej. el ítem DIMENSIONADO de un flujo de conversión — solo se obtiene convirtiendo su ítem genérico, nunca se compra tal cual)."
           }
         },
         "required": [
@@ -43671,6 +43776,21 @@
             "items": {
               "$ref": "#/components/schemas/ReglaCombinacionDto"
             }
+          },
+          "itemGenericoOrigen": {
+            "type": "string",
+            "example": "BUMPER-GEN",
+            "description": "Ítem SIN dimensiones (plano) del que se obtiene este ítem mediante conversión (POST /inventory/conversion-dimension) — habilita comprar el genérico sin dimensión y convertirlo asignando la combinación recién antes de vender. Solo tiene sentido en un ítem que declara \"dimensiones\" arriba. El ítem indicado acá debe ser plano (sin ninguna dimensión propia) — ERPNext rechaza con 400 si no lo es. Enviar \"\" para quitar la configuración (el ítem deja de participar del flujo de conversión)."
+          },
+          "isSalesItem": {
+            "type": "boolean",
+            "default": true,
+            "description": "Campo NATIVO de Item (is_sales_item). Default true. Poné en false para un ítem que nunca debe venderse directo (ej. el ítem GENÉRICO de un flujo de conversión de dimensión — se compra, nunca se vende sin antes convertirlo)."
+          },
+          "isPurchaseItem": {
+            "type": "boolean",
+            "default": true,
+            "description": "Campo NATIVO de Item (is_purchase_item). Default true. Poné en false para un ítem que nunca debe comprarse directo (ej. el ítem DIMENSIONADO de un flujo de conversión — solo se obtiene convirtiendo su ítem genérico, nunca se compra tal cual)."
           }
         }
       },
@@ -48802,6 +48922,10 @@
             "type": "boolean",
             "description": "Reclasificación de Combinación — Reclasificar"
           },
+          "inventario.convertir-dimension": {
+            "type": "boolean",
+            "description": "Conversión a Ítem Dimensionado — Convertir"
+          },
           "clientes.crear": {
             "type": "boolean",
             "description": "Clientes — Nuevo"
@@ -50069,6 +50193,7 @@
           "inventario.carga-inicial.anular",
           "inventario.ajustar",
           "inventario.reclasificar",
+          "inventario.convertir-dimension",
           "clientes.crear",
           "clientes.listar",
           "clientes.eliminar",

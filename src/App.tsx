@@ -74,6 +74,7 @@ const CargaInicialForm     = lazy(() => import('@/features/inventory/CargaInicia
 const CargaInicialDetail   = lazy(() => import('@/features/inventory/CargaInicialDetail'))
 const AjusteDimensionForm  = lazy(() => import('@/features/inventory/AjusteDimensionForm'))
 const ReclasificacionForm  = lazy(() => import('@/features/inventory/ReclasificacionForm'))
+const ConversionDimensionForm = lazy(() => import('@/features/inventory/ConversionDimensionForm'))
 const ComprasPage     = lazy(() => import('@/features/compras/ComprasPage'))
 const CompraDetail    = lazy(() => import('@/features/compras/CompraDetail'))
 const CompraForm      = lazy(() => import('@/features/compras/CompraForm'))
@@ -302,6 +303,7 @@ export default function App() {
             <Route path="/inventario/carga-inicial/:id" element={<Suspense fallback={<PageLoader />}><CargaInicialDetail /></Suspense>} />
             <Route path="/inventario/ajustes-dimension" element={<Suspense fallback={<PageLoader />}><AjusteDimensionForm /></Suspense>} />
             <Route path="/inventario/reclasificaciones" element={<Suspense fallback={<PageLoader />}><ReclasificacionForm /></Suspense>} />
+            <Route path="/inventario/conversion-dimension" element={<Suspense fallback={<PageLoader />}><ConversionDimensionForm /></Suspense>} />
 
             {/* Compras */}
             <Route path="/compras" element={<Suspense fallback={<PageLoader />}><ComprasPage /></Suspense>} />

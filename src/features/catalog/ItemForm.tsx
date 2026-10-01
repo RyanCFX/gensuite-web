@@ -16,6 +16,7 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { MultiSearchSelect } from '@/shared/ui/MultiSearchSelect'
+import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { AttributeSelect } from '@/components/shared/AttributeSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { ArrowLeft, Plus, Minus, Trash2, ImagePlus, Loader2, Save } from 'lucide-react'
@@ -62,6 +63,11 @@ const schema = z.object({
   asignarSerialEnDespacho: z.boolean().optional(),
   purchaseTaxTemplate: z.string().optional(),
   salesTaxTemplate: z.string().optional(),
+  // ── Conversión de Ítem Genérico a Ítem Dimensionado — docs/tasks/
+  // PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §3 ─────────────────────────
+  itemGenericoOrigen: z.string().optional(),
+  isSalesItem: z.boolean().optional(),
+  isPurchaseItem: z.boolean().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -326,6 +332,9 @@ export default function ItemForm() {
       asignarSerialEnDespacho: false,
       purchaseTaxTemplate: '',
       salesTaxTemplate: '',
+      itemGenericoOrigen: '',
+      isSalesItem: true,
+      isPurchaseItem: true,
     },
   })
 
@@ -377,6 +386,9 @@ export default function ItemForm() {
       asignarSerialEnDespacho: existingItem.asignarSerialEnDespacho ?? false,
       purchaseTaxTemplate: existingItem.purchaseTaxTemplate ?? '',
       salesTaxTemplate: existingItem.salesTaxTemplate ?? '',
+      itemGenericoOrigen: existingItem.itemGenericoOrigen ?? '',
+      isSalesItem: existingItem.isSalesItem ?? true,
+      isPurchaseItem: existingItem.isPurchaseItem ?? true,
     })
     setBarcodes(existingItem.barcodes ?? [])
     setShowBarcodes((existingItem.barcodes?.length ?? 0) > 0)
@@ -400,6 +412,15 @@ export default function ItemForm() {
   const watchedPriceB = watch('priceB')
   const watchedPriceC = watch('priceC')
   const watchedTrackingType = watch('trackingType')
+  // ── Conversión de Ítem Genérico a Ítem Dimensionado — docs/tasks/
+  // PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §3.1. Resuelve el nombre legible del
+  // `itemGenericoOrigen` guardado (solo tenemos el código) para el `selectedLabel` del picker.
+  const watchedItemGenericoOrigen = watch('itemGenericoOrigen')
+  const { data: itemGenericoOrigenData } = useQuery({
+    queryKey: ['item-ref', watchedItemGenericoOrigen],
+    queryFn: () => getItem(watchedItemGenericoOrigen!),
+    enabled: !!watchedItemGenericoOrigen,
+  })
 
   // §4.4 — exclusiones: plantilla de variantes, variante, o artículo con lotes. `hasVariants`
   // (estado local) cubre la creación; en edición un template ya existente se detecta por
@@ -511,6 +532,12 @@ export default function ItemForm() {
       // Servicios: sección "Compra" oculta — no se manda impuesto de compra.
       purchaseTaxTemplate: !isProduct ? undefined : (noPurchaseTax ? undefined : data.purchaseTaxTemplate || undefined),
       salesTaxTemplate: noSalesTax ? undefined : data.salesTaxTemplate || undefined,
+      // Solo tiene sentido en un artículo con dimensiones — mismo criterio que `dimensionesPayload`
+      // más abajo. Se manda '' explícito (no se omite) para poder QUITAR un vínculo ya guardado,
+      // igual que otros campos Link opcionales de este endpoint (ej. purchaseTaxTemplate).
+      itemGenericoOrigen: (dimensionesBlockUsable && dimensionesItem.length > 0) ? (data.itemGenericoOrigen ?? '') : undefined,
+      isSalesItem: data.isSalesItem,
+      isPurchaseItem: data.isPurchaseItem,
     }
 
     // §4.1/§4.6 — `usaDimensiones` NUNCA se manda (el servidor la ignora/rechaza, es de solo
@@ -1497,6 +1524,28 @@ export default function ItemForm() {
               )}
             </div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* docs/tasks/PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §3.2 — nativos de
+                  ERPNext (is_sales_item/is_purchase_item), default activados. Visibles siempre acá
+                  (incluso sin ninguna dimensión declarada) — el ítem GENÉRICO de un par de
+                  conversión nunca tiene dimensiones pero igual necesita poder marcar "Se puede
+                  vender: no". Desactivar "Se puede comprar" en el ítem DIMENSIONADO que solo se
+                  obtiene por conversión desde su genérico. */}
+              <div className="form-row">
+                <div className="ff-wrap">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                    <input type="checkbox" className="ff-check" {...register('isSalesItem')} />
+                    Se puede vender este artículo
+                  </label>
+                </div>
+                <div className="ff-wrap">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                    <input type="checkbox" className="ff-check" {...register('isPurchaseItem')} />
+                    Se puede comprar este artículo
+                    <FieldTooltip>Desactívalo para un artículo dimensionado que solo se debe obtener por conversión desde su ítem genérico.</FieldTooltip>
+                  </label>
+                </div>
+              </div>
+
               {dimensionesActivas.length === 0 ? (
                 <p className="ff-hint">
                   Todavía no hay dimensiones de inventario creadas para tu empresa.{' '}
@@ -1645,6 +1694,35 @@ export default function ItemForm() {
                           </table>
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* docs/tasks/PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §3.1 — solo tiene
+                      sentido en un ítem DIMENSIONADO (ya declaró al menos un eje arriba). */}
+                  {dimensionesItem.length > 0 && (
+                    <div className="ff-wrap">
+                      <label className="ff-label" htmlFor="itemGenericoOrigen">
+                        Ítem genérico de origen
+                        <FieldTooltip>
+                          Este artículo se obtiene convirtiendo este otro ítem (sin dimensiones). Dejalo
+                          vacío si este artículo se compra y vende directo con su propia combinación.
+                        </FieldTooltip>
+                      </label>
+                      <Controller
+                        name="itemGenericoOrigen"
+                        control={control}
+                        render={({ field }) => (
+                          <ItemSelect
+                            value={field.value ?? ''}
+                            selectedLabel={itemGenericoOrigenData?.itemName ?? field.value ?? ''}
+                            onSelect={(item) => field.onChange(item.id)}
+                            onClear={() => field.onChange('')}
+                            excludeDimensioned
+                            placeholder="Buscar ítem genérico (sin dimensiones)…"
+                          />
+                        )}
+                      />
+                      {errors.itemGenericoOrigen && <span className="ff-error">{errors.itemGenericoOrigen.message}</span>}
                     </div>
                   )}
                 </>

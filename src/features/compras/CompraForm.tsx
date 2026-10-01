@@ -633,6 +633,7 @@ export default function CompraForm() {
 
   // ── Multimoneda (docs/tasks/60_multimoneda_dop_usd_eur.md §4) ──────────────
   const [currency, setCurrency] = useState('')
+  const [currencyTouched, setCurrencyTouched] = useState(false)
   const [conversionRate, setConversionRate] = useState<number | ''>('')
   const { data: monedas } = useQuery({
     queryKey: ['monedas'],
@@ -770,9 +771,17 @@ export default function CompraForm() {
     setSupplierName(supplier.supplierName)
     if (!tipoBienes606Touched && supplier.defaultTipoBienes606) setTipoBienes606(supplier.defaultTipoBienes606)
     if (!formaPago606Touched && supplier.defaultFormaPago606) setFormaPago606(supplier.defaultFormaPago606)
+    if (!tipoComprobante && supplier.ncfTypeDefault) setTipoComprobante(supplier.ncfTypeDefault)
+    if (!cuentaCxpOverride && supplier.cuentaCxpDefault) setCuentaCxpOverride(supplier.cuentaCxpDefault)
+    if (!currencyTouched && supplier.defaultCurrency) setCurrency(supplier.defaultCurrency)
     if (!tipoPagoTouched) {
       if (!supplier.diasCredito) setTipoPago('Contado')
       else if (supplier.defaultTipoPagoProveedor) setTipoPago(supplier.defaultTipoPagoProveedor)
+    }
+    if (supplier.diasCredito) {
+      const base = new Date(postingDate || todayIso())
+      base.setDate(base.getDate() + supplier.diasCredito)
+      setDueDate(format(base, 'yyyy-MM-dd'))
     }
     queryClient.invalidateQueries({ queryKey: ['supplierSearch'] })
   }
@@ -880,6 +889,23 @@ export default function CompraForm() {
     if (!tipoBienes606 && s.defaultTipoBienes606) setTipoBienes606(s.defaultTipoBienes606)
     if (!formaPago606 && s.defaultFormaPago606) setFormaPago606(s.defaultFormaPago606)
     if (!tipoComprobante && s.ncfTypeDefault) setTipoComprobante(s.ncfTypeDefault)
+    if (!cuentaCxpOverride && s.cuentaCxpDefault) setCuentaCxpOverride(s.cuentaCxpDefault)
+    if (!currencyTouched && s.defaultCurrency) setCurrency(s.defaultCurrency)
+
+    // Respaldo del onChange del selector — ese resuelve contra el listado paginado y puede
+    // no traer al proveedor si la búsqueda ya rotó. Misma regla: sin días de crédito,
+    // Contado forzado; con días, el default configurado. Solo en creación para no pisar
+    // lo hidratado en edición (ahí el onChange sigue mandando si el usuario cambia).
+    if (!isEdit && !tipoPagoTouched) {
+      if (!s.diasCredito) setTipoPago('Contado')
+      else if (s.defaultTipoPagoProveedor) setTipoPago(s.defaultTipoPagoProveedor)
+    }
+    // Sin fecha puesta por el usuario: postingDate + días de crédito (igual que onChange).
+    if (!isEdit && s.diasCredito && !dueDate) {
+      const base = new Date(postingDate || todayIso())
+      base.setDate(base.getDate() + s.diasCredito)
+      setDueDate(format(base, 'yyyy-MM-dd'))
+    }
 
     setTaxesTemplate((prev) =>
       prev.length === 0 ? (s.impuestoComprasDefault?.map((d) => d.id) ?? []) : prev,
@@ -887,7 +913,7 @@ export default function CompraForm() {
     setRetenciones((prev) =>
       prev.length === 0 ? (s.retencionesDefault?.map((d) => d.id) ?? []) : prev,
     )
-  }, [supplierDetail, esProveedorOcasional, tipoBienes606, formaPago606, tipoComprobante])
+  }, [supplierDetail, esProveedorOcasional, tipoBienes606, formaPago606, tipoComprobante, cuentaCxpOverride, currencyTouched, isEdit, tipoPagoTouched, dueDate, postingDate])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Hint: cuando el usuario no dejó ninguna retención pero el proveedor tiene defaults,
@@ -1537,7 +1563,7 @@ export default function CompraForm() {
                     <label className="ff-label">Moneda</label>
                     <Select
                       value={currency || monedaBase}
-                      onValueChange={(val) => { setCurrency(val === monedaBase ? '' : val); setConversionRate('') }}
+                      onValueChange={(val) => { setCurrency(val === monedaBase ? '' : val); setCurrencyTouched(true); setConversionRate('') }}
                       disabled={isReturn}
                     >
                       <SelectItem value={monedaBase}>{monedaBase}</SelectItem>

@@ -22,6 +22,8 @@ import type {
   AjusteDimensionResult,
   ReclasificacionDimensionDto,
   ReclasificacionDimensionResult,
+  ConversionDimensionDto,
+  ConversionDimensionResult,
 } from './types'
 
 export interface InventoryFilterParams extends PaginationParams {
@@ -157,6 +159,17 @@ export async function ajustarDimension(data: AjusteDimensionDto) {
 export async function reclasificarDimension(data: ReclasificacionDimensionDto) {
   const res = await client.post<{ success: true; data: ReclasificacionDimensionResult }>(
     ENDPOINTS.inventory.reclasificaciones,
+    data,
+  )
+  return unwrap(res)
+}
+
+/** Consume N unidades de un ítem genérico (sin dimensiones) y produce N unidades de un ítem
+ *  dimensionado, asignando la combinación — docs/tasks/
+ *  PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §4. */
+export async function convertirDimension(data: ConversionDimensionDto) {
+  const res = await client.post<{ success: true; data: ConversionDimensionResult }>(
+    ENDPOINTS.inventory.conversionDimension,
     data,
   )
   return unwrap(res)

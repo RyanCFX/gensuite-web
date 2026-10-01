@@ -41,7 +41,6 @@ const schema = z
     abaSwift: z.string().optional(),
     defaultTipoBienes606: z.string().optional(),
     defaultFormaPago606: z.string().optional(),
-    defaultTipoPagoProveedor: z.string().optional(),
     ncfTypeDefault: z.string().optional(),
     almacenCompraDefault: z.string().optional(),
     cuentaCxpDefault: z.string().optional(),
@@ -72,6 +71,15 @@ export interface SupplierFormPanelProps {
   supplier?: Supplier
   onSuccess: (supplier: Supplier) => void
   onCancel: () => void
+}
+
+/** Resuelve el label a mostrar para un valor guardado de catálogo fiscal/almacén. El backend
+ *  acepta el código corto o el string completo en los 606, así que lo guardado puede venir en
+ *  cualquiera de las dos formas — se matchea tolerante (por value o por label) y, si ni así
+ *  matchea, se muestra el valor crudo en vez de un campo aparentemente vacío. */
+function catalogLabel(items: { value: string; label: string }[] | undefined, value?: string | null): string {
+  if (!value) return ''
+  return items?.find((t) => t.value === value || t.label === value)?.label ?? value
 }
 
 export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFormPanelProps) {
@@ -206,7 +214,6 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
       abaSwift: '',
       defaultTipoBienes606: '',
       defaultFormaPago606: '',
-      defaultTipoPagoProveedor: '',
       ncfTypeDefault: '',
       almacenCompraDefault: '',
       cuentaCxpDefault: '',
@@ -241,7 +248,6 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
         abaSwift: supplier.abaSwift ?? '',
         defaultTipoBienes606: supplier.defaultTipoBienes606 ?? '',
         defaultFormaPago606: supplier.defaultFormaPago606 ?? '',
-        defaultTipoPagoProveedor: supplier.defaultTipoPagoProveedor ?? '',
         ncfTypeDefault: supplier.ncfTypeDefault ?? '',
         almacenCompraDefault: supplier.almacenCompraDefault ?? '',
         cuentaCxpDefault: supplier.cuentaCxpDefault ?? '',
@@ -275,7 +281,8 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
         abaSwift: data.abaSwift || undefined,
         defaultTipoBienes606: data.defaultTipoBienes606 || undefined,
         defaultFormaPago606: data.defaultFormaPago606 || undefined,
-        defaultTipoPagoProveedor: (data.defaultTipoPagoProveedor || undefined) as 'Contado' | 'Crédito' | undefined,
+        // Sin campo visible: se deriva de los días de crédito (días > 0 → Crédito, si no Contado).
+        defaultTipoPagoProveedor: data.diasCredito > 0 ? 'Crédito' : 'Contado',
         ncfTypeDefault: data.ncfTypeDefault || undefined,
         almacenCompraDefault: data.almacenCompraDefault || undefined,
         cuentaCxpDefault: data.cuentaCxpDefault || undefined,
@@ -300,7 +307,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<FormValues>) => updateSupplier(supplier!.id, data as unknown as UpdateProveedorDto),
+    mutationFn: (data: Partial<FormValues> & { defaultTipoPagoProveedor?: 'Contado' | 'Crédito' }) => updateSupplier(supplier!.id, data as unknown as UpdateProveedorDto),
     onSuccess: (data) => {
       toast.success('Proveedor actualizado correctamente')
       queryClient.invalidateQueries({ queryKey: ['suppliers'] })
@@ -322,7 +329,12 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
       // A diferencia del resto de los campos de este PUT, `defaultCurrency` es un enum
       // restringido en el backend (DOP/USD/EUR) — un '' sin tocar se rechazaría con
       // CURRENCY_NOT_SUPPORTED en vez de tratarse como "no enviado".
-      updateMutation.mutate({ ...values, defaultCurrency: values.defaultCurrency || undefined })
+      // `defaultTipoPagoProveedor` no tiene campo visible: se deriva de los días de crédito.
+      updateMutation.mutate({
+        ...values,
+        defaultTipoPagoProveedor: values.diasCredito > 0 ? 'Crédito' : 'Contado',
+        defaultCurrency: values.defaultCurrency || undefined,
+      })
     } else {
       createMutation.mutate(values)
     }
@@ -464,7 +476,10 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                   <input className="ff-input" {...register('mobileNo')} />
                 </div>
                 <div className="ff-wrap">
-                  <label className="ff-label">Días de Crédito</label>
+                  <label className="ff-label">
+                    Días de Crédito
+                    <FieldTooltip>Define el tipo de pago del proveedor: con días mayor a 0 queda a Crédito, en 0 queda de Contado.</FieldTooltip>
+                  </label>
                   <input className="ff-input" type="number" min={0} {...register('diasCredito', { valueAsNumber: true })} />
                 </div>
               </div>
@@ -620,7 +635,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                         onChange={field.onChange}
                         options={defaultTipoBienes606Options}
                         onSearch={setDefaultTipoBienes606Search}
-                        selectedLabel={catalogos?.tipoBienes606?.find((t) => t.value === field.value)?.label ?? ''}
+                        selectedLabel={catalogLabel(catalogos?.tipoBienes606, field.value)}
                         placeholder="Sin configurar"
                       />
                     )}
@@ -637,7 +652,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                         onChange={field.onChange}
                         options={defaultFormaPago606Options}
                         onSearch={setDefaultFormaPago606Search}
-                        selectedLabel={catalogos?.formaPago606?.find((t) => t.value === field.value)?.label ?? ''}
+                        selectedLabel={catalogLabel(catalogos?.formaPago606, field.value)}
                         placeholder="Sin configurar"
                       />
                     )}
@@ -660,19 +675,6 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
             </p>
             <div className="form-section">
               <div className="ff-wrap">
-                <label className="ff-label">Tipo de Pago</label>
-                <Controller
-                  name="defaultTipoPagoProveedor"
-                  control={control}
-                  render={({ field }) => (
-                    <Select value={field.value ?? ''} onValueChange={field.onChange} placeholder="Sin configurar">
-                      <SelectItem value="Contado">Contado</SelectItem>
-                      <SelectItem value="Crédito">Crédito</SelectItem>
-                    </Select>
-                  )}
-                />
-              </div>
-              <div className="ff-wrap">
                 <label className="ff-label">
                   Tipo de Comprobante por Defecto
                   <FieldTooltip>Prellena el tipo de comprobante al registrar una Compra o Gasto a este proveedor — editable por documento. No valida ni restringe nada.</FieldTooltip>
@@ -686,7 +688,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                       onChange={(v) => field.onChange(v || '')}
                       options={ncfDefaultOptions}
                       onSearch={setNcfDefaultSearch}
-                      selectedLabel={ncfDefaultOptions.find((o) => o.value === field.value)?.label ?? ''}
+                      selectedLabel={catalogLabel(ncfDefaultOptions, field.value)}
                       placeholder="Sin configurar"
                     />
                   )}
@@ -710,7 +712,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                       onChange={field.onChange}
                       options={almacenCompraDefaultOptions}
                       onSearch={() => {}}
-                      selectedLabel={almacenesData?.find((w) => w.id === field.value)?.name ?? ''}
+                      selectedLabel={almacenesData?.find((w) => w.id === field.value || w.name === field.value)?.name ?? field.value ?? ''}
                       placeholder="Se resuelve por la sucursal de la compra"
                     />
                   )}

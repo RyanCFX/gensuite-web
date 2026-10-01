@@ -1,5 +1,5 @@
 // GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
-// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (466 acciones). Regenerar: node scripts/gen-acciones.mjs
+// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (467 acciones). Regenerar: node scripts/gen-acciones.mjs
 
 export type AccionId =
   | 'apertura.compras.anular'
@@ -270,6 +270,7 @@ export type AccionId =
   | 'inventario.conteos.crear'
   | 'inventario.conteos.listar'
   | 'inventario.conteos.someter'
+  | 'inventario.convertir-dimension'
   | 'inventario.historial.consultar'
   | 'inventario.lotes.consultar'
   | 'inventario.reclasificar'
@@ -738,6 +739,7 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'inventario.conteos.crear',
   'inventario.conteos.listar',
   'inventario.conteos.someter',
+  'inventario.convertir-dimension',
   'inventario.historial.consultar',
   'inventario.lotes.consultar',
   'inventario.reclasificar',

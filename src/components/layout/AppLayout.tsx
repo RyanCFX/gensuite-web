@@ -54,6 +54,7 @@ import {
   History,
   Handshake,
   ArrowLeftRight,
+  Repeat,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { usePermissionsStore } from "@/stores/permissions.store";
@@ -256,6 +257,13 @@ const NAV_OPS: NavEntry[] = [
         label: "Reclasificación de Dimensión",
         icon: <ArrowRightLeft size={14} />,
         path: "/inventario/reclasificaciones",
+      },
+      {
+        // Conversión de Ítem Genérico a Ítem Dimensionado — docs/tasks/
+        // PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md §4.
+        label: "Conversión a Ítem Dimensionado",
+        icon: <Repeat size={14} />,
+        path: "/inventario/conversion-dimension",
       },
       {
         label: "Valoración de Stock",

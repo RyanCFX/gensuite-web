@@ -92,6 +92,7 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/inventario/zonas', accion: 'inventario.zonas.listar' },
   { pattern: '/inventario/ajustes-dimension', accion: 'inventario.ajustar' },
   { pattern: '/inventario/reclasificaciones', accion: 'inventario.reclasificar' },
+  { pattern: '/inventario/conversion-dimension', accion: 'inventario.convertir-dimension' },
   // Carga Inicial de Inventario — docs/tasks/PROMPT_CARGA_INICIAL_INVENTARIO_FRONTEND.md §2.
   // NO confundir con /apertura/inventario (Migración de Saldos): cuenta contable, semántica de
   // qty y permisos son independientes entre ambas pantallas.
