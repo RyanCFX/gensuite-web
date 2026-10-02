@@ -433,20 +433,48 @@ export interface CatalogoFiscalItem {
   label: string
 }
 
-export interface CatalogosFiscales {
+// GET /config/catalogos-fiscales — la forma depende de `?type` (ver descripción del endpoint
+// en openapi.json, tag Configuración, operación catalogos-fiscales):
+// - `?type=venta`: solo el bloque de venta (`ncfTypes` + `ncfTypesFisicos`).
+// - `?type=compra`: solo el bloque de compra (`ncfTypesCompra`, con B0x y sus E0x).
+// - sin `type`: ambos bloques (no usar en pantallas nuevas).
+// `tipoBienes606`, `formaPago606` y `facturacionElectronicaHabilitada` vienen siempre,
+// sin importar el `type`.
+export interface CatalogosFiscalesBase {
+  tipoBienes606: CatalogoFiscalItem[]
+  formaPago606: CatalogoFiscalItem[]
+  facturacionElectronicaHabilitada: boolean
+}
+
+/** Respuesta con `?type=venta` — `ncfTypes` trae E31/E32… si e-CF está habilitado, B0x si no. */
+export interface CatalogosFiscalesVenta extends CatalogosFiscalesBase {
+  /** Tipos para emitir en venta (electrónicos E3x/E4x o físicos B0x según el tenant). */
   ncfTypes: CatalogoFiscalItem[]
+  /** Siempre B0x — solo para el selector de tipo al crear una secuencia en /config/ncf. */
   ncfTypesFisicos: CatalogoFiscalItem[]
+}
+
+/** Respuesta con `?type=compra` — selector de tipo de comprobante del proveedor. */
+export interface CatalogosFiscalesCompra extends CatalogosFiscalesBase {
+  /** Siempre B0x + sus equivalentes E0x. */
+  ncfTypesCompra: CatalogoFiscalItem[]
+}
+
+/** Respuesta sin `type` (ambos bloques). Ninguna pantalla nueva debe pedirla así. */
+export interface CatalogosFiscales extends CatalogosFiscalesBase {
+  ncfTypes?: CatalogoFiscalItem[]
+  /** Ausente cuando se pide con `?type=compra`. */
+  ncfTypesFisicos?: CatalogoFiscalItem[]
   /** Ausente cuando se pide con `?type=venta` (docs/tasks/
    *  PROMPT_NCF_DEFAULT_REGIMENES_ESPECIALES_REDONDEO_FRONTEND.md §3). */
   ncfTypesCompra?: CatalogoFiscalItem[]
-  tipoBienes606: CatalogoFiscalItem[]
-  formaPago606: CatalogoFiscalItem[]
-  /** El backend siempre lo devuelve, sin importar el valor de `type` (§3). */
-  facturacionElectronicaHabilitada?: boolean
 }
 
 export type CatalogosFiscalesType = 'venta' | 'compra'
 
+export async function getCatalogosFiscales(params: { type: 'venta' }): Promise<CatalogosFiscalesVenta>
+export async function getCatalogosFiscales(params: { type: 'compra' }): Promise<CatalogosFiscalesCompra>
+export async function getCatalogosFiscales(params?: { type?: CatalogosFiscalesType }): Promise<CatalogosFiscales>
 export async function getCatalogosFiscales(params?: { type?: CatalogosFiscalesType }) {
   const res = await client.get<{ success: true; data: CatalogosFiscales }>(ENDPOINTS.config.catalogosFiscales, {
     params: params?.type ? { type: params.type } : undefined,

@@ -4,7 +4,9 @@ import Barcode from 'react-barcode'
 import { Image as ImageIcon, Layers } from 'lucide-react'
 import { resolveFileUrl } from '@/shared/api/client'
 import { formatMoney as formatCurrencyAmount } from '@/lib/formatters'
-import type { TemplateElement, TemplateFieldCategory } from './types'
+import { DEFAULT_REPEATER_LINES } from './constants'
+import { resolveRepeaterRows } from './flowLayout'
+import type { RepeaterElement, RepeaterToken, TableColumn, TemplateElement, TemplateFieldCategory } from './types'
 
 // Bindings multimoneda de Pos Invoice (docs/tasks/63_plantillas_multimoneda.md §1) — los 3
 // montos "*Base" se formatean como dinero (símbolo + separadores) en `empresa.monedaBase`, y la
@@ -145,24 +147,64 @@ function formatBoundDate(raw: unknown, pattern: string): string {
   }
 }
 
+/** Formatea un porcentaje solo para presentación (`18` -> `"18%"`) — nunca recalcula nada. */
+function formatPct(value: unknown): string {
+  if (value == null || value === '') return ''
+  const num = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(num)) return String(value ?? '')
+  return `${Number(num.toFixed(2))}%`
+}
+
+/** Tokens de campo del repetidor que son montos (se formatean con moneda, solo presentación). */
+const REPEATER_MONEY_KEYS = new Set(['precio', 'itbis', 'monto', 'total'])
+
+/** Tokens de campo del repetidor que son tasas/porcentajes. */
+const REPEATER_PCT_KEYS = new Set(['itbisPct', 'descuentoPct'])
+
+/** Resuelve un token del repetidor contra una fila — una key ausente es vacío, sin error. */
+function resolveRepeaterToken(row: Record<string, unknown>, token: RepeaterToken, currency?: string): string {
+  if (token.kind === 'text') return token.text ?? ''
+  const value = row[token.key]
+  if (value == null || value === '') return ''
+  if (REPEATER_MONEY_KEYS.has(token.key)) return formatMoney(value, currency)
+  if (REPEATER_PCT_KEYS.has(token.key)) return formatPct(value)
+  return String(value)
+}
+
+function repeaterLinesOf(element: RepeaterElement): RepeaterElement['lines'] {
+  return Array.isArray(element.lines) && element.lines.length > 0 ? element.lines : DEFAULT_REPEATER_LINES
+}
+
 /** Cada fila de `items.tabla` (§2.1 del doc) — es la única tabla que sabe dibujar el editor
- * hoy (TableColumn.key está fijo a columnas de línea de artículo). */
+ * hoy (TableColumn.key está fijo a columnas de línea de artículo). Desde el render-data nuevo
+ * trae además `itbis`, `itbisPct` y `total` (monto de la línea con ITBIS); `descripcion` ya
+ * viene con las dimensiones si el artículo está dimensionado, cortada a 40 caracteres. */
 interface ItemRow {
   descripcion?: string
+  codigo?: string
   cantidad?: number
   precio?: number
+  itbis?: number
+  itbisPct?: number
+  descuentoPct?: number
   monto?: number
+  /** Monto de la línea con ITBIS (si el precio ya incluía ITBIS, igual a `monto`). */
+  total?: number
+  uom?: string
   /** Solo con cobertura ARS; `null` en cualquier otra factura (§8.2 del doc de Farmacia v2). */
   coberturaArs?: number | null
   montoPaciente?: number | null
 }
 
-function formatMoney(value: unknown): string {
-  // `null`/`undefined` deben quedar en blanco, no en "0.00": es lo que traen los campos ARS en
-  // una factura sin aseguradora (Number(null) daría 0).
+/** Monto de una celda de la tabla de items, con símbolo de moneda (ej. "RD$4,000.95") — mismo
+ * formateador (`Intl.NumberFormat`, 2 decimales siempre) que el resto de montos de la factura,
+ * para que la columna de precios no quede como el único texto sin símbolo del ticket. */
+function formatMoney(value: unknown, currency?: string): string {
+  // `null`/`undefined` deben quedar en blanco, no en "RD$0.00": es lo que traen los campos ARS
+  // en una factura sin aseguradora (Number(null) daría 0).
   if (value == null || value === '') return ''
   const num = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(num) ? num.toFixed(2) : ''
+  return Number.isFinite(num) ? formatCurrencyAmount(num, currency) : ''
 }
 
 /** Evalúa una `ConditionalRule` contra el valor real del campo — comparación numérica cuando
@@ -337,44 +379,116 @@ export function TemplateEditorElementView({ element, fields, values }: Props) {
     case 'table': {
       const visibleColumns = element.columns.filter((c) => c.visible)
       // La tabla del editor solo representa items.tabla (TableColumn.key es fijo a columnas
-      // de línea de artículo) — no hay binding configurable a otra tabla.
+      // de línea de artículo) — no hay binding configurable a otra tabla. Si el backend mandara
+      // un truthy no-arreglo (ej. string serializado), Array.isArray evita que `rows.map` lance
+      // y deje el ticket entero en blanco — se degrada a tabla vacía en vez de romper el render.
+      const boundRows = values ? resolveBoundValue(values, 'items.tabla') : undefined
       const rows: ItemRow[] = values
-        ? ((resolveBoundValue(values, 'items.tabla') as ItemRow[] | undefined) ?? [])
-        : [1, 2].map((n) => ({ descripcion: `Producto ${n}`, cantidad: n, precio: 250, monto: n * 250 }))
+        ? (Array.isArray(boundRows) ? (boundRows as ItemRow[]) : [])
+        : [1, 2].map((n) => ({ descripcion: `Producto ${n}`, codigo: `PROD-00${n}`, cantidad: n, precio: 250, itbis: n * 90, itbisPct: 18, descuentoPct: 0, monto: n * 250, total: n * 340, uom: 'Und' }))
+      const currency = typeof values?.['factura.moneda'] === 'string' ? (values['factura.moneda'] as string) : undefined
+      function cellContent(c: TableColumn, row: ItemRow): string | number {
+        switch (c.key) {
+          case 'descripcion':
+            return row.descripcion ?? ''
+          case 'codigo':
+            return row.codigo ?? ''
+          case 'uom':
+            return row.uom ?? ''
+          case 'cantidad':
+            return row.cantidad ?? ''
+          case 'itbisPct':
+            return formatPct(row.itbisPct)
+          case 'descuentoPct':
+            return formatPct(row.descuentoPct)
+          case 'precio':
+            return formatMoney(row.precio, currency)
+          case 'itbis':
+            return formatMoney(row.itbis, currency)
+          case 'total':
+            // `total` es el monto con ITBIS; `monto` es el alias histórico (igual cuando el
+            // precio ya incluía ITBIS) — plantillas viejas guardan `monto`.
+            return formatMoney(row.total ?? row.monto, currency)
+          case 'monto':
+            return formatMoney(row.monto, currency)
+          case 'coberturaArs':
+            // `null` = factura sin aseguradora: la celda queda vacía, no en RD$0.00.
+            return formatMoney(row.coberturaArs, currency)
+          case 'montoPaciente':
+            return formatMoney(row.montoPaciente, currency)
+          default:
+            return ''
+        }
+      }
+      // NO se usa <table>/<thead>/<tbody>/<tr>/<td> — confirmado con un PDF real de "Guardar
+      // como PDF" generado por Chrome y, en comparación, con un elemento `list` en el mismo
+      // lugar: con la misma plantilla y los mismos datos, Chrome imprime la lista pero descarta
+      // por completo el contenido de las filas de un <table> (el texto ni siquiera existe en el
+      // content stream del PDF resultante) — bug de paginación de impresión de Chrome con tablas,
+      // no de datos/binding. Un grid de divs se ve idéntico y no dispara ese bug.
+      const gridTemplateColumns = visibleColumns
+        .map((c) => (c.key === 'descripcion' ? 'minmax(0, 1fr)' : 'max-content'))
+        .join(' ')
       return (
-        <table className="tpl-el-table" style={{ fontSize: element.fontSize }}>
-          <thead>
-            <tr>
-              {visibleColumns.map((c) => (
-                <th key={c.key} style={{ textAlign: c.key === 'descripcion' ? 'left' : 'right' }}>{c.label}</th>
+        <div className="tpl-el-table" style={{ fontSize: element.fontSize, gridTemplateColumns }}>
+          {visibleColumns.map((c) => (
+            <div
+              key={c.key}
+              className="tpl-el-table-cell tpl-el-table-head"
+              style={{ textAlign: c.key === 'descripcion' ? 'left' : 'right' }}
+            >
+              {c.label}
+            </div>
+          ))}
+          {rows.map((row, i) =>
+            visibleColumns.map((c) => (
+              <div
+                key={`${i}-${c.key}`}
+                className="tpl-el-table-cell"
+                style={{ textAlign: c.key === 'descripcion' ? 'left' : 'right' }}
+              >
+                {cellContent(c, row)}
+              </div>
+            )),
+          )}
+        </div>
+      )
+    }
+    case 'repeater': {
+      // Repetidor por bloques sobre `items.tabla` o `pagos.tabla` — cada registro se imprime
+      // como un bloque de N líneas (no una fila de celdas). Con datos reales crece según la
+      // cantidad de registros y el layout de flujo (`flowLayout.ts`) empuja lo que está debajo.
+      const binding = element.binding || 'items.tabla'
+      const rows = resolveRepeaterRows(binding, values)
+      const lines = repeaterLinesOf(element)
+      const currency = typeof values?.['factura.moneda'] === 'string' ? (values['factura.moneda'] as string) : undefined
+      const lineGap = typeof element.lineGap === 'number' ? element.lineGap : 2
+      const blockGap = typeof element.blockGap === 'number' ? element.blockGap : 4
+      if (rows.length === 0) {
+        return values ? null : (
+          <div className="tpl-el-repeater">
+            <div className="tpl-el-repeater-line" style={{ fontSize: 10, textAlign: 'left' }}>
+              <span className="tpl-el-placeholder">Lista vacía</span>
+            </div>
+          </div>
+        )
+      }
+      return (
+        <div className="tpl-el-repeater">
+          {rows.map((row, i) => (
+            <div key={i} className="tpl-el-repeater-block" style={{ marginBottom: i < rows.length - 1 ? blockGap : 0 }}>
+              {lines.map((line, j) => (
+                <div
+                  key={j}
+                  className="tpl-el-repeater-line"
+                  style={{ fontSize: line.fontSize, textAlign: line.align, marginBottom: j < lines.length - 1 ? lineGap : 0 }}
+                >
+                  {line.tokens.map((t) => resolveRepeaterToken(row, t, currency)).join('')}
+                </div>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={i}>
-                {visibleColumns.map((c) => (
-                  <td key={c.key} style={{ textAlign: c.key === 'descripcion' ? 'left' : 'right' }}>
-                    {c.key === 'descripcion'
-                      ? row.descripcion ?? ''
-                      : c.key === 'cantidad'
-                        ? row.cantidad ?? ''
-                        : c.key === 'precio'
-                          ? formatMoney(row.precio)
-                          : c.key === 'total'
-                            ? formatMoney(row.monto)
-                            : c.key === 'coberturaArs'
-                              // `null` = factura sin aseguradora: la celda queda vacía, no en 0.00.
-                              ? formatMoney(row.coberturaArs)
-                              : c.key === 'montoPaciente'
-                                ? formatMoney(row.montoPaciente)
-                                : /* itbis: no existe en items.tabla real (§2.3 del doc) */ ''}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </div>
+          ))}
+        </div>
       )
     }
     case 'list': {

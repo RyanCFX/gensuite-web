@@ -1,5 +1,6 @@
 import { Printer } from 'lucide-react'
 import { TemplateEditorElementView } from './TemplateEditorElementView'
+import { layoutPageWithFlow } from './flowLayout'
 import type { TemplateDocument, TemplateFieldCategory, TemplateElement } from './types'
 import { MIN_CANVAS_HEIGHT } from './constants'
 
@@ -29,32 +30,37 @@ export function PreviewModal({ doc, fields, values, onClose }: Props) {
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, background: 'var(--surface-sunken, #e5e7eb)', padding: 24, maxHeight: '70vh', overflow: 'auto' }}>
-          {doc.pages.map((page, i) => (
-            <div key={page.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              {doc.pages.length > 1 && (
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  Página {i + 1} de {doc.pages.length}
-                </span>
-              )}
-              <div className="tpl-preview-ticket" style={{ width: doc.page.width, minHeight: pageContentHeight(doc, page.elements) }}>
-                {page.elements.map((el) => (
-                  <div
-                    key={el.id}
-                    style={{
-                      position: 'absolute',
-                      left: el.x,
-                      top: el.y,
-                      width: el.width,
-                      height: el.height,
-                      transform: `rotate(${el.rotation}deg)`,
-                    }}
-                  >
-                    <TemplateEditorElementView element={el} fields={fields} values={values} />
-                  </div>
-                ))}
+          {doc.pages.map((page, i) => {
+            // Con datos reales, tablas y repetidores crecen y empujan lo de abajo (una sola
+            // pasada por página — no llamar dos veces).
+            const flowed = values ? layoutPageWithFlow(page.elements, values).elements : page.elements
+            return (
+              <div key={page.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                {doc.pages.length > 1 && (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    Página {i + 1} de {doc.pages.length}
+                  </span>
+                )}
+                <div className="tpl-preview-ticket" style={{ width: doc.page.width, minHeight: pageContentHeight(doc, flowed) }}>
+                  {flowed.map((el) => (
+                    <div
+                      key={el.id}
+                      style={{
+                        position: 'absolute',
+                        left: el.x,
+                        top: el.y,
+                        width: el.width,
+                        height: el.height,
+                        transform: `rotate(${el.rotation}deg)`,
+                      }}
+                    >
+                      <TemplateEditorElementView element={el} fields={fields} values={values} />
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
         <div className="modal-foot">
           <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>

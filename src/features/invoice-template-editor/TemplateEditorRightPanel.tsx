@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, BringToFront, SendToBack, Copy, Trash2, Upload, Sigma, GitBranch, Table as TableIcon, MousePointer2 } from 'lucide-react'
-import type { TemplateElement, TemplateFieldCategory, TextAlign, TextElement } from './types'
-import { CONDITION_OPERATOR_LABELS } from './constants'
+import { AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, BringToFront, SendToBack, Copy, Trash2, Upload, Sigma, GitBranch, Table as TableIcon, MousePointer2, ChevronDown, ChevronUp, Plus, GripVertical } from 'lucide-react'
+import type { RepeaterElement, RepeaterLine, RepeaterToken, RepeaterTokenKey, TemplateElement, TemplateFieldCategory, TextAlign, TextElement } from './types'
+import { CONDITION_OPERATOR_LABELS, repeaterTokensFor } from './constants'
 import { uploadPlantillaLogo } from '@/shared/api/plantillas'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 
@@ -138,6 +138,191 @@ function TextStyleControl({ element, onUpdate }: { element: TextElement; onUpdat
         <Underline size={14} />
       </button>
     </div>
+  )
+}
+
+/** Configuración del repetidor "Lista de productos/servicios": líneas por registro, contenido
+ * y orden de cada línea (tokens de campo mezclados con texto fijo), alineación y tamaño por
+ * línea. Todo se guarda dentro del elemento en `documentJson` — el backend no lo interpreta. */
+function RepeaterConfig({ element, fields, onUpdate }: { element: RepeaterElement; fields: TemplateFieldCategory[]; onUpdate: (patch: Partial<RepeaterElement>) => void }) {
+  const [fixedText, setFixedText] = useState<Record<number, string>>({})
+  const [newToken, setNewToken] = useState<Record<number, string>>({})
+  // Orígenes válidos: los campos `array` del catálogo real (normalmente `items.tabla` y
+  // `pagos.tabla`). Si el catálogo aún no los trae, se ofrecen los dos conocidos.
+  const arrayKeys = ALL_FIELD_KEYS(fields).filter((f) => f.array).map((f) => f.key)
+  const bindingOptions = Array.from(new Set([...arrayKeys, 'items.tabla', 'pagos.tabla']))
+  const allowedKeys = new Set(repeaterTokensFor(element.binding || 'items.tabla').map((t) => t.key))
+  const lines = element.lines ?? []
+
+  function setLines(next: RepeaterLine[]) {
+    onUpdate({ lines: next })
+  }
+
+  function changeBinding(binding: string) {
+    const allowed = new Set(repeaterTokensFor(binding).map((t) => t.key))
+    setLines(
+      lines.map((l) => ({
+        ...l,
+        tokens: l.tokens.filter((t) => t.kind === 'text' || allowed.has(t.key)),
+      })),
+    )
+    onUpdate({ binding })
+  }
+
+  function moveLine(index: number, dir: -1 | 1) {
+    const next = [...lines]
+    const target = index + dir
+    if (target < 0 || target >= next.length) return
+    ;[next[index], next[target]] = [next[target], next[index]]
+    setLines(next)
+  }
+
+  function moveToken(lineIndex: number, tokenIndex: number, dir: -1 | 1) {
+    const next = lines.map((l) => ({ ...l, tokens: [...l.tokens] }))
+    const tokens = next[lineIndex].tokens
+    const target = tokenIndex + dir
+    if (target < 0 || target >= tokens.length) return
+    ;[tokens[tokenIndex], tokens[target]] = [tokens[target], tokens[tokenIndex]]
+    setLines(next)
+  }
+
+  function updateToken(lineIndex: number, tokenIndex: number, token: RepeaterToken) {
+    const next = lines.map((l) => ({ ...l, tokens: [...l.tokens] }))
+    next[lineIndex].tokens[tokenIndex] = token
+    setLines(next)
+  }
+
+  function removeToken(lineIndex: number, tokenIndex: number) {
+    const next = lines.map((l) => ({ ...l, tokens: l.tokens.filter((_, i) => i !== tokenIndex) }))
+    setLines(next)
+  }
+
+  return (
+    <>
+      <div className="ff-wrap">
+        <label className="ff-label">Origen de datos</label>
+        <select className="ff-input ff-select" value={element.binding || 'items.tabla'} onChange={(e) => changeBinding(e.target.value)}>
+          {bindingOptions.map((key) => (
+            <option key={key} value={key}>{key === 'items.tabla' ? 'Productos/servicios (items.tabla)' : key === 'pagos.tabla' ? 'Métodos de pago (pagos.tabla)' : key}</option>
+          ))}
+        </select>
+        <p className="ff-hint">Cada registro se imprime como un bloque de {lines.length} {lines.length === 1 ? 'línea' : 'líneas'}. Crece con la cantidad de registros y empuja hacia abajo lo que está debajo.</p>
+      </div>
+
+      {lines.map((line, li) => (
+        <div key={li} style={{ border: '1px solid var(--border-default)', borderRadius: 8, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, flex: 1 }}>Línea {li + 1}</span>
+            <button type="button" className="btn btn-ghost btn-size-icon-sm" title="Subir línea" disabled={li === 0} onClick={() => moveLine(li, -1)}><ChevronUp size={14} /></button>
+            <button type="button" className="btn btn-ghost btn-size-icon-sm" title="Bajar línea" disabled={li === lines.length - 1} onClick={() => moveLine(li, 1)}><ChevronDown size={14} /></button>
+            <button
+              type="button" className="btn btn-ghost btn-size-icon-sm" title="Eliminar línea" disabled={lines.length <= 1}
+              onClick={() => setLines(lines.filter((_, i) => i !== li))}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {line.tokens.map((token, ti) => (
+              <div key={ti} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <GripVertical size={13} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+                {token.kind === 'field' ? (
+                  <select
+                    className="ff-input ff-select" style={{ flex: 1, minWidth: 0 }} value={token.key}
+                    onChange={(e) => updateToken(li, ti, { kind: 'field', key: e.target.value as RepeaterTokenKey })}
+                  >
+                    {repeaterTokensFor(element.binding || 'items.tabla').map((t) => (
+                      <option key={t.key} value={t.key}>{t.label}</option>
+                    ))}
+                    {!allowedKeys.has(token.key) && <option value={token.key}>{token.key} (de otro origen)</option>}
+                  </select>
+                ) : (
+                  <input
+                    className="ff-input" style={{ flex: 1, minWidth: 0 }} value={token.text}
+                    onChange={(e) => updateToken(li, ti, { kind: 'text', text: e.target.value })}
+                    placeholder='Texto fijo (ej. " * $")'
+                  />
+                )}
+                <button type="button" className="btn btn-ghost btn-size-icon-sm" title="Subir" disabled={ti === 0} onClick={() => moveToken(li, ti, -1)}><ChevronUp size={13} /></button>
+                <button type="button" className="btn btn-ghost btn-size-icon-sm" title="Bajar" disabled={ti === line.tokens.length - 1} onClick={() => moveToken(li, ti, 1)}><ChevronDown size={13} /></button>
+                <button type="button" className="btn btn-ghost btn-size-icon-sm" title="Quitar" onClick={() => removeToken(li, ti)}><Trash2 size={13} /></button>
+              </div>
+            ))}
+            {line.tokens.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Línea vacía — agrega un campo o texto fijo.</p>}
+          </div>
+
+          <div style={{ display: 'flex', gap: 6 }}>
+            <select
+              className="ff-input ff-select" style={{ flex: 1, minWidth: 0 }}
+              value={newToken[li] ?? repeaterTokensFor(element.binding || 'items.tabla')[0]?.key ?? ''}
+              onChange={(e) => setNewToken((prev) => ({ ...prev, [li]: e.target.value }))}
+              title="Campo a agregar"
+            >
+              {repeaterTokensFor(element.binding || 'items.tabla').map((t) => (
+                <option key={t.key} value={t.key}>{t.label}</option>
+              ))}
+            </select>
+            <button
+              type="button" className="btn btn-secondary btn-size-sm"
+              onClick={() => {
+                const key = newToken[li] ?? repeaterTokensFor(element.binding || 'items.tabla')[0]?.key
+                if (!key) return
+                const next = lines.map((l, i) => (i === li ? { ...l, tokens: [...l.tokens, { kind: 'field', key } as RepeaterToken] } : l))
+                setLines(next)
+              }}
+            >
+              <Plus size={13} /> Campo
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              className="ff-input" style={{ flex: 1, minWidth: 0 }} value={fixedText[li] ?? ''}
+              onChange={(e) => setFixedText((prev) => ({ ...prev, [li]: e.target.value }))}
+              placeholder='Texto fijo (ej. " * $", "ITBIS ")'
+            />
+            <button
+              type="button" className="btn btn-secondary btn-size-sm" disabled={!(fixedText[li] ?? '').length}
+              onClick={() => {
+                const text = fixedText[li] ?? ''
+                if (!text.length) return
+                const next = lines.map((l, i) => (i === li ? { ...l, tokens: [...l.tokens, { kind: 'text', text }] } : l))
+                setLines(next)
+                setFixedText((prev) => ({ ...prev, [li]: '' }))
+              }}
+            >
+              <Plus size={13} /> Texto
+            </button>
+          </div>
+
+          <div className="form-row form-row-3">
+            <NumberField label="Tamaño" value={line.fontSize} onChange={(v) => {
+              const next = lines.map((l, i) => (i === li ? { ...l, fontSize: Math.max(4, v) } : l))
+              setLines(next)
+            }} />
+            <div className="ff-wrap">
+              <label className="ff-label">Alineación</label>
+              <AlignControl value={line.align} onChange={(v) => {
+                const next = lines.map((l, i) => (i === li ? { ...l, align: v } : l))
+                setLines(next)
+              }} />
+            </div>
+          </div>
+        </div>
+      ))}
+
+      <button
+        type="button" className="btn btn-secondary btn-size-sm"
+        onClick={() => setLines([...lines, { tokens: [], align: 'left', fontSize: 9 }])}
+      >
+        <Plus size={14} /> Agregar línea
+      </button>
+
+      <div className="form-row form-row-3">
+        <NumberField label="Espacio entre líneas" value={element.lineGap ?? 2} onChange={(v) => onUpdate({ lineGap: Math.max(0, v) })} />
+        <NumberField label="Espacio entre productos" value={element.blockGap ?? 4} onChange={(v) => onUpdate({ blockGap: Math.max(0, v) })} />
+      </div>
+    </>
   )
 }
 
@@ -305,6 +490,10 @@ export function TemplateEditorRightPanel({
               <NumberField label="Tamaño de fuente" value={element.fontSize} onChange={(v) => onUpdate({ fontSize: v })} />
             </div>
           </div>
+        )}
+
+        {element.type === 'repeater' && (
+          <RepeaterConfig element={element} fields={fields} onUpdate={onUpdate as (patch: Partial<RepeaterElement>) => void} />
         )}
 
         {element.type === 'list' && (

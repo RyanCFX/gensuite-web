@@ -1,5 +1,5 @@
 import { createElementId } from './mocks'
-import { DEFAULT_TABLE_COLUMNS } from './constants'
+import { DEFAULT_REPEATER_BLOCK_GAP, DEFAULT_REPEATER_LINE_GAP, DEFAULT_REPEATER_LINES, DEFAULT_TABLE_COLUMNS } from './constants'
 import type { ElementType, TemplateDocument, TemplateElement, TemplateFieldDef, TemplatePage } from './types'
 
 const DEFAULT_POSITION = { x: 24, y: 24 }
@@ -27,6 +27,12 @@ export function createDefaultElement(type: ElementType, overrides: Partial<Templ
       return { ...base, type: 'logo', src: null, processed: false, width: 100, height: 60, ...overrides } as TemplateElement
     case 'table':
       return { ...base, type: 'table', width: 240, height: 100, fontSize: 9, columns: DEFAULT_TABLE_COLUMNS.map((c) => ({ ...c })), ...overrides } as TemplateElement
+    case 'repeater':
+      return {
+        ...base, type: 'repeater', binding: 'items.tabla', width: 240, height: 60,
+        lines: DEFAULT_REPEATER_LINES.map((l) => ({ ...l, tokens: l.tokens.map((t) => ({ ...t })) })),
+        lineGap: DEFAULT_REPEATER_LINE_GAP, blockGap: DEFAULT_REPEATER_BLOCK_GAP, ...overrides,
+      } as TemplateElement
     case 'list':
       return { ...base, type: 'list', binding: '', width: 200, height: 60, fontSize: 10, ...overrides } as TemplateElement
     case 'date':
@@ -50,6 +56,15 @@ export function createElementFromField(field: TemplateFieldDef): TemplateElement
   if (field.key === 'items.tabla') {
     return createDefaultElement('table')
   }
+  // `pagos.tabla` (detalle de métodos de pago, con cobros posteriores incluidos) se muestra
+  // con el mismo repetidor por bloques que los productos: una línea por método
+  // (ej. `Efectivo  $500.00`).
+  if (field.key === 'pagos.tabla') {
+    return createDefaultElement('repeater', {
+      binding: 'pagos.tabla',
+      lines: [{ tokens: [{ kind: 'field', key: 'modoPago' }, { kind: 'text', text: '  $' }, { kind: 'field', key: 'monto' }], align: 'left', fontSize: 9 }],
+    } as Partial<TemplateElement>)
+  }
   if (field.key === 'factura.fecha') {
     return createDefaultElement('date', { binding: field.key } as Partial<TemplateElement>)
   }
@@ -58,6 +73,23 @@ export function createElementFromField(field: TemplateFieldDef): TemplateElement
     text: field.sample || field.label,
     width: Math.max(100, Math.min(240, field.label.length * 8 + 40)),
   } as Partial<TemplateElement>)
+}
+
+/** Copia profunda de las estructuras anidadas mutables de un elemento (columnas de tabla,
+ * líneas/tokens del repetidor) — el spread superficial compartiría la referencia entre el
+ * original y el clon, y editar uno afectaría al otro. */
+export function deepCloneNested(el: TemplateElement): TemplateElement {
+  if (el.type === 'table') return { ...el, columns: el.columns.map((c) => ({ ...c })) }
+  if (el.type === 'repeater') {
+    return {
+      ...el,
+      lines: (Array.isArray(el.lines) ? el.lines : []).map((l) => ({
+        ...l,
+        tokens: l.tokens.map((t) => ({ ...t })),
+      })),
+    }
+  }
+  return { ...el }
 }
 
 /** Clona un documento completo (todas sus páginas) con ids nuevos para cada página y cada
@@ -70,7 +102,7 @@ export function cloneDocument(doc: TemplateDocument): TemplateDocument {
     const elements = page.elements.map((el) => {
       const newId = createElementId()
       idMap.set(el.id, newId)
-      return { ...el, id: newId }
+      return { ...deepCloneNested(el), id: newId }
     })
     const remapped = elements.map((el) =>
       el.type === 'group' ? { ...el, childIds: el.childIds.map((id) => idMap.get(id) ?? id) } : el,
@@ -94,7 +126,7 @@ export function cloneElements(elements: TemplateElement[]): TemplateElement[] {
   const cloned = elements.map((el) => {
     const newId = createElementId()
     idMap.set(el.id, newId)
-    return { ...el, id: newId }
+    return { ...deepCloneNested(el), id: newId }
   })
   return cloned.map((el) =>
     el.type === 'group'

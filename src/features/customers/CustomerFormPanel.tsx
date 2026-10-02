@@ -129,15 +129,16 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
   })
   const [impuestoVentasSearch, setImpuestoVentasSearch] = useState('')
 
-  // Catálogo NCF físico (B01–B17) para el "Tipo de Comprobante por Defecto" (docs/tasks/81 §5) —
-  // mismas opciones/etiquetas que el selector de ncfType de facturas.
+  // "Tipo de Comprobante por Defecto" (docs/tasks/81 §5) — bloque de venta (`ncfTypes` de
+  // ?type=venta: E31/E32… si e-CF está habilitado, B0x si no), mismas opciones/etiquetas que
+  // el selector de ncfType de facturas.
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: () => getCatalogosFiscales(),
+    queryKey: ['catalogos-fiscales', { type: 'venta' }],
+    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
     staleTime: 60 * 60_000,
   })
   const [ncfDefaultSearch, setNcfDefaultSearch] = useState('')
-  const ncfDefaultOptions: SearchSelectOption[] = (catalogos?.ncfTypesFisicos ?? catalogos?.ncfTypes ?? [])
+  const ncfDefaultOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])
     .filter((t) => !ncfDefaultSearch || t.label.toLowerCase().includes(ncfDefaultSearch.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 

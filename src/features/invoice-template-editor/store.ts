@@ -1,7 +1,8 @@
 import { create, type StoreApi } from 'zustand'
 import { DEFAULT_ZOOM, TEMPLATE_FORMATS, ZOOM_LEVELS } from './constants'
 import { fetchDefaultTemplate } from './mocks'
-import { createDefaultElement, createElementFromField, createEmptyPage, cloneDocument, cloneElements } from './elementFactory'
+import { createDefaultElement, createElementFromField, createEmptyPage, cloneDocument, cloneElements, deepCloneNested } from './elementFactory'
+import { decodeElementsClipboard, encodeElementsClipboard, readTextFromSystemClipboard, writeTextToSystemClipboard } from './elementClipboard'
 import { deleteDraft as deleteDraftStorage, getDraft, listDrafts, saveDraft as saveDraftStorage } from './drafts'
 import { toApiType, fromApiType } from './typeMapping'
 import { mapCamposToFieldCategories, mapGaleriaItemToTemplateGalleryItem } from './apiAdapters'
@@ -109,8 +110,16 @@ interface EditorState {
   /** Copia la selección actual (uno o varios elementos, incluso de páginas distintas) al
    * portapapeles interno. */
   copySelection: () => void
+  /** Copia la selección al portapapeles interno Y al del sistema como JSON con cabecera
+   * (ver `elementClipboard.ts`) — así se puede pegar en otra pestaña o tenant tal cual.
+   * Devuelve `false` si no había selección o no se pudo escribir al portapapeles. */
+  copySelectionToSystemClipboard: () => Promise<boolean>
   /** Pega el portapapeles (si tiene algo) en la página activa, con ids nuevos y offset. */
   pasteClipboard: () => void
+  /** Pegado cruzado: si el portapapeles del sistema trae un JSON del canvas (cabecera
+   * presente) lo importa con ids nuevos en la página activa; si no, cae al portapapeles
+   * interno en memoria. */
+  pasteFromSystemClipboard: () => Promise<{ count: number; fromOtherFormat: boolean; dropped: number }>
   bringToFront: (id: string) => void
   sendToBack: (id: string) => void
 
@@ -461,7 +470,7 @@ export const useTemplateEditorStore = create<EditorState>((set, get) => ({
     set((state) => withOwningPageElements(state, id, (elements) => {
       const source = elements.find((el) => el.id === id)
       if (!source) return elements
-      const copy: TemplateElement = { ...source, id: `${source.id}_copy_${Date.now() % 100000}`, x: source.x + 12, y: source.y + 12 }
+      const copy: TemplateElement = { ...deepCloneNested(source), id: `${source.id}_copy_${Date.now() % 100000}`, x: source.x + 12, y: source.y + 12 }
       newId = copy.id
       return [...elements, copy]
     }))
@@ -491,6 +500,40 @@ export const useTemplateEditorStore = create<EditorState>((set, get) => ({
         selectedIds: pasted.map((el) => el.id),
       }
     })
+  },
+
+  copySelectionToSystemClipboard: async () => {
+    const state = get()
+    const doc = state.documents[state.format]
+    if (!doc) return false
+    const selected = doc.pages.flatMap((p) => p.elements).filter((el) => state.selectedIds.includes(el.id))
+    if (selected.length === 0) return false
+    set({ clipboard: selected.map((el) => ({ ...el })) })
+    return writeTextToSystemClipboard(encodeElementsClipboard(state.format, selected))
+  },
+
+  pasteFromSystemClipboard: async () => {
+    const none = { count: 0, fromOtherFormat: false, dropped: 0 }
+    const text = await readTextFromSystemClipboard()
+    if (text) {
+      const decoded = decodeElementsClipboard(text)
+      if (decoded) {
+        if (decoded.elements.length === 0) return { ...none, dropped: decoded.dropped }
+        // Se sincroniza el portapapeles interno para que pegados siguientes (o sin acceso
+        // al del sistema) sigan funcionando igual.
+        set({ clipboard: decoded.elements.map((el) => ({ ...el })) })
+        get().pasteClipboard()
+        return {
+          count: decoded.elements.length,
+          fromOtherFormat: decoded.format !== get().format,
+          dropped: decoded.dropped,
+        }
+      }
+    }
+    // Sin JSON del canvas en el portapapeles — cae al portapapeles interno en memoria.
+    const count = get().clipboard.length
+    get().pasteClipboard()
+    return { ...none, count }
   },
 
   bringToFront: (id) => {

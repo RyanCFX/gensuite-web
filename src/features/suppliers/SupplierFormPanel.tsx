@@ -102,8 +102,8 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
 
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: () => getCatalogosFiscales(),
+    queryKey: ['catalogos-fiscales', { type: 'compra' }],
+    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
     staleTime: 60 * 60_000,
   })
   const [defaultTipoBienes606Search, setDefaultTipoBienes606Search] = useState('')
@@ -116,10 +116,10 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
     .filter((t) => !defaultFormaPago606Search || t.label.toLowerCase().includes(defaultFormaPago606Search.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 
-  // "Tipo de Comprobante por Defecto" (docs/tasks/81 §5) — mismo catálogo B01–B17 que el
-  // selector de tipoComprobante de compras/gastos.
+  // "Tipo de Comprobante por Defecto" (docs/tasks/81 §5) — bloque de compra (`ncfTypesCompra`
+  // de ?type=compra: B0x + sus E0x), igual que el selector de tipoComprobante de compras/gastos.
   const [ncfDefaultSearch, setNcfDefaultSearch] = useState('')
-  const ncfDefaultOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? catalogos?.ncfTypesFisicos ?? [])
+  const ncfDefaultOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? [])
     .filter((t) => !ncfDefaultSearch || t.label.toLowerCase().includes(ncfDefaultSearch.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 

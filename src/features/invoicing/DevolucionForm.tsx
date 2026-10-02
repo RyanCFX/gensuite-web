@@ -20,7 +20,7 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { RotateCcw, Users, FileText, Check, AlertCircle, AlertTriangle, ArrowLeft } from 'lucide-react'
 import type { ApiError, EcfModificationCode, MotivoAnulacionArs } from '@/shared/api/types'
 import { MOTIVOS_ANULACION_ARS, esCoberturaCompleta } from '@/shared/api/types'
-import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
+import { ECF_MODIFICATION_CODES_CREDIT_NOTE, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DEVOLUCION_DIAS_LIMITE_ITBIS } from '@/lib/constants'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
@@ -609,7 +609,7 @@ export default function DevolucionForm() {
                   }}
                   placeholder="Selecciona el código…"
                 >
-                  {ECF_MODIFICATION_CODES.map((c) => (
+                  {ECF_MODIFICATION_CODES_CREDIT_NOTE.map((c) => (
                     <SelectItem key={c.code} value={String(c.code)}>{c.label}</SelectItem>
                   ))}
                 </Select>

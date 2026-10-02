@@ -111,8 +111,8 @@ export default function InvoicesPage() {
   })
 
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: () => getCatalogosFiscales(),
+    queryKey: ['catalogos-fiscales', { type: 'venta' }],
+    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
     staleTime: 60 * 60_000,
   })
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')

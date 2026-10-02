@@ -176,8 +176,8 @@ export default function RelacionDetail() {
   const almacenOptions: SearchSelectOption[] = (almacenesData ?? []).map((w) => ({ value: w.id, label: w.name }))
 
   const { data: catalogosFiscales } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: () => getCatalogosFiscales(),
+    queryKey: ['catalogos-fiscales', { type: 'compra' }],
+    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
     staleTime: 60 * 60_000,
   })
   const [cfgTipoBienes606Search, setCfgTipoBienes606Search] = useState('')

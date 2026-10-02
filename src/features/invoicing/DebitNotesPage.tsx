@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -14,7 +14,7 @@ import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import type { Invoice, CreateDebitNoteDto, EcfModificationCode } from '@/shared/api/types'
-import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
+import { ECF_MODIFICATION_CODES_DEBIT_NOTE, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
 import { Select, SelectItem } from '@/components/ui/select'
 import { Plus, Loader2, Trash2, Download, SlidersHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
@@ -177,6 +177,12 @@ export default function DebitNotesPage() {
   // modificación DGII es obligatorio al crear la nota.
   const { data: ecfTipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos, staleTime: 60 * 60_000 })
   const ndEsEcf = ecfTipoElectronicoHabilitado(ecfTipos, '33')
+
+  // A diferencia de la nota de crédito, la nota de débito solo admite el código 3 (aumento de
+  // montos) — lo preseleccionamos para no obligar al usuario a elegir entre una sola opción.
+  useEffect(() => {
+    if (ndEsEcf && !modificationCode) setModificationCode(3)
+  }, [ndEsEcf, modificationCode])
 
   const submittedInvoices = invoicesData?.items ?? []
 
@@ -613,7 +619,7 @@ export default function DebitNotesPage() {
                       onValueChange={(v) => setModificationCode(v ? (Number(v) as EcfModificationCode) : '')}
                       placeholder="Selecciona el código…"
                     >
-                      {ECF_MODIFICATION_CODES.map((c) => (
+                      {ECF_MODIFICATION_CODES_DEBIT_NOTE.map((c) => (
                         <SelectItem key={c.code} value={String(c.code)}>{c.label}</SelectItem>
                       ))}
                     </Select>

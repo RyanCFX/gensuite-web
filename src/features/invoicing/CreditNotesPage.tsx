@@ -14,7 +14,7 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { listSucursales } from '@/shared/api/sucursales'
 import { listDepartamentos } from '@/shared/api/departamentos'
 import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo, EcfModificationCode } from '@/shared/api/types'
-import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
+import { ECF_MODIFICATION_CODES_CREDIT_NOTE, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
 import { Select, SelectItem } from '@/components/ui/select'
 import { Plus, Loader2, ArrowRightLeft, ChevronDown, ChevronRight, Download, SlidersHorizontal, AlertTriangle, Trash2 } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
@@ -156,8 +156,8 @@ export default function CreditNotesPage() {
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
 
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: () => getCatalogosFiscales(),
+    queryKey: ['catalogos-fiscales', { type: 'venta' }],
+    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
     staleTime: 60 * 60_000,
   })
 
@@ -817,7 +817,7 @@ export default function CreditNotesPage() {
                       onValueChange={(v) => setModificationCode(v ? (Number(v) as EcfModificationCode) : '')}
                       placeholder="Selecciona el código…"
                     >
-                      {ECF_MODIFICATION_CODES.map((c) => (
+                      {ECF_MODIFICATION_CODES_CREDIT_NOTE.map((c) => (
                         <SelectItem key={c.code} value={String(c.code)}>{c.label}</SelectItem>
                       ))}
                     </Select>

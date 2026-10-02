@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { PlantillasTabs } from '@/shared/ui/PlantillasTabs'
@@ -36,7 +36,7 @@ export default function InvoiceTemplateEditorPage({ fixedType }: Props) {
     format, documents, loadingDocuments, availableFields, fieldsLoading, selectedIds, zoom, saving, history,
     templateGallery, galleryLoading, drafts,
     init, setFormat, setPageHeight, addPage, appendDocumentPages, removePage,
-    addElement, addElementFromField, updateElement, removeElement, duplicateElement, copySelection, pasteClipboard,
+    addElement, addElementFromField, updateElement, removeElement, duplicateElement, copySelectionToSystemClipboard, pasteFromSystemClipboard,
     bringToFront, sendToBack, selectIds, beginTransaction, zoomIn, zoomOut, zoomByFactor, undo, redo, save,
     applyDocument, saveDraft, removeDraft, setDefaultTemplate, deleteTemplate,
   } = useTemplateEditorStore()
@@ -54,6 +54,25 @@ export default function InvoiceTemplateEditorPage({ fixedType }: Props) {
   // sigue siendo el mismo para ambas (carga los dos tipos en `init()`), solo cambia cuál está
   // "activo" en cada ruta.
   useEffect(() => { setFormat(fixedType) }, [fixedType, setFormat])
+
+  // Copiado como JSON con cabecera (cruza pestañas/tenants) y pegado con detección
+  // automática de esa cabecera — ver `elementClipboard.ts`.
+  const handleCopySelection = useCallback(async (count: number) => {
+    const ok = await copySelectionToSystemClipboard()
+    if (ok) toast.success(`Elementos copiados como JSON (${count}) — listos para pegar en otra pestaña o tenant`)
+    else toast.error('No se pudo copiar al portapapeles del sistema')
+  }, [copySelectionToSystemClipboard])
+
+  const handlePasteClipboard = useCallback(async () => {
+    const res = await pasteFromSystemClipboard()
+    if (res.count > 0) {
+      const extra = res.fromOtherFormat ? ' (venían de otra plantilla)' : ''
+      const dropped = res.dropped > 0 ? ` — ${res.dropped} descartados por tipo desconocido` : ''
+      toast.success(`Se pegaron ${res.count} elemento${res.count === 1 ? '' : 's'}${extra}${dropped}`)
+    } else if (res.dropped > 0) {
+      toast.warning('El JSON del portapapeles no traía elementos válidos')
+    }
+  }, [pasteFromSystemClipboard])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -74,12 +93,12 @@ export default function InvoiceTemplateEditorPage({ fixedType }: Props) {
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && selectedIds.length > 0) {
         e.preventDefault()
-        copySelection()
+        void handleCopySelection(selectedIds.length)
         return
       }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
         e.preventDefault()
-        pasteClipboard()
+        void handlePasteClipboard()
         return
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0) {
@@ -90,7 +109,7 @@ export default function InvoiceTemplateEditorPage({ fixedType }: Props) {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedIds, undo, redo, removeElement, selectIds, copySelection, pasteClipboard])
+  }, [selectedIds, undo, redo, removeElement, selectIds, handleCopySelection, handlePasteClipboard])
 
   const doc = documents[format]
   const selectedElement = selectedIds.length === 1
@@ -237,10 +256,13 @@ export default function InvoiceTemplateEditorPage({ fixedType }: Props) {
               canUndo={activeHistory.past.length > 0}
               canRedo={activeHistory.future.length > 0}
               saving={saving}
+              canCopy={selectedIds.length > 0}
               onZoomIn={zoomIn}
               onZoomOut={zoomOut}
               onUndo={undo}
               onRedo={redo}
+              onCopy={() => void handleCopySelection(selectedIds.length)}
+              onPaste={() => void handlePasteClipboard()}
               onSave={handleSave}
               onPreview={() => setActiveModal('preview')}
               onTestPrint={handleTestPrint}
