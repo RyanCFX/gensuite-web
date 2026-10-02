@@ -4217,9 +4217,14 @@ tbody .badge {
 
 .tpl-logo-bw { background: #f9fafb; border: 1px solid #e5e7eb; }
 
-.tpl-el-table { width: 100%; border-collapse: collapse; color: #111827; }
-.tpl-el-table th, .tpl-el-table td { padding: 2px 4px; border-bottom: 1px solid #e5e7eb; }
-.tpl-el-table th { font-weight: 700; border-bottom: 1px solid #111827; }
+/* Grid de divs, no <table> real — confirmado que Chrome descarta el contenido de las filas de
+   un <table>/<tr>/<td> al imprimir este árbol (ver el comentario en el caso 'table' de
+   TemplateEditorElementView.tsx), aunque el mismo dato en un <div> (ej. el elemento `list`) sí
+   se imprime bien. Un grid con una fila por renglón se ve idéntico a una tabla con
+   border-collapse y no dispara ese bug. */
+.tpl-el-table { width: 100%; display: grid; color: #111827; break-inside: avoid; page-break-inside: avoid; }
+.tpl-el-table-cell { padding: 2px 4px; border-bottom: 1px solid #e5e7eb; break-inside: avoid; page-break-inside: avoid; }
+.tpl-el-table-head { font-weight: 700; border-bottom: 1px solid #111827; }
 
 .tpl-el-conditional {
   width: 100%;
