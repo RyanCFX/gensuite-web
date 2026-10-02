@@ -4,8 +4,7 @@ import Barcode from 'react-barcode'
 import { Image as ImageIcon, Layers } from 'lucide-react'
 import { resolveFileUrl } from '@/shared/api/client'
 import { formatMoney as formatCurrencyAmount } from '@/lib/formatters'
-import { DEFAULT_REPEATER_LINES } from './constants'
-import { resolveRepeaterRows } from './flowLayout'
+import { normalizeRepeaterLines, resolveRepeaterRows } from './flowLayout'
 import type { RepeaterElement, RepeaterToken, TableColumn, TemplateElement, TemplateFieldCategory } from './types'
 
 // Bindings multimoneda de Pos Invoice (docs/tasks/63_plantillas_multimoneda.md §1) — los 3
@@ -171,8 +170,8 @@ function resolveRepeaterToken(row: Record<string, unknown>, token: RepeaterToken
   return String(value)
 }
 
-function repeaterLinesOf(element: RepeaterElement): RepeaterElement['lines'] {
-  return Array.isArray(element.lines) && element.lines.length > 0 ? element.lines : DEFAULT_REPEATER_LINES
+function repeaterLinesOf(element: RepeaterElement) {
+  return normalizeRepeaterLines(element.lines)
 }
 
 /** Cada fila de `items.tabla` (§2.1 del doc) — es la única tabla que sabe dibujar el editor
@@ -477,15 +476,28 @@ export function TemplateEditorElementView({ element, fields, values }: Props) {
         <div className="tpl-el-repeater">
           {rows.map((row, i) => (
             <div key={i} className="tpl-el-repeater-block" style={{ marginBottom: i < rows.length - 1 ? blockGap : 0 }}>
-              {lines.map((line, j) => (
-                <div
-                  key={j}
-                  className="tpl-el-repeater-line"
-                  style={{ fontSize: line.fontSize, textAlign: line.align, marginBottom: j < lines.length - 1 ? lineGap : 0 }}
-                >
-                  {line.tokens.map((t) => resolveRepeaterToken(row, t, currency)).join('')}
-                </div>
-              ))}
+              {lines.map((line, j) => {
+                const parts = line.tokens.map((t) => resolveRepeaterToken(row, t, currency))
+                return (
+                  <div
+                    key={j}
+                    className={`tpl-el-repeater-line${line.align === 'justify' ? ' tpl-el-repeater-line-justify' : ''}`}
+                    style={{
+                      fontSize: line.fontSize,
+                      fontWeight: line.bold ? 'bold' : 'normal',
+                      fontStyle: line.italic ? 'italic' : 'normal',
+                      textAlign: line.align,
+                      marginBottom: j < lines.length - 1 ? lineGap : 0,
+                    }}
+                  >
+                    {line.align === 'justify' && parts.some((p) => p !== '')
+                      ? parts.filter((p) => p !== '').map((p, k) => (
+                        <span key={k} className="tpl-el-repeater-part">{p}</span>
+                      ))
+                      : parts.join('')}
+                  </div>
+                )
+              })}
             </div>
           ))}
         </div>

@@ -34,13 +34,15 @@ function scaleElement(el: TemplateElement, factor: number): TemplateElement {
     case 'date':
     case 'conditional':
       return { ...base, fontSize: el.fontSize * factor } as TemplateElement
-    case 'repeater':
+    case 'repeater': {
+      const lines = Array.isArray(el.lines) ? el.lines : []
       return {
         ...base,
-        lines: el.lines.map((l) => ({ ...l, fontSize: l.fontSize * factor, tokens: l.tokens.map((t) => ({ ...t })) })),
+        lines: lines.map((l) => ({ ...l, fontSize: (l.fontSize ?? 10) * factor, tokens: l.tokens.map((t) => ({ ...t })) })),
         lineGap: el.lineGap * factor,
         blockGap: el.blockGap * factor,
       } as TemplateElement
+    }
     case 'line':
       return { ...base, thickness: Math.max(1, el.thickness * factor) } as TemplateElement
     case 'rectangle':

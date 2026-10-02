@@ -73,7 +73,7 @@ export const CONDITION_OPERATOR_LABELS: Record<string, string> = {
 //   Nombre producto
 //   2 * $150.00   ITBIS $54.00 = $354.00
 export const DEFAULT_REPEATER_LINES: RepeaterLine[] = [
-  { tokens: [{ kind: 'field', key: 'descripcion' }], align: 'left', fontSize: 10 },
+  { tokens: [{ kind: 'field', key: 'descripcion' }], align: 'left', fontSize: 10, bold: false, italic: false },
   {
     tokens: [
       { kind: 'field', key: 'cantidad' },
@@ -86,6 +86,8 @@ export const DEFAULT_REPEATER_LINES: RepeaterLine[] = [
     ],
     align: 'left',
     fontSize: 9,
+    bold: false,
+    italic: false,
   },
 ]
 

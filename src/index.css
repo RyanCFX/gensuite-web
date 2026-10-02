@@ -4246,6 +4246,26 @@ tbody .badge {
   padding: 1px 2px;
 }
 
+/* Alineación justificada entre extremos (texto a la izquierda y monto a la derecha en la
+   misma línea): cada token va en su propio tramo y el espacio sobrante se reparte entre
+   ellos. Cada tramo trunca con `...` por separado; la cursiva que una térmica no soporte
+   la degrada ella sola a texto normal sin afectar este layout. */
+.tpl-el-repeater-line-justify {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.tpl-el-repeater-line-justify > .tpl-el-repeater-part {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tpl-el-repeater-line-justify > .tpl-el-repeater-part:first-child {
+  flex: 1 1 auto;
+}
+
 .tpl-el-conditional {
   width: 100%;
   height: 100%;
@@ -4384,6 +4404,24 @@ tbody .badge {
   font-size: 12px;
   color: var(--text-primary);
   word-break: break-all;
+}
+
+/* Vista previa del formato de una línea del repetidor — refleja negrita/cursiva/tamaño y
+   alineación tal como saldrá en el ticket. */
+.tpl-line-preview {
+  display: block;
+  padding: 8px 10px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tpl-line-preview-justify {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .tpl-align-control { display: flex; border: 1px solid var(--border-default); border-radius: var(--radius-md); overflow: hidden; }

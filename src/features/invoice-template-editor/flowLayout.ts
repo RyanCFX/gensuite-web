@@ -1,5 +1,5 @@
 import { DEFAULT_REPEATER_LINES } from './constants'
-import type { RepeaterElement, TableElement, TemplateElement } from './types'
+import type { RepeaterElement, RepeaterLine, RepeaterLineAlign, TableElement, TemplateElement } from './types'
 
 // Altura estimada de los elementos de flujo (tabla y repetidor) con datos reales, y
 // desplazamiento ("empuje") de los elementos que están debajo.
@@ -12,8 +12,34 @@ import type { RepeaterElement, TableElement, TemplateElement } from './types'
 
 const LINE_HEIGHT_FACTOR = 1.25
 
-function normalizedLines(el: RepeaterElement) {
-  return Array.isArray(el.lines) && el.lines.length > 0 ? el.lines : DEFAULT_REPEATER_LINES
+export interface NormalizedRepeaterLine {
+  tokens: RepeaterLine['tokens']
+  align: RepeaterLineAlign
+  fontSize: number
+  bold: boolean
+  italic: boolean
+}
+
+/** Normaliza el formato de una línea a valores concretos — una línea sin formato definido
+ * hereda el del elemento: sin negrita, sin cursiva, alineada a la izquierda. */
+export function normalizeRepeaterLine(line: RepeaterLine): NormalizedRepeaterLine {
+  return {
+    tokens: Array.isArray(line.tokens) ? line.tokens : [],
+    align: line.align ?? 'left',
+    fontSize: typeof line.fontSize === 'number' && line.fontSize > 0 ? line.fontSize : 10,
+    bold: !!line.bold,
+    italic: !!line.italic,
+  }
+}
+
+function normalizedLines(el: RepeaterElement): NormalizedRepeaterLine[] {
+  return normalizeRepeaterLines(el.lines)
+}
+
+/** Normaliza todas las líneas del elemento (o las por defecto si no trae ninguna). */
+export function normalizeRepeaterLines(lines: RepeaterLine[] | undefined): NormalizedRepeaterLine[] {
+  const raw = Array.isArray(lines) && lines.length > 0 ? lines : DEFAULT_REPEATER_LINES
+  return raw.map(normalizeRepeaterLine)
 }
 
 /** Filas de muestra para modo diseño (sin `values`): 2 por binding. */
@@ -48,7 +74,7 @@ export function repeaterContentHeight(el: RepeaterElement, rowCount: number): nu
   const lineGap = typeof el.lineGap === 'number' ? el.lineGap : 2
   const blockGap = typeof el.blockGap === 'number' ? el.blockGap : 4
   const blockHeight =
-    lines.reduce((sum, l) => sum + (l.fontSize || 10) * LINE_HEIGHT_FACTOR + 2, 0) +
+    lines.reduce((sum, l) => sum + l.fontSize * LINE_HEIGHT_FACTOR + 2, 0) +
     lineGap * Math.max(0, lines.length - 1)
   return rowCount * blockHeight + blockGap * Math.max(0, rowCount - 1)
 }

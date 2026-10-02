@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline, BringToFront, SendToBack, Copy, Trash2, Upload, Sigma, GitBranch, Table as TableIcon, MousePointer2, ChevronDown, ChevronUp, Plus, GripVertical } from 'lucide-react'
-import type { RepeaterElement, RepeaterLine, RepeaterToken, RepeaterTokenKey, TemplateElement, TemplateFieldCategory, TextAlign, TextElement } from './types'
+import { AlignLeft, AlignCenter, AlignRight, AlignJustify, Bold, Italic, Underline, BringToFront, SendToBack, Copy, Trash2, Upload, Sigma, GitBranch, Table as TableIcon, MousePointer2, ChevronDown, ChevronUp, Plus, GripVertical } from 'lucide-react'
+import type { RepeaterElement, RepeaterLine, RepeaterLineAlign, RepeaterToken, RepeaterTokenKey, TemplateElement, TemplateFieldCategory, TextAlign, TextElement } from './types'
 import { CONDITION_OPERATOR_LABELS, repeaterTokensFor } from './constants'
 import { uploadPlantillaLogo } from '@/shared/api/plantillas'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
@@ -46,6 +46,51 @@ function AlignControl({ value, onChange }: { value: TextAlign; onChange: (v: Tex
           <Icon size={14} />
         </button>
       ))}
+    </div>
+  )
+}
+
+/** Alineación de una línea del repetidor: izquierda, centro, derecha o justificada entre
+ * extremos (texto a la izquierda y monto a la derecha en la misma línea). */
+function RepeaterAlignControl({ value, onChange }: { value: RepeaterLineAlign; onChange: (v: RepeaterLineAlign) => void }) {
+  const options: { value: RepeaterLineAlign; icon: typeof AlignLeft; title: string }[] = [
+    { value: 'left', icon: AlignLeft, title: 'Izquierda' },
+    { value: 'center', icon: AlignCenter, title: 'Centro' },
+    { value: 'right', icon: AlignRight, title: 'Derecha' },
+    { value: 'justify', icon: AlignJustify, title: 'Justificada entre extremos' },
+  ]
+  return (
+    <div className="tpl-align-control">
+      {options.map(({ value: v, icon: Icon, title }) => (
+        <button key={v} type="button" title={title} className={value === v ? 'active' : ''} onClick={() => onChange(v)}>
+          <Icon size={14} />
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Negrita y cursiva independientes para una línea del repetidor — cada una se activa o
+ * desactiva por separado y aplica a toda la línea (todos sus tokens y textos fijos). */
+function RepeaterStyleControl({ bold, italic, onChange }: { bold: boolean; italic: boolean; onChange: (v: { bold: boolean; italic: boolean }) => void }) {
+  return (
+    <div className="tpl-align-control">
+      <button
+        type="button"
+        className={bold ? 'active' : ''}
+        title="Negrita"
+        onClick={() => onChange({ bold: !bold, italic })}
+      >
+        <Bold size={14} />
+      </button>
+      <button
+        type="button"
+        className={italic ? 'active' : ''}
+        title="Cursiva"
+        onClick={() => onChange({ bold, italic: !italic })}
+      >
+        <Italic size={14} />
+      </button>
     </div>
   )
 }
@@ -295,17 +340,47 @@ function RepeaterConfig({ element, fields, onUpdate }: { element: RepeaterElemen
             </button>
           </div>
 
+          <div className="ff-wrap">
+            <label className="ff-label">Vista previa de la línea</label>
+            <div
+              className={`tpl-line-preview${(line.align ?? 'left') === 'justify' ? ' tpl-line-preview-justify' : ''}`}
+              style={{
+                fontSize: line.fontSize ?? 10,
+                fontWeight: line.bold ? 'bold' : 'normal',
+                fontStyle: line.italic ? 'italic' : 'normal',
+                textAlign: line.align ?? 'left',
+              }}
+            >
+              {(line.align ?? 'left') === 'justify' ? (
+                <><span>Texto</span><span>$0.00</span></>
+              ) : (
+                'Aa Ejemplo 123'
+              )}
+            </div>
+          </div>
+
           <div className="form-row form-row-3">
-            <NumberField label="Tamaño" value={line.fontSize} onChange={(v) => {
+            <NumberField label="Tamaño" value={line.fontSize ?? 10} onChange={(v) => {
               const next = lines.map((l, i) => (i === li ? { ...l, fontSize: Math.max(4, v) } : l))
               setLines(next)
             }} />
             <div className="ff-wrap">
               <label className="ff-label">Alineación</label>
-              <AlignControl value={line.align} onChange={(v) => {
+              <RepeaterAlignControl value={line.align ?? 'left'} onChange={(v) => {
                 const next = lines.map((l, i) => (i === li ? { ...l, align: v } : l))
                 setLines(next)
               }} />
+            </div>
+            <div className="ff-wrap">
+              <label className="ff-label">Estilo</label>
+              <RepeaterStyleControl
+                bold={!!line.bold}
+                italic={!!line.italic}
+                onChange={({ bold, italic }) => {
+                  const next = lines.map((l, i) => (i === li ? { ...l, bold, italic } : l))
+                  setLines(next)
+                }}
+              />
             </div>
           </div>
         </div>
@@ -313,7 +388,7 @@ function RepeaterConfig({ element, fields, onUpdate }: { element: RepeaterElemen
 
       <button
         type="button" className="btn btn-secondary btn-size-sm"
-        onClick={() => setLines([...lines, { tokens: [], align: 'left', fontSize: 9 }])}
+        onClick={() => setLines([...lines, { tokens: [], align: 'left', fontSize: 9, bold: false, italic: false }])}
       >
         <Plus size={14} /> Agregar línea
       </button>

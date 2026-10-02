@@ -125,11 +125,21 @@ export type RepeaterTokenKey = RepeaterItemTokenKey | RepeaterPagoTokenKey
 
 export type RepeaterToken = { kind: 'field'; key: RepeaterTokenKey } | { kind: 'text'; text: string }
 
+/** Alineación de una línea del repetidor — `justify` distribuye el contenido entre ambos
+ * extremos (texto a la izquierda y monto a la derecha en la misma línea). */
+export type RepeaterLineAlign = TextAlign | 'justify'
+
 export interface RepeaterLine {
   /** Contenido y orden de la línea: tokens de campo mezclados con texto fijo. */
   tokens: RepeaterToken[]
-  align: TextAlign
-  fontSize: number
+  /** Formato propio de la línea (aplica a todos sus tokens y textos fijos). Todo opcional:
+   * una línea sin formato definido hereda el del elemento — sin negrita, sin cursiva,
+   * alineada a la izquierda (fontSize por defecto 10). Las plantillas ya guardadas, sin
+   * estos campos, siguen renderizando igual que antes. */
+  align?: RepeaterLineAlign
+  fontSize?: number
+  bold?: boolean
+  italic?: boolean
 }
 
 export interface RepeaterElement extends BaseElement {
