@@ -193,7 +193,7 @@ function RepeaterConfig({ element, fields, onUpdate }: { element: RepeaterElemen
   }
 
   function removeToken(lineIndex: number, tokenIndex: number) {
-    const next = lines.map((l) => ({ ...l, tokens: l.tokens.filter((_, i) => i !== tokenIndex) }))
+    const next = lines.map((l, i) => (i === lineIndex ? { ...l, tokens: l.tokens.filter((_, ti) => ti !== tokenIndex) } : l))
     setLines(next)
   }
 
@@ -286,7 +286,7 @@ function RepeaterConfig({ element, fields, onUpdate }: { element: RepeaterElemen
               onClick={() => {
                 const text = fixedText[li] ?? ''
                 if (!text.length) return
-                const next = lines.map((l, i) => (i === li ? { ...l, tokens: [...l.tokens, { kind: 'text', text }] } : l))
+                const next = lines.map((l, i) => (i === li ? { ...l, tokens: [...l.tokens, { kind: 'text', text } as RepeaterToken] } : l))
                 setLines(next)
                 setFixedText((prev) => ({ ...prev, [li]: '' }))
               }}
