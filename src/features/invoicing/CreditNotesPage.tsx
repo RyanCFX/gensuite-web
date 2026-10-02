@@ -16,7 +16,7 @@ import { listDepartamentos } from '@/shared/api/departamentos'
 import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo, EcfModificationCode } from '@/shared/api/types'
 import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
 import { Select, SelectItem } from '@/components/ui/select'
-import { Plus, Loader2, ArrowRightLeft, ChevronDown, ChevronRight, Download, SlidersHorizontal, AlertTriangle } from 'lucide-react'
+import { Plus, Loader2, ArrowRightLeft, ChevronDown, ChevronRight, Download, SlidersHorizontal, AlertTriangle, Trash2 } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
@@ -853,7 +853,7 @@ export default function CreditNotesPage() {
                     </p>
                   ) : (
                     <div className="items-table-wrap" style={{ marginTop: 4 }}>
-                      <table className="items-table items-table-resizable">
+                      <table className="items-table navy-table items-table-resizable">
                         <colgroup>
                           {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
                         </colgroup>
@@ -909,17 +909,27 @@ export default function CreditNotesPage() {
                               </td>
                               <td style={{ textAlign: 'right' }}>{formatMoney(item.rate, selectedInvoice?.currency)}</td>
                               <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(item.qty * item.rate, selectedInvoice?.currency)}</td>
-                              <td>
-                                <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeNoteItem(index)}>✕</button>
+                              <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ position: 'relative', verticalAlign: 'middle' }}>
+                                <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-ghost btn-size-icon-xs"
+                                    onClick={() => removeNoteItem(index)}
+                                    title="Eliminar"
+                                    style={{ color: 'var(--error-text)' }}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           )})}
                         </tbody>
                       </table>
-                      <div className="items-total-row">
-                        <div className="items-total-line" style={{ fontWeight: 700 }}>
-                          <span>Total crédito</span>
-                          <span>{formatMoney(noteItems.reduce((s, i) => s + i.qty * i.rate, 0), selectedInvoice?.currency)}</span>
+                      <div className="items-total-row navy-totals">
+                        <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: 'flex-end', gap: 24, marginRight: itemsColWidths['actions'] }}>
+                          <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'right' }}>Total crédito</span>
+                          <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'right', minWidth: 170 }}>{formatMoney(noteItems.reduce((s, i) => s + i.qty * i.rate, 0), selectedInvoice?.currency)}</span>
                         </div>
                       </div>
                     </div>
@@ -928,7 +938,7 @@ export default function CreditNotesPage() {
               </div>
               <div className="modal-foot">
                 <button type="button" className="btn btn-ghost" onClick={crearClose.requestClose}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
+                <button type="submit" className="btn btn-navy" disabled={createMutation.isPending}>
                   {createMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
                   Crear y Someter
                 </button>

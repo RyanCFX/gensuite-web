@@ -160,7 +160,7 @@ export default function ConfirmacionDespachoDetail() {
 
       <div className="card">
         <div className="table-scroll">
-          <table className="data-table items-table-resizable">
+          <table className="data-table navy-table items-table-resizable">
             <colgroup>
               {columns.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
             </colgroup>
@@ -240,7 +240,7 @@ export default function ConfirmacionDespachoDetail() {
       {!yaResuelta && puedeConfirmar && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
           <button
-            className="btn btn-primary"
+            className="btn btn-navy"
             disabled={confirmarMutation.isPending || !allTrackingComplete}
             onClick={handleConfirm}
           >

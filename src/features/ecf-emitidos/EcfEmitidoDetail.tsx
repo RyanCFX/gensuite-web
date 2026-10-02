@@ -4,11 +4,12 @@
 // CONSTANCIA: las pruebas end-to-end con datos reales quedan pendientes — ningún tenant tiene Vega
 // conectado en producción.
 
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { QRCodeSVG } from 'qrcode.react'
 import { toast } from 'sonner'
-import { ArrowLeft, Receipt, RefreshCw, RotateCcw, ExternalLink, AlertTriangle, Info, FileText } from 'lucide-react'
+import { ArrowLeft, Receipt, RefreshCw, RotateCcw, ExternalLink, AlertTriangle, Info, Link2, ChevronRight, Archive } from 'lucide-react'
 import { getEcfEmitido, refreshEcfEmitido, regenerarEcfEmitido } from '@/shared/api/ecf-emitidos'
 import { Permitido } from '@/components/shared/Permitido'
 import { downloadInvoiceEcfPdfa } from '@/shared/api/invoices'
@@ -86,6 +87,22 @@ export default function EcfEmitidoDetail() {
   })
 
   const { widths: colWidths, startResize } = useResizableColumns(ECF_LINEAS_COLUMNS)
+  const [relatedOpen, setRelatedOpen] = useState(false)
+  const relatedRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!relatedOpen) return
+    const onDown = (e: PointerEvent) => {
+      if (relatedRef.current && !relatedRef.current.contains(e.target as Node)) setRelatedOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setRelatedOpen(false) }
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [relatedOpen])
 
   if (isLoading) {
     return (
@@ -126,6 +143,7 @@ export default function EcfEmitidoDetail() {
             <ArrowLeft size={14} /> e-CF Emitidos
           </a>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span className="page-title-dot" />
             <span style={{ fontFamily: 'var(--font-body)' }}>{v.ncf}</span>
             <span className={`badge ${ecfStatusBadge(v.status)}`}>{ecfFlujoStatusLabel(v.flujo, v.status)}</span>
             {chip && <span className={`badge ${chip.className}`}>{chip.label}</span>}
@@ -136,11 +154,12 @@ export default function EcfEmitidoDetail() {
             {v.counterpartRnc ? ` · ${v.counterpartRnc}` : ''}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {v.status === 'REJECTED' && (
             <Permitido accion="ecf.emitidos.regenerar">
               <button
-                className="btn btn-secondary btn-size-sm"
+                className="btn btn-secondary btn-size-md"
+                style={{ border: '1.457px solid var(--Gris-Forms, #CCDBE2)', color: '#0E3D51' }}
                 disabled={regenerarMutation.isPending}
                 onClick={() => regenerarMutation.mutate()}
               >
@@ -151,7 +170,8 @@ export default function EcfEmitidoDetail() {
           )}
           {canRefresh && (
             <button
-              className="btn btn-secondary btn-size-sm"
+              className="btn btn-secondary btn-size-md"
+              style={{ border: '1.457px solid var(--Gris-Forms, #CCDBE2)', color: '#0E3D51' }}
               disabled={refreshMutation.isPending}
               onClick={() => refreshMutation.mutate()}
             >
@@ -161,12 +181,43 @@ export default function EcfEmitidoDetail() {
           )}
           {v.erpnext && esSales && (
             <button
-              className="btn btn-ghost btn-size-sm"
+              className="btn btn-secondary btn-size-md"
+              style={{ border: '1.457px solid var(--Gris-Forms, #CCDBE2)', color: '#0E3D51' }}
               disabled={pdfaMutation.isPending}
               onClick={() => pdfaMutation.mutate(v.erpnext!.docname)}
             >
-              <FileText size={14} /> {pdfaMutation.isPending ? 'Generando…' : 'PDF/A (archivo fiscal)'}
+              <Archive size={14} /> {pdfaMutation.isPending ? 'Generando…' : 'PDF/A (archivo fiscal)'}
             </button>
+          )}
+          {docPath && (
+            <div className="dropdown" ref={relatedRef} style={{ display: 'flex' }}>
+              <button
+                className="btn btn-secondary btn-size-md"
+                style={{ border: '1.457px solid var(--Gris-Forms, #CCDBE2)', color: '#0E3D51' }}
+                aria-haspopup="true"
+                aria-expanded={relatedOpen}
+                onClick={() => setRelatedOpen((o) => !o)}
+              >
+                <Link2 size={14} /> Documentos relacionados
+                <ChevronRight size={11} style={{ transform: 'rotate(90deg)' }} aria-hidden="true" />
+              </button>
+              <div
+                className={`dropdown-panel${relatedOpen ? ' open' : ''}`}
+                role="menu"
+                style={{ left: 0, right: 'auto' }}
+              >
+                <div className="dd-header">
+                  <div className="dd-name" style={{ fontSize: 11 }}>{esSales ? 'Factura de venta' : 'Factura de compra'}</div>
+                </div>
+                <button
+                  className="dd-item"
+                  role="menuitem"
+                  onClick={() => { setRelatedOpen(false); navigate(docPath) }}
+                >
+                  {v.erpnext!.docname}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -183,7 +234,7 @@ export default function EcfEmitidoDetail() {
 
       {/* Flujo de estado ante la DGII */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Flujo de estado ante la DGII</h2>
         </div>
         <div className="card-body">
@@ -193,7 +244,7 @@ export default function EcfEmitidoDetail() {
 
       {/* Datos del comprobante */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Receipt size={16} /> Datos del comprobante
           </h2>
@@ -219,25 +270,13 @@ export default function EcfEmitidoDetail() {
             </div>
           )}
 
-          {docPath && (
-            <p style={{ fontSize: 13, marginTop: 12 }}>
-              {esSales ? 'Factura de venta' : 'Factura de compra'}:{' '}
-              <Link to={docPath} style={{ fontFamily: 'var(--font-body)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                {v.erpnext!.docname} <ExternalLink size={12} />
-              </Link>
-              {v.erpnext?.outboxState && (
-                <span className="td-muted" style={{ fontSize: 12 }}> · outbox: {v.erpnext.outboxState}
-                  {v.erpnext.attempt != null ? ` (intento ${v.erpnext.attempt})` : ''}
-                </span>
-              )}
-            </p>
-          )}
+
         </div>
       </div>
 
       {/* Totales */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Totales</h2>
         </div>
         <div className="card-body">
@@ -253,11 +292,8 @@ export default function EcfEmitidoDetail() {
 
       {/* Líneas */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
-          <h2 className="card-title">Líneas</h2>
-        </div>
         <div className="items-table-wrap">
-          <table className="items-table items-table-resizable">
+          <table className="items-table navy-table items-table-resizable">
             <colgroup>
               {ECF_LINEAS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
             </colgroup>
@@ -316,7 +352,7 @@ export default function EcfEmitidoDetail() {
 
       {/* Timbre / QR */}
       <div className="card">
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Timbre fiscal (DGII)</h2>
         </div>
         <div className="card-body">

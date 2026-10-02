@@ -23,6 +23,7 @@ import { formatDate, formatMoney, todayIso } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
+import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
@@ -645,7 +646,7 @@ export default function DebitNotesPage() {
                 <div>
                   <label className="ff-label">Artículos / cargos adicionales</label>
                   <div className="items-table-wrap" style={{ marginTop: 4 }}>
-                    <table className="items-table items-table-resizable">
+                    <table className="items-table navy-table items-table-resizable">
                       <colgroup>
                         {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
                       </colgroup>
@@ -673,12 +674,12 @@ export default function DebitNotesPage() {
                       <tbody>
                         {noteItems.map((item, index) => (
                           <tr key={index}>
-                            <td>
-                              <input
-                                className="items-input"
+                            <td style={{ minWidth: 200 }}>
+                              <ItemSelect
                                 value={item.itemCode}
-                                onChange={(e) => updateNoteItem(index, { itemCode: e.target.value })}
-                                placeholder="ITEM-001"
+                                selectedLabel={item.itemCode || undefined}
+                                onSelect={(catalogItem) => updateNoteItem(index, { itemCode: catalogItem.id })}
+                                onClear={() => updateNoteItem(index, { itemCode: '' })}
                               />
                             </td>
                             <td>
@@ -706,10 +707,18 @@ export default function DebitNotesPage() {
                             <td style={{ textAlign: 'right', fontWeight: 500 }}>
                               {formatMoney(item.qty * item.rate, selectedInvoice?.currency)}
                             </td>
-                            <td>
-                              <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeNoteItem(index)}>
-                                <Trash2 size={12} />
-                              </button>
+                            <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ position: 'relative', verticalAlign: 'middle' }}>
+                              <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-size-icon-xs"
+                                  onClick={() => removeNoteItem(index)}
+                                  title="Eliminar"
+                                  style={{ color: 'var(--error-text)' }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -720,10 +729,10 @@ export default function DebitNotesPage() {
                         <Plus size={14} /> Agregar artículo
                       </button>
                     </div>
-                    <div className="items-total-row">
-                      <div className="items-total-line" style={{ fontWeight: 700 }}>
-                        <span>Total débito</span>
-                        <span>{formatMoney(noteItems.reduce((s, i) => s + i.qty * i.rate, 0), selectedInvoice?.currency)}</span>
+                    <div className="items-total-row navy-totals">
+                      <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: 'flex-end', gap: 24, marginRight: itemsColWidths['actions'] }}>
+                        <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'right' }}>Total débito</span>
+                        <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'right', minWidth: 170 }}>{formatMoney(noteItems.reduce((s, i) => s + i.qty * i.rate, 0), selectedInvoice?.currency)}</span>
                       </div>
                     </div>
                   </div>
@@ -731,7 +740,7 @@ export default function DebitNotesPage() {
               </div>
               <div className="modal-foot">
                 <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
+                <button type="submit" className="btn btn-navy" disabled={createMutation.isPending}>
                   {createMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
                   Crear y Someter
                 </button>
