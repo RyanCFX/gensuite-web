@@ -132,8 +132,7 @@ export default function ComprasPage() {
                 </FilterField>
                 )}
                 {filtros.puedeFiltrar('branch') && (
-                <FilterField label="Sucursal" style={{ width: 200 }}>
-                  <OpcionesSelect
+                <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }}
                     recurso="sucursales"
                     value={branch}
                     onChange={(val) => { setBranch(val); setPage(1) }}
@@ -141,7 +140,6 @@ export default function ComprasPage() {
                     placeholder="Todas las sucursales"
                     fallback={fallbackSucursales}
                   />
-                </FilterField>
                 )}
 
                 <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>

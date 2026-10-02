@@ -709,7 +709,7 @@ export default function EmpresaConfig() {
                       onChange={(val) => set('defaultWarehouse', val || undefined)}
                       options={warehouseOptions}
                       onSearch={setWarehouseSearch}
-                      selectedLabel={(warehouses ?? []).find((w) => w.id === form.defaultWarehouse)?.name ?? ''}
+                      selectedLabel={(warehouses ?? []).find((w) => w.id === form.defaultWarehouse)?.name ?? form.defaultWarehouse ?? ''}
                       placeholder="Sin predeterminado"
                     />
                   </div>
@@ -720,7 +720,7 @@ export default function EmpresaConfig() {
                       onChange={(val) => set('transitWarehouse', val || undefined)}
                       options={transitWarehouseOptions}
                       onSearch={setTransitWarehouseSearch}
-                      selectedLabel={transitWarehouses.find((w) => w.id === form.transitWarehouse)?.name ?? ''}
+                      selectedLabel={(warehouses ?? []).find((w) => w.id === form.transitWarehouse)?.name ?? form.transitWarehouse ?? ''}
                       placeholder="Sin configurar"
                     />
                     {transitWarehouses.length === 0 ? (

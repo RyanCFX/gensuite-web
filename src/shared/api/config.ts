@@ -55,8 +55,15 @@ import type {
 } from './types'
 
 export async function getEmpresa() {
-  const res = await client.get<{ success: true; data: Empresa }>(ENDPOINTS.config.empresa)
-  return unwrap(res)
+  const res = await client.get<{ success: true; data: Empresa & { phone?: string; address?: string; taxId?: string } }>(ENDPOINTS.config.empresa)
+  // El BFF devuelve `phone`/`address`/`taxId`; la UI trabaja con `telefono`/`direccion`/`rnc`.
+  const { phone, address, taxId, ...empresa } = unwrap(res)
+  return {
+    ...empresa,
+    telefono: empresa.telefono ?? phone,
+    direccion: empresa.direccion ?? address,
+    rnc: empresa.rnc ?? taxId,
+  } as Empresa
 }
 
 export async function updateEmpresa(data: Partial<Empresa>) {

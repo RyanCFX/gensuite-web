@@ -298,7 +298,9 @@ client.interceptors.response.use(
       // Toast throttleado: un mismo mensaje puede llegar en ráfaga (react-query reintenta,
       // varias queries fallan a la vez) — no spamear al usuario con el mismo aviso.
       const msg = data?.error?.message
-      if (msg && shouldToastPermiso(msg)) toast.error(msg)
+      // `silent403`: la request lo pide (ej. selects de filtros en tablas, que se ocultan solos).
+      const silent403 = (error.config as { silent403?: boolean } | undefined)?.silent403
+      if (msg && !silent403 && shouldToastPermiso(msg)) toast.error(msg)
       if (errorCode === 'PERMISO_INSUFICIENTE') {
         // Refresco SILENCIOSO: no toca `status`, así ProtectedRoute no re-monta la app (evita el
         // loop de re-render → re-request → 403 → refresh → ...). Deduplicado en el store.
