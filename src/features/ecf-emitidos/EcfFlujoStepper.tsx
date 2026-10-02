@@ -8,9 +8,17 @@ import { formatDateTime } from '@/lib/formatters'
 
 type Tone = 'done' | 'current' | 'error' | 'warn' | 'pending'
 
+// Estados terminales que sí son un fallo — cualquier otro terminal (incluido ACCEPTED con
+// requiereAtención, ej. contingencia diferida) se muestra en verde, no en rojo.
+const ESTADOS_FALLO = new Set(['REJECTED', 'FAILED', 'NOT_FOUND'])
+
 function pasoTone(paso: EcfFlujoPaso, flujo: EcfFlujo): Tone {
-  if (paso.actual && paso.terminal && flujo.requiereAtencion) {
-    return paso.estado === 'CONDITIONAL' ? 'warn' : 'error'
+  if (paso.actual && paso.terminal) {
+    const est = (paso.estado ?? '').toUpperCase()
+    if (ESTADOS_FALLO.has(est)) return 'error'
+    if (est === 'CONDITIONAL' && flujo.requiereAtencion) return 'warn'
+    // Aceptado (con o sin atención requerida) va en teal como los pasos superados.
+    return 'done'
   }
   if (paso.actual) return 'current'
   if (paso.alcanzado) return 'done'
@@ -40,7 +48,7 @@ export function EcfFlujoStepper({ flujo }: { flujo: EcfFlujo }) {
   return (
     <div
       className="table-scroll"
-      style={{ display: 'flex', alignItems: 'flex-start', paddingBottom: 4, gap: 0 }}
+      style={{ display: 'flex', alignItems: 'flex-start', paddingTop: 6, paddingBottom: 4, gap: 0 }}
     >
       {pasos.map((paso, i) => {
         const tone = pasoTone(paso, flujo)

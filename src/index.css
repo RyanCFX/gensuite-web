@@ -41,7 +41,7 @@
 
   --success-bg: #f0fdf4;
   --success-border: #bbf7d0;
-  --success-text: #16a34a;
+  --success-text: #208591;
   --warning-bg: #fefce8;
   --warning-border: #fef08a;
   --warning-text: #ca8a04;
@@ -115,7 +115,7 @@
 
   --success-bg: #052e16;
   --success-border: #166534;
-  --success-text: #4ade80;
+  --success-text: #208591;
   --warning-bg: #1c1400;
   --warning-border: #713f12;
   --warning-text: #facc15;
@@ -1082,7 +1082,8 @@ button {
   letter-spacing: 0.03em;
   color: var(--text-secondary);
   text-align: left;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .data-table tbody tr {
@@ -1099,6 +1100,7 @@ button {
   font-size: 13px;
   color: var(--text-primary);
   vertical-align: middle;
+  overflow-wrap: break-word;
 }
 
 .table-row-clickable { cursor: pointer; }
@@ -1359,6 +1361,10 @@ button {
 }
 
 .ff-required { color: var(--error-text); margin-left: 2px; }
+
+/* El asterisco de requerido va rojo, pero un label completo marcado como requerido
+   mantiene su color normal (no queda en rojo permanente). */
+label.ff-label.ff-required { color: #0E3D51; }
 
 .ff-input-wrap { position: relative; }
 
@@ -1834,7 +1840,7 @@ button {
 .modal-title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #0E3D51;
 }
 
 .modal-sub {
@@ -2080,6 +2086,7 @@ button {
   color: var(--text-primary);
   vertical-align: middle;
   border-bottom: 1px solid var(--border-subtle);
+  overflow-wrap: break-word;
 }
 
 .items-table tbody tr:last-child td { border-bottom: none; }
@@ -2418,12 +2425,13 @@ button {
 }
 
 /* ─── Columnas redimensionables (ver useResizableColumns) ───
-   `table-layout: fixed` + <colgroup> hace que el ancho declarado en cada <col> mande siempre —
-   la tabla ya no se encoge/expande sola según el contenido (vacía vs. con filas), y arrastrar el
-   divisor cambia el ancho real de la columna de forma predecible. */
-.items-table-resizable { table-layout: fixed; }
-.items-table-resizable th { position: relative; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.items-table-resizable td { overflow: hidden; }
+   `table-layout: auto` + <colgroup>: las columnas se adaptan al contenido (con el ancho
+   declarado como base) y el texto se ajusta en vez de recortarse; si el contenido mínimo
+   supera el contenedor, el wrapper (.table-scroll, .items-table-wrap…) hace scroll
+   horizontal. Arrastrar el divisor sigue ajustando el ancho sugerido de la columna. */
+.items-table-resizable { table-layout: auto; }
+.items-table-resizable th { position: relative; white-space: normal; overflow-wrap: break-word; }
+.items-table-resizable td { overflow-wrap: break-word; }
 
 .col-resize-handle {
   position: absolute;

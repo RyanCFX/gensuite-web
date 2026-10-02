@@ -136,6 +136,7 @@ export default function DevolucionDetail() {
             <ArrowLeft size={14} /> Devoluciones
           </a>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="page-title-dot" />
             Devolución {devolucion.ncf ?? devolucion.creditNoteId}
             <span className={`badge ${STATUS_BADGE[devolucion.documentStatus] ?? 'badge-neutral'}`}>
               {STATUS_LABEL[devolucion.documentStatus] ?? devolucion.documentStatus}
@@ -145,7 +146,8 @@ export default function DevolucionDetail() {
         </div>
         {devolucion.documentStatus === 'submitted' && (
           <button
-            className="btn btn-secondary btn-size-sm"
+            className="btn btn-secondary btn-size-md"
+            style={{ border: '1.457px solid var(--Gris-Forms, #CCDBE2)', color: '#0E3D51' }}
             onClick={() => downloadMutation.mutate()}
             disabled={downloadMutation.isPending}
           >
@@ -162,7 +164,7 @@ export default function DevolucionDetail() {
         )}
         {devolucion.documentStatus === 'draft' && (
           <button
-            className="btn btn-danger btn-size-sm"
+            className="btn btn-danger btn-size-md"
             onClick={() => { setCancelReason(''); setCancelModalOpen(true) }}
           >
             <Ban size={14} /> Cancelar devolución
@@ -171,7 +173,7 @@ export default function DevolucionDetail() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Información General</h2>
         </div>
         <div className="card-body">
@@ -202,17 +204,17 @@ export default function DevolucionDetail() {
               <span className="detail-label">Cliente</span>
               <span className="detail-value">{devolucion.customerName}</span>
             </div>
-          </div>
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-            <p style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>Motivo</p>
-            <p style={{ fontSize: 13, whiteSpace: 'pre-line' }}>{devolucion.reason || '—'}</p>
+            <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+              <span className="detail-label">Motivo</span>
+              <span className="detail-value" style={{ whiteSpace: 'pre-line' }}>{devolucion.reason || '—'}</span>
+            </div>
           </div>
         </div>
       </div>
 
       {devolucion.originalInvoice && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Receipt size={16} /> Factura original
             </h2>
@@ -258,8 +260,8 @@ export default function DevolucionDetail() {
 
       {devolucion.aseguradora && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ShieldCheck size={16} style={{ color: 'var(--icon-muted)' }} />
+          <div className="card-header navy-card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShieldCheck size={16} />
             <h2 className="card-title" style={{ flex: 1 }}>Cobertura ARS revertida</h2>
             <EstadoArsBadge estado={devolucion.aseguradora.estadoArsAlDevolver} />
           </div>
@@ -334,7 +336,7 @@ export default function DevolucionDetail() {
                   la nota del paciente ni la de la ARS.
                 </span>
                 <button
-                  className="btn btn-primary btn-size-sm"
+                  className="btn btn-navy btn-size-sm"
                   onClick={() => emitirNcArsMutation.mutate()}
                   disabled={emitirNcArsMutation.isPending}
                 >
@@ -350,11 +352,11 @@ export default function DevolucionDetail() {
       )}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Artículos devueltos</h2>
         </div>
         <div className="items-table-wrap">
-          <table className="items-table items-table-resizable">
+          <table className="items-table navy-table items-table-resizable">
             <colgroup>
               {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
             </colgroup>
@@ -399,10 +401,10 @@ export default function DevolucionDetail() {
               ))}
             </tbody>
           </table>
-          <div className="items-total-row">
-            <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
-              <span>Total</span>
-              <span>{formatDOP(Math.abs(devolucion.grandTotal))}</span>
+          <div className="items-total-row navy-totals">
+            <div className="items-total-line total-row-highlight" style={{ fontWeight: 700, justifyContent: 'flex-end', gap: 24 }}>
+              <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'right' }}>Total</span>
+              <span style={{ fontSize: 18, color: '#FCB124', textAlign: 'left', minWidth: 170 }}>{formatDOP(Math.abs(devolucion.grandTotal))}</span>
             </div>
           </div>
         </div>
@@ -410,7 +412,7 @@ export default function DevolucionDetail() {
 
       {usageStatus && (
         <div className="card">
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Wallet size={16} /> Estado de uso
             </h2>

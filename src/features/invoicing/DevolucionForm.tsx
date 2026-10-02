@@ -17,7 +17,7 @@ import { formatDOP, formatDate, daysSince } from '@/lib/formatters'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
-import { RotateCcw, Users, FileText, Check, AlertCircle, AlertTriangle } from 'lucide-react'
+import { RotateCcw, Users, FileText, Check, AlertCircle, AlertTriangle, ArrowLeft } from 'lucide-react'
 import type { ApiError, EcfModificationCode, MotivoAnulacionArs } from '@/shared/api/types'
 import { MOTIVOS_ANULACION_ARS, esCoberturaCompleta } from '@/shared/api/types'
 import { ECF_MODIFICATION_CODES, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
@@ -336,21 +336,21 @@ export default function DevolucionForm() {
   return (
     <div className="page-container">
       <button className="page-back-link" onClick={invoiceId ? confirmClose.requestClose : () => navigate('/devoluciones')}>
-        ← Devoluciones
+        <ArrowLeft size={14} /> Devoluciones
       </button>
 
       <PageHeader
-        title="Nueva Devolución"
+        title={<><span className="page-title-dot" />Nueva Devolución</>}
         description="Busca al cliente y selecciona la factura sometida a devolver (pagada o pendiente)."
         action={<RecargarButton label="Actualizar" />}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>
         <div className="card">
-          <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="card-header navy-card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span
               className="badge badge-info"
-              style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+              style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, fontWeight: 700, fontSize: 12 }}
             >
               1
             </span>
@@ -387,10 +387,10 @@ export default function DevolucionForm() {
         </div>
 
         <div className="card" style={{ opacity: customerId ? 1 : 0.5, pointerEvents: customerId ? 'auto' : 'none' }}>
-          <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="card-header navy-card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span
               className="badge badge-info"
-              style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+              style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0, fontWeight: 700, fontSize: 12 }}
             >
               2
             </span>
@@ -450,7 +450,7 @@ export default function DevolucionForm() {
 
         {invoice && (
           <div className="card">
-            <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="card-header navy-card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <RotateCcw size={15} style={{ color: 'var(--icon-muted)' }} />
               <span className="card-title">Devolver producto(s)</span>
             </div>
@@ -479,6 +479,7 @@ export default function DevolucionForm() {
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
                 <input
                   type="checkbox"
+                  className="ff-check"
                   checked={returnFullInvoice}
                   onChange={(e) => setReturnFullInvoice(e.target.checked)}
                 />
@@ -487,7 +488,7 @@ export default function DevolucionForm() {
 
               {!returnFullInvoice && (
                 <div className="items-table-wrap">
-                  <table className="items-table items-table-resizable">
+                  <table className="items-table navy-table items-table-resizable">
                     <colgroup>
                       {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
                     </colgroup>
@@ -515,9 +516,9 @@ export default function DevolucionForm() {
                           <td style={{ textAlign: 'center' }}>
                             <input
                               type="checkbox"
+                              className="ff-check"
                               checked={row.checked}
                               onChange={() => toggleReturnRow(rowIndex)}
-                              style={{ cursor: 'pointer', accentColor: 'var(--color-brand)' }}
                             />
                           </td>
                           <td>
@@ -673,7 +674,7 @@ export default function DevolucionForm() {
             <div className="modal-foot">
               <button className="btn btn-secondary" onClick={confirmClose.requestClose}>Cancelar</button>
               <button
-                className="btn btn-primary"
+                className="btn btn-navy"
                 onClick={() => devolucionMutation.mutate()}
                 disabled={!canConfirmReturn || devolucionMutation.isPending}
               >

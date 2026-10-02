@@ -1567,7 +1567,7 @@ persistInvoice(buildInvoiceDto())
           </div>
           <div className="card-body">
             <div className="form-row">
-<div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
+<div className="ff-wrap" style={multimonedaHabilitada ? undefined : { gridColumn: 'span 2' }}>
                  <label className="ff-label ff-required" htmlFor="customer">Cliente</label>
                  {esClienteOcasional ? (
                    <input
@@ -1785,6 +1785,32 @@ persistInvoice(buildInvoiceDto())
               <div className="inline-alert inline-alert-warn" style={{ marginTop: 12 }}>
                 El cliente ha excedido su límite de crédito ${(semaforo.pctUsado ?? 0).toFixed(1)}% utilizado).
                 Considera revisar el saldo pendiente antes de emitir esta factura.
+              </div>
+            )}
+            {mostrarSelectorDespachoFuturo && (
+              <div style={{ marginTop: 16, borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
+                <label className="ff-label" style={{ marginBottom: 8, display: 'block' }}>Despacho</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    className={`btn btn-size-sm ${!despachoFuturo ? 'btn-navy' : 'btn-secondary'}`}
+                    onClick={() => setDespachoFuturo(false)}
+                  >
+                    Despachar ahora
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn btn-size-sm ${despachoFuturo ? 'btn-navy' : 'btn-secondary'}`}
+                    onClick={() => setDespachoFuturo(true)}
+                  >
+                    Despachar después
+                  </button>
+                </div>
+                <p className="ff-hint" style={{ marginTop: 6 }}>
+                  {despachoFuturo
+                    ? 'La factura no descontará inventario al someterse — la salida física se registra después con un Despacho.'
+                    : 'La factura descontará inventario al someterse — se confirma que exista stock físico en el almacén de cada línea.'}
+                </p>
               </div>
             )}
           </div>
@@ -2321,37 +2347,6 @@ persistInvoice(buildInvoiceDto())
             </div>
         </div>
         </div>
-
-        {mostrarSelectorDespachoFuturo && (
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div className="card-header navy-card-header">
-              <h2 className="card-title">Despacho</h2>
-            </div>
-            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  className={`btn btn-size-sm ${!despachoFuturo ? 'btn-navy' : 'btn-secondary'}`}
-                  onClick={() => setDespachoFuturo(false)}
-                >
-                  Despachar ahora
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-size-sm ${despachoFuturo ? 'btn-navy' : 'btn-secondary'}`}
-                  onClick={() => setDespachoFuturo(true)}
-                >
-                  Despachar después
-                </button>
-              </div>
-              <p className="ff-hint" style={{ margin: 0 }}>
-                {despachoFuturo
-                  ? 'La factura no descontará inventario al someterse — la salida física se registra después con un Despacho.'
-                  : 'La factura descontará inventario al someterse — se confirma que exista stock físico en el almacén de cada línea.'}
-              </p>
-            </div>
-          </div>
-        )}
 
         <div className="card">
           <div

@@ -167,14 +167,6 @@ const NAV_VENTAS: NavEntry[] = [
     icon: <Receipt size={16} aria-hidden="true" />,
     path: "/ecf-emitidos",
   },
-  {
-    label: "Reportes",
-    icon: <BarChart3 size={16} aria-hidden="true" />,
-    prefix: "/reportes/ventas|/reportes/607",
-    children: [
-      { label: "Ventas", icon: <BarChart3 size={14} />, path: "/reportes/ventas" }
-    ],
-  },
 ];
 
 const NAV_OPS: NavEntry[] = [
@@ -1844,15 +1836,12 @@ function AppLayoutInner() {
         <div className="sb-section">
           {!collapsed && <div className="sb-label">Contabilidad</div>}
           {contabilidadNav.map((entry) => renderEntry(entry, handleNav, collapsed))}
+          {reportesNav && renderEntry(reportesNav, handleNav, collapsed)}
         </div>
       )}
 
       {/* Footer */}
       <div className="sb-footer">
-        {reportesNav &&
-          renderEntry(reportesNav, handleNav, collapsed, {
-            floatWhenCollapsed: true,
-          })}
         {configNavPermFiltered && (
           <NavItemBtn item={configEntryItem} onNav={handleNav} collapsed={collapsed} />
         )}
