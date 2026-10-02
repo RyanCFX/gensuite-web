@@ -20,6 +20,7 @@ import {
   getComprasAnalitica, downloadComprasAnaliticaPdf,
   getComprasRegistro, downloadComprasRegistroPdf,
   getVentasItemWise, downloadVentasItemWisePdf,
+  getVentasItemWiseDetalle, downloadVentasItemWiseDetallePdf,
   getComprasItemWise, downloadComprasItemWisePdf,
   getPedidosAnalitica, downloadPedidosAnaliticaPdf,
   getComprasOrdenesAnalitica, downloadComprasOrdenesAnaliticaPdf,
@@ -136,7 +137,7 @@ const REPORT_META: Record<string, { label: string; description: string }> = {
   'flujo-efectivo': { label: 'Flujo de Efectivo', description: 'Cash Flow: entradas y salidas de efectivo del período' },
   'compras-analitica': { label: 'Analítica de Compras', description: 'Purchase Analytics: compras por proveedor y artículo' },
   'compras-registro': { label: 'Registro de Compras', description: 'Purchase Register: facturas de compra del período' },
-  'ventas-item-wise': { label: 'Registro de Ventas por Artículo', description: 'Item-wise Sales Register: ventas detalladas por artículo' },
+  'ventas-item-wise': { label: 'Registro de Ventas por Artículo', description: 'Ventas agregadas por artículo (cantidad y monto del período) — clic en una fila para ver el detalle' },
   'compras-item-wise': { label: 'Registro de Compras por Artículo', description: 'Item-wise Purchase Register: compras detalladas por artículo' },
   'pedidos-analitica': { label: 'Analítica de Pedidos', description: 'Sales Order Analysis: cantidad pedida vs. entregada vs. facturada' },
   'compras-ordenes-analitica': { label: 'Analítica de Órdenes de Compra', description: 'Purchase Order Analysis: cantidad ordenada vs. recibida vs. facturada' },
@@ -183,9 +184,11 @@ function ServiceUnavailable({ message }: { message?: string }) {
 function ReportTable({
   data,
   columns,
+  onRowClick,
 }: {
   data: Record<string, unknown>[]
   columns?: ColumnDef[]
+  onRowClick?: (row: Record<string, unknown>) => void
 }) {
   // Usa los fieldnames de `columns` si vienen del backend; si no, infiere de la primera fila
   const colDefs: ColumnDef[] = data && data.length > 0
@@ -224,7 +227,11 @@ function ReportTable({
         </thead>
         <tbody>
           {data.map((row, i) => (
-            <tr key={i}>
+            <tr
+              key={i}
+              className={onRowClick ? 'table-row-clickable' : undefined}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+            >
               {colDefs.map((c) => {
                 const val = row[c.fieldname]
                 const isAmount = c.fieldname.toLowerCase().includes('monto') || c.fieldname.toLowerCase().includes('total')
@@ -365,9 +372,9 @@ function DgiiReport({ tipo }: { tipo: '606' | '607' | '608' }) {
 }
 
 /** Wrapper que desenvuelve cualquier formato de respuesta y renderiza la tabla */
-function AutoTable({ data }: { data: unknown }) {
+function AutoTable({ data, onRowClick }: { data: unknown; onRowClick?: (row: Record<string, unknown>) => void }) {
   const { rows, columns } = extractRows(data)
-  return <ReportTable data={rows} columns={columns} />
+  return <ReportTable data={rows} columns={columns} onRowClick={onRowClick} />
 }
 
 // Mismos labels de fallback que ya usan AgingPage.tsx (Cobros) y AgingProveedoresPage.tsx (Pagos)
@@ -2304,6 +2311,14 @@ function ComprasRegistroReport() {
   )
 }
 
+type VentasItemWiseDetalleSel = {
+  itemCode: string
+  dimensiones: Record<string, string>
+  descripcion: string
+}
+
+/** Agregado por artículo/combinación (§3) — la fila entera es clickeable hacia el detalle (§4).
+ *  `itemCode`/`dimensiones` de cada fila NO son columnas visibles: solo viajan al drill-down. */
 function VentasItemWiseReport() {
   const [fromDate, setFromDate] = useState(monthStart())
   const [toDate, setToDate] = useState(today())
@@ -2311,6 +2326,7 @@ function VentasItemWiseReport() {
   const [department, setDepartment] = useState('')
   const [customer, setCustomer] = useState('')
   const [itemCode, setItemCode] = useState('')
+  const [detalle, setDetalle] = useState<VentasItemWiseDetalleSel | null>(null)
   const customerFilter = useCustomerFilter(customer)
   const itemFilter = useItemFilter(itemCode)
   const puedeImprimir = usePermissionsStore((s) => s.acciones['reportes.ventas.item-wise.imprimir'] === true)
@@ -2323,6 +2339,20 @@ function VentasItemWiseReport() {
     queryFn: () => getVentasItemWise(paramsReporteVentasItemWise),
     retry: false,
   })
+
+  if (detalle) {
+    return (
+      <VentasItemWiseDetalleReport
+        fromDate={fromDate}
+        toDate={toDate}
+        branch={branch}
+        department={department}
+        customer={customer}
+        sel={detalle}
+        onVolver={() => setDetalle(null)}
+      />
+    )
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -2371,6 +2401,108 @@ function VentasItemWiseReport() {
               <div className="filter-bar-right">
                 <DownloadPdfButton
                   onDownload={() => downloadVentasItemWisePdf(paramsReporteVentasItemWise)}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="card navy-table-card">
+        {isLoading && <LoadingRows />}
+        {error && <ErrorBanner err={error} />}
+        {!isLoading && !error && (
+          <>
+            <p style={{ margin: '12px 16px 0', fontSize: 12, opacity: 0.75 }}>
+              Hacé clic en una fila para ver el detalle de sus ventas individuales.
+            </p>
+            <AutoTable
+              data={data}
+              onRowClick={(row) => setDetalle({
+                itemCode: String(row.itemCode ?? ''),
+                dimensiones: (row.dimensiones ?? {}) as Record<string, string>,
+                descripcion: String(row.descripcion ?? row.itemCode ?? ''),
+              })}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Drill-down de una fila del agregado (§4) — cada venta individual del artículo/combinación
+ *  en el mismo período. Gatea con el mismo `reportes.ventas.item-wise.ver` de la pantalla
+ *  padre (ya chequeado a nivel de ruta); el PDF usa `...imprimir`, igual que el agregado. */
+function VentasItemWiseDetalleReport({
+  fromDate,
+  toDate,
+  branch,
+  department,
+  customer: customerInicial,
+  sel,
+  onVolver,
+}: {
+  fromDate: string
+  toDate: string
+  branch: string
+  department: string
+  customer: string
+  sel: VentasItemWiseDetalleSel
+  onVolver: () => void
+}) {
+  const [customer, setCustomer] = useState(customerInicial)
+  const customerFilter = useCustomerFilter(customer)
+  const puedeImprimir = usePermissionsStore((s) => s.acciones['reportes.ventas.item-wise.imprimir'] === true)
+
+  const { filtros } = useReporteFiltros()
+  const dimensionesParam = sel.dimensiones && Object.keys(sel.dimensiones).length > 0 ? sel.dimensiones : undefined
+  const dimensionesKey = dimensionesParam ? JSON.stringify(dimensionesParam) : ''
+  const paramsDetalleRaw = {
+    fromDate, toDate,
+    branch: branch || undefined, department: department || undefined,
+    itemCode: sel.itemCode, customer: customer || undefined,
+    dimensiones: dimensionesParam,
+  }
+  const { limpios: paramsDetalle } = filtros.sanear(paramsDetalleRaw)
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['reporte-ventas-item-wise-detalle', fromDate, toDate, branch, department, sel.itemCode, dimensionesKey, customer],
+    queryFn: () => getVentasItemWiseDetalle({ ...paramsDetalle, itemCode: sel.itemCode }),
+    retry: false,
+  })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button className="btn btn-secondary btn-size-sm" onClick={onVolver}>
+          ← Volver a Ventas por Artículo
+        </button>
+        <h3 style={{ margin: 0, fontSize: 15 }}>Ventas de: {sel.descripcion}</h3>
+      </div>
+      <div className="card filter-card-navy">
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Período">
+                <span style={{ fontSize: 13 }}>{fromDate} → {toDate}</span>
+              </FilterField>
+              {customerFilter.visible && (
+              <FilterField label="Cliente" style={{ width: 200 }}>
+                <SearchSelect
+                  value={customer}
+                  selectedLabel={customerFilter.label}
+                  onChange={setCustomer}
+                  options={customerFilter.options}
+                  onSearch={customerFilter.onSearch}
+                  loading={customerFilter.isLoading}
+                  placeholder="Todos los clientes"
+                />
+              </FilterField>
+              )}
+            </div>
+            {puedeImprimir && (
+              <div className="filter-bar-right">
+                <DownloadPdfButton
+                  onDownload={() => downloadVentasItemWiseDetallePdf({ ...paramsDetalle, itemCode: sel.itemCode })}
                 />
               </div>
             )}

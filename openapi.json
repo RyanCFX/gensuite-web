@@ -1487,7 +1487,7 @@
             "bearer": []
           }
         ],
-        "summary": "Item-wise Sales Register — detalle de ventas por línea de artículo",
+        "summary": "Ventas por Artículo — cantidad y monto vendido del período, agrupado por artículo (y por combinación de dimensión de inventario cuando el artículo está dimensionado)",
         "tags": [
           "Reportes"
         ]
@@ -1573,7 +1573,215 @@
             "bearer": []
           }
         ],
-        "summary": "PDF de Registro de Ventas por Artículo — mismos filtros que la versión JSON",
+        "summary": "PDF de Ventas por Artículo — mismos filtros que la versión JSON",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/ventas/item-wise/detalle": {
+      "get": {
+        "operationId": "ReportesController_getItemWiseSalesDetalle",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": true,
+            "in": "query",
+            "description": "Artículo a detallar (obligatorio).",
+            "schema": {
+              "example": "BUMPER-001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "customer",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "CUST-00001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dimensiones",
+            "required": false,
+            "in": "query",
+            "description": "Combinación exacta de dimensión de inventario a filtrar — clave = código de dimensión, valor = id del Valor Dimension Inventario. Omitirla trae todas las combinaciones vendidas de este artículo mezcladas.",
+            "schema": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "example": {
+                "marca": "MARCA-TOYOTA",
+                "anio": "ANIO-2005"
+              },
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de Ventas por Artículo — cada venta individual de un artículo (y, opcionalmente, de una combinación puntual de dimensión) en el período; drill-down de una fila del reporte agregado",
+        "tags": [
+          "Reportes"
+        ]
+      }
+    },
+    "/api/v1/reportes/ventas/item-wise/detalle/pdf": {
+      "get": {
+        "operationId": "ReportesController_getItemWiseSalesDetallePdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: inicio del mes actual",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-06-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Sucursal (Accounting Dimension).",
+            "schema": {
+              "example": "Santo Domingo",
+              "type": "string"
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar por Departamento (Accounting Dimension).",
+            "schema": {
+              "example": "Ventas - JBC",
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": true,
+            "in": "query",
+            "description": "Artículo a detallar (obligatorio).",
+            "schema": {
+              "example": "BUMPER-001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "customer",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "CUST-00001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dimensiones",
+            "required": false,
+            "in": "query",
+            "description": "Combinación exacta de dimensión de inventario a filtrar — clave = código de dimensión, valor = id del Valor Dimension Inventario. Omitirla trae todas las combinaciones vendidas de este artículo mezcladas.",
+            "schema": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "example": {
+                "marca": "MARCA-TOYOTA",
+                "anio": "ANIO-2005"
+              },
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "PDF de Detalle de Ventas por Artículo — mismos filtros que la versión JSON",
         "tags": [
           "Reportes"
         ]
@@ -6702,6 +6910,290 @@
         "summary": "PDF del cheque de este pago (solo tiene sentido si se registró con esCheque=true)",
         "tags": [
           "Cuentas por Pagar"
+        ]
+      }
+    },
+    "/api/v1/catalog/dimensiones-inventario": {
+      "get": {
+        "description": "Incluye cuántos espacios quedan libres: el número de dimensiones tiene un tope por empresa que se fija al darla de alta, porque cada una agrega una columna indexada al libro de inventario.",
+        "operationId": "DimensionesInventarioController_listar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar las dimensiones de inventario de la empresa (Marca, Modelo, Año…)",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
+        ]
+      },
+      "post": {
+        "description": "Toma uno de los espacios libres de la empresa. Responde 400 si no quedan: ampliarlos es una tarea de mantenimiento programada, no autoservicio.",
+        "operationId": "DimensionesInventarioController_crear",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDimensionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear una dimensión de inventario",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
+        ]
+      }
+    },
+    "/api/v1/catalog/dimensiones-inventario/{codigo}": {
+      "put": {
+        "description": "El código y el espacio no se pueden cambiar: son la identidad física de la columna del libro de inventario.",
+        "operationId": "DimensionesInventarioController_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDimensionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambiar la etiqueta o el orden de una dimensión",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
+        ]
+      }
+    },
+    "/api/v1/catalog/dimensiones-inventario/{codigo}/toggle": {
+      "post": {
+        "operationId": "DimensionesInventarioController_toggle",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activar o desactivar una dimensión (no hay borrado)",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
+        ]
+      }
+    },
+    "/api/v1/catalog/dimensiones-inventario/{codigo}/valores": {
+      "get": {
+        "description": "Con `padre` se obtienen solo los valores que dependen de ese otro valor — es lo que permite los selectores en cascada (elegir Honda y que solo aparezcan modelos Honda).",
+        "operationId": "DimensionesInventarioController_listarValores",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Valores de una dimensión",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
+        ]
+      },
+      "post": {
+        "operationId": "DimensionesInventarioController_crearValor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateValorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Agregar un valor a una dimensión",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
+        ]
+      }
+    },
+    "/api/v1/catalog/dimensiones-inventario/{codigo}/valores/{id}": {
+      "put": {
+        "description": "El id del valor no se puede cambiar: queda escrito en cada movimiento del libro de inventario. Para \"renombrar\", cree uno nuevo y dé de baja el viejo.",
+        "operationId": "DimensionesInventarioController_actualizarValor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateValorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar un valor",
+        "tags": [
+          "Catálogo — Dimensiones de Inventario"
         ]
       }
     },
@@ -13207,290 +13699,6 @@
         "summary": "Convierte N unidades de un ítem, DENTRO DEL MISMO artículo, de stock sin dimensión a stock de una combinación puntual, asignando la combinación en ese momento — permite comprar un artículo sin conocer la combinación exacta y decidirla recién antes de venderlo. Configuración por producto (Item.custom_permite_compra_sin_dimension), nunca de tenant.",
         "tags": [
           "Inventario"
-        ]
-      }
-    },
-    "/api/v1/catalog/dimensiones-inventario": {
-      "get": {
-        "description": "Incluye cuántos espacios quedan libres: el número de dimensiones tiene un tope por empresa que se fija al darla de alta, porque cada una agrega una columna indexada al libro de inventario.",
-        "operationId": "DimensionesInventarioController_listar",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Listar las dimensiones de inventario de la empresa (Marca, Modelo, Año…)",
-        "tags": [
-          "Catálogo — Dimensiones de Inventario"
-        ]
-      },
-      "post": {
-        "description": "Toma uno de los espacios libres de la empresa. Responde 400 si no quedan: ampliarlos es una tarea de mantenimiento programada, no autoservicio.",
-        "operationId": "DimensionesInventarioController_crear",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateDimensionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Crear una dimensión de inventario",
-        "tags": [
-          "Catálogo — Dimensiones de Inventario"
-        ]
-      }
-    },
-    "/api/v1/catalog/dimensiones-inventario/{codigo}": {
-      "put": {
-        "description": "El código y el espacio no se pueden cambiar: son la identidad física de la columna del libro de inventario.",
-        "operationId": "DimensionesInventarioController_actualizar",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "codigo",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateDimensionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Cambiar la etiqueta o el orden de una dimensión",
-        "tags": [
-          "Catálogo — Dimensiones de Inventario"
-        ]
-      }
-    },
-    "/api/v1/catalog/dimensiones-inventario/{codigo}/toggle": {
-      "post": {
-        "operationId": "DimensionesInventarioController_toggle",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "codigo",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Activar o desactivar una dimensión (no hay borrado)",
-        "tags": [
-          "Catálogo — Dimensiones de Inventario"
-        ]
-      }
-    },
-    "/api/v1/catalog/dimensiones-inventario/{codigo}/valores": {
-      "get": {
-        "description": "Con `padre` se obtienen solo los valores que dependen de ese otro valor — es lo que permite los selectores en cascada (elegir Honda y que solo aparezcan modelos Honda).",
-        "operationId": "DimensionesInventarioController_listarValores",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "codigo",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Valores de una dimensión",
-        "tags": [
-          "Catálogo — Dimensiones de Inventario"
-        ]
-      },
-      "post": {
-        "operationId": "DimensionesInventarioController_crearValor",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "codigo",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateValorDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Agregar un valor a una dimensión",
-        "tags": [
-          "Catálogo — Dimensiones de Inventario"
-        ]
-      }
-    },
-    "/api/v1/catalog/dimensiones-inventario/{codigo}/valores/{id}": {
-      "put": {
-        "description": "El id del valor no se puede cambiar: queda escrito en cada movimiento del libro de inventario. Para \"renombrar\", cree uno nuevo y dé de baja el viejo.",
-        "operationId": "DimensionesInventarioController_actualizarValor",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateValorDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Editar un valor",
-        "tags": [
-          "Catálogo — Dimensiones de Inventario"
         ]
       }
     },
@@ -38671,6 +38879,94 @@
           "modeOfPayment"
         ]
       },
+      "CreateDimensionDto": {
+        "type": "object",
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "example": "marca",
+            "description": "Identificador estable de la dimensión. Se usa como clave en toda la API y NO se puede cambiar después: solo minúsculas sin acentos, números y guión bajo."
+          },
+          "etiqueta": {
+            "type": "string",
+            "example": "Marca",
+            "description": "Lo que ve el usuario. Sí se puede cambiar después."
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "Categorica",
+              "Ordinal"
+            ],
+            "default": "Categorica",
+            "description": "Ordinal habilita rangos desde/hasta en las combinaciones permitidas de un artículo (ej. años)."
+          },
+          "dimensionPadre": {
+            "type": "string",
+            "example": "marca",
+            "description": "Código de la dimensión de la que depende esta. Con esto, \"Civic\" solo puede elegirse junto a \"Honda\", declarado una vez en el catálogo y no artículo por artículo."
+          }
+        },
+        "required": [
+          "codigo",
+          "etiqueta"
+        ]
+      },
+      "UpdateDimensionDto": {
+        "type": "object",
+        "properties": {
+          "etiqueta": {
+            "type": "string",
+            "description": "Solo la etiqueta y el orden se pueden cambiar."
+          },
+          "orden": {
+            "type": "number"
+          }
+        }
+      },
+      "CreateValorDto": {
+        "type": "object",
+        "properties": {
+          "valor": {
+            "type": "string",
+            "example": "Honda"
+          },
+          "id": {
+            "type": "string",
+            "example": "MARCA-HONDA",
+            "description": "Id del valor. Si se omite, se genera desde la dimensión y el valor."
+          },
+          "padre": {
+            "type": "string",
+            "example": "MARCA-HONDA",
+            "description": "Id del valor padre, cuando la dimensión depende de otra (Civic → Honda)."
+          },
+          "ordenNumerico": {
+            "type": "number",
+            "description": "Para dimensiones ordinales: el número con el que se compara en los rangos."
+          }
+        },
+        "required": [
+          "valor"
+        ]
+      },
+      "UpdateValorDto": {
+        "type": "object",
+        "properties": {
+          "valor": {
+            "type": "string"
+          },
+          "padre": {
+            "type": "string"
+          },
+          "ordenNumerico": {
+            "type": "number"
+          },
+          "activo": {
+            "type": "boolean"
+          }
+        }
+      },
       "TelefonoClienteDto": {
         "type": "object",
         "properties": {
@@ -41546,94 +41842,6 @@
           "qty",
           "dimensiones"
         ]
-      },
-      "CreateDimensionDto": {
-        "type": "object",
-        "properties": {
-          "codigo": {
-            "type": "string",
-            "example": "marca",
-            "description": "Identificador estable de la dimensión. Se usa como clave en toda la API y NO se puede cambiar después: solo minúsculas sin acentos, números y guión bajo."
-          },
-          "etiqueta": {
-            "type": "string",
-            "example": "Marca",
-            "description": "Lo que ve el usuario. Sí se puede cambiar después."
-          },
-          "tipo": {
-            "type": "string",
-            "enum": [
-              "Categorica",
-              "Ordinal"
-            ],
-            "default": "Categorica",
-            "description": "Ordinal habilita rangos desde/hasta en las combinaciones permitidas de un artículo (ej. años)."
-          },
-          "dimensionPadre": {
-            "type": "string",
-            "example": "marca",
-            "description": "Código de la dimensión de la que depende esta. Con esto, \"Civic\" solo puede elegirse junto a \"Honda\", declarado una vez en el catálogo y no artículo por artículo."
-          }
-        },
-        "required": [
-          "codigo",
-          "etiqueta"
-        ]
-      },
-      "UpdateDimensionDto": {
-        "type": "object",
-        "properties": {
-          "etiqueta": {
-            "type": "string",
-            "description": "Solo la etiqueta y el orden se pueden cambiar."
-          },
-          "orden": {
-            "type": "number"
-          }
-        }
-      },
-      "CreateValorDto": {
-        "type": "object",
-        "properties": {
-          "valor": {
-            "type": "string",
-            "example": "Honda"
-          },
-          "id": {
-            "type": "string",
-            "example": "MARCA-HONDA",
-            "description": "Id del valor. Si se omite, se genera desde la dimensión y el valor."
-          },
-          "padre": {
-            "type": "string",
-            "example": "MARCA-HONDA",
-            "description": "Id del valor padre, cuando la dimensión depende de otra (Civic → Honda)."
-          },
-          "ordenNumerico": {
-            "type": "number",
-            "description": "Para dimensiones ordinales: el número con el que se compara en los rangos."
-          }
-        },
-        "required": [
-          "valor"
-        ]
-      },
-      "UpdateValorDto": {
-        "type": "object",
-        "properties": {
-          "valor": {
-            "type": "string"
-          },
-          "padre": {
-            "type": "string"
-          },
-          "ordenNumerico": {
-            "type": "number"
-          },
-          "activo": {
-            "type": "boolean"
-          }
-        }
       },
       "CobrarFacturaDto": {
         "type": "object",

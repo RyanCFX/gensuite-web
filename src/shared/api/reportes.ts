@@ -515,6 +515,47 @@ export async function downloadVentasItemWisePdf(params?: VentasItemWiseParams) {
   URL.revokeObjectURL(url)
 }
 
+// ─── Detalle de Ventas por Artículo (drill-down de una fila del agregado) ────
+// GET /reportes/ventas/item-wise/detalle — itemCode obligatorio; `dimensiones` viaja como
+// un único string JSON en el query param (no objeto anidado estilo dimensiones[marca]=...).
+
+export interface VentasItemWiseDetalleParams {
+  fromDate?: string
+  toDate?: string
+  branch?: string
+  department?: string
+  /** Obligatorio — row.itemCode de la fila clickeada en el agregado. */
+  itemCode: string
+  customer?: string
+  /** Combinación puntual de la fila clickeada — omitir si es {} (artículo sin dimensión). */
+  dimensiones?: Record<string, string>
+}
+
+function serializarDimensiones(dimensiones?: Record<string, string>): string | undefined {
+  if (!dimensiones || Object.keys(dimensiones).length === 0) return undefined
+  return JSON.stringify(dimensiones)
+}
+
+export async function getVentasItemWiseDetalle(params: VentasItemWiseDetalleParams) {
+  const res = await client.get(ENDPOINTS.reportes.ventasItemWiseDetalle, {
+    params: { ...params, dimensiones: serializarDimensiones(params.dimensiones) },
+  })
+  return res.data
+}
+
+export async function downloadVentasItemWiseDetallePdf(params: VentasItemWiseDetalleParams) {
+  const res = await client.get<Blob>(ENDPOINTS.reportes.ventasItemWiseDetallePdf, {
+    params: { ...params, dimensiones: serializarDimensiones(params.dimensiones) },
+    responseType: 'blob',
+  })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `ventas-item-wise-detalle_${params.itemCode}_${params?.fromDate ?? ''}_${params?.toDate ?? ''}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ─── Registro de Compras por Artículo (Item-wise Purchase Register) ─────────
 
 export interface ComprasItemWiseParams {

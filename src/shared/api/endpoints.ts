@@ -518,6 +518,8 @@ export const ENDPOINTS = {
     comprasRegistroPdf: '/reportes/compras/registro/pdf',
     ventasItemWise: '/reportes/ventas/item-wise',
     ventasItemWisePdf: '/reportes/ventas/item-wise/pdf',
+    ventasItemWiseDetalle: '/reportes/ventas/item-wise/detalle',
+    ventasItemWiseDetallePdf: '/reportes/ventas/item-wise/detalle/pdf',
     comprasItemWise: '/reportes/compras/item-wise',
     comprasItemWisePdf: '/reportes/compras/item-wise/pdf',
     pedidosAnalitica: '/reportes/pedidos/analitica',
