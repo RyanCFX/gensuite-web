@@ -300,6 +300,9 @@ export default function InvoiceForm() {
   const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
   const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
   const [ncfType, setNcfType] = useState<NcfType>('B02')
+  // El usuario ya eligió un Tipo NCF a mano — los auto-efectos no deben pisarlo al
+  // llegar tarde `facturacionConfig` o al limpiar el cliente.
+  const ncfTouchedRef = useRef(false)
   const [items, setItems] = useState<LineItem[]>([])
   // Disponibilidad real (físico − reservado) por artículo — docs/tasks/73_alertas_stock_disponible_reservado.md.
   // Se usa en validateLineStock para bloquear el submit ANTES de que ERPNext rechace la venta, que
@@ -643,6 +646,22 @@ export default function InvoiceForm() {
       .catch(() => setSemaforo(null))
       .finally(() => setLoadingSemaforo(false))
   }, [selectedCustomer])
+
+  // ── Default inicial desde el tenant (pantalla /facturas/nueva recién abierta) ──
+  // Sin cliente seleccionado y sin venta ocasional, ninguno de los auto-efectos de
+  // abajo corre (todos hacen early-return) y el select se quedaba en el 'B02'
+  // hardcodeado del useState aunque `GET /config/facturacion` trajera otro valor
+  // (p. ej. "E32"). Se aplica acá una sola vez al llegar la config; los efectos de
+  // cliente/ocasional (declarados después) conservan la prioridad cuando apliquen,
+  // y un cambio manual del usuario (ncfTouchedRef) nunca se pisa.
+  useEffect(() => {
+    if (isEdit) return
+    if (selectedCustomer || esClienteOcasional) return
+    const def = facturacionConfig?.ncfTipoVentaDefault
+    if (!def) return
+    if (ncfTouchedRef.current) return
+    setNcfType(def)
+  }, [isEdit, selectedCustomer, esClienteOcasional, facturacionConfig?.ncfTipoVentaDefault])
 
   // ── Auto-select NCF type based on customer (only for new customers) ───────
   // docs/tasks/81 §5 — el `ncfTypeDefault` del cliente (si tiene) gana sobre la heurística
@@ -1681,7 +1700,7 @@ persistInvoice(buildInvoiceDto())
                    id="ncfType"
                    value={ncfType}
                    selectedLabel={(catalogos?.ncfTypes ?? []).find((t) => t.value === ncfType)?.label ?? ''}
-                   onChange={(val) => setNcfType((val || 'B02') as NcfType)}
+                   onChange={(val) => { ncfTouchedRef.current = true; setNcfType((val || 'B02') as NcfType) }}
                    options={ncfTypeOptions}
                    onSearch={setNcfTypeSearch}
                    className="ff-select"
