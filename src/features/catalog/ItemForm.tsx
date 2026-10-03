@@ -1473,18 +1473,18 @@ export default function ItemForm() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <span className="ff-section-divider">Descuento</span>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 40, flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 15 }}>Acepta descuento</span>
-                    <button
-                      type="button"
-                      className="ff-toggle-square"
-                      aria-pressed={watch('allowsDiscount')}
-                      aria-label="Acepta descuento"
-                      onClick={() => setValue('allowsDiscount', !watch('allowsDiscount'), { shouldDirty: true })}
-                    >
+                  <button
+                    type="button"
+                    className="pill-plus-trigger"
+                    aria-expanded={watch('allowsDiscount')}
+                    aria-label="Acepta descuento"
+                    onClick={() => setValue('allowsDiscount', !watch('allowsDiscount'), { shouldDirty: true })}
+                  >
+                    Acepta descuento
+                    <span key={watch('allowsDiscount') ? 'open' : 'closed'} className="pill-plus-trigger-icon">
                       {watch('allowsDiscount') ? <Minus size={14} /> : <Plus size={14} />}
-                    </button>
-                  </div>
+                    </span>
+                  </button>
                   {watch('allowsDiscount') && (
                     <div className="ff-wrap" style={{ minWidth: 180 }}>
                       <label className="ff-label" htmlFor="maxDiscountPct">

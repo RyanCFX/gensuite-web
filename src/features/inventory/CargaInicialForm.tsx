@@ -200,7 +200,7 @@ export default function CargaInicialForm() {
       </a>
 
       <PageHeader
-        title="Registrar entrada"
+        title={<><span className="page-title-dot" />Registrar entrada</>}
         description="Agrega existencias a un almacén sin que haya una compra de por medio — hallazgos, donaciones, ajustes puntuales."
         action={<RecargarButton label="Actualizar" />}
       />
@@ -218,7 +218,7 @@ export default function CargaInicialForm() {
 
       <form onSubmit={handleSubmit}>
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Datos generales</h2></div>
+          <div className="card-header navy-card-header"><h2 className="card-title">Datos generales</h2></div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="form-row form-row-3">
               <div className="ff-wrap">
@@ -267,7 +267,7 @@ export default function CargaInicialForm() {
             )}
 
             <div className="items-table-wrap">
-              <table className="items-table items-table-resizable">
+              <table className="items-table navy-table items-table-resizable">
                 <colgroup>
                   {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
                 </colgroup>

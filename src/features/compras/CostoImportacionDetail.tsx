@@ -111,12 +111,12 @@ export default function CostoImportacionDetail() {
       </button>
 
       <PageHeader
-        title={`Costo de Importación ${costo.id}`}
+        title={<><span className="page-title-dot" />`Costo de Importación ${costo.id}`</>}
         description={formatDate(costo.postingDate)}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {costo.status === 'draft' && (
-              <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmAction('submit')}>
+              <button className="btn btn-navy btn-size-sm" onClick={() => setConfirmAction('submit')}>
                 <Send size={14} />Someter
               </button>
             )}
@@ -135,7 +135,7 @@ export default function CostoImportacionDetail() {
         </div>
 
         <div className="card">
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <span className="card-title">Información General</span>
           </div>
           <div className="fields-grid fields-grid-3">
@@ -156,11 +156,11 @@ export default function CostoImportacionDetail() {
 
         {/* Purchase Receipts */}
         <div className="card">
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <span className="card-title">Documentos de Recepción</span>
           </div>
           <div className="table-scroll">
-            <table className="data-table items-table-resizable">
+            <table className="data-table navy-table items-table-resizable">
               <colgroup>
                 {RECEIPTS_COLUMNS.map((c) => <col key={c.key} style={{ width: receiptsColWidths[c.key] }} />)}
               </colgroup>
@@ -198,11 +198,11 @@ export default function CostoImportacionDetail() {
 
         {/* Taxes/Charges */}
         <div className="card">
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <span className="card-title">Impuestos y Cargos</span>
           </div>
           <div className="table-scroll">
-            <table className="data-table items-table-resizable">
+            <table className="data-table navy-table items-table-resizable">
               <colgroup>
                 {TAXES_COLUMNS.map((c) => <col key={c.key} style={{ width: taxesColWidths[c.key] }} />)}
               </colgroup>
@@ -243,11 +243,11 @@ export default function CostoImportacionDetail() {
         {/* Items (prorrateados) — se muestran apenas existan, incluso en borrador recién creado */}
         {costo.items && costo.items.length > 0 && (
           <div className="card">
-            <div className="card-header">
+            <div className="card-header navy-card-header">
               <span className="card-title">Artículos Prorrateados</span>
             </div>
             <div className="table-scroll">
-              <table className="data-table items-table-resizable">
+              <table className="data-table navy-table items-table-resizable">
                 <colgroup>
                   {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
                 </colgroup>

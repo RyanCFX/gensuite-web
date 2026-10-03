@@ -695,7 +695,7 @@ export default function GastoForm() {
       </button>
 
       <PageHeader
-        title={isEdit ? 'Editar Gasto' : 'Nuevo Gasto'}
+        title={<><span className="page-title-dot" />{isEdit ? 'Editar Gasto' : 'Nuevo Gasto'}</>}
         description="Registra un gasto sin movimiento de inventario"
         action={<RecargarButton label="Actualizar" />}
       />
@@ -714,7 +714,7 @@ export default function GastoForm() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Header */}
           <div className="card">
-            <div className="card-header">
+            <div className="card-header navy-card-header">
               <span className="card-title">Información General</span>
             </div>
             <div className="card-body">
@@ -853,7 +853,7 @@ export default function GastoForm() {
 
           {/* Items */}
           <div className="card">
-            <div className="card-header">
+            <div className="card-header navy-card-header">
               <span className="card-title">Artículos / Conceptos</span>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button type="button" className="btn btn-secondary btn-size-sm" onClick={openAdHocCreate}>
@@ -866,7 +866,7 @@ export default function GastoForm() {
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
-                <table className="items-table items-table-resizable">
+                <table className="items-table navy-table items-table-resizable">
                   <colgroup>
                     {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
                   </colgroup>
@@ -1000,7 +1000,7 @@ export default function GastoForm() {
                 </div>
               )}
 
-              <div className="items-total-row">
+              <div className="items-total-row navy-totals">
                 <div className="items-total-line">
                   <span>Subtotal</span>
                   <span>{currency(subtotal)}</span>

@@ -156,7 +156,7 @@ export default function DevolucionDetail() {
       <button className="page-back-link" onClick={() => navigate('/devoluciones-compras')}>← Devoluciones de Compras</button>
 
       <PageHeader
-        title={`Devolución ${devolucion.id}`}
+        title={<><span className="page-title-dot" />`Devolución ${devolucion.id}`</>}
         description={devolucion.supplierName ?? devolucion.supplier}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -165,7 +165,7 @@ export default function DevolucionDetail() {
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/devoluciones-compras/${id}/editar`)}>
                   <FileText size={14} />Editar
                 </button>
-                <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmAction('submit')}>
+                <button className="btn btn-navy btn-size-sm" onClick={() => setConfirmAction('submit')}>
                   <Send size={14} />Someter
                 </button>
                 <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('delete')}>
@@ -217,7 +217,7 @@ export default function DevolucionDetail() {
         </div>
 
         <div className="card">
-          <div className="card-header"><span className="card-title">Información General</span></div>
+          <div className="card-header navy-card-header"><span className="card-title">Información General</span></div>
           <div className="fields-grid fields-grid-3">
             <div className="detail-field"><span className="detail-label">Proveedor</span><span className="detail-value">{devolucion.supplierName ?? devolucion.supplier}</span></div>
             <div className="detail-field"><span className="detail-label">Factura origen</span><span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{devolucion.originalInvoice}</span></div>
@@ -239,9 +239,9 @@ export default function DevolucionDetail() {
         </div>
 
         <div className="card">
-          <div className="card-header"><span className="card-title">Artículos devueltos</span></div>
+          <div className="card-header navy-card-header"><span className="card-title">Artículos devueltos</span></div>
           <div className="table-scroll">
-            <table className="data-table items-table-resizable">
+            <table className="data-table navy-table items-table-resizable">
               <colgroup>
                 {ITEMS_DEVUELTOS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
               </colgroup>
@@ -290,9 +290,9 @@ export default function DevolucionDetail() {
 
         {appliedTo.length > 0 && (
           <div className="card">
-            <div className="card-header"><span className="card-title">Aplicado a Cuentas por Pagar</span></div>
+            <div className="card-header navy-card-header"><span className="card-title">Aplicado a Cuentas por Pagar</span></div>
             <div className="table-scroll">
-              <table className="data-table items-table-resizable">
+              <table className="data-table navy-table items-table-resizable">
                 <colgroup>
                   {APLICADO_CXP_COLUMNS.map((c) => <col key={c.key} style={{ width: aplicadoColWidths[c.key] }} />)}
                 </colgroup>

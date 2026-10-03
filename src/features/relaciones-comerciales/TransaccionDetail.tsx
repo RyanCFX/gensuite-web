@@ -500,7 +500,7 @@ export default function TransaccionDetail() {
       <div className="page-header">
         <div>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {transaccion.transaccionUid}
+            <span className="page-title-dot" />{transaccion.transaccionUid}
             <Badge variant={badge.variant}>{badge.label}</Badge>
           </h1>
           <p className="page-sub">
@@ -548,7 +548,7 @@ export default function TransaccionDetail() {
 
       {/* Zona 1 — Lo que envió el socio */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header"><h2 className="card-title">Lo que envió el socio</h2></div>
+        <div className="card-header navy-card-header"><h2 className="card-title">Lo que envió el socio</h2></div>
         <div className="card-body">
           <PayloadSnapshotView payload={transaccion.payloadSnapshot} />
         </div>
@@ -556,7 +556,7 @@ export default function TransaccionDetail() {
 
       {/* Zona 2 — Mi documento */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header"><h2 className="card-title">Mi documento</h2></div>
+        <div className="card-header navy-card-header"><h2 className="card-title">Mi documento</h2></div>
         <div className="card-body">
           {documentoLocalId ? (
             <Link to={documentoLocalEsVenta ? `/facturas/${documentoLocalId}` : `/compras/${documentoLocalId}`}>
@@ -610,7 +610,7 @@ export default function TransaccionDetail() {
       {/* Mapeo de artículos — flujo de Aceptar */}
       {mostrarAceptar && (
         <div className="card" style={{ marginBottom: 16 }} ref={mapeoRef}>
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <h2 className="card-title">Mapeo de artículos</h2>
             <button
               className="btn btn-secondary btn-size-sm"
@@ -686,7 +686,7 @@ export default function TransaccionDetail() {
       {/* Zona 3 — Diferencias */}
       {diffQuery.data && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Diferencias</h2></div>
+          <div className="card-header navy-card-header"><h2 className="card-title">Diferencias</h2></div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <DiffView diff={diffQuery.data} />
             {(mostrarIgualarBorrador || mostrarIgualarEnmienda) && (
@@ -705,7 +705,7 @@ export default function TransaccionDetail() {
 
       {/* Historial */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header"><h2 className="card-title">Historial</h2></div>
+        <div className="card-header navy-card-header"><h2 className="card-title">Historial</h2></div>
         <div className="card-body">
           {transaccion.historial.length === 0 ? (
             <span className="td-muted">Sin eventos registrados</span>
@@ -1038,7 +1038,7 @@ function PayloadSnapshotView({ payload }: { payload: Record<string, unknown> }) 
       )}
       {lineasArr.length > 0 && (
         <div className="table-scroll">
-          <table className="data-table items-table-resizable">
+          <table className="data-table navy-table items-table-resizable">
             <colgroup>
               {SNAPSHOT_COLUMNS.map((c) => <col key={c.key} style={{ width: snapshotColWidths[c.key] }} />)}
             </colgroup>

@@ -169,7 +169,7 @@ export default function GastoDetail() {
       </button>
 
       <PageHeader
-        title={`Gasto ${gasto.id}`}
+        title={<><span className="page-title-dot" />`Gasto ${gasto.id}`</>}
         description={gasto.esProveedorOcasional ? (gasto.proveedorOcasionalNombre ?? gasto.supplierName) : gasto.supplierName}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -182,7 +182,7 @@ export default function GastoDetail() {
                   <BookOpen size={14} />Impacto contable
                 </button>
                 <button
-                  className="btn btn-primary btn-size-sm"
+                  className="btn btn-navy btn-size-sm"
                   onClick={() => (gasto.tipoPago === 'Contado' ? setShowPagoContadoModal(true) : setConfirmAction('submit'))}
                   disabled={blockSubmit}
                   title={blockSubmit ? 'Completa los campos 606 requeridos y respeta el límite de Gastos Menores antes de someter' : undefined}
@@ -244,7 +244,7 @@ export default function GastoDetail() {
         )}
 
         <div className="card">
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <span className="card-title">Información General</span>
           </div>
           <div className="fields-grid fields-grid-3">
@@ -347,11 +347,11 @@ export default function GastoDetail() {
 
         {/* Items */}
         <div className="card">
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <span className="card-title">Conceptos</span>
           </div>
           <div className="table-scroll">
-            <table className="data-table items-table-resizable">
+            <table className="data-table navy-table items-table-resizable">
               <colgroup>
                 {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
               </colgroup>

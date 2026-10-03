@@ -143,7 +143,7 @@ export default function EcfRecibidoDetail() {
             <ArrowLeft size={14} /> e-CF Recibidos
           </a>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            {v.ncf}
+            <span className="page-title-dot" />{v.ncf}
             <span className={`badge ${ecfStatusBadge(v.status)}`}>{ecfStatusLabel(v.status)}</span>
             <span className={`badge ${ecfConciliacionBadge(v.conciliacion)}`}>{ecfConciliacionLabel(v.conciliacion)}</span>
             <span className={`badge ${acecfBadge(v.acecf?.status)}`}>{acecfStatusLabel(v.acecf?.status)}</span>
@@ -163,7 +163,7 @@ export default function EcfRecibidoDetail() {
       )}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Receipt size={16} /> Datos del comprobante
           </h2>
@@ -181,7 +181,7 @@ export default function EcfRecibidoDetail() {
 
       {/* Conciliación */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Link2 size={16} /> Conciliación con factura de compra
           </h2>
@@ -200,7 +200,7 @@ export default function EcfRecibidoDetail() {
               </p>
               <div>
                 <button
-                  className="btn btn-primary btn-size-sm"
+                  className="btn btn-navy btn-size-sm"
                   disabled={vincularMutation.isPending}
                   onClick={() => vincularMutation.mutate(v.candidatosConciliacion[0])}
                 >
@@ -220,7 +220,7 @@ export default function EcfRecibidoDetail() {
               </div>
               <div>
                 <button
-                  className="btn btn-primary btn-size-sm"
+                  className="btn btn-navy btn-size-sm"
                   disabled={!multipleSel || vincularMutation.isPending}
                   onClick={() => vincularMutation.mutate(multipleSel)}
                 >
@@ -246,7 +246,7 @@ export default function EcfRecibidoDetail() {
               </div>
               <div>
                 <button
-                  className="btn btn-primary btn-size-sm"
+                  className="btn btn-navy btn-size-sm"
                   disabled={!manualPi || vincularMutation.isPending}
                   onClick={() => vincularMutation.mutate(manualPi)}
                 >
@@ -260,11 +260,11 @@ export default function EcfRecibidoDetail() {
 
       {/* Líneas del proveedor */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Líneas del proveedor</h2>
         </div>
         <div className="items-table-wrap">
-          <table className="items-table items-table-resizable">
+          <table className="items-table navy-table items-table-resizable">
             <colgroup>
               {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
             </colgroup>
@@ -319,7 +319,7 @@ export default function EcfRecibidoDetail() {
 
       {/* ACECF */}
       <div className="card">
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Aprobación comercial (ACECF)</h2>
           <span className={`badge ${acecfBadge(v.acecf?.status)}`}>{acecfStatusLabel(v.acecf?.status)}</span>
         </div>
@@ -330,7 +330,7 @@ export default function EcfRecibidoDetail() {
                 Decide si aceptas o rechazas comercialmente este comprobante. La decisión es legal e irreversible.
               </p>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn btn-primary btn-size-sm" onClick={() => setAcecfModal('ACCEPTED')}>
+                <button className="btn btn-navy btn-size-sm" onClick={() => setAcecfModal('ACCEPTED')}>
                   <Check size={14} /> Aceptar
                 </button>
                 <button className="btn btn-danger btn-size-sm" onClick={() => { setRejectReason(''); setAcecfModal('REJECTED') }}>

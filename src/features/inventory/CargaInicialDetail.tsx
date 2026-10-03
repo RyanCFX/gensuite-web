@@ -74,7 +74,7 @@ export default function CargaInicialDetail() {
       <div className="page-header">
         <div>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {doc.id}
+            <span className="page-title-dot" />{doc.id}
             <span className={`badge ${ESTADO_BADGE[doc.status]}`}>{ESTADO_LABEL[doc.status]}</span>
           </h1>
           <p className="page-sub">{formatDate(doc.postingDate)}{doc.branch ? ` · ${doc.branch}` : ''}</p>
@@ -90,7 +90,7 @@ export default function CargaInicialDetail() {
       )}
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-header"><h2 className="card-title">Información general</h2></div>
+        <div className="card-header navy-card-header"><h2 className="card-title">Información general</h2></div>
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="fields-grid">
             <div className="detail-field">
@@ -121,9 +121,9 @@ export default function CargaInicialDetail() {
       </div>
 
       <div className="card">
-        <div className="card-header"><h2 className="card-title">Artículos ({doc.items.length})</h2></div>
+        <div className="card-header navy-card-header"><h2 className="card-title">Artículos ({doc.items.length})</h2></div>
         <div className="table-scroll">
-          <table className="data-table items-table-resizable">
+          <table className="data-table navy-table items-table-resizable">
             <colgroup>
               {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
             </colgroup>

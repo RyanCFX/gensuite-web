@@ -147,7 +147,7 @@ export default function SolicitudDetail() {
       </button>
 
       <PageHeader
-        title={`Solicitud ${solicitud.id}`}
+        title={<><span className="page-title-dot" />`Solicitud ${solicitud.id}`</>}
         description={`Creada el ${formatDate(solicitud.transactionDate)}`}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -172,7 +172,7 @@ export default function SolicitudDetail() {
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/compras/solicitudes/${id}/editar`)}>
                   <FileText size={14} />Editar
                 </button>
-                <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmAction('submit')}>
+                <button className="btn btn-navy btn-size-sm" onClick={() => setConfirmAction('submit')}>
                   <Send size={14} />Someter
                 </button>
               </>
@@ -186,7 +186,7 @@ export default function SolicitudDetail() {
                 ) : (
                   <>
                     <button
-                      className="btn btn-primary btn-size-sm"
+                      className="btn btn-navy btn-size-sm"
                       onClick={() => setShowGenerarOrden(true)}
                       disabled={remanentes.length === 0}
                       title={remanentes.length === 0 ? 'No queda remanente por ordenar' : undefined}
@@ -221,7 +221,7 @@ export default function SolicitudDetail() {
         </div>
 
         <div className="card">
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <span className="card-title">Información General</span>
           </div>
           <div className="fields-grid fields-grid-3">
@@ -242,7 +242,7 @@ export default function SolicitudDetail() {
 
         <div className="card">
           <div className="table-scroll">
-            <table className="data-table items-table-resizable">
+            <table className="data-table navy-table items-table-resizable">
               <colgroup>
                 {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
               </colgroup>
@@ -423,7 +423,7 @@ function GenerarOrdenModal({ solicitudId, remanentes, onClose, onSuccess }: Gene
           </div>
 
           <div className="table-scroll">
-          <table className="items-table items-table-resizable">
+          <table className="items-table navy-table items-table-resizable">
             <colgroup>
               {ORDEN_LINES_COLUMNS.map((c) => <col key={c.key} style={{ width: ordenLinesColWidths[c.key] }} />)}
             </colgroup>

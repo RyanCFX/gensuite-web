@@ -143,13 +143,13 @@ export default function TransferenciasPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Transferencias entre Almacenes"
+        title={<><span className="page-title-dot" />Transferencias entre Almacenes</>}
         description="Mueve artículos entre almacenes o sucursales"
         action={
           <>
             <RecargarButton />
             {puedeCrear && (
-              <button className="btn btn-primary" onClick={() => navigate('/transferencias/nueva')}>
+              <button className="btn btn-navy" onClick={() => navigate('/transferencias/nueva')}>
                 <Plus size={16} />
                 Nueva Transferencia
               </button>
@@ -158,42 +158,47 @@ export default function TransferenciasPage() {
         }
       />
 
-      <div className="filter-bar">
-        <div className="filter-bar-left">
-          <FilterField label="Estado">
-            <Select value={status} onValueChange={setStatus}>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="draft">Borrador</SelectItem>
-              <SelectItem value="in_transit">En tránsito</SelectItem>
-              <SelectItem value="completed">Completada</SelectItem>
-              <SelectItem value="cancelled">Cancelada</SelectItem>
-            </Select>
-          </FilterField>
-          <FilterField label="Almacén" style={{ width: 200 }}>
-            <SearchSelect
-              value={warehouse}
-              onChange={setWarehouse}
-              options={warehouseOptions}
-              onSearch={setWarehouseSearch}
-              selectedLabel={warehouse}
-              placeholder="Todos los almacenes"
-            />
-          </FilterField>
-          <FilterField label="Sucursal" style={{ width: 200 }}>
-            <SearchSelect
-              value={branch}
-              onChange={setBranch}
-              options={branchOptions}
-              onSearch={setBranchSearch}
-              selectedLabel={sucursales.find((s) => s.id === branch)?.name ?? ''}
-              placeholder="Todas las sucursales"
-            />
-          </FilterField>
+      <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
+        <div className="card-body">
+          <div className="filter-bar" style={{ margin: 0 }}>
+            <div className="filter-bar-left">
+              <FilterField label="Estado">
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="draft">Borrador</SelectItem>
+                  <SelectItem value="in_transit">En tránsito</SelectItem>
+                  <SelectItem value="completed">Completada</SelectItem>
+                  <SelectItem value="cancelled">Cancelada</SelectItem>
+                </Select>
+              </FilterField>
+              <FilterField label="Almacén" style={{ width: 200 }}>
+                <SearchSelect
+                  value={warehouse}
+                  onChange={setWarehouse}
+                  options={warehouseOptions}
+                  onSearch={setWarehouseSearch}
+                  selectedLabel={warehouse}
+                  placeholder="Todos los almacenes"
+                />
+              </FilterField>
+              <FilterField label="Sucursal" style={{ width: 200 }}>
+                <SearchSelect
+                  value={branch}
+                  onChange={setBranch}
+                  options={branchOptions}
+                  onSearch={setBranchSearch}
+                  selectedLabel={sucursales.find((s) => s.id === branch)?.name ?? ''}
+                  placeholder="Todas las sucursales"
+                />
+              </FilterField>
+            </div>
+          </div>
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table items-table-resizable">
+        <table className="data-table navy-table items-table-resizable">
           <colgroup>
             {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
           </colgroup>
@@ -238,7 +243,7 @@ export default function TransferenciasPage() {
                     <div className="empty-title">Sin transferencias</div>
                     <p className="empty-sub">Crea la primera transferencia entre almacenes.</p>
                     {puedeCrear && (
-                      <button className="btn btn-primary btn-size-sm" onClick={() => navigate('/transferencias/nueva')}>
+                      <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/transferencias/nueva')}>
                         <Plus size={14} /> Nueva Transferencia
                       </button>
                     )}
@@ -303,6 +308,7 @@ export default function TransferenciasPage() {
           </span>
         </div>
       )}
+      </div>
 
       {/* Confirmar recepción */}
       {toConfirm && (
