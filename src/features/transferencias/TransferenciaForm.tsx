@@ -179,7 +179,7 @@ export default function TransferenciaForm() {
       <div className="page-header">
         <div>
           <a className="page-back-link" onClick={() => navigate('/transferencias')}><ArrowLeft size={14} /> Transferencias</a>
-          <h1 className="page-title">Nueva Transferencia</h1>
+          <h1 className="page-title"><span className="page-title-dot" />Nueva Transferencia</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <RecargarButton label="Actualizar" />
@@ -197,7 +197,7 @@ export default function TransferenciaForm() {
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div className="card">
-          <div className="card-header"><h2 className="card-title">Información General</h2></div>
+          <div className="card-header navy-card-header"><h2 className="card-title">Información General</h2></div>
           <div className="card-body">
             <div className="form-row">
               <div className="ff-wrap">
@@ -243,7 +243,7 @@ export default function TransferenciaForm() {
 
         <div className="card">
           <div className="items-table-wrap">
-            <table className="items-table items-table-resizable">
+            <table className="items-table navy-table items-table-resizable">
               <colgroup>
                 {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
               </colgroup>

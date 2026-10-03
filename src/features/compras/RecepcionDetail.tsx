@@ -246,7 +246,7 @@ export default function RecepcionDetail() {
       </button>
 
       <PageHeader
-        title={`Recepción ${receipt.id}`}
+        title={<><span className="page-title-dot" />`Recepción ${receipt.id}`</>}
         description={receipt.supplierName}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -271,7 +271,7 @@ export default function RecepcionDetail() {
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/compras/recepciones/${id}/editar`)}>
                   <FileText size={14} />Editar
                 </button>
-                <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmAction('submit')}>
+                <button className="btn btn-navy btn-size-sm" onClick={() => setConfirmAction('submit')}>
                   <Send size={14} />Someter
                 </button>
               </>
@@ -282,7 +282,7 @@ export default function RecepcionDetail() {
                   <Printer size={14} />Imprimir etiquetas
                 </button>
                 {canFacturar && (
-                  <button className="btn btn-primary btn-size-sm" onClick={openFacturar}>
+                  <button className="btn btn-navy btn-size-sm" onClick={openFacturar}>
                     <Receipt size={14} />Facturar
                   </button>
                 )}
@@ -321,7 +321,7 @@ export default function RecepcionDetail() {
         </div>
 
         <div className="card">
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <span className="card-title">Información General</span>
           </div>
           <div className="fields-grid fields-grid-3">
@@ -347,7 +347,7 @@ export default function RecepcionDetail() {
         {/* Items */}
         <div className="card">
           <div className="table-scroll">
-            <table className="data-table items-table-resizable">
+            <table className="data-table navy-table items-table-resizable">
               <colgroup>
                 {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
               </colgroup>

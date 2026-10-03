@@ -32,7 +32,7 @@ import {
   aplicarCreditNoteAFactura,
   removerCreditNoteAplicada,
 } from "@/shared/api/notes";
-import { listMetodosPago, listDenominaciones, getFacturacionConfig, getCatalogosFiscales } from "@/shared/api/config";
+import { listDenominaciones, getFacturacionConfig, getCatalogosFiscales } from "@/shared/api/config";
 import { createDevolucion } from "@/shared/api/devoluciones";
 import { getItemLookup } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";

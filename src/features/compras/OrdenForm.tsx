@@ -440,7 +440,7 @@ export default function OrdenForm() {
       </button>
 
       <PageHeader
-        title={isEdit ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}
+        title={<><span className="page-title-dot" />{isEdit ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}</>}
         description="El pedido formal a un proveedor específico, con precios"
         action={<RecargarButton label="Actualizar" />}
       />
@@ -455,7 +455,7 @@ export default function OrdenForm() {
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="card">
-            <div className="card-header">
+            <div className="card-header navy-card-header">
               <span className="card-title">Información General</span>
             </div>
             <div className="card-body">
@@ -527,7 +527,7 @@ export default function OrdenForm() {
           </div>
 
           <div className="card">
-            <div className="card-header">
+            <div className="card-header navy-card-header">
               <span className="card-title">Artículos</span>
               <button
                 type="button"
@@ -540,7 +540,7 @@ export default function OrdenForm() {
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
-                <table className="items-table items-table-resizable">
+                <table className="items-table navy-table items-table-resizable">
                   <colgroup>
                     {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
                   </colgroup>
@@ -691,7 +691,7 @@ export default function OrdenForm() {
                   </tbody>
                 </table>
               </div>
-              <div className="items-total-row">
+              <div className="items-total-row navy-totals">
                 <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
                   <span>Total</span>
                   <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: currency || 'DOP' }).format(grandTotal)}</strong>

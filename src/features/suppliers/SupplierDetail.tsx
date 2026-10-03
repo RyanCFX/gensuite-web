@@ -244,7 +244,7 @@ export default function SupplierDetail() {
 
       <PageHeader
         title={
-          <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><span className="page-title-dot" />
             {supplier.esProveedorExterior
               ? <Globe size={20} style={{ color: 'var(--icon-muted)' }} />
               : <Building2 size={20} style={{ color: 'var(--icon-muted)' }} />}
@@ -283,7 +283,7 @@ export default function SupplierDetail() {
           <SaldoFavorProveedorIndicator tieneSaldoAFavor={supplier.tieneSaldoAFavor} saldoAFavor={supplier.saldoAFavor} />
 
           <div className="card">
-            <div className="card-header">
+            <div className="card-header navy-card-header">
               <span className="card-title">Información General</span>
             </div>
             <div className="fields-grid fields-grid-3">
@@ -359,7 +359,7 @@ export default function SupplierDetail() {
 
           {tieneCompras && (
           <div className="card">
-            <div className="card-header">
+            <div className="card-header navy-card-header">
               <span className="card-title">Compras Recientes</span>
             </div>
             <div className="card-body">
@@ -370,7 +370,7 @@ export default function SupplierDetail() {
 
           {(supplier.banco || supplier.numeroCuenta) && (
             <div className="card">
-              <div className="card-header">
+              <div className="card-header navy-card-header">
                 <span className="card-title">Cuenta Bancaria</span>
               </div>
               <div className="fields-grid">
@@ -397,7 +397,7 @@ export default function SupplierDetail() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="card">
-            <div className="card-header">
+            <div className="card-header navy-card-header">
               <span className="card-title">Valores por Defecto de Compra</span>
             </div>
             <div className="fields-grid">
@@ -466,7 +466,7 @@ export default function SupplierDetail() {
 
           {tieneCxP && (
           <div className="card">
-            <div className="card-header">
+            <div className="card-header navy-card-header">
               <span className="card-title">Historial de Pagos</span>
               {id && (
                 <button className="btn btn-ghost btn-size-sm" onClick={() => navigate(`/pagos/lista?supplier=${id}`)}>

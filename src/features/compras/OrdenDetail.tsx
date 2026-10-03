@@ -301,7 +301,7 @@ export default function OrdenDetail() {
       </button>
 
       <PageHeader
-        title={`Orden ${orden.id}`}
+        title={<><span className="page-title-dot" />`Orden ${orden.id}`</>}
         description={orden.supplierName}
         action={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -326,7 +326,7 @@ export default function OrdenDetail() {
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/compras/ordenes/${id}/editar`)}>
                   <FileText size={14} />Editar
                 </button>
-                <button className="btn btn-primary btn-size-sm" onClick={() => setConfirmAction('submit')}>
+                <button className="btn btn-navy btn-size-sm" onClick={() => setConfirmAction('submit')}>
                   <Send size={14} />Someter
                 </button>
               </>
@@ -349,7 +349,7 @@ export default function OrdenDetail() {
                       </button>
                     )}
                     {canFacturar && (
-                      <button className="btn btn-primary btn-size-sm" onClick={openFacturar}>
+                      <button className="btn btn-navy btn-size-sm" onClick={openFacturar}>
                         <Receipt size={14} />Facturar
                       </button>
                     )}
@@ -389,7 +389,7 @@ export default function OrdenDetail() {
         </div>
 
         <div className="card">
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <span className="card-title">Información General</span>
           </div>
           <div className="fields-grid fields-grid-3">
@@ -422,7 +422,7 @@ export default function OrdenDetail() {
 
         <div className="card">
           <div className="table-scroll">
-            <table className="data-table items-table-resizable">
+            <table className="data-table navy-table items-table-resizable">
               <colgroup>
                 {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
               </colgroup>

@@ -247,14 +247,14 @@ export default function DevolucionForm() {
       <div className="page-container">
         <button className="page-back-link" onClick={() => navigate('/devoluciones-compras')}>← Devoluciones de Compras</button>
         <PageHeader
-          title="Nueva Devolución"
+          title={<><span className="page-title-dot" />Nueva Devolución</>}
           description="Busca al proveedor y luego selecciona la factura de compra a devolver."
           action={<RecargarButton label="Actualizar" />}
         />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 560 }}>
           <div className="card">
-            <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="card-header navy-card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span
                 className="badge badge-info"
                 style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
@@ -290,7 +290,7 @@ export default function DevolucionForm() {
           </div>
 
           <div className="card" style={{ opacity: supplierId ? 1 : 0.5, pointerEvents: supplierId ? 'auto' : 'none' }}>
-            <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="card-header navy-card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span
                 className="badge badge-info"
                 style={{ width: 22, height: 22, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
@@ -336,7 +336,7 @@ export default function DevolucionForm() {
       <button className="page-back-link" onClick={() => navigate(-1)}>← Devoluciones de Compras</button>
 
       <PageHeader
-        title={isEdit ? `Editar ${devolucion?.id}` : 'Nueva Devolución'}
+        title={<><span className="page-title-dot" />{isEdit ? `Editar ${devolucion?.id}` : 'Nueva Devolución'}</>}
         description={
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <Building2 size={13} style={{ color: 'var(--icon-muted)' }} />
@@ -353,7 +353,7 @@ export default function DevolucionForm() {
             <button className="btn btn-ghost btn-size-sm" onClick={confirmClose.requestClose}>
               <X size={14} />Cancelar
             </button>
-            <button className="btn btn-primary btn-size-sm" onClick={handleSave} disabled={saveMutation.isPending}>
+            <button className="btn btn-navy btn-size-sm" onClick={handleSave} disabled={saveMutation.isPending}>
               <Save size={14} />{saveMutation.isPending ? 'Guardando…' : (isEdit ? 'Guardar' : 'Crear')}
             </button>
           </div>
@@ -369,7 +369,7 @@ export default function DevolucionForm() {
       )}
 
       <div className="card">
-        <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="card-header navy-card-header" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Undo2 size={15} style={{ color: 'var(--icon-muted)' }} />
           <span className="card-title">Datos de la Devolución</span>
         </div>
@@ -391,12 +391,12 @@ export default function DevolucionForm() {
       </div>
 
       <div className="card">
-        <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="card-header navy-card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span className="card-title">Artículos a devolver</span>
           <span className="badge badge-info">{rows.filter((it) => it.returnQty > 0).length} seleccionado(s)</span>
         </div>
         <div className="table-scroll">
-          <table className="data-table items-table-resizable">
+          <table className="data-table navy-table items-table-resizable">
             <colgroup>
               {DEVOLUCION_FORM_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
             </colgroup>

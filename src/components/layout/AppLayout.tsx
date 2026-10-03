@@ -1705,6 +1705,7 @@ function AppLayoutInner() {
   }, [location.pathname]);
 
   const displayName = user?.fullName ?? user?.email ?? "Usuario";
+  const tenantName = memberships.find((m) => m.slug === tenant?.slug)?.name ?? tenant?.slug ?? "";
   const initials = displayName.slice(0, 2).toUpperCase();
 
   // Apply theme to root element
@@ -1956,7 +1957,7 @@ function AppLayoutInner() {
                 <span className="avatar-sm" aria-hidden="true">
                   {initials}
                 </span>
-                <span>{displayName.split("@")[0]}</span>
+                <span>{displayName.split("@")[0]}{tenantName ? ` - ${tenantName}` : ''}</span>
                 <ChevronRight
                   size={11}
                   style={{ transform: "rotate(90deg)" }}

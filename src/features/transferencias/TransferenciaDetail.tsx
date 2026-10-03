@@ -4,7 +4,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getTransferencia, confirmarTransferencia, cancelarTransferencia } from '@/shared/api/transferencias'
 import { getUsuarioAlmacenesPermitidos } from '@/shared/api/usuarios'
 import { getCachedUser } from '@/shared/api/storage'
-import { PageHeader } from '@/components/shared/PageHeader'
 import { formatDate } from '@/lib/formatters'
 import { ArrowLeft, Check, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -97,37 +96,35 @@ export default function TransferenciaDetail() {
 
   return (
     <div className="page-container">
-      <PageHeader
-        title={
-          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div className="page-header">
+        <div>
+          <a className="page-back-link" onClick={() => navigate('/transferencias')}><ArrowLeft size={14} /> Transferencias</a>
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="page-title-dot" />
             Transferencia: {t.fromWarehouse} → {t.toWarehouse}
             <span className={`badge ${STATUS_BADGE[t.status] ?? 'badge-neutral'}`}>{STATUS_LABEL[t.status] ?? t.status}</span>
-          </span>
-        }
-        action={
-          <div style={{ display: 'flex', gap: 8 }}>
-            <a className="page-back-link" onClick={() => navigate('/transferencias')}><ArrowLeft size={14} /> Transferencias</a>
-            {t.status === 'in_transit' && (
-              <>
-                <button
-                  className="btn btn-secondary"
-                  title={canConfirm ? undefined : 'No tienes acceso a la sucursal destino'}
-                  disabled={!canConfirm}
-                  onClick={() => setConfirmOpen(true)}
-                >
-                  <Check size={15} /> Confirmar Recepción
-                </button>
-                <button className="btn btn-ghost" style={{ color: 'var(--icon-muted)' }} onClick={() => setCancelOpen(true)}>
-                  <X size={15} /> Cancelar
-                </button>
-              </>
-            )}
-          </div>
-        }
-      />
+          </h1>
+        </div>
+      </div>
+
+      {t.status === 'in_transit' && (
+        <div className="doc-actions-bar" style={{ background: 'transparent', border: 'none', padding: 0, marginBottom: 16 }}>
+          <button
+            className="btn btn-navy btn-size-md"
+            title={canConfirm ? undefined : 'No tienes acceso a la sucursal destino'}
+            disabled={!canConfirm}
+            onClick={() => setConfirmOpen(true)}
+          >
+            <Check size={14} /> Confirmar Recepción
+          </button>
+          <button className="btn btn-danger btn-size-md" onClick={() => setCancelOpen(true)}>
+            <X size={14} /> Cancelar
+          </button>
+        </div>
+      )}
 
       <div className="card">
-        <div className="card-header"><h2 className="card-title">Información General</h2></div>
+        <div className="card-header navy-card-header"><h2 className="card-title">Información General</h2></div>
         <div className="card-body">
           <div className="form-row form-row-3">
             <div>
@@ -153,7 +150,7 @@ export default function TransferenciaDetail() {
 
       <div className="card" style={{ marginTop: 20 }}>
         <div className="items-table-wrap">
-          <table className="items-table items-table-resizable">
+          <table className="items-table navy-table items-table-resizable">
             <colgroup>
               {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: itemsColWidths[c.key] }} />)}
             </colgroup>
@@ -183,7 +180,7 @@ export default function TransferenciaDetail() {
 
       {t.notes && (
         <div className="card" style={{ marginTop: 20 }}>
-          <div className="card-header"><h2 className="card-title">Notas</h2></div>
+          <div className="card-header navy-card-header"><h2 className="card-title">Notas</h2></div>
           <div className="card-body">
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{t.notes}</p>
           </div>
@@ -201,7 +198,7 @@ export default function TransferenciaDetail() {
               <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
                 Vas a recibir en <strong>{t.toWarehouse}</strong> los siguientes artículos, provenientes de <strong>{t.fromWarehouse}</strong>:
               </p>
-              <table className="data-table items-table-resizable" style={{ marginTop: 12 }}>
+              <table className="data-table navy-table items-table-resizable" style={{ marginTop: 12 }}>
                 <colgroup>
                   {MODAL_COLUMNS.map((c) => <col key={c.key} style={{ width: modalColWidths[c.key] }} />)}
                 </colgroup>
@@ -229,7 +226,7 @@ export default function TransferenciaDetail() {
             </div>
             <div className="modal-foot">
               <button className="btn btn-secondary" onClick={() => setConfirmOpen(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending}>
+              <button className="btn btn-navy" onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending}>
                 {confirmMutation.isPending ? <Loader2 size={14} className="spinner" /> : null}
                 Confirmar Recepción
               </button>

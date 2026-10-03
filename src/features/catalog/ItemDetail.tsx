@@ -496,7 +496,7 @@ function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
 
   return (
     <div className="card" id="variants">
-      <div className="card-header">
+      <div className="card-header navy-card-header">
         <div>
           <span className="card-title">Variantes</span>
           {variants && (
@@ -511,7 +511,7 @@ function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
             + Agregar variante
           </button>
           <button
-            className="btn btn-primary btn-size-sm"
+            className="btn btn-navy btn-size-sm"
             onClick={() => setShowGenerateConfirm(true)}
             disabled={generating}
           >
@@ -536,7 +536,7 @@ function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
       )}
 
       <div className="table-scroll">
-        <table className="data-table items-table-resizable">
+        <table className="data-table navy-table items-table-resizable">
           <colgroup>
             {VARIANTS_COLUMNS.map((c) => <col key={c.key} style={{ width: variantsColWidths[c.key] }} />)}
           </colgroup>
@@ -956,7 +956,7 @@ function StockPorDimensionPanel({ itemCode }: { itemCode: string }) {
   return (
     <div className="card" style={{ marginBottom: 16 }}>
       <div
-        className="card-header"
+        className="card-header navy-card-header"
         style={{ cursor: 'pointer' }}
         onClick={() => setOpen((v) => !v)}
       >
@@ -1079,7 +1079,7 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-header">
+      <div className="card-header navy-card-header">
         <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <MapPin size={15} style={{ color: 'var(--text-secondary)' }} /> Ubicaciones
         </span>
@@ -1096,7 +1096,7 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
               />
             </div>
           )}
-          <button className="btn btn-primary btn-size-sm" onClick={() => setShowAssign(true)} disabled={!activeWarehouse}>
+          <button className="btn btn-navy btn-size-sm" onClick={() => setShowAssign(true)} disabled={!activeWarehouse}>
             + Asignar ubicación
           </button>
         </div>
@@ -1280,7 +1280,7 @@ export default function ItemDetail() {
             <ArrowLeft size={14} /> {moduleLabel}
           </a>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Package size={20} style={{ color: 'var(--text-secondary)' }} />
+            <span className="page-title-dot" /><Package size={20} style={{ color: 'var(--text-secondary)' }} />
             {item.itemName}
             {item.disabled
               ? <span className="badge badge-neutral">Inactivo</span>
@@ -1389,7 +1389,7 @@ export default function ItemDetail() {
 
       {!item.hasVariants && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Compra</h2></div>
+          <div className="card-header navy-card-header"><h2 className="card-title">Compra</h2></div>
           <div className="card-body">
             <div className="fields-grid fields-grid-3">
               {item.valuationRate != null && (
@@ -1419,7 +1419,7 @@ export default function ItemDetail() {
 
       {!item.hasVariants && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header"><h2 className="card-title">Venta</h2></div>
+          <div className="card-header navy-card-header"><h2 className="card-title">Venta</h2></div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="fields-grid fields-grid-3">
               <div className="detail-field">
@@ -1589,7 +1589,7 @@ export default function ItemDetail() {
           propio artículo, sin vínculos con otros ítems. Solo informativo. */}
       {item.type === 'product' && !item.hasVariants && item.usaDimensiones === true && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <h2 className="card-title">Dimensiones de inventario</h2>
           </div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
@@ -1608,7 +1608,7 @@ export default function ItemDetail() {
 
       {item.type === 'product' && !item.hasVariants && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <h2 className="card-title">Existencias por almacén</h2>
           </div>
           <div className="card-body">
@@ -1618,7 +1618,7 @@ export default function ItemDetail() {
                 return <p style={{ color: 'var(--text-tertiary)', fontSize: 13, margin: 0 }}>Sin existencias</p>
               }
               return (
-                <table className="data-table items-table-resizable" style={{ width: '100%' }}>
+                <table className="data-table navy-table items-table-resizable" style={{ width: '100%' }}>
                   <colgroup>
                     {STOCK_WAREHOUSE_COLUMNS.map((c) => <col key={c.key} style={{ width: stockWhColWidths[c.key] }} />)}
                   </colgroup>
@@ -1654,7 +1654,7 @@ export default function ItemDetail() {
           sección entera en vez de mostrar "undefined"/"0" engañoso. */}
       {item.enPedido !== undefined && item.reservado !== undefined && item.disponible !== undefined && (
         <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header">
+          <div className="card-header navy-card-header">
             <h2 className="card-title">Disponibilidad</h2>
           </div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1702,7 +1702,7 @@ export default function ItemDetail() {
       )}
 
       <div className="card">
-        <div className="card-header">
+        <div className="card-header navy-card-header">
           <h2 className="card-title">Detalles</h2>
         </div>
         <div className="card-body">

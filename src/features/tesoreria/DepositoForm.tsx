@@ -449,7 +449,7 @@ export default function DepositoForm() {
               label: 'Cuenta del banco',
               value: cuentaBancoOverride,
               onChange: setCuentaBancoOverride,
-              cuentaHeredada: cuentaBancariaObj?.account,
+              cuentaHeredada: cuentaBancariaObj?.account ?? undefined,
               rootType: 'Asset',
             },
             {

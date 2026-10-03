@@ -901,7 +901,7 @@ export default function RecepcionForm() {
       </button>
 
       <PageHeader
-        title={isEdit ? 'Editar Recepción' : 'Nueva Recepción de Mercancía'}
+        title={<><span className="page-title-dot" />{isEdit ? 'Editar Recepción' : 'Nueva Recepción de Mercancía'}</>}
         description="Registra la mercancía recibida — sin datos fiscales, esos se capturan al facturar"
         action={<RecargarButton label="Actualizar" />}
       />
@@ -917,7 +917,7 @@ export default function RecepcionForm() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Header fields */}
           <div className="card">
-            <div className="card-header">
+            <div className="card-header navy-card-header">
               <span className="card-title">Información General</span>
             </div>
             <div className="card-body">
@@ -975,7 +975,7 @@ export default function RecepcionForm() {
 
           {/* Items */}
           <div className="card">
-            <div className="card-header">
+            <div className="card-header navy-card-header">
               <span className="card-title">Artículos</span>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
@@ -998,7 +998,7 @@ export default function RecepcionForm() {
             </div>
             <div className="card-body" style={{ padding: 0 }}>
               <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
-                <table className="items-table items-table-resizable">
+                <table className="items-table navy-table items-table-resizable">
                   <colgroup>
                     {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
                   </colgroup>
@@ -1056,7 +1056,7 @@ export default function RecepcionForm() {
                   </tbody>
                 </table>
               </div>
-              <div className="items-total-row">
+              <div className="items-total-row navy-totals">
                 <div className="items-total-line" style={{ fontWeight: 700, fontSize: 15 }}>
                   <span>Total Estimado</span>
                   <strong>{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(grandTotal)}</strong>

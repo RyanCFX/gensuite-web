@@ -122,13 +122,13 @@ export default function TransferenciasPage() {
   return (
     <div className="page-container">
       <PageHeader
-        title="Transferencias entre Almacenes"
+        title={<><span className="page-title-dot" />Transferencias entre Almacenes</>}
         description="Mueve artículos entre almacenes o sucursales"
         action={
           <>
             <RecargarButton />
             {puedeCrear && (
-              <button className="btn btn-primary" onClick={() => navigate('/transferencias/nueva')}>
+              <button className="btn btn-navy" onClick={() => navigate('/transferencias/nueva')}>
                 <Plus size={16} />
                 Nueva Transferencia
               </button>
@@ -153,8 +153,9 @@ export default function TransferenciasPage() {
         </div>
       </div>
 
+      <div className="card navy-table-card">
       <div className="table-scroll">
-        <table className="data-table items-table-resizable">
+        <table className="data-table navy-table items-table-resizable">
           <colgroup>
             {COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
           </colgroup>
@@ -199,7 +200,7 @@ export default function TransferenciasPage() {
                     <div className="empty-title">Sin transferencias</div>
                     <p className="empty-sub">Crea la primera transferencia entre almacenes.</p>
                     {puedeCrear && (
-                      <button className="btn btn-primary btn-size-sm" onClick={() => navigate('/transferencias/nueva')}>
+                      <button className="btn btn-navy btn-size-sm" onClick={() => navigate('/transferencias/nueva')}>
                         <Plus size={14} /> Nueva Transferencia
                       </button>
                     )}
@@ -264,6 +265,7 @@ export default function TransferenciasPage() {
           </span>
         </div>
       )}
+      </div>
 
       {/* Confirmar recepción */}
       {toConfirm && (

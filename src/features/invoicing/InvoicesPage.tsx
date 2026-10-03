@@ -194,15 +194,17 @@ export default function InvoicesPage() {
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <div className="search-input-wrap">
-                <Search size={15} className="search-input-icon" />
-                <input
-                  className="search-input"
-                  placeholder="Buscar por cliente..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
+              <FilterField label="Buscar por cliente">
+                <div className="search-input-wrap">
+                  <Search size={15} className="search-input-icon" />
+                  <input
+                    className="search-input"
+                    placeholder="Cliente"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+              </FilterField>
               {filtros.puedeFiltrar('status') && (
               <FilterField label="Estado">
                 <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>

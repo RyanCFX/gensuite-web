@@ -300,7 +300,7 @@ export default function TransferenciaInternaForm() {
               label: 'Cuenta de la pata origen',
               value: cuentaBancoOrigenOverride,
               onChange: setCuentaBancoOrigenOverride,
-              cuentaHeredada: cuentaOrigenObj?.account,
+              cuentaHeredada: cuentaOrigenObj?.account ?? undefined,
               rootType: 'Asset',
             },
             {
@@ -308,7 +308,7 @@ export default function TransferenciaInternaForm() {
               label: 'Cuenta de la pata destino',
               value: cuentaBancoDestinoOverride,
               onChange: setCuentaBancoDestinoOverride,
-              cuentaHeredada: cuentaDestinoObj?.account,
+              cuentaHeredada: cuentaDestinoObj?.account ?? undefined,
               rootType: 'Asset',
             },
           ]}
