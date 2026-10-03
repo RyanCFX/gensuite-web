@@ -429,9 +429,9 @@ export default function InvoiceDetail() {
   const formatosPermitidosPdf = formatosPermitidos?.filter((f) => f !== "pos");
   const permitePos = formatosPermitidos?.includes("pos") ?? false;
 
-  // Precalienta el caché de ['turno-actual'] (lo lee TurnoCajaIndicator) — el `data` no se
-  // usa acá directamente.
-  useQuery({
+  // Turno abierto del usuario (lo lee también TurnoCajaIndicator con la misma key) — se usa
+  // al someter: solo se redirige a Caja si hay un turno abierto; sin turno no hay cobro posible.
+  const { data: turnoActual, isLoading: turnoActualLoading } = useQuery({
     queryKey: ['turno-actual'],
     queryFn: getTurnoActual,
     enabled: !!invoice && invoice.status === "draft" && usaModuloPos,
@@ -760,13 +760,19 @@ export default function InvoiceDetail() {
       setDirectoMop("");
       setDirectoAmount("");
 
-      // Nuevo flujo POS: la factura va a "por cobrar" sin NCF — redirigir a Caja. Si el usuario
-      // no tiene acceso a Caja, se queda en esta pantalla (la factura ya quedó en la cola en el
-      // servidor de todos modos; alguien con permiso la cobrará después).
+      // Nuevo flujo POS: la factura va a "por cobrar" sin NCF — redirigir a Caja solo si el
+      // usuario tiene acceso Y un turno abierto (sin turno el drawer de cobro no puede operar;
+      // PorCobrarPage mostraría "Caja bloqueada"). Sin turno se queda en esta pantalla; la
+      // factura igual quedó en la cola en el servidor. Si no tiene acceso a Caja, igual que
+      // antes: se queda acá y otro usuario con acceso la cobrará después.
       if ("status" in updated && updated.status === "pendiente_cobro") {
-        if (puedeAccederCaja) {
+        // Si el estado del turno aún está cargando no se puede validar — se redirige igual que
+        // antes y PorCobrarPage muestra "Caja bloqueada" si resulta no haber turno.
+        if (puedeAccederCaja && (turnoActual || turnoActualLoading)) {
           toast.success(updated.message);
           navigate(`/caja/por-cobrar?invoiceId=${updated.invoiceId}`);
+        } else if (puedeAccederCaja) {
+          toast.success("Factura sometida — abre un turno de caja para cobrarla.");
         } else {
           toast.success("Factura sometida — pendiente de cobro en Caja.");
         }
