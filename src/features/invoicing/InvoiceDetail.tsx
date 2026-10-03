@@ -458,8 +458,8 @@ export default function InvoiceDetail() {
   });
 
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: () => getCatalogosFiscales(),
+    queryKey: ['catalogos-fiscales', { type: 'venta' }],
+    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
     staleTime: 60 * 60_000,
   });
 

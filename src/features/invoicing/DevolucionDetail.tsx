@@ -92,8 +92,8 @@ export default function DevolucionDetail() {
     cancelReason.trim().length >= 10 && cancelReason.trim().length <= 500
 
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: () => getCatalogosFiscales(),
+    queryKey: ['catalogos-fiscales', { type: 'venta' }],
+    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
     staleTime: 60 * 60_000,
   })
 

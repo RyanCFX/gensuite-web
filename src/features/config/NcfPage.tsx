@@ -40,7 +40,8 @@ const NCF_COLUMNS = [
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 // Solo define el color del badge para los tipos más comunes — el listado real de tipos
-// disponibles para crear/editar una secuencia viene de GET /config/catalogos-fiscales (ncfTypes).
+// disponibles para crear/editar una secuencia viene de GET /config/catalogos-fiscales
+// (ncfTypesFisicos de ?type=venta).
 // Un tipo sin entrada aquí simplemente cae al badge neutral (ver NcfTypeBadge).
 const NCF_TYPE_COLOR: Record<string, string> = {
   B01: '#1a69ab',
@@ -160,8 +161,8 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   const [error, setError] = useState('')
 
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: () => getCatalogosFiscales(),
+    queryKey: ['catalogos-fiscales', { type: 'venta' }],
+    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
     staleTime: 60 * 60_000,
   })
   const ncfTypeOptions = catalogos?.ncfTypesFisicos ?? []
@@ -322,8 +323,8 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
   const maxExpiration = format(addYears(new Date(), 5), 'yyyy-MM-dd')
 
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: () => getCatalogosFiscales(),
+    queryKey: ['catalogos-fiscales', { type: 'venta' }],
+    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
     staleTime: 60 * 60_000,
   })
   const ncfTypeOptions = catalogos?.ncfTypesFisicos ?? []
@@ -493,8 +494,8 @@ function DetailDrawer({ serieId }: { serieId: number; onClose?: () => void }) {
     queryFn: () => getNcfSerie(serieId),
   })
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: () => getCatalogosFiscales(),
+    queryKey: ['catalogos-fiscales', { type: 'venta' }],
+    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
     staleTime: 60 * 60_000,
   })
 

@@ -1,4 +1,4 @@
-import type { ElementPaletteItem, PageSpec, TemplateType } from './types'
+import type { ElementPaletteItem, PageSpec, RepeaterLine, TemplateType } from './types'
 
 export interface TemplateFormatOption {
   type: TemplateType
@@ -40,6 +40,7 @@ export const ELEMENT_PALETTE: ElementPaletteItem[] = [
   { type: 'line', label: 'Línea' },
   { type: 'logo', label: 'Logo' },
   { type: 'table', label: 'Tabla' },
+  { type: 'repeater', label: 'Lista de productos/servicios' },
   { type: 'list', label: 'Lista' },
   { type: 'conditional', label: 'Condicional' },
   { type: 'rectangle', label: 'Rectángulo' },
@@ -66,4 +67,56 @@ export const CONDITION_OPERATOR_LABELS: Record<string, string> = {
   '>=': 'mayor o igual que',
   '<=': 'menor o igual que',
   contains: 'contiene',
+}
+
+// Líneas por defecto del repetidor nuevo (ejemplo del prompt con 2 líneas por producto):
+//   Nombre producto
+//   2 * $150.00   ITBIS $54.00 = $354.00
+export const DEFAULT_REPEATER_LINES: RepeaterLine[] = [
+  { tokens: [{ kind: 'field', key: 'descripcion' }], align: 'left', fontSize: 10, bold: false, italic: false },
+  {
+    tokens: [
+      { kind: 'field', key: 'cantidad' },
+      { kind: 'text', text: ' * $' },
+      { kind: 'field', key: 'precio' },
+      { kind: 'text', text: '   ITBIS $' },
+      { kind: 'field', key: 'itbis' },
+      { kind: 'text', text: ' = $' },
+      { kind: 'field', key: 'total' },
+    ],
+    align: 'left',
+    fontSize: 9,
+    bold: false,
+    italic: false,
+  },
+]
+
+export const DEFAULT_REPEATER_LINE_GAP = 2
+export const DEFAULT_REPEATER_BLOCK_GAP = 4
+
+/** Tokens de campo disponibles por binding origen del repetidor. */
+export const REPEATER_ITEM_TOKENS: { key: string; label: string }[] = [
+  { key: 'descripcion', label: 'Descripción' },
+  { key: 'codigo', label: 'Código' },
+  { key: 'cantidad', label: 'Cantidad' },
+  { key: 'precio', label: 'Precio' },
+  { key: 'itbis', label: 'ITBIS ($)' },
+  { key: 'itbisPct', label: 'ITBIS (%)' },
+  { key: 'descuentoPct', label: 'Descuento (%)' },
+  { key: 'monto', label: 'Monto (sin ITBIS)' },
+  { key: 'total', label: 'Total (con ITBIS)' },
+  { key: 'uom', label: 'Unidad (UoM)' },
+]
+
+export const REPEATER_PAGO_TOKENS: { key: string; label: string }[] = [
+  { key: 'modoPago', label: 'Modo de pago' },
+  { key: 'monto', label: 'Monto' },
+  { key: 'numeroTarjeta', label: 'Nº tarjeta' },
+  { key: 'codigoAutorizacion', label: 'Cód. autorización' },
+  { key: 'banco', label: 'Banco' },
+  { key: 'numeroCheque', label: 'Nº cheque' },
+]
+
+export function repeaterTokensFor(binding: string): { key: string; label: string }[] {
+  return binding === 'pagos.tabla' ? REPEATER_PAGO_TOKENS : REPEATER_ITEM_TOKENS
 }

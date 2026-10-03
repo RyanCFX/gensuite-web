@@ -84,8 +84,7 @@ function BranchDepartmentFilters({
 
   return (
     <>
-      <FilterField label="Sucursal" style={{ width: 200 }}>
-        <OpcionesSelect
+      <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }}
           recurso="sucursales"
           value={branch}
           onChange={onBranchChange}
@@ -93,7 +92,6 @@ function BranchDepartmentFilters({
           placeholder="Todas las sucursales"
           fallback={fallbackSucursales}
         />
-      </FilterField>
     </>
   )
 }
@@ -1004,8 +1002,7 @@ function CuadreTurnoReport() {
                 <DatePicker className="filter-select" clearable value={toDate} onChange={setToDate} />
               </FilterField>
               {filtros.puedeFiltrar('cajero') && (
-              <FilterField label="Cajero" style={{ width: 200 }}>
-                <OpcionesSelect
+              <OpcionesSelect hideOnForbidden filterLabel="Cajero" filterStyle={{ width: 200 }}
                   recurso="usuarios"
                   value={cajero}
                   selectedLabel={cajeroLabel}
@@ -1013,7 +1010,6 @@ function CuadreTurnoReport() {
                   placeholder="Todos los cajeros"
                   fallback={fallbackUsuarios}
                 />
-              </FilterField>
               )}
             </div>
             <div className="filter-bar-right">
@@ -1190,8 +1186,7 @@ function CorteCajaDiaReport() {
                 <DatePicker className="filter-select" value={date} onChange={setDate} />
               </FilterField>
               {filtrosCorte.puedeFiltrar('cajero') && (
-              <FilterField label="Cajero" style={{ width: 200 }}>
-                <OpcionesSelect
+              <OpcionesSelect hideOnForbidden filterLabel="Cajero" filterStyle={{ width: 200 }}
                   recurso="usuarios"
                   value={cajero}
                   selectedLabel={cajeroLabel}
@@ -1199,7 +1194,6 @@ function CorteCajaDiaReport() {
                   placeholder="Todos los cajeros"
                   fallback={fallbackUsuarios}
                 />
-              </FilterField>
               )}
             </div>
             <div className="filter-bar-right">
@@ -1405,9 +1399,11 @@ function LibroDiarioReport() {
                 </Select>
               </FilterField>
               {partyType && filtros.puedeFiltrar('party') && (
-                <FilterField label={partyType === 'Customer' ? 'Cliente' : 'Proveedor'} style={{ width: 220 }}>
                   <OpcionesSelect
                     key={partyType}
+                    hideOnForbidden
+                    filterLabel={partyType === 'Customer' ? 'Cliente' : 'Proveedor'}
+                    filterStyle={{ width: 220 }}
                     recurso={partyType === 'Customer' ? 'clientes' : 'proveedores'}
                     value={party}
                     selectedLabel={partyLabel}
@@ -1415,7 +1411,6 @@ function LibroDiarioReport() {
                     placeholder={partyType === 'Customer' ? 'Todos los clientes' : 'Todos los proveedores'}
                     fallback={partyType === 'Customer' ? fallbackClientes : fallbackProveedores}
                   />
-                </FilterField>
               )}
             </div>
           </div>

@@ -140,8 +140,7 @@ export default function StockPage() {
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
               {filtros.puedeFiltrar('warehouse') && (
-              <FilterField label="Almacén" style={{ width: 200 }}>
-                <OpcionesSelect
+              <OpcionesSelect hideOnForbidden filterLabel="Almacén" filterStyle={{ width: 200 }}
                   recurso="almacenes"
                   value={warehouse === 'all' ? '' : warehouse}
                   onChange={(val) => { setWarehouse(val || 'all'); if (val) setBranch('') }}
@@ -149,11 +148,9 @@ export default function StockPage() {
                   placeholder="Todos los almacenes"
                   fallback={fallbackAlmacenes}
                 />
-              </FilterField>
               )}
               {warehouse === 'all' && filtros.puedeFiltrar('branch') && (
-                <FilterField label="Sucursal" style={{ width: 200 }}>
-                  <OpcionesSelect
+                <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }}
                     recurso="sucursales"
                     value={branch}
                     onChange={setBranch}
@@ -161,7 +158,6 @@ export default function StockPage() {
                     placeholder="Todas las sucursales"
                     fallback={fallbackSucursales}
                   />
-                </FilterField>
               )}
               <FilterField label="Categoría / nombre">
                 <input

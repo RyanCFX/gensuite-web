@@ -139,18 +139,30 @@ export function ecfTipoLabel(typeId: string): string {
   return entry ? `${entry.typeId} — ${entry.label}` : typeId
 }
 
-/** Códigos de modificación DGII (Tabla VI) para Notas de Crédito/Débito electrónicas.
+/** Códigos de modificación DGII (Tabla VI) para e-CF de Nota de Crédito (34).
+ *  Códigos 1-3 son los de uso ordinario (ver respuesta DGII CA4275): 1 anula el comprobante
+ *  original, 2 corrige texto sin afectar montos, 3 disminuye los montos originales.
  *  El copy en español es el que ve el usuario — nunca se muestra el número solo. */
-export const ECF_MODIFICATION_CODES: { code: EcfModificationCode; label: string; comun: boolean }[] = [
-  { code: 1, label: 'Devolución total de productos', comun: true },
+export const ECF_MODIFICATION_CODES_CREDIT_NOTE: { code: EcfModificationCode; label: string; comun: boolean }[] = [
+  { code: 1, label: 'Anulación total del comprobante', comun: true },
   { code: 2, label: 'Corrección de texto / datos', comun: true },
-  { code: 3, label: 'Corrección de montos', comun: true },
+  { code: 3, label: 'Corrección de montos (disminución)', comun: true },
   { code: 4, label: 'Reemplazo por contingencia', comun: false },
   { code: 5, label: 'Referencia a Factura de Consumo', comun: false },
 ]
 
-export function ecfModificationCodeLabel(code: number): string {
-  return ECF_MODIFICATION_CODES.find((c) => c.code === code)?.label ?? String(code)
+/** Códigos de modificación DGII (Tabla VI) para e-CF de Nota de Débito (33).
+ *  A diferencia de la nota de crédito, aquí solo aplica el código 3 — y su efecto es el
+ *  opuesto: aumenta los montos del comprobante original (ej. intereses por mora, fletes o
+ *  cargos adicionales posteriores a la emisión). Los códigos 1 y 2 no aplican a notas de
+ *  débito (ver respuesta DGII CA4275). */
+export const ECF_MODIFICATION_CODES_DEBIT_NOTE: { code: EcfModificationCode; label: string; comun: boolean }[] = [
+  { code: 3, label: 'Corrección de montos (aumento)', comun: true },
+]
+
+export function ecfModificationCodeLabel(code: number, tipo: 'credito' | 'debito' = 'credito'): string {
+  const codes = tipo === 'debito' ? ECF_MODIFICATION_CODES_DEBIT_NOTE : ECF_MODIFICATION_CODES_CREDIT_NOTE
+  return codes.find((c) => c.code === code)?.label ?? String(code)
 }
 
 /** true si el tipo (por typeId de e-CF, ej. "34" para B04) ya está habilitado para emitirse

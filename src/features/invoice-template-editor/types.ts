@@ -22,6 +22,7 @@ export type ElementType =
   | 'logo'
   | 'table'
   | 'list'
+  | 'repeater'
   | 'date'
   | 'conditional'
   | 'rectangle'
@@ -91,8 +92,13 @@ export interface LogoElement extends BaseElement {
 
 export interface TableColumn {
   /** `coberturaArs`/`montoPaciente` solo traen valor en facturas con cobertura ARS (§8.2 del doc
-   *  de Farmacia v2); en el resto quedan vacías, así que nacen invisibles. */
-  key: 'descripcion' | 'cantidad' | 'precio' | 'itbis' | 'total' | 'coberturaArs' | 'montoPaciente'
+   *  de Farmacia v2); en el resto quedan vacías, así que nacen invisibles.
+   *  `monto` es alias histórico de `total` (lee `row.monto` igual) — plantillas guardadas
+   *  anteriores a la unificación de keys lo traen (confirmado en la default de jbc); el
+   *  renderer los trata igual, no crear columnas nuevas con esta key.
+   *  `itbis`/`total` ahora sí vienen en `items.tabla` (repeater + render-data nuevo);
+   *  `codigo`/`uom`/`descuentoPct`/`itbisPct` son columnas nuevas disponibles para la tabla. */
+  key: 'descripcion' | 'codigo' | 'cantidad' | 'precio' | 'itbis' | 'itbisPct' | 'descuentoPct' | 'total' | 'monto' | 'uom' | 'coberturaArs' | 'montoPaciente'
   label: string
   visible: boolean
 }
@@ -101,6 +107,51 @@ export interface TableElement extends BaseElement {
   type: 'table'
   columns: TableColumn[]
   fontSize: number
+}
+
+// ─── Elemento repetidor "Lista de productos/servicios" ──────────────────────
+// Repetidor sobre `items.tabla` (o `pagos.tabla` con la misma pieza), distinto de la tabla
+// de columnas: cada registro se imprime como un bloque de N líneas (no una fila de celdas).
+// Toda la configuración vive dentro de `documentJson` — el backend la trata como blob opaco
+// y nunca la interpreta.
+export type RepeaterItemTokenKey =
+  | 'descripcion' | 'codigo' | 'cantidad' | 'precio' | 'itbis' | 'itbisPct'
+  | 'descuentoPct' | 'monto' | 'total' | 'uom'
+
+export type RepeaterPagoTokenKey =
+  | 'modoPago' | 'monto' | 'numeroTarjeta' | 'codigoAutorizacion' | 'banco' | 'numeroCheque'
+
+export type RepeaterTokenKey = RepeaterItemTokenKey | RepeaterPagoTokenKey
+
+export type RepeaterToken = { kind: 'field'; key: RepeaterTokenKey } | { kind: 'text'; text: string }
+
+/** Alineación de una línea del repetidor — `justify` distribuye el contenido entre ambos
+ * extremos (texto a la izquierda y monto a la derecha en la misma línea). */
+export type RepeaterLineAlign = TextAlign | 'justify'
+
+export interface RepeaterLine {
+  /** Contenido y orden de la línea: tokens de campo mezclados con texto fijo. */
+  tokens: RepeaterToken[]
+  /** Formato propio de la línea (aplica a todos sus tokens y textos fijos). Todo opcional:
+   * una línea sin formato definido hereda el del elemento — sin negrita, sin cursiva,
+   * alineada a la izquierda (fontSize por defecto 10). Las plantillas ya guardadas, sin
+   * estos campos, siguen renderizando igual que antes. */
+  align?: RepeaterLineAlign
+  fontSize?: number
+  bold?: boolean
+  italic?: boolean
+}
+
+export interface RepeaterElement extends BaseElement {
+  type: 'repeater'
+  /** Tabla origen: `items.tabla` (productos) o `pagos.tabla` (métodos de pago). */
+  binding: string
+  /** Líneas por producto/método — el usuario define qué va en cada línea. */
+  lines: RepeaterLine[]
+  /** Separación vertical entre líneas de un mismo bloque (px del modelo). */
+  lineGap: number
+  /** Separación vertical entre bloques de registros distintos (px del modelo). */
+  blockGap: number
 }
 
 export interface ListElement extends BaseElement {
@@ -154,6 +205,7 @@ export type TemplateElement =
   | LogoElement
   | TableElement
   | ListElement
+  | RepeaterElement
   | DateElement
   | ConditionalElement
   | RectangleElement

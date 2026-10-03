@@ -63,8 +63,8 @@ export default function CompraDetail() {
   })
 
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: () => getCatalogosFiscales(),
+    queryKey: ['catalogos-fiscales', { type: 'compra' }],
+    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
     staleTime: 60 * 60_000,
   })
 

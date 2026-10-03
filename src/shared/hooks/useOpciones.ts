@@ -21,6 +21,7 @@ export interface UseOpcionesOpts {
   enabled?: boolean
   fallback?: FallbackFn
   staleTime?: number
+  silent403?: boolean
 }
 
 export function useOpciones(recurso: string, opts?: UseOpcionesOpts) {
@@ -32,7 +33,7 @@ export function useOpciones(recurso: string, opts?: UseOpcionesOpts) {
     queryFn: async (): Promise<OpcionItem[]> => {
       if (!sinOpciones.has(recurso)) {
         try {
-          return await getOpciones(recurso, { q, limit })
+          return await getOpciones(recurso, { q, limit, silent403: opts?.silent403 })
         } catch (err) {
           const status = (err as ApiError)?.statusCode
           if (status === 404 && fallback) {

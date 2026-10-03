@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { FilterField } from './FilterField'
 import { SearchSelect, type SearchSelectOption } from './SearchSelect'
 import { useOpciones } from '@/shared/hooks/useOpciones'
-import type { OpcionItem } from '@/shared/api/types'
+import type { ApiError, OpcionItem } from '@/shared/api/types'
 
 // Select alimentado por GET /opciones/:recurso (listas mínimas value/label).
 // docs/tasks/PROMPT_PERMISOS_V2_Y_DASHBOARD_MODULAR_FRONTEND.md §5.3.
@@ -24,6 +25,11 @@ export interface OpcionesSelectProps {
   onEnterWithoutMatch?: (query: string) => void
   /** Listado legacy mientras el backend no expone /opciones (404 → fallback). */
   fallback?: (q: string, limit: number) => Promise<OpcionItem[]>
+  /** Filtros de tablas: ante un 403 no hay alerta y el control no se renderiza. */
+  hideOnForbidden?: boolean
+  /** Con `filterLabel` el select se envuelve en un `FilterField` (y se oculta junto con él). */
+  filterLabel?: string
+  filterStyle?: React.CSSProperties
 }
 
 export function OpcionesSelect({
@@ -41,11 +47,15 @@ export function OpcionesSelect({
   headerContent,
   onEnterWithoutMatch,
   fallback,
+  hideOnForbidden = false,
+  filterLabel,
+  filterStyle,
 }: OpcionesSelectProps) {
   const [q, setQ] = useState('')
-  const { data, isLoading } = useOpciones(recurso, { q, limit, enabled: !disabled, fallback })
+  const { data, isLoading, error: loadError } = useOpciones(recurso, { q, limit, enabled: !disabled, fallback, silent403: hideOnForbidden })
+  if (hideOnForbidden && (loadError as ApiError | null)?.statusCode === 403) return null
   const options: SearchSelectOption[] = (data ?? []).map((o) => ({ value: o.value, label: o.label }))
-  return (
+  const select = (
     <SearchSelect
       value={value}
       onChange={onChange}
@@ -63,4 +73,5 @@ export function OpcionesSelect({
       onEnterWithoutMatch={onEnterWithoutMatch}
     />
   )
+  return filterLabel ? <FilterField label={filterLabel} style={filterStyle}>{select}</FilterField> : select
 }

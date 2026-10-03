@@ -111,8 +111,8 @@ export default function InvoicesPage() {
   })
 
   const { data: catalogos } = useQuery({
-    queryKey: ['catalogos-fiscales'],
-    queryFn: () => getCatalogosFiscales(),
+    queryKey: ['catalogos-fiscales', { type: 'venta' }],
+    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
     staleTime: 60 * 60_000,
   })
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
@@ -226,8 +226,7 @@ export default function InvoicesPage() {
               </FilterField>
               )}
               {filtros.puedeFiltrar('branch') && (
-              <FilterField label="Sucursal" style={{ width: 200 }}>
-                <OpcionesSelect
+              <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }}
                   recurso="sucursales"
                   value={branch}
                   onChange={setBranch}
@@ -235,12 +234,10 @@ export default function InvoicesPage() {
                   selectedLabel={branch}
                   fallback={fallbackSucursales}
                 />
-              </FilterField>
               )}
               {esFarmacia && filtros.puedeFiltrar('aseguradora') && (
                 <>
-                  <FilterField label="Aseguradora" style={{ width: 200 }}>
-                    <OpcionesSelect
+                  <OpcionesSelect hideOnForbidden filterLabel="Aseguradora" filterStyle={{ width: 200 }}
                       recurso="aseguradoras"
                       value={aseguradora}
                       selectedLabel={aseguradoraLabel}
@@ -248,7 +245,6 @@ export default function InvoicesPage() {
                       placeholder="Todas las ARS"
                       fallback={fallbackAseguradoras}
                     />
-                  </FilterField>
                   {filtros.puedeFiltrar('estadoArs') && (
                   <FilterField label="Estado ARS">
                     <Select value={estadoArs} onValueChange={(val) => setEstadoArs(val as EstadoArsFilter)}>

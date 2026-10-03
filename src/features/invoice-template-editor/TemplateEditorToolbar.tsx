@@ -1,20 +1,23 @@
-import { ZoomIn, ZoomOut, Undo2, Redo2, Save, Eye, Printer } from 'lucide-react'
+import { ZoomIn, ZoomOut, Undo2, Redo2, Save, Eye, Printer, Copy, ClipboardPaste } from 'lucide-react'
 
 interface Props {
   zoom: number
   canUndo: boolean
   canRedo: boolean
   saving: boolean
+  canCopy: boolean
   onZoomIn: () => void
   onZoomOut: () => void
   onUndo: () => void
   onRedo: () => void
+  onCopy: () => void
+  onPaste: () => void
   onSave: () => void
   onPreview: () => void
   onTestPrint: () => void
 }
 
-export function TemplateEditorToolbar({ zoom, canUndo, canRedo, saving, onZoomIn, onZoomOut, onUndo, onRedo, onSave, onPreview, onTestPrint }: Props) {
+export function TemplateEditorToolbar({ zoom, canUndo, canRedo, saving, canCopy, onZoomIn, onZoomOut, onUndo, onRedo, onCopy, onPaste, onSave, onPreview, onTestPrint }: Props) {
   return (
     <div className="tpl-toolbar">
       <div className="tpl-toolbar-group">
@@ -35,6 +38,23 @@ export function TemplateEditorToolbar({ zoom, canUndo, canRedo, saving, onZoomIn
         </button>
         <button type="button" className="tpl-toolbar-btn" onClick={onRedo} disabled={!canRedo} title="Rehacer (Ctrl+Shift+Z)">
           <Redo2 size={16} />
+        </button>
+      </div>
+
+      <span className="tpl-toolbar-sep" />
+
+      <div className="tpl-toolbar-group">
+        <button
+          type="button" className="tpl-toolbar-btn" onClick={onCopy} disabled={!canCopy}
+          title="Copiar selección como JSON (Ctrl+C) — se puede pegar en otra pestaña o tenant"
+        >
+          <Copy size={16} />
+        </button>
+        <button
+          type="button" className="tpl-toolbar-btn" onClick={onPaste}
+          title="Pegar JSON del canvas (Ctrl+V) — detecta automáticamente la cabecera"
+        >
+          <ClipboardPaste size={16} />
         </button>
       </div>
 

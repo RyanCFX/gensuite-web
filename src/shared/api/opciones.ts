@@ -27,6 +27,8 @@ function normalizeOpciones(raw: unknown): OpcionItem[] {
 export interface OpcionesParams {
   q?: string
   limit?: number
+  /** No mostrar el toast global si la request da 403 (el llamador oculta el control). */
+  silent403?: boolean
 }
 
 /**
@@ -36,6 +38,10 @@ export interface OpcionesParams {
  * que dependa del recurso (modo activo).
  */
 export async function getOpciones(recurso: string, params?: OpcionesParams): Promise<OpcionItem[]> {
-  const res = await client.get<{ success: true; data: unknown }>(ENDPOINTS.opciones.porRecurso(recurso), { params })
+  const { silent403, ...query } = params ?? {}
+  const res = await client.get<{ success: true; data: unknown }>(ENDPOINTS.opciones.porRecurso(recurso), {
+    params: query,
+    ...(silent403 ? { silent403: true } : {}),
+  } as Parameters<typeof client.get>[1])
   return normalizeOpciones(res.data.data)
 }
