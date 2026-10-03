@@ -7,7 +7,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, ChevronLeft, ChevronRight, Ban } from 'lucide-react'
 import { listAperturaInventario, cancelarAperturaInventario } from '@/shared/api/apertura'
-import { listSucursales } from '@/shared/api/sucursales'
 import type { AperturaInventarioListItem } from '@/shared/api/types'
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate } from '@/lib/formatters'
@@ -15,10 +14,9 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { FilterField } from '@/shared/ui/FilterField'
 import { DatePicker } from '@/shared/ui/DatePicker'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const PAGE_SIZE = 20
 
@@ -40,7 +38,6 @@ export default function InventarioListPage() {
   const puedeAnular = usePuede('apertura.inventario.anular')
 
   const [branch, setBranch] = useState('')
-  const [branchQuery, setBranchQuery] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
@@ -49,14 +46,6 @@ export default function InventarioListPage() {
 
   const offset = (page - 1) * PAGE_SIZE
 
-  const { data: sucursalesData } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    staleTime: 60_000,
-  })
-  const branchOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
-    .filter((s) => !branchQuery || s.name.toLowerCase().includes(branchQuery.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
 
   const { data, isLoading } = useQuery({
     queryKey: ['apertura-inventario', { branch, fromDate, toDate, offset }],
@@ -105,16 +94,7 @@ export default function InventarioListPage() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
-              <FilterField label="Sucursal" style={{ width: 220 }}>
-                <SearchSelect
-                  value={branch}
-                  onChange={(v) => { setBranch(v); setPage(1) }}
-                  options={branchOptions}
-                  onSearch={setBranchQuery}
-                  selectedLabel={branch}
-                  placeholder="Todas las sucursales"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 220 }} recurso="sucursales" value={branch} onChange={(v) => { setBranch(v); setPage(1) }} selectedLabel={branch} placeholder="Todas las sucursales" />
               <FilterField label="Desde">
                 <DatePicker className="ff-input" value={fromDate} onChange={(v) => { setFromDate(v); setPage(1) }} clearable />
               </FilterField>

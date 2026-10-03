@@ -11,11 +11,10 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Badge } from '@/shared/ui/Badge'
 import { Modal } from '@/shared/ui/Modal'
-import { useQuery } from '@tanstack/react-query'
-import { listCategories } from '@/shared/api/catalog'
 import type { DecisionMapeoDto, EstadoLineaMapeo, Item, LineaMapeo, ResultadoMapeo, CrearArticuloDesdeSocioDto } from '@/shared/api/types'
 import { formatDOP, formatNumber } from '@/lib/formatters'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useOpcionesLista } from '@/shared/hooks/useOpciones'
 
 const ESTADO_BADGE: Record<EstadoLineaMapeo, { label: string; variant: 'success' | 'warning' | 'neutral' | 'error' }> = {
   confirmada: { label: 'Confirmada', variant: 'success' },
@@ -291,10 +290,7 @@ function CrearArticuloModal({
   const [itemCode, setItemCode] = useState('')
   const [crearPrecioCompra, setCrearPrecioCompra] = useState(false)
 
-  const { data: categorias, isLoading: categoriasLoading } = useQuery({
-    queryKey: ['categorias-all-relaciones', categoriaQuery],
-    queryFn: () => listCategories({ search: categoriaQuery || undefined, limit: 100 }),
-  })
+  const { data: categorias, isLoading: categoriasLoading } = useOpcionesLista('categorias', { q: categoriaQuery, limit: 100 })
   const categoriaOptions: SearchSelectOption[] = (categorias?.items ?? []).map((c) => ({
     value: c.id,
     label: c.name,

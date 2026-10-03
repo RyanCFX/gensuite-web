@@ -8,21 +8,18 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { crearAperturaVenta } from '@/shared/api/apertura'
-import { listCustomers } from '@/shared/api/customers'
-import { listSucursales } from '@/shared/api/sucursales'
 import { getFacturacionConfig } from '@/shared/api/config'
-import { listMonedas } from '@/shared/api/monedas'
 import type { CrearFacturaAperturaVentaDto, FacturaAperturaVenta } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DatePicker } from '@/shared/ui/DatePicker'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { Modal } from '@/shared/ui/Modal'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { formatMoney } from '@/lib/formatters'
 import { NCF_ORIGINAL_REGEX, TIPOS_NCF_DGII, today, usePreflightGate } from './lib'
+import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 interface FieldErrors {
   customer?: string
@@ -55,8 +52,6 @@ export default function VentaForm() {
 
   const [form, setForm] = useState(emptyForm())
   const [errors, setErrors] = useState<FieldErrors>({})
-  const [customerQuery, setCustomerQuery] = useState('')
-  const [branchQuery, setBranchQuery] = useState('')
   const [created, setCreated] = useState<FacturaAperturaVenta | null>(null)
 
   const { data: facturacionConfig } = useQuery({
@@ -67,32 +62,12 @@ export default function VentaForm() {
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
 
-  const { data: monedas } = useQuery({
-    queryKey: ['monedas'],
-    queryFn: listMonedas,
-    enabled: multimonedaHabilitada,
-    staleTime: 5 * 60_000,
-  })
-  const monedasOptions = (monedas ?? []).filter((m) => m.habilitada && m.code !== monedaBase)
+  const { data: monedas } = useOpcionesArray('monedas', { limit: 100, enabled: multimonedaHabilitada, staleTime: 5 * 60_000 })
+  const monedasOptions = (monedas ?? []).filter((m) => m.code !== monedaBase)
 
-  const { data: customersData, isLoading: customersLoading } = useQuery({
-    queryKey: ['aperturaCustomerSearch', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-  })
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
-  }))
 
-  const { data: sucursalesData } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    staleTime: 60_000,
-  })
+  const { data: sucursalesData } = useOpcionesLista('sucursales', { limit: 100, staleTime: 60_000 })
   const mostrarSucursal = (sucursalesData?.items.length ?? 0) > 1
-  const branchOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
-    .filter((s) => !branchQuery || s.name.toLowerCase().includes(branchQuery.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
 
   const mostrarTasaCambio = multimonedaHabilitada && !!form.moneda && form.moneda !== monedaBase
 
@@ -215,16 +190,7 @@ export default function VentaForm() {
                   Cliente
                   <FieldTooltip>Si el cliente no existe, créalo primero en el módulo de Clientes.</FieldTooltip>
                 </label>
-                <SearchSelect
-                  value={form.customerId}
-                  selectedLabel={form.customerLabel}
-                  onChange={(id, opt) => { setForm((f) => ({ ...f, customerId: id, customerLabel: opt?.label ?? '' })); setErrors((e) => ({ ...e, customer: undefined })) }}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={customersLoading}
-                  placeholder="Buscar cliente…"
-                  error={!!errors.customer}
-                />
+                <OpcionesSelect recurso="clientes" value={form.customerId} onChange={(id, opt) => { setForm((f) => ({ ...f, customerId: id, customerLabel: opt?.label ?? '' })); setErrors((e) => ({ ...e, customer: undefined })) }} placeholder="Buscar cliente…" error={!!errors.customer} selectedLabel={form.customerLabel} minChars={2} />
                 {errors.customer && <span className="ff-error">{errors.customer}</span>}
               </div>
               <div className="ff-wrap">
@@ -274,14 +240,7 @@ export default function VentaForm() {
               {mostrarSucursal && (
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal</label>
-                  <SearchSelect
-                    value={form.branch}
-                    onChange={(v) => { setForm((f) => ({ ...f, branch: v })); setErrors((e) => ({ ...e, branch: undefined })) }}
-                    options={branchOptions}
-                    onSearch={setBranchQuery}
-                    placeholder="Opcional"
-                    error={!!errors.branch}
-                  />
+                  <OpcionesSelect recurso="sucursales" value={form.branch} onChange={(v) => { setForm((f) => ({ ...f, branch: v })); setErrors((e) => ({ ...e, branch: undefined })) }} placeholder="Opcional" error={!!errors.branch} />
                   {errors.branch && <span className="ff-error">{errors.branch}</span>}
                 </div>
               )}

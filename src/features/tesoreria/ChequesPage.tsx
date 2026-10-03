@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listCheques } from '@/shared/api/tesoreria'
 import type { ListChequesParams } from '@/shared/api/tesoreria'
-import { listSuppliers } from '@/shared/api/suppliers'
 import type { ChequeEstado } from '@/shared/api/types'
 import { CuentaBancariaSelect } from './components/CuentaBancariaSelect'
 import { formatDate, formatDOP } from '@/lib/formatters'
@@ -11,14 +10,13 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Drawer } from '@/shared/ui/Drawer'
 import { Printer, SlidersHorizontal } from 'lucide-react'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const COLUMNS = [
   { key: 'fecha', width: 100 },
@@ -49,20 +47,11 @@ export default function ChequesPage() {
   const [toDate, setToDate] = useState('')
   const [beneficiario, setBeneficiario] = useState('')
   const [beneficiarioLabel, setBeneficiarioLabel] = useState('')
-  const [beneficiarioQuery, setBeneficiarioQuery] = useState('')
   const [impreso, setImpreso] = useState<'all' | 'yes' | 'no'>('all')
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { orderBy, sort } = useSortState()
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['cheques-beneficiario-search', beneficiarioQuery],
-    queryFn: () => listSuppliers({ search: beneficiarioQuery || undefined, limit: 15 }),
-  })
-  const beneficiarioOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
-    value: s.id,
-    label: s.supplierName,
-  }))
 
   const params: ListChequesParams = {
     cuentaBancaria: cuentaBancaria || undefined,
@@ -115,17 +104,7 @@ export default function ChequesPage() {
                   onChange={(e) => setChequeNo(e.target.value)}
                 />
               </FilterField>
-              <FilterField label="Beneficiario" style={{ width: 220 }}>
-                <SearchSelect
-                  value={beneficiario}
-                  selectedLabel={beneficiarioLabel}
-                  onChange={(val, opt) => { setBeneficiario(val); setBeneficiarioLabel(opt?.label ?? '') }}
-                  options={beneficiarioOptions}
-                  onSearch={setBeneficiarioQuery}
-                  loading={suppliersLoading}
-                  placeholder="Filtrar por proveedor…"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Beneficiario" filterStyle={{ width: 220 }} recurso="proveedores" value={beneficiario} onChange={(val, opt) => { setBeneficiario(val); setBeneficiarioLabel(opt?.label ?? '') }} selectedLabel={beneficiarioLabel} placeholder="Filtrar por proveedor…" />
               <FilterField label="Estado">
                 <Select value={estado} onValueChange={(v) => setEstado(v as EstadoFilter)} clearable={false}>
                   <SelectItem value="all">Todos los estados</SelectItem>

@@ -5,12 +5,12 @@ import { Search, ChevronLeft, ChevronRight } from 'lucide-react'
 import { getMovimientos, getResumenMovimientos } from '@/shared/api/tesoreria'
 import { CuentaBancariaSelect } from './components/CuentaBancariaSelect'
 import { formatDate, formatDOP, formatMoney } from '@/lib/formatters'
-import type { CuentaBancaria } from '@/shared/api/types'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import type { OpcionLista } from '@/shared/hooks/useOpciones'
 
 const PAGE_SIZE = 30
 
@@ -51,7 +51,7 @@ function today(): string {
 export default function MovimientosBancoPage() {
   const navigate = useNavigate()
   const [cuentaBancaria, setCuentaBancaria] = useState('')
-  const [cuentaBancariaObj, setCuentaBancariaObj] = useState<CuentaBancaria | undefined>()
+  const [cuentaBancariaObj, setCuentaBancariaObj] = useState<OpcionLista | undefined>()
   const [fromDate, setFromDate] = useState(firstOfMonth())
   const [toDate, setToDate] = useState(today())
   const [appliedRange, setAppliedRange] = useState({ fromDate: firstOfMonth(), toDate: today() })

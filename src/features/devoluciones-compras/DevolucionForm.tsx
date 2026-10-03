@@ -5,8 +5,7 @@ import { useEffectOnActive } from 'keepalive-for-react'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { listCompras, getCompra } from '@/shared/api/compras-gastos'
-import { getItem } from '@/shared/api/catalog'
-import { listSuppliers } from '@/shared/api/suppliers'
+import { getItemLookup } from '@/shared/api/catalog'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import {
@@ -26,6 +25,7 @@ import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { DEVOLUCION_DIAS_LIMITE_ITBIS } from '@/lib/constants'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const DEVOLUCION_FORM_COLUMNS = [
   { key: 'codigo', width: 120 },
@@ -100,17 +100,6 @@ export default function DevolucionForm() {
   const showPicker = !isEdit && !originalInvoiceParam
   const [supplierId, setSupplierId] = useState('')
   const [supplierLabel, setSupplierLabel] = useState('')
-  const [supplierSearch, setSupplierSearch] = useState('')
-  const { data: suppliersData, isLoading: loadingSuppliers } = useQuery({
-    queryKey: ['supplierSearch-devolucion', supplierSearch],
-    queryFn: () => listSuppliers({ search: supplierSearch || undefined, limit: 15 }),
-    enabled: showPicker,
-  })
-  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
-    value: s.id,
-    label: s.supplierName,
-    sublabel: s.rnc ?? s.cedula,
-  }))
 
   const [compraSearch, setCompraSearch] = useState('')
   const { data: comprasSometidas, isLoading: loadingCompras } = useQuery({
@@ -142,7 +131,7 @@ export default function DevolucionForm() {
     if (!sourceCompra) return
     const codes = [...new Set(sourceCompra.items.map((it) => it.itemCode))]
     let cancelled = false
-    Promise.all(codes.map((code) => getItem(code).catch(() => null))).then((catalogItems) => {
+    Promise.all(codes.map((code) => getItemLookup(code).catch(() => null))).then((catalogItems) => {
       if (cancelled) return
       const next: Record<string, string> = {}
       catalogItems.forEach((ci, idx) => {
@@ -291,20 +280,11 @@ export default function DevolucionForm() {
                   </button>
                 </div>
               ) : (
-                <SearchSelect
-                  value=""
-                  onChange={(val) => {
+                <OpcionesSelect recurso="proveedores" value="" onChange={(val, opt) => {
                     if (!val) return
-                    const opt = supplierOptions.find((o) => o.value === val)
                     setSupplierId(val)
                     setSupplierLabel(opt?.label ?? val)
-                  }}
-                  options={supplierOptions}
-                  onSearch={setSupplierSearch}
-                  selectedLabel=""
-                  placeholder="Buscar proveedor por nombre, RNC o cédula…"
-                  loading={loadingSuppliers}
-                />
+                  }} placeholder="Buscar proveedor por nombre, RNC o cédula…" selectedLabel="" minChars={2} />
               )}
             </div>
           </div>

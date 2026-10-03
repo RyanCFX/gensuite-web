@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { createSupplier, updateSupplier } from '@/shared/api/suppliers'
 import { listRetenciones } from '@/shared/api/retenciones'
 import type { ApiError, Supplier, CreateProveedorDto, UpdateProveedorDto } from '@/shared/api/types'
-import { listGruposProveedores, getCatalogosFiscales, listPaises, listBancos, listImpuestosCompras, getFacturacionConfig, listAlmacenes } from '@/shared/api/config'
+import { getCatalogosFiscales, listPaises, listBancos, listImpuestosCompras, getFacturacionConfig } from '@/shared/api/config'
 import { validateRNCDetailed, validateCedulaDetailed, formatRNC, formatCedula } from '@/lib/validators/dgii'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -18,6 +18,8 @@ import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { CheckCircle2, XCircle, Save, Loader2 } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 
 const schema = z
@@ -86,13 +88,6 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   const isEdit = Boolean(supplier)
   const queryClient = useQueryClient()
 
-  const { data: gruposData, isLoading: gruposLoading } = useQuery({
-    queryKey: ['grupos-proveedores'],
-    queryFn: listGruposProveedores,
-    staleTime: 60_000,
-  })
-
-  // ── Multimoneda (docs/tasks/64_multimoneda_completo.md Fase 2) ────────────
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
@@ -126,11 +121,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   // Sin contexto de sucursal en esta pantalla (es un default a nivel de proveedor, no de
   // documento) — ofrece todos los almacenes del tenant, igual que "Almacén destino" en
   // RelacionDetail (misma naturaleza de campo: override que gana sobre la resolución normal).
-  const { data: almacenesData } = useQuery({
-    queryKey: ['almacenes-todos'],
-    queryFn: () => listAlmacenes(),
-    staleTime: 60_000,
-  })
+  const { data: almacenesData } = useOpcionesArray('almacenes', { limit: 100, staleTime: 60_000 })
   const almacenCompraDefaultOptions: SearchSelectOption[] = (almacenesData ?? []).map((w) => ({ value: w.id, label: w.name }))
 
   const { data: paisesData, isLoading: paisesLoading } = useQuery({
@@ -139,11 +130,6 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
     staleTime: 60 * 60_000,
   })
 
-  const grupoOptions: SearchSelectOption[] = (gruposData ?? []).map((g) => ({
-    value: g.name,
-    label: g.name,
-    sublabel: g.parentGroup ? `Sub de: ${g.parentGroup}` : undefined,
-  }))
 
   const [paisSearch, setPaisSearch] = useState('')
   const paisOptions: SearchSelectOption[] = useMemo(() => {
@@ -494,14 +480,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                     name="supplierGroup"
                     control={control}
                     render={({ field }) => (
-                      <SearchSelect
-                        value={field.value ?? ''}
-                        onChange={(id) => field.onChange(id || undefined)}
-                        options={grupoOptions}
-                        onSearch={() => {}}
-                        loading={gruposLoading}
-                        placeholder="Buscar grupo…"
-                      />
+                      <OpcionesSelect recurso="grupos-proveedores" value={field.value ?? ''} onChange={(id) => field.onChange(id || undefined)} placeholder="Buscar grupo…" />
                     )}
                   />
                 </div>

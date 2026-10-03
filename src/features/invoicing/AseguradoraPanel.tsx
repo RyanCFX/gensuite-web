@@ -1,14 +1,11 @@
-import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { ChevronDown, ChevronRight, Loader2, RefreshCw, ShieldCheck } from 'lucide-react'
-import { listAseguradoras, nombreAseguradora } from '@/shared/api/aseguradoras'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { validateCedulaDetailed } from '@/lib/validators/dgii'
 import { formatDOP } from '@/lib/formatters'
 import type { AseguradoraFormState } from './aseguradoraForm'
 import { RecargarButton } from '@/components/shared/RecargarButton'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 /**
  * Panel "Aseguradora (ARS)" del formulario de factura — vertical farmacia
@@ -42,18 +39,7 @@ export function AseguradoraPanel({
   footer,
 }: Props) {
   const [open, setOpen] = useState(true)
-  const [arsQuery, setArsQuery] = useState('')
 
-  const { data: arsData, isLoading: arsLoading } = useQuery({
-    queryKey: ['aseguradoras-picker', arsQuery],
-    // Nunca `/customers`: el servidor rechaza un Customer que no sea aseguradora (§3.2).
-    queryFn: () => listAseguradoras({ nombre: arsQuery || undefined, limit: 15 }),
-    enabled,
-  })
-  const arsOptions: SearchSelectOption[] = useMemo(
-    () => (arsData?.items ?? []).map((a) => ({ value: a.id, label: nombreAseguradora(a), sublabel: a.rnc })),
-    [arsData],
-  )
 
   function set<K extends keyof AseguradoraFormState>(key: K, v: AseguradoraFormState[K]) {
     onChange({ ...value, [key]: v })
@@ -112,17 +98,7 @@ export function AseguradoraPanel({
           <div className="form-row form-row-3">
             <div className="ff-wrap">
               <label className="ff-label ff-required">Aseguradora</label>
-              <SearchSelect
-                value={value.aseguradora}
-                selectedLabel={value.aseguradoraLabel}
-                onChange={(val, opt) => onChange({ ...value, aseguradora: val, aseguradoraLabel: opt?.label ?? '' })}
-                options={arsOptions}
-                onSearch={setArsQuery}
-                loading={arsLoading}
-                placeholder="Buscar ARS…"
-                error={submitted && !value.aseguradora}
-                disabled={readOnly}
-              />
+              <OpcionesSelect recurso="aseguradoras" value={value.aseguradora} onChange={(val, opt) => onChange({ ...value, aseguradora: val, aseguradoraLabel: opt?.label ?? '' })} placeholder="Buscar ARS…" error={submitted && !value.aseguradora} disabled={readOnly} selectedLabel={value.aseguradoraLabel} />
               {aseguradoraEsCliente && (
                 <p className="ff-hint" style={{ color: 'var(--color-error)' }}>
                   La aseguradora no puede ser el cliente de la factura — el cliente es el paciente.

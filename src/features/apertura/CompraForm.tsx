@@ -9,10 +9,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { crearAperturaCompra } from '@/shared/api/apertura'
-import { listSuppliers } from '@/shared/api/suppliers'
-import { listSucursales } from '@/shared/api/sucursales'
 import { getFacturacionConfig, getCatalogosFiscales } from '@/shared/api/config'
-import { listMonedas } from '@/shared/api/monedas'
 import type { CrearFacturaAperturaCompraDto, FacturaAperturaCompra } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -24,6 +21,8 @@ import { Modal } from '@/shared/ui/Modal'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { formatMoney } from '@/lib/formatters'
 import { today, usePreflightGate } from './lib'
+import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 interface FieldErrors {
   supplier?: string
@@ -56,8 +55,6 @@ export default function CompraForm() {
 
   const [form, setForm] = useState(emptyForm())
   const [errors, setErrors] = useState<FieldErrors>({})
-  const [supplierQuery, setSupplierQuery] = useState('')
-  const [branchQuery, setBranchQuery] = useState('')
   const [tipoComprobanteQuery, setTipoComprobanteQuery] = useState('')
   const [created, setCreated] = useState<FacturaAperturaCompra | null>(null)
 
@@ -69,13 +66,8 @@ export default function CompraForm() {
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
 
-  const { data: monedas } = useQuery({
-    queryKey: ['monedas'],
-    queryFn: listMonedas,
-    enabled: multimonedaHabilitada,
-    staleTime: 5 * 60_000,
-  })
-  const monedasOptions = (monedas ?? []).filter((m) => m.habilitada && m.code !== monedaBase)
+  const { data: monedas } = useOpcionesArray('monedas', { limit: 100, enabled: multimonedaHabilitada, staleTime: 5 * 60_000 })
+  const monedasOptions = (monedas ?? []).filter((m) => m.code !== monedaBase)
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
@@ -86,25 +78,9 @@ export default function CompraForm() {
     .filter((t) => !tipoComprobanteQuery || t.label.toLowerCase().includes(tipoComprobanteQuery.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['aperturaSupplierSearch', supplierQuery],
-    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
-  })
-  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
-    value: s.id,
-    label: s.supplierName,
-    sublabel: s.rnc ?? s.cedula,
-  }))
 
-  const { data: sucursalesData } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    staleTime: 60_000,
-  })
+  const { data: sucursalesData } = useOpcionesLista('sucursales', { limit: 100, staleTime: 60_000 })
   const mostrarSucursal = (sucursalesData?.items.length ?? 0) > 1
-  const branchOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
-    .filter((s) => !branchQuery || s.name.toLowerCase().includes(branchQuery.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
 
   const mostrarTasaCambio = multimonedaHabilitada && !!form.moneda && form.moneda !== monedaBase
 
@@ -217,16 +193,7 @@ export default function CompraForm() {
                   Proveedor
                   <FieldTooltip>Si el proveedor no existe, créalo primero en el módulo de Proveedores.</FieldTooltip>
                 </label>
-                <SearchSelect
-                  value={form.supplierId}
-                  selectedLabel={form.supplierLabel}
-                  onChange={(id, opt) => { setForm((f) => ({ ...f, supplierId: id, supplierLabel: opt?.label ?? '' })); setErrors((e) => ({ ...e, supplier: undefined })) }}
-                  options={supplierOptions}
-                  onSearch={setSupplierQuery}
-                  loading={suppliersLoading}
-                  placeholder="Buscar proveedor…"
-                  error={!!errors.supplier}
-                />
+                <OpcionesSelect recurso="proveedores" value={form.supplierId} onChange={(id, opt) => { setForm((f) => ({ ...f, supplierId: id, supplierLabel: opt?.label ?? '' })); setErrors((e) => ({ ...e, supplier: undefined })) }} placeholder="Buscar proveedor…" error={!!errors.supplier} selectedLabel={form.supplierLabel} minChars={2} />
                 {errors.supplier && <span className="ff-error">{errors.supplier}</span>}
               </div>
               <div className="ff-wrap">
@@ -276,14 +243,7 @@ export default function CompraForm() {
               {mostrarSucursal && (
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal</label>
-                  <SearchSelect
-                    value={form.branch}
-                    onChange={(v) => { setForm((f) => ({ ...f, branch: v })); setErrors((e) => ({ ...e, branch: undefined })) }}
-                    options={branchOptions}
-                    onSearch={setBranchQuery}
-                    placeholder="Opcional"
-                    error={!!errors.branch}
-                  />
+                  <OpcionesSelect recurso="sucursales" value={form.branch} onChange={(v) => { setForm((f) => ({ ...f, branch: v })); setErrors((e) => ({ ...e, branch: undefined })) }} placeholder="Opcional" error={!!errors.branch} />
                   {errors.branch && <span className="ff-error">{errors.branch}</span>}
                 </div>
               )}

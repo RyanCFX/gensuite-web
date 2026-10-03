@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getItem } from '@/shared/api/catalog'
+import { getItemLookup } from '@/shared/api/catalog'
 import { getItemUbicaciones } from '@/shared/api/ubicaciones'
 import { formatDOP } from '@/lib/formatters'
 import { X, Package, MapPin, Percent, Tag } from 'lucide-react'
@@ -12,7 +12,7 @@ import { X, Package, MapPin, Percent, Tag } from 'lucide-react'
 export function ItemDetailModal({ itemCode, onClose }: { itemCode: string; onClose: () => void }) {
   const { data: item, isLoading, isError } = useQuery({
     queryKey: ['item', itemCode],
-    queryFn: () => getItem(itemCode),
+    queryFn: () => getItemLookup(itemCode),
     enabled: !!itemCode,
   })
 

@@ -2,9 +2,6 @@ import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listDevoluciones } from '@/shared/api/devoluciones'
-import { listSucursales } from '@/shared/api/sucursales'
-import { listDepartamentos } from '@/shared/api/departamentos'
-import { listCustomers } from '@/shared/api/customers'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { getCatalogosFiscales } from '@/shared/api/config'
 import { useDebounce } from '@/lib/useDebounce'
@@ -20,6 +17,7 @@ import { Drawer } from '@/shared/ui/Drawer'
 import { Select, SelectItem } from '@/components/ui/select'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const PAGE_SIZE = 20
 
@@ -94,16 +92,6 @@ export default function DevolucionesPage() {
   // ── Filtro por cliente (autocomplete real, mismo patrón que CreditNotesPage) ──
   const [customerId, setCustomerId] = useState('')
   const [customerLabel, setCustomerLabel] = useState('')
-  const [customerQuery, setCustomerQuery] = useState('')
-  const { data: customersData, isLoading: customersLoading } = useQuery({
-    queryKey: ['customerSearch', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-  })
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
-    sublabel: c.rnc ?? c.cedula,
-  }))
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
@@ -118,25 +106,9 @@ export default function DevolucionesPage() {
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
 
-  const { data: sucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-  })
 
-  const { data: departamentos } = useQuery({
-    queryKey: ['departamentos-all'],
-    queryFn: () => listDepartamentos({ limit: 100 }),
-  })
 
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchOptions: SearchSelectOption[] = (sucursales?.items ?? [])
-    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((s) => ({ value: s.id, label: s.name }))
 
-  const [departmentSearch, setDepartmentSearch] = useState('')
-  const departmentOptions: SearchSelectOption[] = (departamentos?.items ?? [])
-    .filter((d) => !departmentSearch || d.name.toLowerCase().includes(departmentSearch.toLowerCase()))
-    .map((d) => ({ value: d.id, label: d.name }))
 
   const { data, isLoading, isError } = useQuery({
     queryKey: [
@@ -227,37 +199,9 @@ export default function DevolucionesPage() {
                   onChange={handleSearchChange}
                 />
               </div>
-              <FilterField label="Cliente" style={{ width: 220 }}>
-                <SearchSelect
-                  value={customerId}
-                  selectedLabel={customerLabel}
-                  onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? ''); setPage(1) }}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={customersLoading}
-                  placeholder="Filtrar por cliente…"
-                />
-              </FilterField>
-              <FilterField label="Sucursal" style={{ width: 200 }}>
-                <SearchSelect
-                  value={branch}
-                  onChange={(val) => { setBranch(val); setPage(1) }}
-                  options={branchOptions}
-                  onSearch={setBranchSearch}
-                  selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
-                  placeholder="Todas las sucursales"
-                />
-              </FilterField>
-              <FilterField label="Departamento" style={{ width: 200 }}>
-                <SearchSelect
-                  value={department}
-                  onChange={(val) => { setDepartment(val); setPage(1) }}
-                  options={departmentOptions}
-                  onSearch={setDepartmentSearch}
-                  selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
-                  placeholder="Todos los departamentos"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Cliente" filterStyle={{ width: 220 }} recurso="clientes" value={customerId} onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? ''); setPage(1) }} selectedLabel={customerLabel} placeholder="Filtrar por cliente…" minChars={2} />
+              <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }} recurso="sucursales" value={branch} onChange={(val) => { setBranch(val); setPage(1) }} placeholder="Todas las sucursales" />
+              <OpcionesSelect hideOnForbidden filterLabel="Departamento" filterStyle={{ width: 200 }} recurso="departamentos" value={department} onChange={(val) => { setDepartment(val); setPage(1) }} placeholder="Todos los departamentos" />
               <FilterField label="Estado">
                 <Select
                   value={status}

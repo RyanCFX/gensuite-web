@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query'
 import { getFacturacionConfig } from '@/shared/api/config'
 import { listInvoices } from '@/shared/api/invoices'
 import { listQuotations } from '@/shared/api/quotations'
-import { listCustomers } from '@/shared/api/customers'
 import { listInventory } from '@/shared/api/inventory'
 import { usePermissionsStore } from '@/stores/permissions.store'
 import { useFeaturesStore } from '@/stores/features.store'
@@ -21,6 +20,7 @@ import {
   Search, ArrowRight,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useOpcionesLista } from '@/shared/hooks/useOpciones'
 
 // ─── Searchable items registry ────────────────────────────────────────────────
 
@@ -317,13 +317,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     staleTime: 30_000,
     retry: false,
   })
-  const qClientes = useQuery({
-    queryKey: ['cmd-search', 'clientes', debounced],
-    queryFn: () => listCustomers({ limit: 5, search: debounced }),
-    enabled: canData && puedeClientes,
-    staleTime: 30_000,
-    retry: false,
-  })
+  const qClientes = useOpcionesLista('clientes', { q: debounced, limit: 5, enabled: canData && puedeClientes, staleTime: 30_000 })
   const qArticulos = useQuery({
     queryKey: ['cmd-search', 'articulos', debounced],
     queryFn: () => listInventory({ limit: 5, search: debounced }),

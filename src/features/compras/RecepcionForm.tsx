@@ -5,11 +5,9 @@ import { useEffectOnActive } from 'keepalive-for-react'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createPurchaseReceipt, updatePurchaseReceipt, getPurchaseReceipt } from '@/shared/api/purchase-receipt'
-import { listSuppliers } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { getUsuarioSucursales } from '@/shared/api/usuarios'
-import { listSucursales } from '@/shared/api/sucursales'
 import { todayIso } from '@/lib/formatters'
 import type { CreatePurchaseReceiptDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -25,7 +23,7 @@ import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { listItems, getItem } from '@/shared/api/catalog'
+import { lookupItems, getItemLookup } from '@/shared/api/catalog'
 import { SeleccionarOrdenCompraModal } from '@/components/shared/SeleccionarOrdenCompraModal'
 import type { OrdenCompraImportLine } from '@/components/shared/SeleccionarOrdenCompraModal'
 import { useAuthStore } from '@/stores/auth.store'
@@ -37,6 +35,8 @@ import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { useAlmacenCompraDefault } from '@/shared/hooks/useAlmacenCompraDefault'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 interface ItemRow {
   itemCode: string
@@ -116,8 +116,8 @@ function onVariantConfirm(
       itemLabel: s.item.itemName,
       description: s.item.internalDescription ?? s.item.itemName,
       qty: s.qty,
-      rate: s.item.valuationRate ?? s.item.standardRate ?? 0,
-      baseRate: s.item.valuationRate ?? s.item.standardRate ?? 0,
+      rate: 0 /* costo no disponible vía lookup: se digita */,
+      baseRate: 0 /* costo no disponible vía lookup: se digita */,
       warehouse: '',
       uom: s.item.stockUom ?? 'Nos',
       trackingType: s.item.trackingType ?? 'none',
@@ -491,7 +491,6 @@ export default function RecepcionForm() {
 
   const [supplierId, setSupplierId] = useState('')
   const [supplierName, setSupplierName] = useState('')
-  const [supplierQuery, setSupplierQuery] = useState('')
   const [postingDate, setPostingDate] = useState(todayIso())
   const [supplierDeliveryNote, setSupplierDeliveryNote] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyItem(defaultWh)])
@@ -523,7 +522,7 @@ export default function RecepcionForm() {
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
     onBarcode: async (code) => {
-      const res = await listItems({ barcode: code, limit: 1 })
+      const res = await lookupItems({ barcode: code, limit: 1 })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       setItems((prev) => [...prev, emptyItem(defaultWh)])
@@ -531,30 +530,13 @@ export default function RecepcionForm() {
     },
   })
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['supplierSearch', supplierQuery],
-    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
-    enabled: true,
-  })
 
-  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
-    value: s.id,
-    label: s.supplierName,
-    sublabel: s.rnc ?? s.cedula,
-  }))
-
-  // Sin sucursal elegida: todos los almacenes del tenant (comportamiento actual).
-  // Con sucursal elegida: solo los almacenes de esa sucursal.
   const { data: warehousesAll } = useQuery({
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
     enabled: !branch,
   })
-  const { data: warehousesForBranch } = useQuery({
-    queryKey: ['almacenes', { branch }],
-    queryFn: () => listAlmacenes({ branch }),
-    enabled: !!branch,
-  })
+  const { data: warehousesForBranch } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch })
   const warehouses = branch ? warehousesForBranch : warehousesAll
 
   const warehouseSelectOptions: SearchSelectOption[] = useMemo(() => {
@@ -579,22 +561,13 @@ export default function RecepcionForm() {
     enabled: !!authUser?.email,
     staleTime: 60_000,
   })
-  const { data: allSucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    enabled: isSystemManager,
-    staleTime: 60_000,
-  })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
   const branchOptions = useMemo(
     () => (isSystemManager
       ? (allSucursales?.items.map((s) => s.name) ?? [])
       : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],
   )
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchSelectOptions: SearchSelectOption[] = branchOptions
-    .filter((b) => !branchSearch || b.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((b) => ({ value: b, label: b }))
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
@@ -656,7 +629,7 @@ export default function RecepcionForm() {
   useEffect(() => {
     if (!receiptData) return
     let cancelled = false
-    Promise.all(receiptData.items.map((ri) => getItem(ri.itemCode).catch(() => null))).then((catalogItems) => {
+    Promise.all(receiptData.items.map((ri) => getItemLookup(ri.itemCode).catch(() => null))).then((catalogItems) => {
       if (cancelled) return
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
@@ -837,7 +810,7 @@ export default function RecepcionForm() {
   const selectCatalogItem = useCallback((idx: number, catalogItem: Item) => {
     setItems((prev) => prev.map((row, i) => {
       if (i !== idx) return row
-      const baseRate = catalogItem.valuationRate ?? catalogItem.standardRate ?? 0
+      const baseRate = 0 /* costo no disponible vía lookup: se digita */
       const trackingType = catalogItem.trackingType ?? 'none'
       return {
         ...row,
@@ -883,7 +856,7 @@ export default function RecepcionForm() {
     const startIndex = items.length
     setItems((prev) => [...prev, ...lines.map(() => emptyItem(defaultWh))])
 
-    const catalogItems = await Promise.all(lines.map((l) => getItem(l.itemCode).catch(() => null)))
+    const catalogItems = await Promise.all(lines.map((l) => getItemLookup(l.itemCode).catch(() => null)))
 
     setItems((prev) => prev.map((row, idx) => {
       const li = idx - startIndex
@@ -951,21 +924,11 @@ export default function RecepcionForm() {
               <div className="form-row form-row-3">
                 <div className="ff-wrap">
                   <label className="ff-label">Proveedor <span className="ff-required">*</span></label>
-                  <SearchSelect
-                    id="supplier"
-                    value={supplierId}
-                    selectedLabel={supplierName}
-                    onChange={(id, opt) => {
+                  <OpcionesSelect recurso="proveedores" id="supplier" value={supplierId} onChange={(id, opt) => {
                       const resolvedId = id === '' ? '' : (opt?.value ?? id)
                       setSupplierId(resolvedId)
                       setSupplierName(opt?.label ?? '')
-                    }}
-                    options={supplierOptions}
-                    onSearch={setSupplierQuery}
-                    loading={suppliersLoading}
-                    placeholder="Buscar proveedor…"
-                    error={!supplierId}
-                  />
+                    }} placeholder="Buscar proveedor…" error={!supplierId} selectedLabel={supplierName} minChars={2} />
                 </div>
 
                 <div className="ff-wrap">
@@ -997,16 +960,7 @@ export default function RecepcionForm() {
 
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal</label>
-                  <SearchSelect
-                    value={branch}
-                    onChange={(val) => { setBranch(val); setBranchError(false) }}
-                    options={branchSelectOptions}
-                    onSearch={setBranchSearch}
-                    selectedLabel={branch}
-                    placeholder="Sin especificar"
-                    error={branchError}
-                    disabled={branchOptions.length === 1}
-                  />
+                  <OpcionesSelect recurso="sucursales" value={branch} onChange={(val) => { setBranch(val); setBranchError(false) }} placeholder="Sin especificar" error={branchError} disabled={branchOptions.length === 1} selectedLabel={branch} />
                 </div>
 
                 {usaDepartamentos && (

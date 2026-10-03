@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { esClienteEmisorNoEncontrado, ECF_ADMIN_ROUTE } from '@/lib/ecfErrors'
 import { Search, DollarSign, ChevronLeft, ChevronRight, X, Clock, AlertTriangle } from 'lucide-react'
 import { listPendientes, cobrarFactura } from '@/shared/api/caja'
-import { getFacturacionConfig, listMetodosPago, listDenominaciones } from '@/shared/api/config'
+import { getFacturacionConfig, listDenominaciones } from '@/shared/api/config'
 import { getTurnoActual } from '@/shared/api/pos'
 import { downloadInvoicePdf } from '@/shared/api/invoices'
 import { formatDate, formatMoney } from '@/lib/formatters'
@@ -39,6 +39,7 @@ import {
 } from '@/lib/paymentLines'
 import type { Invoice, CobrarFacturaDto } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 const PAGE_SIZE = 20
 
@@ -73,11 +74,7 @@ export default function CajaPage() {
     staleTime: 5 * 60_000,
   })
 
-  const { data: metodos } = useQuery({
-    queryKey: ['metodos-pago'],
-    queryFn: listMetodosPago,
-    staleTime: 5 * 60_000,
-  })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, staleTime: 5 * 60_000 })
 
   // Misma key que usa PaymentLinesEditor — cache compartido, sin request extra. Hace falta para
   // validar que el desglose del vuelto suma el excedente.

@@ -4,10 +4,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createTransferencia } from '@/shared/api/transferencias'
-import { listAlmacenes } from '@/shared/api/config'
 import { listUbicaciones } from '@/shared/api/ubicaciones'
-import { getUsuarioAlmacenesPermitidos } from '@/shared/api/usuarios'
-import { getCachedUser } from '@/shared/api/storage'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -20,6 +17,7 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 interface LineItem {
   itemCode: string
@@ -38,7 +36,6 @@ export default function TransferenciaForm() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { multiTab, activeId, closeTab } = useTabs()
-  const currentUserEmail = getCachedUser()?.email
 
   const [fromAlmacen, setFromAlmacen] = useState('')
   const [fromAlmacenLabel, setFromAlmacenLabel] = useState('')
@@ -61,38 +58,9 @@ export default function TransferenciaForm() {
   const [submitted, setSubmitted] = useState(false)
   const [configError, setConfigError] = useState<string | null>(null)
 
-  const { data: warehousesData } = useQuery({
-    queryKey: ['almacenes-all'],
-    queryFn: () => listAlmacenes(),
-  })
-  const warehouses = warehousesData ?? []
 
-  const { data: myWarehouses } = useQuery({
-    queryKey: ['usuarioAlmacenesPermitidos', currentUserEmail],
-    queryFn: () => getUsuarioAlmacenesPermitidos(currentUserEmail!),
-    enabled: !!currentUserEmail,
-    staleTime: 60_000,
-  })
 
-  // Origen: preferimos limitarlo a los almacenes que el usuario tiene permitidos,
-  // pero si esa lista aún no carga o viene vacía mostramos todos (el backend valida igual).
-  const originWarehouses = myWarehouses?.warehouses.length
-    ? warehouses.filter((w) => myWarehouses.warehouses.includes(w.id))
-    : warehouses
 
-  const [fromWarehouseSearch, setFromWarehouseSearch] = useState('')
-  const fromWarehouseOptions: SearchSelectOption[] = originWarehouses
-    .filter((w) => !fromWarehouseSearch || w.name.toLowerCase().includes(fromWarehouseSearch.toLowerCase()))
-    .map((w) => ({ value: w.id, label: w.name }))
-
-  const [toWarehouseSearch, setToWarehouseSearch] = useState('')
-  const toWarehouseOptions: SearchSelectOption[] = warehouses
-    .filter((w) => !toWarehouseSearch || w.name.toLowerCase().includes(toWarehouseSearch.toLowerCase()))
-    .map((w) => ({ value: w.id, label: w.name }))
-
-  // Ubicación/Rack (opcional) dentro del almacén elegido — solo se cargan una vez que hay
-  // almacén seleccionado. Si el usuario no elige una ubicación específica, la transferencia
-  // aplica al almacén completo.
   const [fromUbicacionSearch, setFromUbicacionSearch] = useState('')
   const { data: fromUbicacionesData } = useQuery({
     queryKey: ['ubicaciones-by-warehouse', fromAlmacen],
@@ -234,27 +202,11 @@ export default function TransferenciaForm() {
             <div className="form-row">
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Almacén Origen</label>
-                <SearchSelect
-                  value={fromAlmacen}
-                  onChange={handleFromAlmacenChange}
-                  options={fromWarehouseOptions}
-                  onSearch={setFromWarehouseSearch}
-                  selectedLabel={fromAlmacenLabel}
-                  placeholder="Selecciona un almacén…"
-                  error={submitted && !fromAlmacen}
-                />
+                <OpcionesSelect recurso="almacenes" value={fromAlmacen} onChange={handleFromAlmacenChange} placeholder="Selecciona un almacén…" error={submitted && !fromAlmacen} selectedLabel={fromAlmacenLabel} />
               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Almacén Destino</label>
-                <SearchSelect
-                  value={toAlmacen}
-                  onChange={handleToAlmacenChange}
-                  options={toWarehouseOptions}
-                  onSearch={setToWarehouseSearch}
-                  selectedLabel={toAlmacenLabel}
-                  placeholder="Selecciona un almacén…"
-                  error={submitted && !toAlmacen}
-                />
+                <OpcionesSelect recurso="almacenes" value={toAlmacen} onChange={handleToAlmacenChange} placeholder="Selecciona un almacén…" error={submitted && !toAlmacen} selectedLabel={toAlmacenLabel} />
               </div>
             </div>
             <div className="form-row">

@@ -8,19 +8,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react'
 import { listPendientesAbastecimiento, crearOrdenDesdePedidos } from '@/shared/api/ordenes-compra'
-import { listSuppliers } from '@/shared/api/suppliers'
 import type { MargenNegativoWarning, PendienteAbastecimientoLinea, CreateOrdenDesdePedidosDto } from '@/shared/api/types'
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate, formatMoney } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { FilterField } from '@/shared/ui/FilterField'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { Modal } from '@/shared/ui/Modal'
 import { today } from '@/features/despachos/lib'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const PAGE_SIZE = 20
 
@@ -61,7 +59,6 @@ export default function AbastecimientoPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [supplierId, setSupplierId] = useState('')
   const [supplierLabel, setSupplierLabel] = useState('')
-  const [supplierQuery, setSupplierQuery] = useState('')
   const [transactionDate, setTransactionDate] = useState(today())
   const [marginWarnings, setMarginWarnings] = useState<MargenNegativoWarning[] | null>(null)
   const offset = (page - 1) * PAGE_SIZE
@@ -71,11 +68,6 @@ export default function AbastecimientoPage() {
     queryFn: () => listPendientesAbastecimiento({ itemCode: itemCode || undefined, customer: customer || undefined, limit: PAGE_SIZE, offset }),
   })
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['supplierSearch-abastecimiento', supplierQuery],
-    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
-  })
-  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({ value: s.id, label: s.supplierName }))
 
   const items = data?.items ?? []
   const total = data?.meta.total ?? 0
@@ -275,16 +267,7 @@ export default function AbastecimientoPage() {
           <form onSubmit={handleSubmitForm} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="ff-wrap">
               <label className="ff-label ff-required">Proveedor</label>
-              <SearchSelect
-                value={supplierId}
-                selectedLabel={supplierLabel}
-                onChange={(id, opt) => { setSupplierId(id); setSupplierLabel(opt?.label ?? '') }}
-                options={supplierOptions}
-                onSearch={setSupplierQuery}
-                loading={suppliersLoading}
-                placeholder="Buscar proveedor…"
-                error={!supplierId}
-              />
+              <OpcionesSelect recurso="proveedores" value={supplierId} onChange={(id, opt) => { setSupplierId(id); setSupplierLabel(opt?.label ?? '') }} placeholder="Buscar proveedor…" error={!supplierId} selectedLabel={supplierLabel} minChars={2} />
             </div>
             <div className="ff-wrap">
               <label className="ff-label">Fecha</label>

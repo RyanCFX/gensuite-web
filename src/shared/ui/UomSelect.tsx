@@ -14,11 +14,11 @@
 import { useRef, useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, Plus } from 'lucide-react'
-import { listUOMs } from '@/shared/api/config'
-import { getItem } from '@/shared/api/catalog'
+import { getItemLookup } from '@/shared/api/catalog'
 import { useFloatingDropdown, FloatingPortal } from '@/lib/useFloatingPortal'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 interface UomSelectProps {
   value: string
@@ -40,11 +40,7 @@ interface UomSelectProps {
 // ─── Modo simple: select nativo (usado en ItemForm) ───────────────────────────
 
 function SimpleUomSelect({ value, onChange, disabled, error }: Omit<UomSelectProps, 'itemCode' | 'className'>) {
-  const { data: uoms, isLoading, refetch } = useQuery({
-    queryKey: ['uoms'],
-    queryFn: listUOMs,
-    staleTime: 5 * 60_000,
-  })
+  const { data: uoms, isLoading, refetch } = useOpcionesArray('uom', { limit: 100, staleTime: 5 * 60_000 })
   const [search, setSearch] = useState('')
 
   if (isLoading || !uoms?.length) {
@@ -88,18 +84,13 @@ function ItemUomSelect({ value, onChange, itemCode, direction, className = 'item
   // UOMs del artículo específico
   const { data: itemData, refetch: refetchItem } = useQuery({
     queryKey: ['item', itemCode],
-    queryFn: () => getItem(itemCode),
+    queryFn: () => getItemLookup(itemCode),
     enabled: !!itemCode,
     staleTime: 60_000,
   })
 
   // Todas las UOMs de config — se cargan cuando el usuario pide "más opciones"
-  const { data: allUoms, isLoading: loadingAll, refetch: refetchAllUoms } = useQuery({
-    queryKey: ['uoms'],
-    queryFn: listUOMs,
-    enabled: showAll,
-    staleTime: 5 * 60_000,
-  })
+  const { data: allUoms, isLoading: loadingAll, refetch: refetchAllUoms } = useOpcionesArray('uom', { limit: 100, enabled: showAll, staleTime: 5 * 60_000 })
 
   const handleToggle = () => {
     const wasOpen = open

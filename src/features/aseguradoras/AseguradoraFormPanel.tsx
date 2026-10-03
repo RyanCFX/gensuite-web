@@ -1,18 +1,17 @@
-import { useEffect, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { createAseguradora, updateAseguradora, nombreAseguradora } from '@/shared/api/aseguradoras'
-import { listUsuarios } from '@/shared/api/usuarios'
 import type { ApiError, Aseguradora } from '@/shared/api/types'
 import { validateRNCDetailed, formatRNC } from '@/lib/validators/dgii'
-import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { Info, Plus, Trash2, Save, Loader2 } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const schema = z.object({
   nombre: z.string().min(1, 'El nombre es requerido'),
@@ -49,15 +48,6 @@ export function AseguradoraFormPanel({ aseguradora, onSuccess, onCancel }: Asegu
   const isEdit = Boolean(aseguradora)
   const queryClient = useQueryClient()
 
-  const { data: usuariosData } = useQuery({
-    queryKey: ['usuarios-all'],
-    queryFn: () => listUsuarios({ limit: 100 }),
-    staleTime: 60_000,
-  })
-  const [encargadoQuery, setEncargadoQuery] = useState('')
-  const encargadoOptions: SearchSelectOption[] = (usuariosData?.items ?? [])
-    .filter((u) => !encargadoQuery || u.fullName.toLowerCase().includes(encargadoQuery.toLowerCase()) || u.email.toLowerCase().includes(encargadoQuery.toLowerCase()))
-    .map((u) => ({ value: u.email, label: u.fullName, sublabel: u.email }))
 
   const {
     register, control, handleSubmit, watch, setValue, setError,
@@ -343,14 +333,7 @@ export function AseguradoraFormPanel({ aseguradora, onSuccess, onCancel }: Asegu
                 name="encargadoCxc"
                 control={control}
                 render={({ field }) => (
-                  <SearchSelect
-                    id="encargadoCxc"
-                    value={field.value ?? ''}
-                    onChange={field.onChange}
-                    options={encargadoOptions}
-                    onSearch={setEncargadoQuery}
-                    placeholder="Buscar usuario…"
-                  />
+                  <OpcionesSelect recurso="usuarios" id="encargadoCxc" value={field.value ?? ''} onChange={field.onChange} placeholder="Buscar usuario…" />
                 )}
               />
               {errors.encargadoCxc && <p className="ff-error">{errors.encargadoCxc.message}</p>}

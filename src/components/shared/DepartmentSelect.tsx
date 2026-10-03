@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { listDepartamentos } from '@/shared/api/departamentos'
+import { useOpcionesLista } from '@/shared/hooks/useOpciones'
 
 interface DepartmentSelectProps {
   value: string
@@ -16,11 +15,7 @@ interface DepartmentSelectProps {
 export function DepartmentSelect({ value, onChange, placeholder = 'Buscar departamento…', error, disabled, id }: DepartmentSelectProps) {
   const [query, setQuery] = useState('')
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['department-search', query],
-    queryFn: () => listDepartamentos({ search: query || undefined, limit: 20 }),
-    staleTime: 30_000,
-  })
+  const { data, isLoading, refetch } = useOpcionesLista('departamentos', { q: query, limit: 20, staleTime: 30_000 })
 
   const options: SearchSelectOption[] = (data?.items ?? []).map((d) => ({
     value: d.id,

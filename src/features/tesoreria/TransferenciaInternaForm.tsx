@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { ArrowLeft, ArrowRight, Save, Loader2 } from 'lucide-react'
 import { createTransferenciaInterna, listTiposDocumento } from '@/shared/api/tesoreria'
 import { getFacturacionConfig } from '@/shared/api/config'
-import type { CreateTransferenciaInternaDto, CuentaBancaria, TesoreriaLinea } from '@/shared/api/types'
+import type { CreateTransferenciaInternaDto, TesoreriaLinea } from '@/shared/api/types'
 import { CuentaBancariaSelect } from './components/CuentaBancariaSelect'
 import { DistribucionCuentasEditor } from './components/DistribucionCuentasEditor'
 import { CuentaContableOverrideSection } from './components/CuentaContableOverrideSection'
@@ -17,6 +17,7 @@ import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { formatMoney } from '@/lib/formatters'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import type { OpcionLista } from '@/shared/hooks/useOpciones'
 
 function today(): string {
   const d = new Date()
@@ -30,9 +31,9 @@ export default function TransferenciaInternaForm() {
   const [fecha, setFecha] = useState(today())
   const [tipoDocumentoCode, setTipoDocumentoCode] = useState('')
   const [cuentaOrigen, setCuentaOrigen] = useState('')
-  const [cuentaOrigenObj, setCuentaOrigenObj] = useState<CuentaBancaria | undefined>()
+  const [cuentaOrigenObj, setCuentaOrigenObj] = useState<OpcionLista | undefined>()
   const [cuentaDestino, setCuentaDestino] = useState('')
-  const [cuentaDestinoObj, setCuentaDestinoObj] = useState<CuentaBancaria | undefined>()
+  const [cuentaDestinoObj, setCuentaDestinoObj] = useState<OpcionLista | undefined>()
   const [descripcion, setDescripcion] = useState('')
   const [monto, setMonto] = useState<number>(0)
   const [numeroReferencia, setNumeroReferencia] = useState('')

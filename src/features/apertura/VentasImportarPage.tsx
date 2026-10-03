@@ -5,20 +5,18 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, Plus, Trash2, CheckCircle2, XCircle } from 'lucide-react'
 import { importarAperturaVentas } from '@/shared/api/apertura'
-import { listCustomers } from '@/shared/api/customers'
 import type { ImportarAperturaVentasResultadoFila } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DatePicker } from '@/shared/ui/DatePicker'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { formatMoney } from '@/lib/formatters'
 import { NCF_ORIGINAL_REGEX, today, usePreflightGate } from './lib'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const MAX_FILAS = 200
 
@@ -55,14 +53,8 @@ export default function VentasImportarPage() {
   const { listo } = usePreflightGate()
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
   const [rows, setRows] = useState<Row[]>([emptyRow(), emptyRow(), emptyRow()])
-  const [customerQuery, setCustomerQuery] = useState('')
   const [summary, setSummary] = useState<{ total: number; creadas: number; fallidas: number; montoTotalMigrado: number } | null>(null)
 
-  const { data: customersData, isLoading: customersLoading } = useQuery({
-    queryKey: ['aperturaCustomerSearch', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-  })
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({ value: c.id, label: c.customerName }))
 
   function updateRow(key: number, patch: Partial<Row>) {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch, resultado: undefined } : r)))
@@ -164,16 +156,7 @@ export default function VentasImportarPage() {
                 return (
                   <tr key={row.key} style={isFailed ? { background: 'var(--danger-surface, rgba(220,38,38,0.06))' } : ok ? { opacity: 0.6 } : undefined}>
                     <td>
-                      <SearchSelect
-                        value={row.customerId}
-                        selectedLabel={row.customerLabel}
-                        onChange={(id, opt) => updateRow(row.key, { customerId: id, customerLabel: opt?.label ?? '' })}
-                        options={customerOptions}
-                        onSearch={setCustomerQuery}
-                        loading={customersLoading}
-                        placeholder="Cliente…"
-                        disabled={ok}
-                      />
+                      <OpcionesSelect recurso="clientes" value={row.customerId} onChange={(id, opt) => updateRow(row.key, { customerId: id, customerLabel: opt?.label ?? '' })} placeholder="Cliente…" disabled={ok} selectedLabel={row.customerLabel} minChars={2} />
                     </td>
                     <td><input className="items-input" value={row.numeroFacturaOriginal} disabled={ok} onChange={(e) => updateRow(row.key, { numeroFacturaOriginal: e.target.value })} /></td>
                     <td><DatePicker className="items-input" value={row.fechaFactura} onChange={(v) => updateRow(row.key, { fechaFactura: v })} max={today()} disabled={ok} /></td>

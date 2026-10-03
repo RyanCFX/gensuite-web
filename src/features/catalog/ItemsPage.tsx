@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { listItems, toggleItem, listCategories, listBrands } from '@/shared/api/catalog'
+import { listItems, toggleItem } from '@/shared/api/catalog'
 import { listUOMs } from '@/shared/api/config'
 import type { Item } from '@/shared/api/types'
 import { useDebounce } from '@/lib/useDebounce'
@@ -21,6 +21,7 @@ import { Drawer } from '@/shared/ui/Drawer'
 import { listPrincipiosActivos } from '@/shared/api/principios-activos'
 import { usePermissionsStore } from '@/stores/permissions.store'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const PAGE_SIZE = 20
 
@@ -147,15 +148,7 @@ export default function ItemsPage() {
     .filter((p) => !principioActivoSearch || p.nombre.toLowerCase().includes(principioActivoSearch.toLowerCase()))
     .map((p) => ({ value: p.id, label: p.nombre }))
 
-  const { data: categoriesData } = useQuery({
-    queryKey: ['categories', {}],
-    queryFn: () => listCategories(),
-  })
 
-  const { data: brandsData } = useQuery({
-    queryKey: ['brands', {}],
-    queryFn: () => listBrands(),
-  })
 
   const { data: uomsData } = useQuery({
     queryKey: ['uoms-all'],
@@ -163,15 +156,7 @@ export default function ItemsPage() {
     staleTime: 60 * 60_000,
   })
 
-  const [categorySearch, setCategorySearch] = useState('')
-  const categoryOptions: SearchSelectOption[] = (categoriesData?.items ?? [])
-    .filter((c) => !categorySearch || c.name.toLowerCase().includes(categorySearch.toLowerCase()))
-    .map((c) => ({ value: c.id, label: c.name }))
 
-  const [brandSearch, setBrandSearch] = useState('')
-  const brandOptions: SearchSelectOption[] = (brandsData?.items ?? [])
-    .filter((b) => !brandSearch || b.name.toLowerCase().includes(brandSearch.toLowerCase()))
-    .map((b) => ({ value: b.id, label: b.name }))
 
   const [stockUomSearch, setStockUomSearch] = useState('')
   const stockUomOptions: SearchSelectOption[] = (uomsData ?? [])
@@ -265,26 +250,8 @@ export default function ItemsPage() {
                   onChange={handleSearchChange}
                 />
               </div>
-              <FilterField label="Categoría" style={{ width: 200 }}>
-                <SearchSelect
-                  value={categoryFilter}
-                  onChange={(val) => { setCategoryFilter(val); setPage(1) }}
-                  options={categoryOptions}
-                  onSearch={setCategorySearch}
-                  selectedLabel={categoriesData?.items.find((c) => c.id === categoryFilter)?.name ?? ''}
-                  placeholder="Todas las categorías"
-                />
-              </FilterField>
-              <FilterField label="Marca" style={{ width: 200 }}>
-                <SearchSelect
-                  value={brandFilter}
-                  onChange={(val) => { setBrandFilter(val); setPage(1) }}
-                  options={brandOptions}
-                  onSearch={setBrandSearch}
-                  selectedLabel={brandsData?.items.find((b) => b.id === brandFilter)?.name ?? ''}
-                  placeholder="Todas las marcas"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Categoría" filterStyle={{ width: 200 }} recurso="categorias" value={categoryFilter} onChange={(val) => { setCategoryFilter(val); setPage(1) }} placeholder="Todas las categorías" />
+              <OpcionesSelect hideOnForbidden filterLabel="Marca" filterStyle={{ width: 200 }} recurso="marcas" value={brandFilter} onChange={(val) => { setBrandFilter(val); setPage(1) }} placeholder="Todas las marcas" />
               <FilterField label="Estado">
                 <Select
                   value={statusFilter}

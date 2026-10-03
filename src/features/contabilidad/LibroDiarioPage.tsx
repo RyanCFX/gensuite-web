@@ -4,9 +4,6 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Search, BookOpen, Download, Loader2 } from 'lucide-react'
 import { getLibroDiario, downloadLibroDiarioPdf, type LibroDiarioParams } from '@/shared/api/libroDiario'
-import { listCustomers } from '@/shared/api/customers'
-import { listSuppliers } from '@/shared/api/suppliers'
-import { listSucursales } from '@/shared/api/sucursales'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { classifyGlRow } from '@/shared/lib/glLedger'
 import { AccountSelect } from '@/components/shared/AccountSelect'
@@ -17,6 +14,8 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const LIBRO_DIARIO_COLUMNS = [
   { key: 'identificador', width: 110 },
@@ -76,33 +75,13 @@ export default function LibroDiarioPage() {
   const [department, setDepartment] = useState('')
   const { widths: colWidths, startResize } = useResizableColumns(LIBRO_DIARIO_COLUMNS)
 
-  const [branchQuery, setBranchQuery] = useState('')
-  const { data: sucursalesData } = useQuery({
-    queryKey: ['sucursales-libro-diario', branchQuery],
-    queryFn: () => listSucursales({ limit: 100 }),
-    staleTime: 60_000,
-  })
-  const branchOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
-    .filter((s) => !branchQuery || s.name.toLowerCase().includes(branchQuery.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
-
-  // Filtro de Tercero (§3): el reporte nativo exige valor exacto + saber si es Cliente o
-  // Proveedor — reemplaza el viejo input de texto libre por tipo + autocompletar.
   const [partyType, setPartyType] = useState<'' | 'Customer' | 'Supplier'>('')
   const [party, setParty] = useState('')
   const [partyLabel, setPartyLabel] = useState('')
   const [partyQuery, setPartyQuery] = useState('')
 
-  const { data: customersData, isLoading: customersLoading } = useQuery({
-    queryKey: ['customerSearch', partyQuery],
-    queryFn: () => listCustomers({ search: partyQuery || undefined, limit: 15 }),
-    enabled: partyType === 'Customer',
-  })
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['supplierSearch', partyQuery],
-    queryFn: () => listSuppliers({ search: partyQuery || undefined, limit: 15 }),
-    enabled: partyType === 'Supplier',
-  })
+  const { data: customersData, isLoading: customersLoading } = useOpcionesLista('clientes', { q: partyQuery, limit: 15, enabled: partyType === 'Customer' })
+  const { data: suppliersData, isLoading: suppliersLoading } = useOpcionesLista('proveedores', { q: partyQuery, limit: 15, enabled: partyType === 'Supplier' })
   const partyOptions: SearchSelectOption[] = partyType === 'Customer'
     ? (customersData?.items ?? []).map((c) => ({ value: c.id, label: c.customerName }))
     : partyType === 'Supplier'
@@ -215,14 +194,7 @@ export default function LibroDiarioPage() {
             </div>
             <div className="ff-wrap" style={{ minWidth: 200 }}>
               <label className="ff-label">Sucursal</label>
-              <SearchSelect
-                value={branch}
-                selectedLabel={branch}
-                onChange={setBranch}
-                options={branchOptions}
-                onSearch={setBranchQuery}
-                placeholder="Todas las sucursales"
-              />
+              <OpcionesSelect recurso="sucursales" value={branch} onChange={setBranch} placeholder="Todas las sucursales" selectedLabel={branch} />
             </div>
             <div className="ff-wrap" style={{ minWidth: 220 }}>
               <label className="ff-label">Departamento</label>

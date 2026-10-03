@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { listMetodosPago } from '@/shared/api/config'
-import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { getSiguienteChequeCuenta } from '@/shared/api/tesoreria'
 import { Modal } from '@/shared/ui/Modal'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -9,6 +7,8 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { formatDOP } from '@/lib/formatters'
 import type { PagoContadoDto } from '@/shared/api/types'
+import { useOpcionesLista, useOpcionesArray } from '@/shared/hooks/useOpciones'
+import { reglasCuentaBancaria, cuentasElegibles, chequeManual } from '@/lib/pagoBancario'
 
 interface Props {
   open: boolean
@@ -48,30 +48,18 @@ export function PagoContadoModal({ open, onClose, outstandingAmount, postingDate
     if (open) referenceNoTocado.current = false
   }, [open])
 
-  const { data: metodos } = useQuery({
-    queryKey: ['metodos-pago'],
-    queryFn: listMetodosPago,
-    enabled: open,
-  })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, enabled: open })
   const metodoSeleccionado = (metodos ?? []).find((m) => m.name === modeOfPayment)
   // Se infiere enteramente de la config del método de pago (Config > Métodos de Pago) — no hay
   // checkbox manual, el backend siempre lo fuerza si el método está marcado como cheque. Elegir
   // una cuenta bancaria por sí solo NO implica cheque (a diferencia del criterio legacy de
   // RegistrarPagoPage) — solo la config del método decide.
-  const esCheque = !!metodoSeleccionado?.esCheque
-  const showBankAccount = esCheque || !!metodoSeleccionado?.requiresBankAccount
+  const { esCheque, mostrarCuenta: showBankAccount, cuentaObligatoria: bankAccountRequired, tieneCuentaPorDefecto } = reglasCuentaBancaria(metodoSeleccionado)
 
-  const { data: cuentasBancarias } = useQuery({
-    queryKey: ['cuentas-bancarias-activas'],
-    queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
-    enabled: open && showBankAccount,
-  })
+  const { data: cuentasBancarias } = useOpcionesLista('cuentas-bancarias', { limit: 100, enabled: open && showBankAccount })
 
   const cuentaSeleccionada = cuentasBancarias?.items.find((c) => c.id === bankAccount)
-  // Un cheque siempre requiere indicar de qué cuenta sale, sin importar defaultBankAccount —
-  // ese default solo exime al método de pago cuando NO es cheque (ver PagoContadoDto.esCheque).
-  const bankAccountRequired = esCheque || (showBankAccount && !metodoSeleccionado?.defaultBankAccount)
-  const cuentaChequesManuales = cuentaSeleccionada?.chequesManuales ?? true
+  const cuentaChequesManuales = chequeManual(cuentaSeleccionada)
 
   const { data: siguienteCheque } = useQuery({
     queryKey: ['tesoreria-siguiente-cheque-cuenta', bankAccount],
@@ -165,11 +153,9 @@ export function PagoContadoModal({ open, onClose, outstandingAmount, postingDate
                 referenceNoTocado.current = false
                 setReferenceNo('')
               }}
-              placeholder={metodoSeleccionado?.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
+              placeholder={tieneCuentaPorDefecto ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
             >
-              {(cuentasBancarias?.items ?? [])
-                // Un cheque solo puede emitirse contra una cuenta corriente.
-                .filter((c) => !esCheque || c.tipoCuenta === 'Cuenta Corriente')
+              {cuentasElegibles(cuentasBancarias?.items ?? [], metodoSeleccionado)
                 .map((c) => (
                   <SelectItem key={c.id} value={c.id}>{c.accountName}</SelectItem>
                 ))}

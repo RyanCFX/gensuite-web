@@ -6,17 +6,16 @@ import { format, addDays } from 'date-fns'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createOrdenCompra, updateOrdenCompra, getOrdenCompra } from '@/shared/api/ordenes-compra'
-import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
+import { getSupplier } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
-import { listSucursales } from '@/shared/api/sucursales'
 import { todayIso } from '@/lib/formatters'
 import type { CreateOrdenCompraDto, Item, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
-import { getItem } from '@/shared/api/catalog'
+import { getItemLookup } from '@/shared/api/catalog'
 import { Plus, Trash2, Save, Loader2, Info } from 'lucide-react'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -31,6 +30,8 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useAlmacenCompraDefault } from '@/shared/hooks/useAlmacenCompraDefault'
+import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -103,7 +104,6 @@ export default function OrdenForm() {
 
   const [supplierId, setSupplierId] = useState('')
   const [supplierName, setSupplierName] = useState('')
-  const [supplierQuery, setSupplierQuery] = useState('')
   const [transactionDate, setTransactionDate] = useState(todayIso())
   const [scheduleDate, setScheduleDate] = useState('')
   const [currency, setCurrency] = useState('DOP')
@@ -134,27 +134,13 @@ export default function OrdenForm() {
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['supplierSearch', supplierQuery],
-    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
-    enabled: true,
-  })
-  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
-    value: s.id,
-    label: s.supplierName,
-    sublabel: s.rnc ?? s.cedula,
-  }))
 
   const { data: warehousesAll } = useQuery({
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
     enabled: !branch,
   })
-  const { data: warehousesForBranch } = useQuery({
-    queryKey: ['almacenes', { branch }],
-    queryFn: () => listAlmacenes({ branch }),
-    enabled: !!branch,
-  })
+  const { data: warehousesForBranch } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch })
   const warehouses = branch ? warehousesForBranch : warehousesAll
 
   const warehouseSelectOptions: SearchSelectOption[] = useMemo(() => {
@@ -178,22 +164,13 @@ export default function OrdenForm() {
     enabled: !!authUser?.email,
     staleTime: 60_000,
   })
-  const { data: allSucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    enabled: isSystemManager,
-    staleTime: 60_000,
-  })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
   const branchOptions = useMemo(
     () => (isSystemManager
       ? (allSucursales?.items.map((s) => s.name) ?? [])
       : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],
   )
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchSelectOptions: SearchSelectOption[] = branchOptions
-    .filter((b) => !branchSearch || b.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((b) => ({ value: b, label: b }))
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
@@ -216,7 +193,7 @@ export default function OrdenForm() {
     enabled: !!supplierId,
     staleTime: 5 * 60_000,
   })
-  const supplierTerms = (suppliersData?.items ?? []).find((s) => s.id === supplierId) ?? supplierDetail
+  const supplierTerms = supplierDetail
   const supplierDiasCredito = supplierTerms?.diasCredito ?? 0
   // Misma regla que CompraForm: sin días de crédito no hay crédito posible.
   const supplierTipoPagoPrevisto = !supplierDiasCredito
@@ -275,7 +252,7 @@ export default function OrdenForm() {
   useEffect(() => {
     if (!ordenData) return
     let cancelled = false
-    Promise.all(ordenData.items.map((oi) => getItem(oi.itemCode).catch(() => null))).then((catalogItems) => {
+    Promise.all(ordenData.items.map((oi) => getItemLookup(oi.itemCode).catch(() => null))).then((catalogItems) => {
       if (cancelled) return
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
@@ -421,7 +398,7 @@ export default function OrdenForm() {
         itemCode: catalogItem.id,
         itemLabel: catalogItem.itemName,
         description: catalogItem.internalDescription ?? catalogItem.itemName,
-        rate: catalogItem.valuationRate ?? catalogItem.standardRate ?? 0,
+        rate: 0 /* costo no disponible vía lookup: se digita */,
         uom: catalogItem.stockUom ?? row.uom,
         // Un artículo nuevo en la fila implica una combinación nueva.
         itemDimensionesDeclaradas: catalogItem.usaDimensiones ? catalogItem.dimensiones : undefined,
@@ -432,7 +409,7 @@ export default function OrdenForm() {
     // El picker puede no traer `dimensiones` — solo el detalle las garantiza (§4.3). Si faltan,
     // se completan para habilitar la columna de dimensión.
     if (!catalogItem.dimensiones || catalogItem.dimensiones.length === 0) {
-      getItem(catalogItem.id).then((detail) => {
+      getItemLookup(catalogItem.id).then((detail) => {
         if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
         setItems((prev) => prev.map((row, i) =>
           i === idx && row.itemCode === catalogItem.id && !(row.itemDimensionesDeclaradas?.length)
@@ -485,27 +462,12 @@ export default function OrdenForm() {
               <div className="form-row form-row-3">
                 <div className="ff-wrap">
                   <label className="ff-label">Proveedor <span className="ff-required">*</span></label>
-                  <SearchSelect
-                    id="supplier"
-                    value={supplierId}
-                    selectedLabel={supplierName}
-                    onChange={(sid, opt) => {
+                  <OpcionesSelect recurso="proveedores" id="supplier" value={supplierId} onChange={(sid, opt) => {
                       const resolvedId = sid === '' ? '' : (opt?.value ?? sid)
                       setSupplierId(resolvedId)
                       setSupplierName(opt?.label ?? '')
-                      // Default inmediato desde el listado (igual que en compras/nueva);
-                      // el detalle (supplierDetail) lo refuerza vía efecto si faltara.
-                      const selected = suppliersData?.items.find((s) => s.id === resolvedId)
-                      if (selected && !currencyTouched && selected.defaultCurrency) {
-                        setCurrency(selected.defaultCurrency)
-                      }
-                    }}
-                    options={supplierOptions}
-                    onSearch={setSupplierQuery}
-                    loading={suppliersLoading}
-                    placeholder="Buscar proveedor…"
-                    error={!supplierId}
-                  />
+                      // La moneda por defecto del proveedor la aplica el efecto sobre supplierDetail.
+                    }} placeholder="Buscar proveedor…" error={!supplierId} selectedLabel={supplierName} minChars={2} />
                 </div>
 
                 <div className="ff-wrap">
@@ -539,16 +501,7 @@ export default function OrdenForm() {
 
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal</label>
-                  <SearchSelect
-                    value={branch}
-                    onChange={(val) => { setBranch(val); setBranchError(false) }}
-                    options={branchSelectOptions}
-                    onSearch={setBranchSearch}
-                    selectedLabel={branch}
-                    placeholder="Sin especificar"
-                    error={branchError}
-                    disabled={branchOptions.length === 1}
-                  />
+                  <OpcionesSelect recurso="sucursales" value={branch} onChange={(val) => { setBranch(val); setBranchError(false) }} placeholder="Sin especificar" error={branchError} disabled={branchOptions.length === 1} selectedLabel={branch} />
                 </div>
 
                 {supplierTerms && (

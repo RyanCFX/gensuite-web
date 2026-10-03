@@ -6,12 +6,12 @@ import { toast } from 'sonner'
 import { addDays, format as formatDateFns } from 'date-fns'
 import { useTabs } from '@/contexts/TabsContext'
 import { createGasto, updateGasto, getGasto } from '@/shared/api/compras-gastos'
-import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
+import { getSupplier } from '@/shared/api/suppliers'
 import type { CreateGastoDto, DistribucionCuentaDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { getCatalogosFiscales, getFacturacionConfig, getCuentasEmpresa, listImpuestosCompras } from '@/shared/api/config'
-import { listMonedas, getTasaVigente } from '@/shared/api/monedas'
+import { getTasaVigente } from '@/shared/api/monedas'
 import type { MonedaCode } from '@/shared/api/types'
 import { getCuenta } from '@/shared/api/cuentas'
 import { CATEGORIA_GASTO } from '@/lib/constants'
@@ -27,7 +27,6 @@ import type { MultiSearchSelectOption } from '@/shared/ui/MultiSearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import type { Item, CuentaPorPagar } from '@/shared/api/types'
 import { getUsuarioSucursales } from '@/shared/api/usuarios'
-import { listSucursales } from '@/shared/api/sucursales'
 import { getCachedUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
@@ -40,6 +39,8 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
+import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 interface ItemRow {
   itemCode: string
@@ -128,7 +129,6 @@ export default function GastoForm() {
   const [esProveedorOcasional, setEsProveedorOcasional] = useState(false)
   const [proveedorOcasionalNombre, setProveedorOcasionalNombre] = useState('')
   const [proveedorOcasionalRnc, setProveedorOcasionalRnc] = useState('')
-  const [supplierQuery, setSupplierQuery] = useState('')
   const [postingDate, setPostingDate] = useState(formatDateFns(new Date(), 'yyyy-MM-dd'))
   const [dueDate, setDueDate] = useState('')
   // Una vez que el usuario edita "Fecha Vencimiento" a mano dejamos de recalcularla
@@ -160,7 +160,6 @@ export default function GastoForm() {
   // defecto del proveedor.
   const [retenciones, setRetenciones] = useState<string[]>([])
   const [branch, setBranch] = useState('')
-  const [branchSearch, setBranchSearch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
   const [serverMessage, setServerMessage] = useState<string | null>(null)
@@ -178,13 +177,8 @@ export default function GastoForm() {
   // ── Multimoneda (docs/tasks/60_multimoneda_dop_usd_eur.md §4) ──────────────
   const [selectedCurrency, setSelectedCurrency] = useState('')
   const [conversionRate, setConversionRate] = useState<number | ''>('')
-  const { data: monedas } = useQuery({
-    queryKey: ['monedas'],
-    queryFn: listMonedas,
-    enabled: multimonedaHabilitada,
-    staleTime: 5 * 60_000,
-  })
-  const monedasHabilitadasOptions = (monedas ?? []).filter((m) => m.habilitada)
+  const { data: monedas } = useOpcionesArray('monedas', { limit: 100, enabled: multimonedaHabilitada, staleTime: 5 * 60_000 })
+  const monedasHabilitadasOptions = (monedas ?? [])
   const { data: tasaVigente } = useQuery({
     queryKey: ['monedas-tasa-vigente', selectedCurrency, monedaBase],
     queryFn: () => getTasaVigente({ from: selectedCurrency as MonedaCode, to: monedaBase as MonedaCode }),
@@ -214,22 +208,11 @@ export default function GastoForm() {
     enabled: !!currentUserEmail,
     staleTime: 60_000,
   })
-  const { data: allSucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    enabled: isSystemManager,
-    staleTime: 60_000,
-  })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
   const branchOptions = useMemo(
     () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],
   )
-  const branchSelectOptions: SearchSelectOption[] = useMemo(() => {
-    const q = branchSearch.toLowerCase()
-    return branchOptions
-      .filter((b) => !q || b.toLowerCase().includes(q))
-      .map((b) => ({ value: b, label: b }))
-  }, [branchOptions, branchSearch])
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
@@ -350,17 +333,7 @@ export default function GastoForm() {
     staleTime: 5 * 60_000,
   })
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['supplierSearch', supplierQuery],
-    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
-    enabled: true,
-  })
 
-  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
-    value: s.id,
-    label: s.supplierName,
-    sublabel: s.rnc ?? s.cedula,
-  }))
 
   const { data: supplierDetail } = useQuery({
     queryKey: ['supplier', supplierId],
@@ -731,17 +704,7 @@ export default function GastoForm() {
                       placeholder="Nombre del proveedor ocasional"
                     />
                   ) : (
-                    <SearchSelect
-                      id="supplier"
-                      value={supplierId}
-                      selectedLabel={supplierLabel}
-                      onChange={(newId, opt) => { setSupplierId(newId === '' ? '' : (opt?.value ?? newId)); setSupplierLabel(opt?.label ?? '') }}
-                      options={supplierOptions}
-                      onSearch={setSupplierQuery}
-                      loading={suppliersLoading}
-                      placeholder="Buscar proveedor…"
-                      error={!supplierId}
-                    />
+                    <OpcionesSelect recurso="proveedores" id="supplier" value={supplierId} onChange={(newId, opt) => { setSupplierId(newId === '' ? '' : (opt?.value ?? newId)); setSupplierLabel(opt?.label ?? '') }} placeholder="Buscar proveedor…" error={!supplierId} selectedLabel={supplierLabel} minChars={2} />
                   )}
                 </div>
                 {esProveedorOcasional && (
@@ -797,17 +760,7 @@ export default function GastoForm() {
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal <span className="ff-required">*</span></label>
-                  <SearchSelect
-                    id="branch"
-                    value={branch}
-                    selectedLabel={branch}
-                    error={!branch || branchError}
-                    onChange={(val) => { setBranch(val); setBranchError(false) }}
-                    options={branchSelectOptions}
-                    onSearch={setBranchSearch}
-                    placeholder="Sin especificar"
-                    disabled={branchOptions.length === 1}
-                  />
+                  <OpcionesSelect recurso="sucursales" id="branch" value={branch} onChange={(val) => { setBranch(val); setBranchError(false) }} placeholder="Sin especificar" error={!branch || branchError} disabled={branchOptions.length === 1} selectedLabel={branch} />
                   {branchError && <span className="ff-error">Debes seleccionar una sucursal para continuar</span>}
                 </div>
                 {usaDepartamentos && (

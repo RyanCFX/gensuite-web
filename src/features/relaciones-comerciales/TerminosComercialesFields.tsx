@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { TerminosComercialesDto } from '@/shared/api/types'
-import { listGruposProveedores, getCatalogosFiscales } from '@/shared/api/config'
-import { listCustomerGroups } from '@/shared/api/customers'
-import { listUsuarios } from '@/shared/api/usuarios'
+import { getCatalogosFiscales } from '@/shared/api/config'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 // Formulario compartido de "Términos comerciales" — mismo shape (`TerminosComercialesDto`, Fase
 // 01 §2.3) que usan tres pantallas distintas: el paso 2 del wizard de "Nueva relación comercial",
@@ -34,26 +33,7 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
     onChange({ ...value, [key]: next })
   }
 
-  const { data: gruposClientesData, isLoading: gruposClientesLoading } = useQuery({
-    queryKey: ['customer-groups'],
-    queryFn: listCustomerGroups,
-    staleTime: 60_000,
-  })
-  const gruposClientesOptions: SearchSelectOption[] = (gruposClientesData ?? []).map((g) => ({
-    value: g.name,
-    label: g.name,
-  }))
 
-  const { data: gruposProveedoresData, isLoading: gruposProveedoresLoading } = useQuery({
-    queryKey: ['grupos-proveedores'],
-    queryFn: listGruposProveedores,
-    staleTime: 60_000,
-  })
-  const gruposProveedoresOptions: SearchSelectOption[] = (gruposProveedoresData ?? []).map((g) => ({
-    value: g.name,
-    label: g.name,
-    sublabel: g.parentGroup ? `Sub de: ${g.parentGroup}` : undefined,
-  }))
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
@@ -70,15 +50,6 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
     .filter((t) => !formaPago606Search || t.label.toLowerCase().includes(formaPago606Search.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 
-  const { data: usuariosData } = useQuery({
-    queryKey: ['usuarios-all'],
-    queryFn: () => listUsuarios({ limit: 100 }),
-    staleTime: 60_000,
-  })
-  const [encargadoCxcSearch, setEncargadoCxcSearch] = useState('')
-  const encargadoCxcOptions: SearchSelectOption[] = (usuariosData?.items ?? [])
-    .filter((u) => !encargadoCxcSearch || u.fullName.toLowerCase().includes(encargadoCxcSearch.toLowerCase()) || u.email.toLowerCase().includes(encargadoCxcSearch.toLowerCase()))
-    .map((u) => ({ value: u.email, label: u.fullName, sublabel: u.email }))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -125,16 +96,7 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
       <div className="form-row">
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-grupoCliente">Grupo de cliente</label>
-          <SearchSelect
-            id="tc-grupoCliente"
-            value={value.grupoCliente ?? ''}
-            onChange={(id) => set('grupoCliente', id || undefined)}
-            options={gruposClientesOptions}
-            onSearch={() => {}}
-            loading={gruposClientesLoading}
-            disabled={disabled}
-            placeholder="Buscar grupo…"
-          />
+          <OpcionesSelect recurso="grupos-clientes" id="tc-grupoCliente" value={value.grupoCliente ?? ''} onChange={(id) => set('grupoCliente', id || undefined)} placeholder="Buscar grupo…" disabled={disabled} />
         </div>
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-cuentaCxcAlterna">Cuenta CxC alterna</label>
@@ -152,15 +114,7 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
       <div className="form-row">
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-encargadoCxc">Encargado de CxC</label>
-          <SearchSelect
-            id="tc-encargadoCxc"
-            value={value.encargadoCxc ?? ''}
-            onChange={(id) => set('encargadoCxc', id || undefined)}
-            options={encargadoCxcOptions}
-            onSearch={setEncargadoCxcSearch}
-            disabled={disabled}
-            placeholder="Buscar usuario…"
-          />
+          <OpcionesSelect recurso="usuarios" id="tc-encargadoCxc" value={value.encargadoCxc ?? ''} onChange={(id) => set('encargadoCxc', id || undefined)} placeholder="Buscar usuario…" disabled={disabled} />
         </div>
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-formaPagoDefault">Forma de pago por defecto</label>
@@ -182,16 +136,7 @@ export function TerminosComercialesFields({ value, onChange, disabled = false }:
       <div className="form-row">
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-grupoProveedor">Grupo de proveedor</label>
-          <SearchSelect
-            id="tc-grupoProveedor"
-            value={value.grupoProveedor ?? ''}
-            onChange={(id) => set('grupoProveedor', id || undefined)}
-            options={gruposProveedoresOptions}
-            onSearch={() => {}}
-            loading={gruposProveedoresLoading}
-            disabled={disabled}
-            placeholder="Buscar grupo…"
-          />
+          <OpcionesSelect recurso="grupos-proveedores" id="tc-grupoProveedor" value={value.grupoProveedor ?? ''} onChange={(id) => set('grupoProveedor', id || undefined)} placeholder="Buscar grupo…" disabled={disabled} />
         </div>
         <div className="ff-wrap">
           <label className="ff-label" htmlFor="tc-diasCreditoProveedor">Días de crédito (proveedor)</label>

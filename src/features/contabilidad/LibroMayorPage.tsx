@@ -4,16 +4,14 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { BookText, Download, Loader2 } from 'lucide-react'
 import { getLibroMayor, downloadLibroMayorPdf, type LibroMayorParams, type GlReportRow } from '@/shared/api/libroMayor'
-import { listSucursales } from '@/shared/api/sucursales'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { classifyGlRow } from '@/shared/lib/glLedger'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const LIBRO_MAYOR_COLUMNS = [
   { key: 'fecha', width: 100 },
@@ -104,15 +102,6 @@ export default function LibroMayorPage() {
 
   const { widths: colWidths, startResize } = useResizableColumns(LIBRO_MAYOR_COLUMNS)
 
-  const [branchQuery, setBranchQuery] = useState('')
-  const { data: sucursalesData } = useQuery({
-    queryKey: ['sucursales-libro-mayor', branchQuery],
-    queryFn: () => listSucursales({ limit: 100 }),
-    staleTime: 60_000,
-  })
-  const branchOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
-    .filter((s) => !branchQuery || s.name.toLowerCase().includes(branchQuery.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
 
   const [queryParams, setQueryParams] = useState<LibroMayorParams | null>(null)
 
@@ -188,14 +177,7 @@ export default function LibroMayorPage() {
             </div>
             <div className="ff-wrap" style={{ minWidth: 200 }}>
               <label className="ff-label">Sucursal</label>
-              <SearchSelect
-                value={branch}
-                selectedLabel={branch}
-                onChange={setBranch}
-                options={branchOptions}
-                onSearch={setBranchQuery}
-                placeholder="Todas las sucursales"
-              />
+              <OpcionesSelect recurso="sucursales" value={branch} onChange={setBranch} placeholder="Todas las sucursales" selectedLabel={branch} />
             </div>
             <div className="ff-wrap" style={{ minWidth: 220 }}>
               <label className="ff-label">Departamento</label>

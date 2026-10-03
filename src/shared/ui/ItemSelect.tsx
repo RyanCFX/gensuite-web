@@ -12,9 +12,11 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { listItems, listCuentasPorPagar } from '@/shared/api/catalog'
+import { lookupItems, listCuentasPorPagar } from '@/shared/api/catalog'
 import { listBundles } from '@/shared/api/bundles'
 import type { Item, Bundle, CuentaPorPagar } from '@/shared/api/types'
+import { getCachedUser, getTenant } from '@/shared/api/storage'
+import { esRecursoNoPermitido } from '@/shared/hooks/useOpciones'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 
@@ -42,7 +44,7 @@ export interface ItemSelectProps {
   /** Excluye del listado los artículos que usan dimensiones de inventario (`usaDimensiones: true`) —
    *  para pickers donde ese tipo de artículo no está soportado (Conteos, Apertura de Inventario,
    *  Carga Inicial de Inventario, componentes de Combo). Filtro client-side sobre el resultado de
-   *  `listItems`; no cambia el comportamiento por defecto de nadie más. */
+   *  `lookupItems`; no cambia el comportamiento por defecto de nadie más. */
   excludeDimensioned?: boolean
   /** Opt-in, no cambia el comportamiento por defecto de nadie más: se llama con el texto tecleado
    *  cada vez que cambia, para que un panel externo (ej. equivalentes por composición — vertical
@@ -72,24 +74,27 @@ export function ItemSelect({
 }: ItemSelectProps) {
   const [query, setQuery] = useState('')
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['itemSearch', query, typeFilter, branch],
+  const { data, isLoading, refetch, error: itemsError } = useQuery({
+    queryKey: ['itemSearch', getTenant()?.slug ?? '', getCachedUser()?.email ?? '', query, typeFilter, branch],
     // `branch` ya filtra a artículos con stock en almacenes de esa sucursal — combinarlo con
     // `validateStock` hace que el backend devuelva 0 resultados, así que se omite validateStock
     // cuando ya hay una sucursal seleccionada (branch cubre esa validación).
     queryFn: () => {
-      const params: Parameters<typeof listItems>[0] = { search: query || undefined, disabled: 'false', limit: 15 }
+      const params: Parameters<typeof lookupItems>[0] = { search: query || undefined, disabled: 'false', limit: 15 }
       if (typeFilter) params.type = typeFilter
       if (branch) {
         params.branch = branch
       } else if (validateStock) {
         params.validateStock = true
       }
-      return listItems(params)
+      return lookupItems(params)
     },
     enabled: !excludeItems,
     staleTime: 30_000,
+    retry: false,
   })
+  // 403 RECURSO_NO_PERMITIDO (sin `lookup.articulos`): el buscador queda deshabilitado.
+  const sinAccesoArticulos = !excludeItems && !includeBundles && !includeCuentasPorPagar && esRecursoNoPermitido(itemsError)
 
   const { data: bundlesData, isLoading: bundlesLoading, refetch: refetchBundles } = useQuery({
     queryKey: ['bundleSearch', query],
@@ -117,7 +122,7 @@ export function ItemSelect({
   const handleEnterWithoutMatch = async (typed: string) => {
     if (excludeItems) return
     if (!/^\d+$/.test(typed)) return
-    const params: Parameters<typeof listItems>[0] = {
+    const params: Parameters<typeof lookupItems>[0] = {
       barcode: typed,
       disabled: 'false',
       limit: 15,
@@ -128,7 +133,7 @@ export function ItemSelect({
     } else if (validateStock) {
       params.validateStock = true
     }
-    const res = await listItems(params)
+    const res = await lookupItems(params)
     const item = res.items?.[0]
     if (!item || (excludeDimensioned && item.usaDimensiones)) { toast.error(`Código de barras no encontrado: ${typed}`); return }
     if (item.hasVariants && onVariantSelect) { onVariantSelect(item); return }
@@ -190,8 +195,8 @@ export function ItemSelect({
       }}
       onEnterWithoutMatch={handleEnterWithoutMatch}
       loading={(!excludeItems && isLoading) || (!!includeBundles && bundlesLoading) || (!!includeCuentasPorPagar && cuentasPorPagarLoading)}
-      placeholder={placeholder}
-      disabled={disabled}
+      placeholder={sinAccesoArticulos ? 'No tiene acceso a esta lista' : placeholder}
+      disabled={disabled || sinAccesoArticulos}
     />
   )
 }

@@ -7,7 +7,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, Upload, ChevronLeft, ChevronRight, Ban } from 'lucide-react'
 import { listAperturaVentas, cancelarAperturaVenta } from '@/shared/api/apertura'
-import { listCustomers } from '@/shared/api/customers'
 import type { FacturaAperturaVenta } from '@/shared/api/types'
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate, formatMoney } from '@/lib/formatters'
@@ -15,11 +14,10 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { FilterField } from '@/shared/ui/FilterField'
 import { DatePicker } from '@/shared/ui/DatePicker'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useDebounce } from '@/lib/useDebounce'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const PAGE_SIZE = 20
 
@@ -45,7 +43,6 @@ export default function VentasListPage() {
   const [search, setSearch] = useState('')
   const [customerId, setCustomerId] = useState('')
   const [customerLabel, setCustomerLabel] = useState('')
-  const [customerQuery, setCustomerQuery] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
@@ -55,11 +52,6 @@ export default function VentasListPage() {
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
 
-  const { data: customersData, isLoading: customersLoading } = useQuery({
-    queryKey: ['aperturaCustomerFilterSearch', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-  })
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({ value: c.id, label: c.customerName }))
 
   const { data, isLoading } = useQuery({
     queryKey: ['apertura-ventas', { debouncedSearch, customerId, fromDate, toDate, offset }],
@@ -116,17 +108,7 @@ export default function VentasListPage() {
               <FilterField label="Buscar">
                 <input className="ff-input filter-select" placeholder="Referencia, NCF…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
               </FilterField>
-              <FilterField label="Cliente" style={{ width: 220 }}>
-                <SearchSelect
-                  value={customerId}
-                  selectedLabel={customerLabel}
-                  onChange={(id, opt) => { setCustomerId(id); setCustomerLabel(opt?.label ?? ''); setPage(1) }}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={customersLoading}
-                  placeholder="Todos los clientes"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Cliente" filterStyle={{ width: 220 }} recurso="clientes" value={customerId} onChange={(id, opt) => { setCustomerId(id); setCustomerLabel(opt?.label ?? ''); setPage(1) }} selectedLabel={customerLabel} placeholder="Todos los clientes" minChars={2} />
               <FilterField label="Desde">
                 <DatePicker className="ff-input" value={fromDate} onChange={(v) => { setFromDate(v); setPage(1) }} clearable />
               </FilterField>

@@ -3,8 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listCounts, getCountTemplate, createCount, submitCount, type CountTemplateItem } from '@/shared/api/counts'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listSucursales } from '@/shared/api/sucursales'
-import { listAlmacenes } from '@/shared/api/config'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatDate, formatNumber, todayIso } from '@/lib/formatters'
 import type { InventoryCount } from '@/shared/api/types'
@@ -15,6 +13,8 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Plus, ClipboardList, Send, AlertTriangle } from 'lucide-react'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 const COUNTS_COLUMNS = [
   { key: 'id', width: 100 },
@@ -66,17 +66,8 @@ export default function CountsPage() {
     queryFn: listWarehouses,
   })
 
-  const { data: sucursales } = useQuery({
-    queryKey: ['sucursales', 'for-count'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    enabled: showNewDialog,
-  })
 
-  const { data: almacenes } = useQuery({
-    queryKey: ['almacenes', 'for-count'],
-    queryFn: () => listAlmacenes(),
-    enabled: showNewDialog,
-  })
+  const { data: almacenes } = useOpcionesArray('almacenes', { limit: 100, enabled: showNewDialog })
 
   // Mapa almacén (warehouse) -> sucursal, para detectar mezcla de sucursales en las líneas
   const warehouseToBranch = useMemo(() => {
@@ -92,10 +83,6 @@ export default function CountsPage() {
     .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
     .map((w) => ({ value: w.name, label: w.name }))
 
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchOptions: SearchSelectOption[] = (sucursales?.items ?? [])
-    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((s) => ({ value: s.id, label: s.name }))
 
   const usedBranches = useMemo(() => {
     const set = new Set<string>()
@@ -330,14 +317,7 @@ export default function CountsPage() {
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal (opcional)</label>
                   <div style={{ maxWidth: 260 }}>
-                    <SearchSelect
-                      value={branch}
-                      onChange={setBranch}
-                      options={branchOptions}
-                      onSearch={setBranchSearch}
-                      selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
-                      placeholder="Auto (según almacenes)"
-                    />
+                    <OpcionesSelect recurso="sucursales" value={branch} onChange={setBranch} placeholder="Auto (según almacenes)" />
                   </div>
                 </div>
 

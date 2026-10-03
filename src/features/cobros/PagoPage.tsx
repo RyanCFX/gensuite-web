@@ -5,9 +5,8 @@ import { toast } from 'sonner'
 import { registerPago } from '@/shared/api/cobros'
 import { listInvoices } from '@/shared/api/invoices'
 import { listPedidos } from '@/shared/api/pedidos'
-import { listCustomers } from '@/shared/api/customers'
-import { listMetodosPago, getLayawayConfig, getFacturacionConfig } from '@/shared/api/config'
-import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
+import { getCustomer } from '@/shared/api/customers'
+import { getLayawayConfig, getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { CheckCircle2, AlertTriangle, Wallet, PackageOpen } from 'lucide-react'
@@ -15,13 +14,15 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { formatDOP, formatMoney, todayIso } from '@/lib/formatters'
 import { getUsuarioSucursales } from '@/shared/api/usuarios'
-import { listSucursales } from '@/shared/api/sucursales'
 import { getCachedUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { reglasCuentaBancaria } from '@/lib/pagoBancario'
 
 const FACTURAS_COLUMNS = [
   { key: 'checked', width: 36 },
@@ -65,7 +66,6 @@ export default function PagoPage() {
   const { widths: apartadosColWidths, startResize: startResizeApartados } = useResizableColumns(APARTADOS_COLUMNS)
 
   const [customerId, setCustomerId] = useState('')
-  const [customerQuery, setCustomerQuery] = useState('')
   const [paidAmount, setPaidAmount] = useState<number>(0)
   const [modeOfPayment, setModeOfPayment] = useState('')
   const [bankAccount, setBankAccount] = useState('')
@@ -78,7 +78,6 @@ export default function PagoPage() {
   const [advancePayment, setAdvancePayment] = useState(false)
   const [pedidoReferencias, setPedidoReferencias] = useState<PedidoReferenciaRow[]>([])
   const [branch, setBranch] = useState('')
-  const [branchSearch, setBranchSearch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
 
@@ -108,22 +107,11 @@ export default function PagoPage() {
     enabled: !!currentUserEmail,
     staleTime: 60_000,
   })
-  const { data: allSucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    enabled: isSystemManager,
-    staleTime: 60_000,
-  })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
   const branchOptions = useMemo(
     () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],
   )
-  const branchSelectOptions: SearchSelectOption[] = useMemo(() => {
-    const q = branchSearch.toLowerCase()
-    return branchOptions
-      .filter((b) => !q || b.toLowerCase().includes(q))
-      .map((b) => ({ value: b, label: b }))
-  }, [branchOptions, branchSearch])
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
@@ -136,19 +124,13 @@ export default function PagoPage() {
 
   // ── Customer search ──────────────────────────────────────────────────────
 
-  const { data: customersData, isLoading: customersLoading } = useQuery({
-    queryKey: ['customerSearch', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-    enabled: true,
+  const { data: customerDetail } = useQuery({
+    queryKey: ['customer', customerId],
+    queryFn: () => getCustomer(customerId),
+    enabled: !!customerId,
+    staleTime: 60_000,
   })
 
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
-    sublabel: c.rnc ?? c.cedula,
-  }))
-
-  // ── Pending invoices for selected customer ───────────────────────────────
 
   const { data: invoicesData, isLoading: invoicesLoading } = useQuery({
     queryKey: ['invoices-pending', customerId],
@@ -232,10 +214,7 @@ export default function PagoPage() {
 
   // ── Métodos de pago ──────────────────────────────────────────────────────
 
-  const { data: metodos } = useQuery({
-    queryKey: ['metodos-pago'],
-    queryFn: listMetodosPago,
-  })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100 })
   const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState('')
   const modeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
     .filter((m) => !m.disabled)
@@ -243,13 +222,9 @@ export default function PagoPage() {
     .map((m) => ({ value: m.name, label: m.name }))
 
   const metodoSeleccionado = (metodos ?? []).find((m) => m.name === modeOfPayment)
-  const requiresBankAccount = metodoSeleccionado?.requiresBankAccount && !metodoSeleccionado.defaultBankAccount
+  const { mostrarCuenta, cuentaObligatoria: requiresBankAccount, tieneCuentaPorDefecto } = reglasCuentaBancaria(metodoSeleccionado)
 
-  const { data: cuentasBancarias } = useQuery({
-    queryKey: ['cuentas-bancarias-activas'],
-    queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
-    enabled: !!metodoSeleccionado?.requiresBankAccount,
-  })
+  const { data: cuentasBancarias } = useOpcionesLista('cuentas-bancarias', { limit: 100, enabled: mostrarCuenta })
   const [bankAccountSearch, setBankAccountSearch] = useState('')
   const bankAccountOptions: SearchSelectOption[] = (cuentasBancarias?.items ?? [])
     .filter((c) => !bankAccountSearch || c.accountName.toLowerCase().includes(bankAccountSearch.toLowerCase()))
@@ -279,7 +254,7 @@ export default function PagoPage() {
   // anticipado (sin factura referenciada) esa moneda sigue siendo la del cliente — se cae a
   // `Customer.defaultCurrency`, igual que hace el backend al resolver moneda de un documento nuevo.
   const cobroCurrency = referencias.find((r) => r.currency)?.currency
-    ?? customersData?.items.find((c) => c.id === customerId)?.defaultCurrency
+    ?? customerDetail?.defaultCurrency
     ?? undefined
 
   // "Caso triangular" (doc 64 §4.1): si la moneda del cobro y la del banco son ambas distintas
@@ -452,7 +427,7 @@ export default function PagoPage() {
                 />
               </div>
 
-              {metodoSeleccionado?.requiresBankAccount && (
+              {mostrarCuenta && (
                 <div className="ff-wrap">
                   <label className="ff-label">
                     Cuenta Bancaria {requiresBankAccount && <span className="ff-required">*</span>}
@@ -463,7 +438,7 @@ export default function PagoPage() {
                     options={bankAccountOptions}
                     onSearch={setBankAccountSearch}
                     selectedLabel={cuentasBancarias?.items.find((c) => c.id === bankAccount)?.accountName ?? ''}
-                    placeholder={metodoSeleccionado.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
+                    placeholder={tieneCuentaPorDefecto ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
                     error={requiresBankAccount && !bankAccount}
                   />
                 </div>
@@ -582,32 +557,12 @@ export default function PagoPage() {
                 <label className="ff-label">
                   Cliente <span className="ff-required">*</span>
                 </label>
-                <SearchSelect
-                  id="customer"
-                  value={customerId}
-                  onChange={(id, opt) => setCustomerId(id === '' ? '' : (opt?.value ?? id))}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={customersLoading}
-                  placeholder="Buscar cliente…"
-                  error={!customerId}
-                />
+                <OpcionesSelect recurso="clientes" id="customer" value={customerId} onChange={(id, opt) => setCustomerId(id === '' ? '' : (opt?.value ?? id))} placeholder="Buscar cliente…" error={!customerId} minChars={2} />
               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>
-                <SearchSelect
-                  id="branch"
-                  value={branch}
-                  selectedLabel={branch}
-                  error={!branch || branchError}
-                  onChange={(val) => { setBranch(val); setBranchError(false) }}
-                  options={branchSelectOptions}
-                  onSearch={setBranchSearch}
-                  placeholder="Sin especificar"
-                  className="ff-select"
-                  disabled={branchOptions.length === 1}
-                />
+                <OpcionesSelect recurso="sucursales" id="branch" value={branch} onChange={(val) => { setBranch(val); setBranchError(false) }} placeholder="Sin especificar" error={!branch || branchError} disabled={branchOptions.length === 1} className="ff-select" selectedLabel={branch} />
                 {branchError && <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal para continuar</p>}
               </div>
 

@@ -6,9 +6,8 @@ import { useTabs } from '@/contexts/TabsContext'
 import { createPago, getPagosPendientes } from '@/shared/api/pagos'
 import { getSiguienteChequeCuenta } from '@/shared/api/tesoreria'
 import { SaldoFavorProveedorPagosSection } from './SaldoFavorProveedorPagosSection'
-import { listSuppliers } from '@/shared/api/suppliers'
-import { listMetodosPago, getFacturacionConfig } from '@/shared/api/config'
-import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
+import { getSupplier } from '@/shared/api/suppliers'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { CheckCircle2, AlertTriangle, Wallet } from 'lucide-react'
@@ -16,7 +15,6 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { formatDOP, todayIso } from '@/lib/formatters'
 import { getUsuarioSucursales } from '@/shared/api/usuarios'
-import { listSucursales } from '@/shared/api/sucursales'
 import { getCachedUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
@@ -24,6 +22,9 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { reglasCuentaBancaria, cuentasElegibles, chequeManual } from '@/lib/pagoBancario'
 
 const REFERENCIAS_COLUMNS = [
   { key: 'check', width: 36 },
@@ -51,7 +52,6 @@ export default function RegistrarPagoPage() {
 
   const [supplierId, setSupplierId] = useState(preselectSupplier)
   const [supplierLabel, setSupplierLabel] = useState('')
-  const [supplierQuery, setSupplierQuery] = useState('')
   const [paidAmount, setPaidAmount] = useState<number>(0)
   const [modeOfPayment, setModeOfPayment] = useState('')
   const [bankAccount, setBankAccount] = useState('')
@@ -64,7 +64,6 @@ export default function RegistrarPagoPage() {
   const [manualRefs, setManualRefs] = useState<Record<string, number>>({})
   const [advancePayment, setAdvancePayment] = useState(false)
   const [branch, setBranch] = useState('')
-  const [branchSearch, setBranchSearch] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [department, setDepartment] = useState('')
   const { widths: referenciasColWidths, startResize: startReferenciasResize } = useResizableColumns(REFERENCIAS_COLUMNS)
@@ -93,22 +92,11 @@ export default function RegistrarPagoPage() {
     enabled: !!currentUserEmail,
     staleTime: 60_000,
   })
-  const { data: allSucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    enabled: isSystemManager,
-    staleTime: 60_000,
-  })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
   const branchOptions = useMemo(
     () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],
   )
-  const branchSelectOptions: SearchSelectOption[] = useMemo(() => {
-    const q = branchSearch.toLowerCase()
-    return branchOptions
-      .filter((b) => !q || b.toLowerCase().includes(q))
-      .map((b) => ({ value: b, label: b }))
-  }, [branchOptions, branchSearch])
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
@@ -121,25 +109,17 @@ export default function RegistrarPagoPage() {
 
   // ── Supplier search ───────────────────────────────────────────────────────
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['supplierSearch', supplierQuery],
-    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
-    enabled: true,
+  const { data: supplierDetail } = useQuery({
+    queryKey: ['supplier', supplierId],
+    queryFn: () => getSupplier(supplierId),
+    enabled: !!supplierId,
+    staleTime: 60_000,
   })
 
-  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
-    value: s.id,
-    label: s.supplierName,
-    sublabel: s.rnc ?? s.cedula,
-  }))
-
-  // Si venimos con un proveedor preseleccionado (desde "Facturas Pendientes de
-  // Pago"), resolvemos su nombre para mostrarlo en el selector.
   useEffect(() => {
     if (!preselectSupplier) return
-    const found = suppliersData?.items.find((s) => s.id === preselectSupplier)
-    if (found) setSupplierLabel(found.supplierName)
-  }, [preselectSupplier, suppliersData])
+    if (supplierDetail && supplierDetail.id === preselectSupplier) setSupplierLabel(supplierDetail.supplierName)
+  }, [preselectSupplier, supplierDetail])
 
   // ── Facturas pendientes del proveedor seleccionado ───────────────────────
 
@@ -170,10 +150,7 @@ export default function RegistrarPagoPage() {
 
   // ── Métodos de pago ──────────────────────────────────────────────────────
 
-  const { data: metodos } = useQuery({
-    queryKey: ['metodos-pago'],
-    queryFn: listMetodosPago,
-  })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100 })
   const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState('')
   const modeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
     .filter((m) => !m.disabled)
@@ -184,24 +161,16 @@ export default function RegistrarPagoPage() {
   // Se infiere enteramente de la config del método de pago (Config > Métodos de Pago) — el
   // backend lo fuerza sin importar lo que envíe este formulario. Elegir una cuenta bancaria por
   // sí solo NO implica cheque — solo la config del método decide.
-  const esCheque = !!metodoSeleccionado?.esCheque
-  const showBankAccountField = !!metodoSeleccionado?.requiresBankAccount || esCheque
-  const requiresBankAccount = esCheque || (metodoSeleccionado?.requiresBankAccount && !metodoSeleccionado.defaultBankAccount)
+  const { esCheque, mostrarCuenta: showBankAccountField, cuentaObligatoria: requiresBankAccount, tieneCuentaPorDefecto } = reglasCuentaBancaria(metodoSeleccionado)
 
-  const { data: cuentasBancarias } = useQuery({
-    queryKey: ['cuentas-bancarias-activas'],
-    queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
-    enabled: showBankAccountField,
-  })
+  const { data: cuentasBancarias } = useOpcionesLista('cuentas-bancarias', { limit: 100, enabled: showBankAccountField })
   const [bankAccountSearch, setBankAccountSearch] = useState('')
-  const bankAccountOptions: SearchSelectOption[] = (cuentasBancarias?.items ?? [])
-    // Un cheque solo puede emitirse contra una cuenta corriente.
-    .filter((c) => !esCheque || c.tipoCuenta === 'Cuenta Corriente')
+  const bankAccountOptions: SearchSelectOption[] = cuentasElegibles(cuentasBancarias?.items ?? [], metodoSeleccionado)
     .filter((c) => !bankAccountSearch || c.accountName.toLowerCase().includes(bankAccountSearch.toLowerCase()))
     .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))
 
   const cuentaSeleccionada = cuentasBancarias?.items.find((c) => c.id === bankAccount)
-  const cuentaChequesManuales = cuentaSeleccionada?.chequesManuales ?? true
+  const cuentaChequesManuales = chequeManual(cuentaSeleccionada)
 
   const { data: siguienteCheque } = useQuery({
     queryKey: ['tesoreria-siguiente-cheque-cuenta', bankAccount],
@@ -280,7 +249,7 @@ export default function RegistrarPagoPage() {
   // sin convertir. `GET /pagos/pendientes` no expone la moneda de la factura (gap de API), así
   // que se aproxima con `Supplier.defaultCurrency` del proveedor seleccionado (Fase 2 del doc).
   const monedaBase = facturacionConfig?.monedaBase
-  const pagoCurrency = suppliersData?.items.find((s) => s.id === supplierId)?.defaultCurrency ?? undefined
+  const pagoCurrency = supplierDetail?.defaultCurrency ?? undefined
   const bankCurrency = cuentaSeleccionada?.currency
   const triangularCase = !!monedaBase && !!pagoCurrency && !!bankCurrency
     && pagoCurrency !== monedaBase && bankCurrency !== monedaBase && bankCurrency !== pagoCurrency
@@ -440,7 +409,7 @@ export default function RegistrarPagoPage() {
                     options={bankAccountOptions}
                     onSearch={setBankAccountSearch}
                     selectedLabel={cuentasBancarias?.items.find((c) => c.id === bankAccount)?.accountName ?? ''}
-                    placeholder={metodoSeleccionado?.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
+                    placeholder={tieneCuentaPorDefecto ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
                     error={requiresBankAccount && !bankAccount}
                   />
                 </div>
@@ -573,33 +542,12 @@ export default function RegistrarPagoPage() {
                 <label className="ff-label">
                   Proveedor <span className="ff-required">*</span>
                 </label>
-                <SearchSelect
-                  id="supplier"
-                  value={supplierId}
-                  selectedLabel={supplierLabel}
-                  onChange={(id, opt) => { setSupplierId(id === '' ? '' : (opt?.value ?? id)); setSupplierLabel(opt?.label ?? '') }}
-                  options={supplierOptions}
-                  onSearch={setSupplierQuery}
-                  loading={suppliersLoading}
-                  placeholder="Buscar proveedor…"
-                  error={!supplierId}
-                />
+                <OpcionesSelect recurso="proveedores" id="supplier" value={supplierId} onChange={(id, opt) => { setSupplierId(id === '' ? '' : (opt?.value ?? id)); setSupplierLabel(opt?.label ?? '') }} placeholder="Buscar proveedor…" error={!supplierId} selectedLabel={supplierLabel} minChars={2} />
               </div>
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>
-                <SearchSelect
-                  id="branch"
-                  value={branch}
-                  selectedLabel={branch}
-                  error={!branch || branchError}
-                  onChange={(val) => { setBranch(val); setBranchError(false) }}
-                  options={branchSelectOptions}
-                  onSearch={setBranchSearch}
-                  placeholder="Sin especificar"
-                  className="ff-select"
-                  disabled={branchOptions.length === 1}
-                />
+                <OpcionesSelect recurso="sucursales" id="branch" value={branch} onChange={(val) => { setBranch(val); setBranchError(false) }} placeholder="Sin especificar" error={!branch || branchError} disabled={branchOptions.length === 1} className="ff-select" selectedLabel={branch} />
                 {branchError && <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal para continuar</p>}
               </div>
 

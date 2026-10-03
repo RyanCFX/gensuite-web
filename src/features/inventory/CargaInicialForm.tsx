@@ -9,8 +9,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, AlertTriangle, Plus, Trash2 } from 'lucide-react'
 import { crearCargaInicial } from '@/shared/api/cargaInicial'
-import { listAlmacenes, getCuentasEmpresa } from '@/shared/api/config'
-import { listSucursales } from '@/shared/api/sucursales'
+import { getCuentasEmpresa } from '@/shared/api/config'
 import { getFacturacionConfig } from '@/shared/api/config'
 import type { CargaInicialItemDto, CrearCargaInicialDto, CargaInicialInventario, Item } from '@/shared/api/types'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
@@ -24,6 +23,8 @@ import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { Modal } from '@/shared/ui/Modal'
 import { formatMoney } from '@/lib/formatters'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { useOpcionesLista, useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 function today(): string {
   const d = new Date()
@@ -59,7 +60,6 @@ export default function CargaInicialForm() {
     { key: 'actions', width: 40 },
   ]
   const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
-  const [branchQuery, setBranchQuery] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [created, setCreated] = useState<CargaInicialInventario | null>(null)
@@ -82,21 +82,10 @@ export default function CargaInicialForm() {
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
 
-  const { data: sucursalesData } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    staleTime: 60_000,
-  })
+  const { data: sucursalesData } = useOpcionesLista('sucursales', { limit: 100, staleTime: 60_000 })
   const mostrarSucursal = (sucursalesData?.items.length ?? 0) > 1
-  const branchOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
-    .filter((s) => !branchQuery || s.name.toLowerCase().includes(branchQuery.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
 
-  const { data: almacenes } = useQuery({
-    queryKey: ['almacenes-all'],
-    queryFn: () => listAlmacenes(),
-    staleTime: 60_000,
-  })
+  const { data: almacenes } = useOpcionesArray('almacenes', { limit: 100, staleTime: 60_000 })
   const warehouseOptions: SearchSelectOption[] = (almacenes ?? [])
     .filter((a) => !a.disabled && (!warehouseSearch || a.name.toLowerCase().includes(warehouseSearch.toLowerCase())))
     .map((a) => ({ value: a.id, label: a.name }))
@@ -228,14 +217,7 @@ export default function CargaInicialForm() {
               {mostrarSucursal && (
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal</label>
-                  <SearchSelect
-                    value={branch}
-                    onChange={setBranch}
-                    options={branchOptions}
-                    onSearch={setBranchQuery}
-                    selectedLabel={branch}
-                    placeholder="Auto (según almacenes)"
-                  />
+                  <OpcionesSelect recurso="sucursales" value={branch} onChange={setBranch} placeholder="Auto (según almacenes)" selectedLabel={branch} />
                 </div>
               )}
               {usaDepartamentos && (

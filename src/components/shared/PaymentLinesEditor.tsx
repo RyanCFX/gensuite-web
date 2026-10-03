@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { listMetodosPago, listBancos, listDenominaciones } from '@/shared/api/config'
-import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
+import { listBancos, listDenominaciones } from '@/shared/api/config'
 import {
   emptyPaymentLine,
   sumPayments,
@@ -20,6 +19,8 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { formatMoney } from '@/lib/formatters'
 import { useMetodoPagoCurrencies } from '@/shared/hooks/useMetodoPagoCurrencies'
 import { Plus, Trash2, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
+import { useOpcionesLista, useOpcionesArray } from '@/shared/hooks/useOpciones'
+import { reglasCuentaBancaria, cuentasElegibles } from '@/lib/pagoBancario'
 
 function calcularVuelto(monto: number, denominaciones: { denominacion: string; valor: number }[]): VueltoLineDraft[] {
   const sorted = [...denominaciones].sort((a, b) => b.valor - a.valor)
@@ -48,14 +49,10 @@ interface PaymentLinesEditorProps {
 }
 
 export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP' }: PaymentLinesEditorProps) {
-  const { data: metodos } = useQuery({ queryKey: ['metodos-pago'], queryFn: listMetodosPago, staleTime: 5 * 60_000 })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, staleTime: 5 * 60_000 })
   const { data: bancos } = useQuery({ queryKey: ['bancos'], queryFn: listBancos, staleTime: 5 * 60_000 })
   const { data: denominaciones } = useQuery({ queryKey: ['denominaciones'], queryFn: listDenominaciones, staleTime: 5 * 60_000 })
-  const { data: cuentasBancarias } = useQuery({
-    queryKey: ['cuentas-bancarias-activas'],
-    queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
-    staleTime: 60_000,
-  })
+  const { data: cuentasBancarias } = useOpcionesLista('cuentas-bancarias', { limit: 100, staleTime: 60_000 })
 
   const [metodoSearch, setMetodoSearch] = useState<Record<number, string>>({})
   const [bancoSearch, setBancoSearch] = useState<Record<number, string>>({})
@@ -202,22 +199,23 @@ export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP
 
               {(() => {
                 const metodo = metodosActivos.find((m) => m.name === p.modeOfPayment)
-                if (!metodo?.requiresBankAccount) return null
+                const reglas = reglasCuentaBancaria(metodo)
+                if (!reglas.mostrarCuenta) return null
                 return (
                   <div className="ff-wrap">
                     <label className="ff-label">
-                      Cuenta Bancaria{!metodo.defaultBankAccount && <span className="ff-required"> *</span>}
+                      Cuenta Bancaria{reglas.cuentaObligatoria && <span className="ff-required"> *</span>}
                     </label>
                     <SearchSelect
                       value={p.bankAccount}
-                      error={!metodo.defaultBankAccount && !p.bankAccount}
+                      error={reglas.cuentaObligatoria && !p.bankAccount}
                       onChange={(val) => updateLine(idx, { bankAccount: val })}
-                      options={(cuentasBancarias?.items ?? [])
+                      options={cuentasElegibles(cuentasBancarias?.items ?? [], metodo)
                         .filter((c) => !bankAccountSearch[idx] || c.accountName.toLowerCase().includes(bankAccountSearch[idx].toLowerCase()))
                         .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))}
                       onSearch={(q) => setBankAccountSearch((prev) => ({ ...prev, [idx]: q }))}
                       selectedLabel={cuentasBancarias?.items.find((c) => c.id === p.bankAccount)?.accountName ?? ''}
-                      placeholder={metodo.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
+                      placeholder={reglas.tieneCuentaPorDefecto ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
                     />
                   </div>
                 )

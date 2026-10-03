@@ -3,17 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Lock } from 'lucide-react'
 import { listTurnos, type ListTurnosParams } from '@/shared/api/pos'
-import { listUsuarios } from '@/shared/api/usuarios'
 import { formatDateTime, formatDOP } from '@/lib/formatters'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { CerrarTurnoModal } from '@/components/shared/CerrarTurnoModal'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import type { TurnoListItem } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const PAGE_SIZE = 20
 
@@ -46,7 +44,6 @@ export default function TurnosPage() {
   const queryClient = useQueryClient()
   const [cajero, setCajero] = useState('')
   const [cajeroLabel, setCajeroLabel] = useState('')
-  const [cajeroQuery, setCajeroQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -58,15 +55,6 @@ export default function TurnosPage() {
 
   const offset = (page - 1) * PAGE_SIZE
 
-  const { data: usuariosData, isLoading: usuariosLoading } = useQuery({
-    queryKey: ['usuariosSearch', cajeroQuery],
-    queryFn: () => listUsuarios({ search: cajeroQuery || undefined, limit: 15 }),
-  })
-  const cajeroOptions: SearchSelectOption[] = (usuariosData?.items ?? []).map((u) => ({
-    value: u.email,
-    label: u.fullName,
-    sublabel: u.email,
-  }))
 
   const params: ListTurnosParams = {
     cajero: cajero || undefined,
@@ -106,17 +94,7 @@ export default function TurnosPage() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <FilterField label="Cajero" style={{ width: 240 }}>
-                <SearchSelect
-                  value={cajero}
-                  selectedLabel={cajeroLabel}
-                  onChange={(val, opt) => { setCajero(val); setCajeroLabel(opt?.label ?? ''); setPage(1) }}
-                  options={cajeroOptions}
-                  onSearch={setCajeroQuery}
-                  loading={usuariosLoading}
-                  placeholder="Filtrar por cajero…"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Cajero" filterStyle={{ width: 240 }} recurso="usuarios" value={cajero} onChange={(val, opt) => { setCajero(val); setCajeroLabel(opt?.label ?? ''); setPage(1) }} selectedLabel={cajeroLabel} placeholder="Filtrar por cajero…" />
               <FilterField label="Estado">
                 <Select value={status} onValueChange={(val) => { setStatus(val as StatusFilter); setPage(1) }}>
                   <SelectItem value="all">Todos los estados</SelectItem>

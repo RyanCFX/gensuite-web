@@ -9,8 +9,7 @@ import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/rea
 import { toast } from 'sonner'
 import { ArrowLeft, ClipboardCheck } from 'lucide-react'
 import { getConfirmacion, confirmarSolicitud } from '@/shared/api/despachos'
-import { getItem } from '@/shared/api/catalog'
-import { listAlmacenes } from '@/shared/api/config'
+import { getItemLookup } from '@/shared/api/catalog'
 import { PageHeader } from '@/components/shared/PageHeader'
 import type { ApiError, ConfirmarStockDespachoItemDto, ConfirmarStockDespachoResult } from '@/shared/api/types'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
@@ -21,6 +20,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 const STATUS_BADGE: Record<string, string> = {
   Pendiente: 'badge-warning',
@@ -50,7 +50,7 @@ export default function ConfirmacionDespachoDetail() {
   const itemQueries = useQueries({
     queries: codesConTracking.map((code) => ({
       queryKey: ['item-tracking-type', code],
-      queryFn: () => getItem(code),
+      queryFn: () => getItemLookup(code),
       staleTime: 5 * 60_000,
     })),
   })
@@ -58,11 +58,7 @@ export default function ConfirmacionDespachoDetail() {
     itemQueries.map((q) => q.data).filter((it): it is NonNullable<typeof it> => !!it).map((it) => [it.id, it.trackingType] as const),
   )
 
-  const { data: almacenesData } = useQuery({
-    queryKey: ['almacenes-confirmar-despacho'],
-    queryFn: () => listAlmacenes(),
-    enabled: !!solicitud,
-  })
+  const { data: almacenesData } = useOpcionesArray('almacenes', { limit: 100, enabled: !!solicitud })
   const warehouseOptions = (almacenesData ?? [])
     .filter((a) => !a.disabled)
     .filter((a) => !warehouseSearch || a.name.toLowerCase().includes(warehouseSearch.toLowerCase()))

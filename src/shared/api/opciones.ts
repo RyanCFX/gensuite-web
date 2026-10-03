@@ -1,4 +1,4 @@
-import { client } from './client'
+import { client, conSilencio403 } from './client'
 import { ENDPOINTS } from './endpoints'
 import type { OpcionItem } from './types'
 
@@ -16,7 +16,8 @@ function normalizeOpciones(raw: unknown): OpcionItem[] {
         const o = item as { value?: unknown; label?: unknown; name?: unknown }
         const value = o.value ?? o.name
         if (typeof value !== 'string') return null
-        return { value, label: typeof o.label === 'string' ? o.label : value }
+        // Conserva los extras del recurso (tax_id, stock_uom…) además de value/label.
+        return { ...(item as object), value, label: typeof o.label === 'string' ? o.label : value } as OpcionItem
       }
       if (typeof item === 'string') return { value: item, label: item }
       return null
@@ -27,6 +28,8 @@ function normalizeOpciones(raw: unknown): OpcionItem[] {
 export interface OpcionesParams {
   q?: string
   limit?: number
+  /** Solo en `almacenes`: filtra por sucursal (se combina con las sucursales asignadas al usuario). */
+  branch?: string
   /** No mostrar el toast global si la request da 403 (el llamador oculta el control). */
   silent403?: boolean
 }
@@ -39,9 +42,7 @@ export interface OpcionesParams {
  */
 export async function getOpciones(recurso: string, params?: OpcionesParams): Promise<OpcionItem[]> {
   const { silent403, ...query } = params ?? {}
-  const res = await client.get<{ success: true; data: unknown }>(ENDPOINTS.opciones.porRecurso(recurso), {
-    params: query,
-    ...(silent403 ? { silent403: true } : {}),
-  } as Parameters<typeof client.get>[1])
+  const get = () => client.get<{ success: true; data: unknown }>(ENDPOINTS.opciones.porRecurso(recurso), { params: query })
+  const res = await (silent403 ? conSilencio403(get) : get())
   return normalizeOpciones(res.data.data)
 }

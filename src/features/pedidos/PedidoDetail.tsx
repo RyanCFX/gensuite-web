@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, Fragment } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getPedido, getPedidoVersion, submitPedido, cancelPedido, amendPedido, downloadPedidoPdf, facturarApartado, cancelarApartado } from '@/shared/api/pedidos'
-import { listMetodosPago, getFacturacionConfig } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { crearDespachoDesdePedido } from '@/shared/api/despachos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
@@ -15,6 +15,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ESTADO_FLUJO_BADGE, ESTADO_FLUJO_LABEL } from './estadoFlujo'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 const ITEMS_COLUMNS = [
   { key: 'codigo', width: 100 },
@@ -103,12 +104,7 @@ export default function PedidoDetail() {
     && !pedido.despachoFuturo
   const pendienteConfirmarDespacho = elegibleParaConfirmarDespacho && !pedido?.despachoConfirmado
 
-  const { data: metodos } = useQuery({
-    queryKey: ['metodos-pago'],
-    queryFn: listMetodosPago,
-    enabled: cancelApartadoOpen,
-    staleTime: 5 * 60_000,
-  })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, enabled: cancelApartadoOpen, staleTime: 5 * 60_000 })
   const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState('')
   const modeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
     .filter((m) => !m.disabled)

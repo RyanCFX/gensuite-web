@@ -10,7 +10,6 @@ import { SortableTh } from '@/shared/ui/SortableTh'
 import { useAuthStore } from '@/stores/auth.store'
 import { Select, SelectItem } from '@/components/ui/select'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
-import { fallbackAlmacenes, fallbackSucursales } from '@/shared/api/opcionesFallback'
 import { useFiltrosPantalla } from '@/shared/permissions/useAcceso'
 import { FilterField } from '@/shared/ui/FilterField'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
@@ -146,7 +145,6 @@ export default function StockPage() {
                   onChange={(val) => { setWarehouse(val || 'all'); if (val) setBranch('') }}
                   selectedLabel={warehouse === 'all' ? '' : warehouse}
                   placeholder="Todos los almacenes"
-                  fallback={fallbackAlmacenes}
                 />
               )}
               {warehouse === 'all' && filtros.puedeFiltrar('branch') && (
@@ -156,7 +154,6 @@ export default function StockPage() {
                     onChange={setBranch}
                     selectedLabel={branch}
                     placeholder="Todas las sucursales"
-                    fallback={fallbackSucursales}
                   />
               )}
               <FilterField label="Categoría / nombre">

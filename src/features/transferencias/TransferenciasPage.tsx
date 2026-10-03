@@ -4,8 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { listTransferencias, confirmarTransferencia, cancelarTransferencia } from '@/shared/api/transferencias'
 import type { ListTransferenciasParams } from '@/shared/api/transferencias'
 import type { Transferencia } from '@/shared/api/types'
-import { listAlmacenes } from '@/shared/api/config'
-import { listSucursales } from '@/shared/api/sucursales'
 import { getUsuarioAlmacenesPermitidos } from '@/shared/api/usuarios'
 import { getCachedUser } from '@/shared/api/storage'
 import { formatDate } from '@/lib/formatters'
@@ -14,11 +12,10 @@ import { toast } from 'sonner'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Select, SelectItem } from '@/components/ui/select'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FilterField } from '@/shared/ui/FilterField'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const COLUMNS = [
   { key: 'origen', width: 160 },
@@ -61,27 +58,9 @@ export default function TransferenciasPage() {
 
   const currentUserEmail = getCachedUser()?.email
 
-  const { data: warehousesData } = useQuery({
-    queryKey: ['almacenes-all'],
-    queryFn: () => listAlmacenes(),
-  })
-  const warehouses = warehousesData ?? []
 
-  const { data: sucursalesData } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-  })
-  const sucursales = sucursalesData?.items ?? []
 
-  const [warehouseSearch, setWarehouseSearch] = useState('')
-  const warehouseOptions: SearchSelectOption[] = warehouses
-    .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
-    .map((w) => ({ value: w.name, label: w.name }))
 
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchOptions: SearchSelectOption[] = sucursales
-    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((s) => ({ value: s.id, label: s.name }))
 
   const { data: myWarehouses } = useQuery({
     queryKey: ['usuarioAlmacenesPermitidos', currentUserEmail],
@@ -169,26 +148,8 @@ export default function TransferenciasPage() {
               <SelectItem value="cancelled">Cancelada</SelectItem>
             </Select>
           </FilterField>
-          <FilterField label="Almacén" style={{ width: 200 }}>
-            <SearchSelect
-              value={warehouse}
-              onChange={setWarehouse}
-              options={warehouseOptions}
-              onSearch={setWarehouseSearch}
-              selectedLabel={warehouse}
-              placeholder="Todos los almacenes"
-            />
-          </FilterField>
-          <FilterField label="Sucursal" style={{ width: 200 }}>
-            <SearchSelect
-              value={branch}
-              onChange={setBranch}
-              options={branchOptions}
-              onSearch={setBranchSearch}
-              selectedLabel={sucursales.find((s) => s.id === branch)?.name ?? ''}
-              placeholder="Todas las sucursales"
-            />
-          </FilterField>
+          <OpcionesSelect hideOnForbidden filterLabel="Almacén" filterStyle={{ width: 200 }} recurso="almacenes" value={warehouse} onChange={setWarehouse} selectedLabel={warehouse} placeholder="Todos los almacenes" />
+          <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }} recurso="sucursales" value={branch} onChange={setBranch} placeholder="Todas las sucursales" />
         </div>
       </div>
 

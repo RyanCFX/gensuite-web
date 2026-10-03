@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Search, DollarSign, Trash2, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { listPorCobrar, completarCobro, descartarFactura } from '@/shared/api/caja'
-import { getFacturacionConfig, listMetodosPago, listDenominaciones } from '@/shared/api/config'
+import { getFacturacionConfig, listDenominaciones } from '@/shared/api/config'
 import { getCustomer } from '@/shared/api/customers'
 import { getTurnoActual } from '@/shared/api/pos'
 import { downloadInvoicePdf } from '@/shared/api/invoices'
@@ -39,6 +39,7 @@ import {
 } from '@/lib/paymentLines'
 import type { CobrarFacturaDto, PendienteCobroItem } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 const PAGE_SIZE = 20
 
@@ -92,11 +93,7 @@ export default function PorCobrarPage() {
     staleTime: 5 * 60_000,
   })
 
-  const { data: metodos } = useQuery({
-    queryKey: ['metodos-pago'],
-    queryFn: listMetodosPago,
-    staleTime: 5 * 60_000,
-  })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, staleTime: 5 * 60_000 })
 
   // Misma key que usa PaymentLinesEditor — cache compartido, sin request extra. Hace falta para
   // validar que el desglose del vuelto suma el excedente.

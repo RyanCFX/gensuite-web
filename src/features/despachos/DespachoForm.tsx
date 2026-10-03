@@ -7,8 +7,6 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, Plus, Minus, Trash2 } from 'lucide-react'
 import { crearDespacho } from '@/shared/api/despachos'
-import { listCustomers } from '@/shared/api/customers'
-import { listSucursales } from '@/shared/api/sucursales'
 import { listWarehouses } from '@/shared/api/inventory'
 import { getFacturacionConfig } from '@/shared/api/config'
 import type { Item, DespachoItemDto, ApiError, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
@@ -19,11 +17,13 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
-import { getItem } from '@/shared/api/catalog'
+import { getItemLookup } from '@/shared/api/catalog'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { mergeLineasIguales } from '@/shared/lib/mergeLineasIguales'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 interface ItemRow {
   itemCode: string
@@ -46,9 +46,7 @@ export default function DespachoForm() {
 
   const [customerId, setCustomerId] = useState('')
   const [customerLabel, setCustomerLabel] = useState('')
-  const [customerQuery, setCustomerQuery] = useState('')
   const [branch, setBranch] = useState('')
-  const [branchQuery, setBranchQuery] = useState('')
   const [department, setDepartment] = useState('')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<ItemRow[]>([emptyRow()])
@@ -70,17 +68,9 @@ export default function DespachoForm() {
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
 
-  const { data: customersData, isLoading: customersLoading } = useQuery({
-    queryKey: ['customerSearch-despacho', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-  })
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({ value: c.id, label: c.customerName }))
 
-  const { data: sucursalesData } = useQuery({ queryKey: ['sucursales-all'], queryFn: () => listSucursales({ limit: 100 }) })
+  const { data: sucursalesData } = useOpcionesLista('sucursales', { limit: 100 })
   const mostrarSucursal = (sucursalesData?.items.length ?? 0) > 1
-  const branchOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
-    .filter((s) => !branchQuery || s.name.toLowerCase().includes(branchQuery.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
 
   const { data: warehousesData } = useQuery({ queryKey: ['warehouses'], queryFn: () => listWarehouses() })
   const [warehouseSearch, setWarehouseSearch] = useState('')
@@ -129,7 +119,7 @@ export default function DespachoForm() {
     // El picker puede no traer `dimensiones` — solo el detalle las garantiza (§4.3). Si faltan,
     // se completan para habilitar el selector de combinación.
     if (!item.dimensiones || item.dimensiones.length === 0) {
-      getItem(item.id).then((detail) => {
+      getItemLookup(item.id).then((detail) => {
         if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
         const dims = detail.dimensiones
         setItems((prev) => prev.map((r, i) =>
@@ -198,27 +188,12 @@ export default function DespachoForm() {
             <div className="form-row">
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Cliente</label>
-                <SearchSelect
-                  value={customerId}
-                  selectedLabel={customerLabel}
-                  onChange={(id, opt) => { setCustomerId(id); setCustomerLabel(opt?.label ?? '') }}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={customersLoading}
-                  placeholder="Buscar cliente…"
-                  error={!customerId}
-                />
+                <OpcionesSelect recurso="clientes" value={customerId} onChange={(id, opt) => { setCustomerId(id); setCustomerLabel(opt?.label ?? '') }} placeholder="Buscar cliente…" error={!customerId} selectedLabel={customerLabel} minChars={2} />
               </div>
               {mostrarSucursal && (
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal</label>
-                  <SearchSelect
-                    value={branch}
-                    onChange={setBranch}
-                    options={branchOptions}
-                    onSearch={setBranchQuery}
-                    placeholder="Opcional"
-                  />
+                  <OpcionesSelect recurso="sucursales" value={branch} onChange={setBranch} placeholder="Opcional" />
                 </div>
               )}
               {usaDepartamentos && (

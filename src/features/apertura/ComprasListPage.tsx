@@ -6,7 +6,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Plus, Upload, ChevronLeft, ChevronRight, Ban } from 'lucide-react'
 import { listAperturaCompras, cancelarAperturaCompra } from '@/shared/api/apertura'
-import { listSuppliers } from '@/shared/api/suppliers'
 import type { FacturaAperturaCompra } from '@/shared/api/types'
 import { usePuede } from '@/shared/permissions/can'
 import { formatDate, formatMoney } from '@/lib/formatters'
@@ -14,11 +13,10 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { FilterField } from '@/shared/ui/FilterField'
 import { DatePicker } from '@/shared/ui/DatePicker'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useDebounce } from '@/lib/useDebounce'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const PAGE_SIZE = 20
 
@@ -44,7 +42,6 @@ export default function ComprasListPage() {
   const [search, setSearch] = useState('')
   const [supplierId, setSupplierId] = useState('')
   const [supplierLabel, setSupplierLabel] = useState('')
-  const [supplierQuery, setSupplierQuery] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [page, setPage] = useState(1)
@@ -54,11 +51,6 @@ export default function ComprasListPage() {
   const debouncedSearch = useDebounce(search, 300)
   const offset = (page - 1) * PAGE_SIZE
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['aperturaSupplierFilterSearch', supplierQuery],
-    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
-  })
-  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({ value: s.id, label: s.supplierName }))
 
   const { data, isLoading } = useQuery({
     queryKey: ['apertura-compras', { debouncedSearch, supplierId, fromDate, toDate, offset }],
@@ -115,17 +107,7 @@ export default function ComprasListPage() {
               <FilterField label="Buscar">
                 <input className="ff-input filter-select" placeholder="N° factura, NCF…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
               </FilterField>
-              <FilterField label="Proveedor" style={{ width: 220 }}>
-                <SearchSelect
-                  value={supplierId}
-                  selectedLabel={supplierLabel}
-                  onChange={(id, opt) => { setSupplierId(id); setSupplierLabel(opt?.label ?? ''); setPage(1) }}
-                  options={supplierOptions}
-                  onSearch={setSupplierQuery}
-                  loading={suppliersLoading}
-                  placeholder="Todos los proveedores"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Proveedor" filterStyle={{ width: 220 }} recurso="proveedores" value={supplierId} onChange={(id, opt) => { setSupplierId(id); setSupplierLabel(opt?.label ?? ''); setPage(1) }} selectedLabel={supplierLabel} placeholder="Todos los proveedores" />
               <FilterField label="Desde">
                 <DatePicker className="ff-input" value={fromDate} onChange={(v) => { setFromDate(v); setPage(1) }} clearable />
               </FilterField>

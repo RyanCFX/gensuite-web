@@ -10,8 +10,6 @@ import {
   getCreditNoteSaldoFavor,
 } from '@/shared/api/notes'
 import { listInvoices, getInvoice } from '@/shared/api/invoices'
-import { listMetodosPago } from '@/shared/api/config'
-import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import type { ApiError } from '@/shared/api/types'
 import { formatDate, formatMoney } from '@/lib/formatters'
 import { ConfirmModal } from '@/shared/ui/Modal'
@@ -20,6 +18,8 @@ import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { useOpcionesLista, useOpcionesArray } from '@/shared/hooks/useOpciones'
+import { reglasCuentaBancaria } from '@/lib/pagoBancario'
 
 /** Nota mínima necesaria para los modales de reembolso/aplicación (la usan la tabla y el detalle). */
 export interface CreditNoteActionTarget {
@@ -37,11 +37,7 @@ export function RefundCreditNoteModal({ note, onClose }: { note: CreditNoteActio
   const [refundModeOfPayment, setRefundModeOfPayment] = useState('')
   const [refundBankAccount, setRefundBankAccount] = useState('')
 
-  const { data: metodos } = useQuery({
-    queryKey: ['metodos-pago'],
-    queryFn: listMetodosPago,
-    staleTime: 5 * 60_000,
-  })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, staleTime: 5 * 60_000 })
   const [refundModeOfPaymentSearch, setRefundModeOfPaymentSearch] = useState('')
   const refundModeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
     .filter((m) => !m.disabled)
@@ -49,13 +45,9 @@ export function RefundCreditNoteModal({ note, onClose }: { note: CreditNoteActio
     .map((m) => ({ value: m.name, label: m.name }))
 
   const refundMetodoSeleccionado = (metodos ?? []).find((m) => m.name === refundModeOfPayment)
-  const refundRequiresBankAccount = refundMetodoSeleccionado?.requiresBankAccount && !refundMetodoSeleccionado.defaultBankAccount
+  const { mostrarCuenta: refundMostrarCuenta, cuentaObligatoria: refundRequiresBankAccount, tieneCuentaPorDefecto: refundCuentaPorDefecto } = reglasCuentaBancaria(refundMetodoSeleccionado)
 
-  const { data: refundCuentasBancarias } = useQuery({
-    queryKey: ['cuentas-bancarias-activas'],
-    queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
-    enabled: !!refundRequiresBankAccount,
-  })
+  const { data: refundCuentasBancarias } = useOpcionesLista('cuentas-bancarias', { limit: 100, enabled: refundMostrarCuenta })
   const [refundBankAccountSearch, setRefundBankAccountSearch] = useState('')
   const refundBankAccountOptions: SearchSelectOption[] = (refundCuentasBancarias?.items ?? [])
     .filter((c) => !refundBankAccountSearch || c.accountName.toLowerCase().includes(refundBankAccountSearch.toLowerCase()))
@@ -127,7 +119,7 @@ export function RefundCreditNoteModal({ note, onClose }: { note: CreditNoteActio
               />
             </div>
 
-            {refundMetodoSeleccionado?.requiresBankAccount && (
+            {refundMostrarCuenta && (
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="refundBankAccount">
                   Cuenta Bancaria {refundRequiresBankAccount && <span className="ff-required">*</span>}
@@ -139,8 +131,8 @@ export function RefundCreditNoteModal({ note, onClose }: { note: CreditNoteActio
                   options={refundBankAccountOptions}
                   onSearch={setRefundBankAccountSearch}
                   selectedLabel={refundCuentasBancarias?.items.find((c) => c.id === refundBankAccount)?.accountName ?? ''}
-                  placeholder={refundMetodoSeleccionado.defaultBankAccount ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
-                  error={!!refundRequiresBankAccount && !refundBankAccount}
+                  placeholder={refundCuentaPorDefecto ? 'Usar cuenta por defecto…' : 'Seleccionar cuenta bancaria…'}
+                  error={refundRequiresBankAccount && !refundBankAccount}
                 />
               </div>
             )}

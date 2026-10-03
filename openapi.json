@@ -19323,6 +19323,323 @@
         ]
       }
     },
+    "/api/v1/catalog/items/lookup": {
+      "get": {
+        "description": "No requiere la pantalla Artículos: se permite si algún formulario del usuario depende del recurso `lookup.articulos` (ej. Crear factura). Usar `search` para la búsqueda remota.",
+        "operationId": "ItemsLookupController_buscar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "Filter by category (Item Group name)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "brand",
+            "required": false,
+            "in": "query",
+            "description": "Filter by brand name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "product",
+                "service"
+              ]
+            }
+          },
+          {
+            "name": "disabled",
+            "required": false,
+            "in": "query",
+            "description": "Show disabled items too",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isTemplate",
+            "required": false,
+            "in": "query",
+            "description": "true = solo artículos template (has_variants=1). false = excluye templates.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "variantOf",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar variantes de un template específico por su código",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeVariants",
+            "required": false,
+            "in": "query",
+            "description": "true = incluir variantes en la lista. Default: false (excluye variantes individuales)",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "validateStock",
+            "required": false,
+            "in": "query",
+            "description": "true = solo devolver artículos con stock disponible (\u003E 0) en algún almacén. Solo aplica a productos.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar artículos por sucursal — solo muestra artículos con stock en almacenes de esa sucursal, y desglosa stock por almacén en stockByWarehouse.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stockUom",
+            "required": false,
+            "in": "query",
+            "description": "UOM de stock (stock_uom)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasWarranty",
+            "required": false,
+            "in": "query",
+            "description": "true = solo artículos con garantía (warranty_period \u003E 0). false = sin garantía.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "warrantyPeriodMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "warrantyPeriodMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "pricesMin",
+            "required": false,
+            "in": "query",
+            "description": "Precio mínimo — coincide si CUALQUIERA de las listas de precio (A/B/C) del artículo cae en el rango.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "pricesMax",
+            "required": false,
+            "in": "query",
+            "description": "Precio máximo — coincide si CUALQUIERA de las listas de precio (A/B/C) del artículo cae en el rango.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "priceMode",
+            "required": false,
+            "in": "query",
+            "description": "custom_price_mode: \"manual\" o \"cost_plus\"",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "maxDiscountPctMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "maxDiscountPctMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "trackingType",
+            "required": false,
+            "in": "query",
+            "description": "custom_tracking_type — no aplica el fallback legacy que sí usa el mapeo de respuesta.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "none",
+                "serial",
+                "batch"
+              ]
+            }
+          },
+          {
+            "name": "barcode",
+            "required": false,
+            "in": "query",
+            "description": "Código de barra exacto (match = sobre Item Barcode.barcode). Más rápido que `search` para lectura por scanner.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "principioActivo",
+            "required": false,
+            "in": "query",
+            "description": "name (id) de un Active Ingredient — filtra artículos que lo declaran en su composición. Filtra por child table (Item Active Ingredient): el servicio deduplica antes de contar.",
+            "schema": {
+              "example": "Acetaminofén",
+              "type": "string"
+            }
+          },
+          {
+            "name": "esMedicamento",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por Item.custom_is_medicine",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "formaFarmaceutica",
+            "required": false,
+            "in": "query",
+            "description": "name (id) de un Dosage Form — filtra por Item.custom_dosage_form",
+            "schema": {
+              "example": "Tableta",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.articulos\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buscar artículos para un formulario (mismos filtros y respuesta que GET /catalog/items, sin costos ni márgenes)",
+        "tags": [
+          "Catalog - Items (lookup para formularios)"
+        ]
+      }
+    },
+    "/api/v1/catalog/items/lookup/{id}": {
+      "get": {
+        "operationId": "ItemsLookupController_obtener",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.articulos\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ficha de un artículo para un formulario (incluye stockByWarehouse; sin costos ni márgenes)",
+        "tags": [
+          "Catalog - Items (lookup para formularios)"
+        ]
+      }
+    },
     "/api/v1/dgii/taxpayers/{rnc}": {
       "get": {
         "operationId": "DgiiTaxpayersController_findByRnc",
@@ -23450,7 +23767,7 @@
     },
     "/api/v1/usuarios/{email}/sucursales": {
       "get": {
-        "description": "Si el usuario tiene un rol de bypass (System Manager), `branches` trae TODAS las sucursales del sistema y `allBranches: true` — no tiene asignación explícita, pero en la práctica no está restringido a ninguna (mismo criterio que /almacenes-permitidos). Con `allBranches: false`, `branches` es la asignación explícita real (custom_allowed_branches).",
+        "description": "Un usuario puede consultar sus PROPIAS sucursales sin el permiso `usuarios.listar`. Si el usuario tiene un rol de bypass (System Manager), `branches` trae TODAS las sucursales del sistema y `allBranches: true` — no tiene asignación explícita, pero en la práctica no está restringido a ninguna (mismo criterio que /almacenes-permitidos). Con `allBranches: false`, `branches` es la asignación explícita real (custom_allowed_branches).",
         "operationId": "UsuariosController_getSucursales",
         "parameters": [
           {
@@ -32728,7 +33045,7 @@
     },
     "/api/v1/opciones/{recurso}": {
       "get": {
-        "description": "recurso = clave sin el prefijo \"lookup.\" (ej. sucursales, almacenes, clientes, proveedores, articulos, usuarios, metodos-pago, departamentos, centros-costo, aseguradoras, categorias, marcas, monedas, cuentas-bancarias, grupos-clientes, grupos-proveedores, uom, listas-precio, roles, cuentas, cajas-pos). Permitido si alguno de sus componentes efectivos depende de él — NO requiere la pantalla de administración de esa entidad. `value` es siempre el `name` de ERPNext. Data-scope de sucursales/almacenes: solo los asignados al usuario ([] si no tiene ninguno), salvo System Manager que ve todos.",
+        "description": "recurso = clave sin el prefijo \"lookup.\" (ej. sucursales, almacenes, clientes, proveedores, articulos, usuarios, metodos-pago, departamentos, centros-costo, aseguradoras, categorias, marcas, monedas, cuentas-bancarias, grupos-clientes, grupos-proveedores, uom, listas-precio, roles, cuentas, cajas-pos). Permitido si alguno de sus componentes efectivos depende de él — NO requiere la pantalla de administración de esa entidad. `value` es siempre el `name` de ERPNext. Algunos recursos traen extras (ej. almacenes: `custom_branch`; metodos-pago: `type`, `currency`, `account`; cuentas-bancarias: `currency`, `account`; monedas: `symbol`; uom: `must_be_whole_number`). `currency` es la moneda de la cuenta contable asociada (null si no tiene). Data-scope de sucursales/almacenes: solo los asignados al usuario ([] si no tiene ninguno), salvo System Manager que ve todos.",
         "operationId": "OpcionesController_listar",
         "parameters": [
           {
@@ -32765,6 +33082,15 @@
               "maximum": 100,
               "default": 50,
               "type": "number"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Solo para `almacenes`: devuelve únicamente los almacenes de esta sucursal (se combina con el data-scope del usuario).",
+            "schema": {
+              "type": "string"
             }
           }
         ],

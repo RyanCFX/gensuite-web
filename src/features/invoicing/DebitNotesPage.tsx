@@ -9,7 +9,6 @@ import {
 } from '@/shared/api/notes'
 import { listInvoices } from '@/shared/api/invoices'
 import { getEcfTipos } from '@/shared/api/ecf'
-import { listSucursales } from '@/shared/api/sucursales'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -33,6 +32,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const LIST_COLUMNS = [
   { key: 'id', width: 100 },
@@ -129,20 +129,7 @@ export default function DebitNotesPage() {
   const [refundedAmountMax, setRefundedAmountMax] = useState('')
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
 
-  const { data: sucursalesData } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-  })
-  const sucursales = sucursalesData?.items ?? []
-  const [filterBranchSearch, setFilterBranchSearch] = useState('')
-  const filterBranchOptions: SearchSelectOption[] = sucursales
-    .filter((s) => !filterBranchSearch || s.name.toLowerCase().includes(filterBranchSearch.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
 
-  const [formBranchSearch, setFormBranchSearch] = useState('')
-  const formBranchOptions: SearchSelectOption[] = sucursales
-    .filter((s) => !formBranchSearch || s.name.toLowerCase().includes(formBranchSearch.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
 
   const { data: notesData, isLoading } = useQuery({
     queryKey: [
@@ -324,16 +311,7 @@ export default function DebitNotesPage() {
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <FilterField label="Sucursal" style={{ width: 200 }}>
-                <SearchSelect
-                  value={filterBranch}
-                  onChange={setFilterBranch}
-                  options={filterBranchOptions}
-                  onSearch={setFilterBranchSearch}
-                  selectedLabel={filterBranch}
-                  placeholder="Todas las sucursales"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }} recurso="sucursales" value={filterBranch} onChange={setFilterBranch} selectedLabel={filterBranch} placeholder="Todas las sucursales" />
               <FilterField label="Departamento" style={{ width: 220, maxWidth: '100%' }}>
                 <DepartmentSelect value={filterDepartment} onChange={setFilterDepartment} placeholder="Todos los departamentos" />
               </FilterField>
@@ -629,16 +607,7 @@ export default function DebitNotesPage() {
                 <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                   <div className="ff-wrap" style={{ flex: 1, minWidth: 160 }}>
                     <label className="ff-label" htmlFor="branch-debit">Sucursal</label>
-                    <SearchSelect
-                      id="branch-debit"
-                      value={branch}
-                      onChange={(val) => { setBranch(val); setBranchError(false) }}
-                      options={formBranchOptions}
-                      onSearch={setFormBranchSearch}
-                      selectedLabel={branch}
-                      placeholder="Sin sucursal"
-                      error={branchError}
-                    />
+                    <OpcionesSelect recurso="sucursales" id="branch-debit" value={branch} onChange={(val) => { setBranch(val); setBranchError(false) }} placeholder="Sin sucursal" error={branchError} selectedLabel={branch} />
                     {branchError && (
                       <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal</p>
                     )}

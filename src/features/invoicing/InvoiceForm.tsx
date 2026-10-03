@@ -13,10 +13,10 @@ import {
   type AseguradoraFormState,
 } from './aseguradoraForm'
 import { esCoberturaCompleta } from '@/shared/api/types'
-import { listCustomers, getCustomer } from '@/shared/api/customers'
+import { getCustomer } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
-import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
-import { listAlmacenes, getCatalogosFiscales, getStockSettings, getFacturacionConfig } from '@/shared/api/config'
+import { lookupItems, getDefaultPriceTier, getItemLookup } from '@/shared/api/catalog'
+import { getCatalogosFiscales, getStockSettings, getFacturacionConfig } from '@/shared/api/config'
 import { getItemUbicaciones } from '@/shared/api/ubicaciones'
 import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { DimensionAxisCell, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
@@ -48,7 +48,7 @@ import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
-import { listSucursales, getSucursal } from '@/shared/api/sucursales'
+import { getSucursal } from '@/shared/api/sucursales'
 import { getCachedUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
@@ -62,6 +62,8 @@ import { formatStockInsufficientMessage, formatUomNotAllowedMessage } from '@/li
 import { isPinPrecioError } from '@/lib/pinOverride'
 import { isPrecioCatalogoError, precioBloqueadoParaLinea } from '@/lib/precioCatalogo'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
+import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 type NcfType = string
 
@@ -291,7 +293,6 @@ export default function InvoiceForm() {
   })
 
   const [customerId, setCustomerId] = useState('')
-  const [customerQuery, setCustomerQuery] = useState('')
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [showCreateCustomer, setShowCreateCustomer] = useState(false)
   const [esClienteOcasional, setEsClienteOcasional] = useState(false)
@@ -335,7 +336,6 @@ export default function InvoiceForm() {
   const [department, setDepartment] = useState('')
   const [branchError, setBranchError] = useState(false)
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
-  const [branchSearch, setBranchSearch] = useState('')
   const [warehouseSearch, setWarehouseSearch] = useState('')
   // '' = automático (Cliente.defaultCurrency → moneda base). Al editar (PATCH), se hidrata con
   // la moneda/tasa que la factura ya tenía — reenviarla es equivalente a omitirla.
@@ -438,7 +438,7 @@ export default function InvoiceForm() {
         toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
         return
       }
-      const res = await listItems({ barcode: code, limit: 1, branch })
+      const res = await lookupItems({ barcode: code, limit: 1, branch })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       const existingIndex = items.findIndex((row) => row.itemCode === item.id)
@@ -457,11 +457,6 @@ export default function InvoiceForm() {
   })
 
   // ── Customer search ───────────────────────────────────────────────────────
-  const { data: customersData, isLoading: loadingCustomers } = useQuery({
-    queryKey: ['customerSearch', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-    enabled: true,
-  })
 
   const { data: defaultPriceTier = 'B' } = useQuery({
     queryKey: ['defaultPriceTier'],
@@ -485,23 +480,12 @@ export default function InvoiceForm() {
     enabled: !!currentUserEmail,
     staleTime: 60_000,
   })
-  const { data: allSucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    enabled: isSystemManager,
-    staleTime: 60_000,
-  })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
   const branchOptions = useMemo(
     () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],
   )
 
-  const branchSelectOptions: SearchSelectOption[] = useMemo(() => {
-    const q = branchSearch.toLowerCase()
-    return branchOptions
-      .filter((b) => !q || b.toLowerCase().includes(q))
-      .map((b) => ({ value: b, label: b }))
-  }, [branchOptions, branchSearch])
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
@@ -519,12 +503,7 @@ export default function InvoiceForm() {
   }, [myBranches])
 
   // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
-  const { data: branchWarehouses } = useQuery({
-    queryKey: ['almacenes', { branch }],
-    queryFn: () => listAlmacenes({ branch }),
-    enabled: !!branch,
-    staleTime: 60_000,
-  })
+  const { data: branchWarehouses } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch, staleTime: 60_000 })
 
   // docs/tasks/75_almacen_venta_confirmar_stock_uoms_permitidas.md §1.4 — si la sucursal tiene
   // almacén de venta configurado, TODA venta debe salir de ahí sin excepción: se oculta el
@@ -638,11 +617,6 @@ export default function InvoiceForm() {
     if (branchOptions.length === 1 && branch !== branchOptions[0]) setBranch(branchOptions[0])
   }, [branchOptions, branch])
 
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
-    sublabel: c.rnc ?? c.cedula,
-  }))
 
   function handleCustomerCreated(customer: Customer) {
     setShowCreateCustomer(false)
@@ -930,7 +904,7 @@ export default function InvoiceForm() {
         editingInvoice.items.map(async (it): Promise<LineItem> => {
           let cat: Item | undefined
           try {
-            cat = await getItem(it.itemCode)
+            cat = await getItemLookup(it.itemCode)
           } catch {
             // Sin catálogo la línea sigue siendo editable, solo pierde límites de descuento/stock.
           }
@@ -1102,7 +1076,7 @@ export default function InvoiceForm() {
     // se completan para habilitar la columna de dimensión.
     if (!catalogItem.dimensiones || catalogItem.dimensiones.length === 0) {
       try {
-        const detail = await getItem(catalogItem.id)
+        const detail = await getItemLookup(catalogItem.id)
         if (detail?.usaDimensiones && detail.dimensiones?.length) {
           setItems((prev) => prev.map((row, i) =>
             i === index && row.itemCode === catalogItem.id && !(row._itemDimensiones?.length)
@@ -1173,7 +1147,7 @@ export default function InvoiceForm() {
     Promise.all(
       (bundle.components ?? []).map(async (c) => {
         try {
-          const item = await getItem(c.itemCode)
+          const item = await getItemLookup(c.itemCode)
           if (item.trackingType === 'serial' || item.trackingType === 'batch') {
             return { itemCode: c.itemCode, itemName: item.itemName, trackingType: item.trackingType, qtyPerCombo: c.qty }
           }
@@ -1268,7 +1242,7 @@ export default function InvoiceForm() {
     }
     const index = items.length
     try {
-      const fullItem = await getItem(equivalenteId)
+      const fullItem = await getItemLookup(equivalenteId)
       addRow()
       await selectCatalogItem(index, fullItem, { autoAddRow: false })
     } catch {
@@ -1579,26 +1553,17 @@ persistInvoice(buildInvoiceDto())
                      required={esClienteOcasional}
                    />
                  ) : (
-                   <SearchSelect
-                     id="customer"
-                     value={customerId}
-                     onChange={(val, _opt) => {
+                   <OpcionesSelect recurso="clientes" id="customer" selectedLabel={selectedCustomer?.customerName} value={customerId} onChange={(val, _opt) => {
                        customerTouchedRef.current = true
                        setCustomerId(val)
                        if (!val) {
                          setSelectedCustomer(null)
                          setSemaforo(null)
                        } else {
-                         const match = customersData?.items.find((c) => c.id === val) ?? null
-                         setSelectedCustomer(match)
+                         // /opciones no trae los datos comerciales: se cargan con el detalle (efecto en [customerId]).
+                         setSelectedCustomer(null)
                        }
-                     }}
-                     options={customerOptions}
-                     onSearch={setCustomerQuery}
-                     loading={loadingCustomers}
-                     placeholder="Buscar cliente…"
-                     error={!customerId}
-                     headerContent={
+                     }} placeholder="Buscar cliente…" error={!customerId} headerContent={
                        <button
                          type="button"
                          className="btn btn-ghost btn-size-sm"
@@ -1607,8 +1572,7 @@ persistInvoice(buildInvoiceDto())
                        >
                          <UserPlus size={14} /> Agregar cliente
                        </button>
-                     }
-                   />
+                     } minChars={2} />
                  )}
                  {selectedCustomer && !esClienteOcasional && (
                    <div style={{ marginTop: 6 }}>
@@ -1757,18 +1721,7 @@ persistInvoice(buildInvoiceDto())
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>
-                <SearchSelect
-                  id="branch"
-                  value={branch}
-                  selectedLabel={branch}
-                  error={!branch || branchError}
-                  onChange={(val) => { setBranch(val); setBranchError(false) }}
-                  options={branchSelectOptions}
-                  onSearch={setBranchSearch}
-                  placeholder="Sin especificar"
-                  className="ff-select"
-                  disabled={branchOptions.length === 1}
-                />
+                <OpcionesSelect recurso="sucursales" id="branch" value={branch} onChange={(val) => { setBranch(val); setBranchError(false) }} placeholder="Sin especificar" error={!branch || branchError} disabled={branchOptions.length === 1} className="ff-select" selectedLabel={branch} />
                 {branchError && <p className="ff-hint" style={{ color: 'var(--color-danger)' }}>Debes seleccionar una sucursal para continuar</p>}
               </div>
 

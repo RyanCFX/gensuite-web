@@ -12,8 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
-import { listItems, getItem } from '@/shared/api/catalog'
-import { listAlmacenes } from '@/shared/api/config'
+import { lookupItems, getItemLookup } from '@/shared/api/catalog'
 import { convertirDimension, getStockPorDimension } from '@/shared/api/inventory'
 import type { Item, DimensionesLinea } from '@/shared/api/types'
 import { mostrarErrorApi } from '@/lib/apiErrors'
@@ -24,6 +23,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { todayIso } from '@/lib/formatters'
+import { esRecursoNoPermitido, useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 /** Picker de artículo restringido a ítems que declaran dimensiones (`usaDimensiones: true`) Y
  *  tienen `permiteCompraSinDimension: true` — solo esos participan del flujo (§7.3 paso 1).
@@ -42,11 +42,13 @@ function ItemConversionSelect({
 }) {
   const [query, setQuery] = useState('')
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, refetch, error: itemsError } = useQuery({
+    retry: false,
     queryKey: ['itemSearch-conversion', query],
-    queryFn: () => listItems({ search: query || undefined, disabled: 'false', type: 'product', limit: 20 }),
+    queryFn: () => lookupItems({ search: query || undefined, disabled: 'false', type: 'product', limit: 20 }),
     staleTime: 30_000,
   })
+  const sinAcceso = esRecursoNoPermitido(itemsError)
 
   const itemsElegibles = (data?.items ?? []).filter((i) => i.usaDimensiones === true && i.permiteCompraSinDimension === true)
 
@@ -69,7 +71,8 @@ function ItemConversionSelect({
       onSearch={setQuery}
       onOpen={() => refetch()}
       loading={isLoading}
-      placeholder="Buscar artículo con compra sin dimensión…"
+      placeholder={sinAcceso ? 'No tiene acceso a esta lista' : "Buscar artículo con compra sin dimensión…"}
+      disabled={sinAcceso}
     />
   )
 }
@@ -88,11 +91,7 @@ export default function ConversionDimensionForm() {
   const [branch, setBranch] = useState('')
   const [resultado, setResultado] = useState<{ itemCode: string; warehouse: string; qty: number } | null>(null)
 
-  const { data: almacenes } = useQuery({
-    queryKey: ['almacenes-all'],
-    queryFn: () => listAlmacenes(),
-    staleTime: 60_000,
-  })
+  const { data: almacenes } = useOpcionesArray('almacenes', { limit: 100, staleTime: 60_000 })
   const warehouseOptions: SearchSelectOption[] = (almacenes ?? [])
     .filter((a) => !a.disabled && (!warehouseSearch || a.name.toLowerCase().includes(warehouseSearch.toLowerCase())))
     .map((a) => ({ value: a.id, label: a.name }))
@@ -125,7 +124,7 @@ export default function ConversionDimensionForm() {
     // garantiza. Si faltan, se completan para habilitar la combinación.
     if (!seleccionado.dimensiones || seleccionado.dimensiones.length === 0) {
       try {
-        const detail = await getItem(seleccionado.id)
+        const detail = await getItemLookup(seleccionado.id)
         if (detail?.usaDimensiones && detail.dimensiones?.length) {
           setItem((prev) => prev?.id === seleccionado.id
             ? { ...prev, usaDimensiones: true, dimensiones: detail.dimensiones, permiteCompraSinDimension: detail.permiteCompraSinDimension }

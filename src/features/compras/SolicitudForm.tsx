@@ -6,10 +6,9 @@ import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createSolicitudCompra, updateSolicitudCompra, getSolicitudCompra } from '@/shared/api/solicitudes-compra'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listAlmacenes, getFacturacionConfig } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { todayIso } from '@/lib/formatters'
-import { listSucursales } from '@/shared/api/sucursales'
 import type { CreateSolicitudCompraDto, Item } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -27,6 +26,8 @@ import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -85,11 +86,7 @@ export default function SolicitudForm() {
     queryFn: listWarehouses,
     enabled: !branch,
   })
-  const { data: warehousesForBranch } = useQuery({
-    queryKey: ['almacenes', { branch }],
-    queryFn: () => listAlmacenes({ branch }),
-    enabled: !!branch,
-  })
+  const { data: warehousesForBranch } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch })
   const warehouses = branch ? warehousesForBranch : warehousesAll
 
   const warehouseSelectOptions: SearchSelectOption[] = useMemo(() => {
@@ -113,22 +110,13 @@ export default function SolicitudForm() {
     enabled: !!authUser?.email,
     staleTime: 60_000,
   })
-  const { data: allSucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    enabled: isSystemManager,
-    staleTime: 60_000,
-  })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
   const branchOptions = useMemo(
     () => (isSystemManager
       ? (allSucursales?.items.map((s) => s.name) ?? [])
       : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],
   )
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchSelectOptions: SearchSelectOption[] = branchOptions
-    .filter((b) => !branchSearch || b.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((b) => ({ value: b, label: b }))
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
@@ -266,7 +254,7 @@ export default function SolicitudForm() {
         itemCode: catalogItem.id,
         itemLabel: catalogItem.itemName,
         description: catalogItem.internalDescription ?? catalogItem.itemName,
-        rate: catalogItem.valuationRate ?? catalogItem.standardRate ?? 0,
+        rate: 0 /* costo no disponible vía lookup: se digita */,
         uom: catalogItem.stockUom ?? row.uom,
       }
     }))
@@ -320,16 +308,7 @@ export default function SolicitudForm() {
 
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal</label>
-                  <SearchSelect
-                    value={branch}
-                    onChange={(val) => { setBranch(val); setBranchError(false) }}
-                    options={branchSelectOptions}
-                    onSearch={setBranchSearch}
-                    selectedLabel={branch}
-                    placeholder="Sin especificar"
-                    error={branchError}
-                    disabled={branchOptions.length === 1}
-                  />
+                  <OpcionesSelect recurso="sucursales" value={branch} onChange={(val) => { setBranch(val); setBranchError(false) }} placeholder="Sin especificar" error={branchError} disabled={branchOptions.length === 1} selectedLabel={branch} />
                 </div>
 
                 {usaDepartamentos && (

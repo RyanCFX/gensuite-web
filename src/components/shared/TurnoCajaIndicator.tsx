@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Clock } from 'lucide-react'
 import { getFacturacionConfig } from '@/shared/api/config'
-import { listCajas } from '@/shared/api/cajas'
 import {
   getTurnoActual,
   abrirTurno,
@@ -14,6 +13,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { CerrarTurnoModal } from '@/components/shared/CerrarTurnoModal'
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 export function TurnoCajaIndicator() {
   const queryClient = useQueryClient()
@@ -42,12 +42,7 @@ export function TurnoCajaIndicator() {
     staleTime: 30_000,
   })
 
-  const { data: cajas } = useQuery({
-    queryKey: ['cajas'],
-    queryFn: listCajas,
-    enabled: usaModuloPos && modalOpen,
-    staleTime: 30_000,
-  })
+  const { data: cajas } = useOpcionesArray('cajas-pos', { limit: 100, enabled: usaModuloPos && modalOpen, staleTime: 30_000 })
   const cajasHabilitadas = (cajas ?? []).filter((c) => !c.disabled)
   const posProfileOptions: SearchSelectOption[] = cajasHabilitadas
     .filter((c) => !posProfileSearch || c.label.toLowerCase().includes(posProfileSearch.toLowerCase()))

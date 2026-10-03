@@ -4,9 +4,9 @@ import { useEffectOnActive } from 'keepalive-for-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTabs } from '@/contexts/TabsContext'
 import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from '@/shared/api/pedidos'
-import { listCustomers, getCustomer } from '@/shared/api/customers'
+import { getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
-import { getLayawayConfig, listAlmacenes, getFacturacionConfig, getStockSettings } from '@/shared/api/config'
+import { getLayawayConfig, getFacturacionConfig, getStockSettings } from '@/shared/api/config'
 import type { Item, ItemPrices, CreatePedidoDto, Bundle, Customer, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { mergeLineasIguales } from '@/shared/lib/mergeLineasIguales'
@@ -22,8 +22,6 @@ import { QtyInput } from '@/shared/ui/QtyInput'
 import { formatMoney, round2, formatDate } from '@/lib/formatters'
 import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { Select, SelectItem } from '@/components/ui/select'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, PackageOpen, UserPlus, ChevronDown, RotateCcw, Lock } from 'lucide-react'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
@@ -33,10 +31,10 @@ import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { listItems, getDefaultPriceTier, getItem } from '@/shared/api/catalog'
+import { lookupItems, getDefaultPriceTier, getItemLookup } from '@/shared/api/catalog'
 import { client, isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
-import { listSucursales, getSucursal } from '@/shared/api/sucursales'
+import { getSucursal } from '@/shared/api/sucursales'
 import { getCachedUser } from '@/shared/api/storage'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
@@ -45,6 +43,8 @@ import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { isPinPrecioError } from '@/lib/pinOverride'
 import { isPrecioCatalogoError, precioBloqueadoParaLinea } from '@/lib/precioCatalogo'
+import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 interface LineItem {
   itemCode: string
@@ -137,7 +137,6 @@ const [customerId, setCustomerId] = useState('')
    /** % de descuento por defecto del cliente elegido — solo sugiere el valor al AGREGAR una línea
     *  nueva (selectCatalogItem/selectBundle), nunca reescribe una que el usuario ya haya tocado. */
    const [customerDefaultDiscountPct, setCustomerDefaultDiscountPct] = useState<number | undefined>(undefined)
-   const [customerQuery, setCustomerQuery] = useState('')
    const [showCreateCustomer, setShowCreateCustomer] = useState(false)
    const [esClienteOcasional, setEsClienteOcasional] = useState(false)
    const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
@@ -300,7 +299,7 @@ const [customerId, setCustomerId] = useState('')
         toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
         return
       }
-      const res = await listItems({ barcode: code, limit: 1, branch: despachoHabilitado ? undefined : branch })
+      const res = await lookupItems({ barcode: code, limit: 1, branch: despachoHabilitado ? undefined : branch })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       const existingIndex = items.findIndex((row) => row.itemCode === item.id)
@@ -329,7 +328,7 @@ const [customerId, setCustomerId] = useState('')
       // A diferencia de lo que originalmente documentaba §10.2, GET /quotations/:id SÍ ecoa la
       // combinación de dimensión elegida por línea (confirmado en vivo 2026-09-27) — se usa
       // directamente para precargar este nuevo Pedido.
-      const catalogItems = await Promise.all(q.items.map((i) => getItem(i.itemCode).catch(() => null)))
+      const catalogItems = await Promise.all(q.items.map((i) => getItemLookup(i.itemCode).catch(() => null)))
       setItems(q.items.map((i, idx) => {
         const discountAmount = i.discountAmount ?? 0
         const discountPct = discountAmount > 0 ? 0 : (i.discountPct ?? 0)
@@ -367,7 +366,7 @@ const [customerId, setCustomerId] = useState('')
       // GET /pedidos/:id/duplicate-source tampoco ecoa la combinación de dimensión elegida por línea
       // (§10.2) — se re-consulta el catálogo solo para saber si el artículo USA dimensiones y así
       // mostrar el selector vacío, obligando a reingresar la combinación en este nuevo Pedido.
-      const catalogItems = await Promise.all(src.items.map((i) => getItem(i.itemCode).catch(() => null)))
+      const catalogItems = await Promise.all(src.items.map((i) => getItemLookup(i.itemCode).catch(() => null)))
       setItems(src.items.map((i, idx) => {
         const discountAmount = i.discountAmount ?? 0
         const discountPct = discountAmount > 0 ? 0 : (i.discountPct ?? 0)
@@ -459,7 +458,7 @@ useEffect(() => {
   useEffect(() => {
     if (!existing) return
     let cancelled = false
-    Promise.all(existing.items.map((i) => getItem(i.itemCode).catch(() => null))).then((catalogItems) => {
+    Promise.all(existing.items.map((i) => getItemLookup(i.itemCode).catch(() => null))).then((catalogItems) => {
       if (cancelled) return
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
@@ -475,10 +474,6 @@ useEffect(() => {
     return () => { cancelled = true }
   }, [existing])
 
-  const { data: customersData } = useQuery({
-    queryKey: ['customerSearch', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-  })
   const { data: defaultPriceTier = 'B' } = useQuery({
     queryKey: ['defaultPriceTier'],
     queryFn: getDefaultPriceTier,
@@ -493,7 +488,6 @@ useEffect(() => {
     staleTime: 5 * 60_000,
   })
 
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({ value: c.id, label: c.customerName, sublabel: c.rnc ?? c.cedula }))
 
   function handleCustomerCreated(customer: Customer) {
     setShowCreateCustomer(false)
@@ -512,19 +506,10 @@ useEffect(() => {
     enabled: !!currentUserEmail,
     staleTime: 60_000,
   })
-  const { data: allSucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    enabled: isSystemManager,
-    staleTime: 60_000,
-  })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
   const branchOptions = isSystemManager
     ? (allSucursales?.items.map((s) => s.name) ?? [])
     : (myBranches?.branches ?? [])
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchSelectOptions: SearchSelectOption[] = branchOptions
-    .filter((b) => !branchSearch || b.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((b) => ({ value: b, label: b }))
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch && !isEdit) setBranch(myBranches.defaultBranch)
@@ -537,12 +522,7 @@ useEffect(() => {
   }, [branchOptions, branch, isEdit])
 
   // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
-  const { data: branchWarehouses } = useQuery({
-    queryKey: ['almacenes', { branch }],
-    queryFn: () => listAlmacenes({ branch }),
-    enabled: !!branch,
-    staleTime: 60_000,
-  })
+  const { data: branchWarehouses } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch, staleTime: 60_000 })
 
   // docs/tasks/75_almacen_venta_confirmar_stock_uoms_permitidas.md §1.4 — si la sucursal tiene
   // almacén de venta configurado, TODA venta debe salir de ahí sin excepción: se oculta el
@@ -741,7 +721,7 @@ useEffect(() => {
     // El picker puede no traer `dimensiones` — solo el detalle las garantiza (§4.3). Si faltan,
     // se completan para habilitar la columna de dimensión.
     if (!catalogItem.dimensiones || catalogItem.dimensiones.length === 0) {
-      getItem(catalogItem.id).then((detail) => {
+      getItemLookup(catalogItem.id).then((detail) => {
         if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
         setItems((prev) => prev.map((row, i) =>
           i === index && row.itemCode === catalogItem.id && !(row.itemDimensionesDeclaradas?.length)
@@ -1060,23 +1040,20 @@ try {
                      required={esClienteOcasional}
                    />
                  ) : (
-                   <SearchSelect
-                     value={customerId}
-                     onChange={(id, opt) => {
+                   <OpcionesSelect recurso="clientes" value={customerId} onChange={(id, opt) => {
                        const cid = id === '' ? '' : (opt?.value ?? id)
                        setCustomerId(cid)
                        setCustomerName(opt?.label ?? '')
-                       const c = cid ? customersData?.items?.find((c) => c.id === cid) : undefined
-                       setCustomerPriceTier(c?.priceTier)
-                       setCustomerDefaultDiscountPct(c?.descuentoDefaultPct ?? undefined)
-                     }}
-                     options={customerOptions}
-                     selectedLabel={customerName}
-                     onSearch={setCustomerQuery}
-                     loading={false}
-                     placeholder="Buscar cliente…"
-                     error={submitted && !customerId}
-                     headerContent={
+                       setCustomerPriceTier(undefined)
+                       setCustomerDefaultDiscountPct(undefined)
+                       // /opciones solo trae value/label: tarifa y descuento salen del detalle del cliente.
+                       if (cid) {
+                         getCustomer(cid).then((c) => {
+                           setCustomerPriceTier(c.priceTier)
+                           setCustomerDefaultDiscountPct(c.descuentoDefaultPct ?? undefined)
+                         }).catch(() => {})
+                       }
+                     }} placeholder="Buscar cliente…" error={submitted && !customerId} headerContent={
                        <button
                          type="button"
                          className="btn btn-ghost btn-size-sm"
@@ -1085,8 +1062,7 @@ try {
                        >
                          <UserPlus size={14} /> Agregar cliente
                        </button>
-                     }
-                   />
+                     } selectedLabel={customerName} minChars={2} />
                  )}
                </div>
 
@@ -1184,16 +1160,7 @@ try {
               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Sucursal</label>
-                <SearchSelect
-                  value={branch}
-                  onChange={(val) => { setBranch(val); setBranchError(false) }}
-                  options={branchSelectOptions}
-                  onSearch={setBranchSearch}
-                  selectedLabel={branch}
-                  placeholder="Sin especificar"
-                  error={!branch || branchError}
-                  disabled={branchOptions.length === 1}
-                />
+                <OpcionesSelect recurso="sucursales" value={branch} onChange={(val) => { setBranch(val); setBranchError(false) }} placeholder="Sin especificar" error={!branch || branchError} disabled={branchOptions.length === 1} selectedLabel={branch} />
               </div>
               {usaDepartamentos && (
                 <div className="ff-wrap">

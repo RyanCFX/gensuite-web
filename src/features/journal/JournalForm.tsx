@@ -14,7 +14,6 @@ import { CostCenterSelect } from '@/components/shared/CostCenterSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
-import { listSucursales } from '@/shared/api/sucursales'
 import { getCuenta } from '@/shared/api/cuentas'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatDOP } from '@/lib/formatters'
@@ -22,6 +21,8 @@ import { ArrowLeft, Plus, Trash2, AlertTriangle } from 'lucide-react'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 interface EntryRow {
   id: number
@@ -78,11 +79,7 @@ export default function JournalForm() {
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
 
   const [sucursalQuery, setSucursalQuery] = useState('')
-  const { data: sucursalesData, isLoading: sucursalesLoading } = useQuery({
-    queryKey: ['sucursales-search', sucursalQuery],
-    queryFn: () => listSucursales({ limit: 100 }),
-    staleTime: 30_000,
-  })
+  const { data: sucursalesData, isLoading: sucursalesLoading } = useOpcionesLista('sucursales', { limit: 100, staleTime: 30_000 })
   const sucursalOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
     .filter((s) => !sucursalQuery || s.name.toLowerCase().includes(sucursalQuery.toLowerCase()))
     .map((s) => ({ value: s.id, label: s.name }))
@@ -268,15 +265,7 @@ export default function JournalForm() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="defaultBranch">Sucursal (default)</label>
-                <SearchSelect
-                  id="defaultBranch"
-                  value={defaultBranch}
-                  onChange={(val) => setDefaultBranch(val)}
-                  options={sucursalOptions}
-                  onSearch={setSucursalQuery}
-                  loading={sucursalesLoading}
-                  placeholder="Buscar sucursal…"
-                />
+                <OpcionesSelect recurso="sucursales" id="defaultBranch" value={defaultBranch} onChange={(val) => setDefaultBranch(val)} placeholder="Buscar sucursal…" />
               </div>
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="defaultDepartment">Departamento (default)</label>

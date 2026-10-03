@@ -4,8 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { listPedidos, cancelPedido } from '@/shared/api/pedidos'
 import type { Pedido } from '@/shared/api/types'
 import type { ListPedidosParams } from '@/shared/api/pedidos'
-import { listSucursales } from '@/shared/api/sucursales'
-import { listCustomers } from '@/shared/api/customers'
 import { displayId, formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, Eye, X, Loader2, Copy, PackageOpen } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,14 +11,13 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { Select, SelectItem } from '@/components/ui/select'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { ESTADO_FLUJO_BADGE, ESTADO_FLUJO_LABEL } from './estadoFlujo'
 import type { PedidoEstadoFlujo } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const COLUMNS = [
   { key: 'id', width: 100 },
@@ -49,7 +46,6 @@ export default function PedidosPage() {
   const queryClient = useQueryClient()
   const [customerId, setCustomerId] = useState('')
   const [customerLabel, setCustomerLabel] = useState('')
-  const [customerQuery, setCustomerQuery] = useState('')
   const [status, setStatus] = useState<string>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -62,26 +58,8 @@ export default function PedidosPage() {
   const { orderBy, sort } = useSortState()
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
-  const { data: sucursalesData } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-  })
-  const sucursales = sucursalesData?.items ?? []
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchOptions: SearchSelectOption[] = sucursales
-    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
 
-  const { data: customersData, isLoading: customersLoading } = useQuery({
-    queryKey: ['customerSearch', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-  })
 
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
-    sublabel: c.rnc ?? c.cedula,
-  }))
 
   const params: ListPedidosParams = {
     customer: customerId || undefined,
@@ -126,17 +104,7 @@ export default function PedidosPage() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <FilterField label="Cliente" style={{ width: 260 }}>
-                <SearchSelect
-                  value={customerId}
-                  selectedLabel={customerLabel}
-                  onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={customersLoading}
-                  placeholder="Filtrar por cliente…"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Cliente" filterStyle={{ width: 260 }} recurso="clientes" value={customerId} onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }} selectedLabel={customerLabel} placeholder="Filtrar por cliente…" minChars={2} />
               <FilterField label="Estado">
                 <Select value={status} onValueChange={setStatus}>
                   <SelectItem value="all">Todos los estados</SelectItem>
@@ -153,16 +121,7 @@ export default function PedidosPage() {
                   ))}
                 </Select>
               </FilterField>
-              <FilterField label="Sucursal" style={{ width: 200 }}>
-                <SearchSelect
-                  value={branch}
-                  onChange={setBranch}
-                  options={branchOptions}
-                  onSearch={setBranchSearch}
-                  selectedLabel={branch}
-                  placeholder="Todas las sucursales"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }} recurso="sucursales" value={branch} onChange={setBranch} selectedLabel={branch} placeholder="Todas las sucursales" />
               <FilterField label="Desde">
                 <DatePicker
                   className="ff-input ff-input-sm"

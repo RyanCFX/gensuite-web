@@ -46,10 +46,6 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 import { useOpciones } from '@/shared/hooks/useOpciones'
-import {
-  fallbackSucursales, fallbackClientes, fallbackProveedores, fallbackArticulos,
-  fallbackAlmacenes, fallbackUsuarios, fallbackAseguradoras,
-} from '@/shared/api/opcionesFallback'
 import { useFiltrosPantalla } from '@/shared/permissions/useAcceso'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
@@ -90,7 +86,6 @@ function BranchDepartmentFilters({
           onChange={onBranchChange}
           selectedLabel={branch}
           placeholder="Todas las sucursales"
-          fallback={fallbackSucursales}
         />
     </>
   )
@@ -1008,7 +1003,6 @@ function CuadreTurnoReport() {
                   selectedLabel={cajeroLabel}
                   onChange={(val, opt) => { setCajero(val); setCajeroLabel(opt?.label ?? '') }}
                   placeholder="Todos los cajeros"
-                  fallback={fallbackUsuarios}
                 />
               )}
             </div>
@@ -1192,7 +1186,6 @@ function CorteCajaDiaReport() {
                   selectedLabel={cajeroLabel}
                   onChange={(val, opt) => { setCajero(val); setCajeroLabel(opt?.label ?? '') }}
                   placeholder="Todos los cajeros"
-                  fallback={fallbackUsuarios}
                 />
               )}
             </div>
@@ -1409,7 +1402,6 @@ function LibroDiarioReport() {
                     selectedLabel={partyLabel}
                     onChange={(val, opt) => { setParty(val); setPartyLabel(opt?.label ?? '') }}
                     placeholder={partyType === 'Customer' ? 'Todos los clientes' : 'Todos los proveedores'}
-                    fallback={partyType === 'Customer' ? fallbackClientes : fallbackProveedores}
                   />
               )}
             </div>
@@ -1490,7 +1482,7 @@ function LibroMayorReport() {
 function useAseguradoraFilter(aseguradoraId: string) {
   const { filtros: filtrosCtx } = useReporteFiltros()
   const [query, setQuery] = useState('')
-  const { data, isLoading } = useOpciones('aseguradoras', { q: query, limit: 15, fallback: fallbackAseguradoras })
+  const { data, isLoading } = useOpciones('aseguradoras', { q: query, limit: 15 })
   const options: SearchSelectOption[] = (data ?? []).map((a) => ({ value: a.value, label: a.label }))
   const label = data?.find((a) => a.value === aseguradoraId)?.label ?? ''
   return { options, label, isLoading, onSearch: setQuery , visible: filtrosCtx.puedeFiltrar('aseguradora') }
@@ -1807,12 +1799,12 @@ function FacturacionFiscalReport() {
 // ─── 9 reportes nativos nuevos (docs/tasks/62_reportes_solicitados_y_reportes_nuevos.md §Parte 2) ─
 // Mismo patrón {columns, rows} de siempre — se renderizan con AutoTable, igual que Ventas/
 // Balance/Valoración de Stock. Filtros compartidos de Proveedor/Cliente/Artículo/Almacén
-// alimentados por GET /opciones/:recurso (con fallback legacy si el backend aún no lo expone).
+// alimentados por GET /opciones/:recurso.
 
 function useSupplierFilter(supplierId: string) {
   const { filtros: filtrosCtx } = useReporteFiltros()
   const [query, setQuery] = useState('')
-  const { data, isLoading } = useOpciones('proveedores', { q: query, limit: 15, fallback: fallbackProveedores })
+  const { data, isLoading } = useOpciones('proveedores', { q: query, limit: 15 })
   const options: SearchSelectOption[] = (data ?? []).map((s) => ({ value: s.value, label: s.label }))
   const label = data?.find((s) => s.value === supplierId)?.label ?? ''
   return { options, label, isLoading, onSearch: setQuery , visible: filtrosCtx.puedeFiltrar('supplier') }
@@ -1821,7 +1813,7 @@ function useSupplierFilter(supplierId: string) {
 function useCustomerFilter(customerId: string) {
   const { filtros: filtrosCtx } = useReporteFiltros()
   const [query, setQuery] = useState('')
-  const { data, isLoading } = useOpciones('clientes', { q: query, limit: 15, fallback: fallbackClientes })
+  const { data, isLoading } = useOpciones('clientes', { q: query, limit: 15 })
   const options: SearchSelectOption[] = (data ?? []).map((c) => ({ value: c.value, label: c.label }))
   const label = data?.find((c) => c.value === customerId)?.label ?? ''
   return { options, label, isLoading, onSearch: setQuery , visible: filtrosCtx.puedeFiltrar('customer') }
@@ -1830,7 +1822,7 @@ function useCustomerFilter(customerId: string) {
 function useItemFilter(itemCode: string) {
   const { filtros: filtrosCtx } = useReporteFiltros()
   const [query, setQuery] = useState('')
-  const { data, isLoading } = useOpciones('articulos', { q: query, limit: 15, fallback: fallbackArticulos })
+  const { data, isLoading } = useOpciones('articulos', { q: query, limit: 15 })
   const options: SearchSelectOption[] = (data ?? []).map((i) => ({ value: i.value, label: `${i.value} — ${i.label}` }))
   const encontrado = data?.find((i) => i.value === itemCode)
   const label = encontrado ? `${encontrado.value} — ${encontrado.label}` : ''
@@ -1840,7 +1832,7 @@ function useItemFilter(itemCode: string) {
 function useWarehouseFilter(warehouseId: string) {
   const { filtros: filtrosCtx } = useReporteFiltros()
   const [query, setQuery] = useState('')
-  const { data } = useOpciones('almacenes', { q: query, limit: 100, fallback: fallbackAlmacenes })
+  const { data } = useOpciones('almacenes', { q: query, limit: 100 })
   const almacenes = data ?? []
   const options: SearchSelectOption[] = almacenes.map((w) => ({ value: w.value, label: w.label }))
   const label = almacenes.find((w) => w.value === warehouseId)?.label ?? ''

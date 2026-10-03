@@ -4,10 +4,8 @@ import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { createCustomer, updateCustomer, listCustomerGroups } from '@/shared/api/customers'
-import { listSucursales } from '@/shared/api/sucursales'
-import { listMetodosPago, listImpuestosVentas, getFacturacionConfig, getCatalogosFiscales } from '@/shared/api/config'
-import { listUsuarios } from '@/shared/api/usuarios'
+import { createCustomer, updateCustomer } from '@/shared/api/customers'
+import { listImpuestosVentas, getFacturacionConfig, getCatalogosFiscales } from '@/shared/api/config'
 import { getDgiiTaxpayer } from '@/shared/api/dgii'
 import type { ApiError, Customer } from '@/shared/api/types'
 import { validateRNCDetailed, validateCedulaDetailed, formatRNC, formatCedula } from '@/lib/validators/dgii'
@@ -19,6 +17,8 @@ import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { CheckCircle2, XCircle, Info, HelpCircle, Plus, Trash2, Save, Loader2 } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 // NOTE: tipoIdentificacion does NOT exist in CreateCustomerDto/UpdateCustomerDto.
 // It is only used here as a local UI helper to decide which field to show.
@@ -87,10 +87,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
   // UI-only: which identification field to show
   const [idType, setIdType] = useState<IdType>('RNC')
 
-  const { data: groupsData } = useQuery({
-    queryKey: ['customer-groups'],
-    queryFn: listCustomerGroups,
-  })
+  const { data: groupsData } = useOpcionesArray('grupos-clientes', { limit: 100 })
 
   // ── Multimoneda (docs/tasks/64_multimoneda_completo.md Fase 2) ────────────
   const { data: facturacionConfig } = useQuery({
@@ -101,21 +98,8 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
   const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
 
-  const { data: sucursalesData } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    staleTime: 60_000,
-  })
-  const [branchQuery, setBranchQuery] = useState('')
-  const branchOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
-    .filter((s) => !branchQuery || s.name.toLowerCase().includes(branchQuery.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
 
-  const { data: metodosPagoData } = useQuery({
-    queryKey: ['metodos-pago'],
-    queryFn: listMetodosPago,
-    staleTime: 60_000,
-  })
+  const { data: metodosPagoData } = useOpcionesArray('metodos-pago', { limit: 100, staleTime: 60_000 })
   const [formaPagoQuery, setFormaPagoQuery] = useState('')
   const formaPagoOptions: SearchSelectOption[] = (metodosPagoData ?? [])
     .filter((m) => !m.disabled)
@@ -142,15 +126,6 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
     .filter((t) => !ncfDefaultSearch || t.label.toLowerCase().includes(ncfDefaultSearch.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 
-  const { data: usuariosData } = useQuery({
-    queryKey: ['usuarios-all'],
-    queryFn: () => listUsuarios({ limit: 100 }),
-    staleTime: 60_000,
-  })
-  const [encargadoQuery, setEncargadoQuery] = useState('')
-  const encargadoOptions: SearchSelectOption[] = (usuariosData?.items ?? [])
-    .filter((u) => !encargadoQuery || u.fullName.toLowerCase().includes(encargadoQuery.toLowerCase()) || u.email.toLowerCase().includes(encargadoQuery.toLowerCase()))
-    .map((u) => ({ value: u.email, label: u.fullName, sublabel: u.email }))
 
   const {
     register, control, handleSubmit, watch, setValue, setError,
@@ -436,14 +411,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
               name="branch"
               control={control}
               render={({ field }) => (
-                <SearchSelect
-                  id="branch"
-                  value={field.value ?? ''}
-                  onChange={field.onChange}
-                  options={branchOptions}
-                  onSearch={setBranchQuery}
-                  placeholder="Buscar sucursal…"
-                />
+                <OpcionesSelect recurso="sucursales" id="branch" value={field.value ?? ''} onChange={field.onChange} placeholder="Buscar sucursal…" />
               )}
             />
           </div>
@@ -813,14 +781,7 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
                 name="encargadoCxc"
                 control={control}
                 render={({ field }) => (
-                  <SearchSelect
-                    id="encargadoCxc"
-                    value={field.value ?? ''}
-                    onChange={field.onChange}
-                    options={encargadoOptions}
-                    onSearch={setEncargadoQuery}
-                    placeholder="Buscar usuario…"
-                  />
+                  <OpcionesSelect recurso="usuarios" id="encargadoCxc" value={field.value ?? ''} onChange={field.onChange} placeholder="Buscar usuario…" />
                 )}
               />
               {errors.encargadoCxc && <p className="ff-error">{errors.encargadoCxc.message}</p>}

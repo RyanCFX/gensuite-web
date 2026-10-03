@@ -6,15 +6,14 @@ import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createCompra, updateCompra, getCompra } from '@/shared/api/compras-gastos'
-import { listSuppliers, getSupplier } from '@/shared/api/suppliers'
+import { getSupplier } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listAlmacenes, getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
-import { listMonedas, getTasaVigente } from '@/shared/api/monedas'
+import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
+import { getTasaVigente } from '@/shared/api/monedas'
 import type { MonedaCode } from '@/shared/api/types'
 import { listRetenciones } from '@/shared/api/retenciones'
 import { useSupplierEmisorElectronico } from '@/shared/hooks/useSupplierEmisorElectronico'
 import { getUsuarioSucursales } from '@/shared/api/usuarios'
-import { listSucursales } from '@/shared/api/sucursales'
 import { todayIso } from '@/lib/formatters'
 import type { CreateCompraDto, Supplier, DistribucionCuentaDto } from '@/shared/api/types'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -36,7 +35,7 @@ import type { VariantSelection } from '@/components/shared/VariantsModal'
 import type { OrdenCompraImportLine } from '@/components/shared/SeleccionarOrdenCompraModal'
 import { listOrdenesCompra, getOrdenCompra } from '@/shared/api/ordenes-compra'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { listItems, getItem } from '@/shared/api/catalog'
+import { lookupItems, getItemLookup } from '@/shared/api/catalog'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
 import type { ComponentTracking } from '@/shared/api/types'
@@ -52,6 +51,8 @@ import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useAlmacenCompraDefault } from '@/shared/hooks/useAlmacenCompraDefault'
+import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 interface ItemRow {
   itemCode: string
@@ -148,8 +149,8 @@ function onVariantConfirm(
       itemLabel: s.item.itemName,
       description: s.item.internalDescription ?? s.item.itemName,
       qty: s.qty,
-      rate: s.item.valuationRate ?? s.item.standardRate ?? 0,
-      baseRate: s.item.valuationRate ?? s.item.standardRate ?? 0,
+      rate: 0 /* costo no disponible vía lookup: se digita */,
+      baseRate: 0 /* costo no disponible vía lookup: se digita */,
       warehouse: '',
       uom: s.item.stockUom ?? 'Nos',
       trackingType: s.item.trackingType ?? 'none',
@@ -604,7 +605,6 @@ export default function CompraForm() {
   const [esProveedorOcasional, setEsProveedorOcasional] = useState(false)
   const [proveedorOcasionalNombre, setProveedorOcasionalNombre] = useState('')
   const [proveedorOcasionalRnc, setProveedorOcasionalRnc] = useState('')
-  const [supplierQuery, setSupplierQuery] = useState('')
   const [showCreateSupplier, setShowCreateSupplier] = useState(false)
   const [postingDate, setPostingDate] = useState(todayIso())
   const [dueDate, setDueDate] = useState('')
@@ -644,13 +644,8 @@ export default function CompraForm() {
   const [currency, setCurrency] = useState('')
   const [currencyTouched, setCurrencyTouched] = useState(false)
   const [conversionRate, setConversionRate] = useState<number | ''>('')
-  const { data: monedas } = useQuery({
-    queryKey: ['monedas'],
-    queryFn: listMonedas,
-    enabled: multimonedaHabilitada,
-    staleTime: 5 * 60_000,
-  })
-  const monedasHabilitadasOptions = (monedas ?? []).filter((m) => m.habilitada)
+  const { data: monedas } = useOpcionesArray('monedas', { limit: 100, enabled: multimonedaHabilitada, staleTime: 5 * 60_000 })
+  const monedasHabilitadasOptions = (monedas ?? [])
   const { data: tasaVigente } = useQuery({
     queryKey: ['monedas-tasa-vigente', currency, monedaBase],
     queryFn: () => getTasaVigente({ from: currency as MonedaCode, to: monedaBase as MonedaCode }),
@@ -680,7 +675,7 @@ export default function CompraForm() {
   // ── Barcode scanner ───────────────────────────────────────────────────────
   useBarcodeScanner({
     onBarcode: async (code) => {
-      const res = await listItems({ barcode: code, limit: 1 })
+      const res = await lookupItems({ barcode: code, limit: 1 })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       const targetIndex = items.length
@@ -712,21 +707,7 @@ export default function CompraForm() {
     .filter((f) => !formaPago606Search || f.label.toLowerCase().includes(formaPago606Search.toLowerCase()))
     .map((f) => ({ value: f.value, label: f.label }))
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['supplierSearch', supplierQuery],
-    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
-    enabled: true,
-  })
 
-  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
-    value: s.id,
-    label: s.supplierName,
-    sublabel: s.rnc ?? s.cedula,
-  }))
-
-  // ── Enlace manual a Orden de Compra (caso excepcional) ──────────────────────
-  // Trae las líneas pendientes de facturar de una orden existente como filas nuevas — ver
-  // handleImportOrdenLines. El camino normal sigue siendo /compras/ordenes/:id/facturar.
   const { data: ordenesData, isLoading: ordenesLoading } = useQuery({
     queryKey: ['ordenes-compra-para-enlazar', ordenSearch],
     queryFn: () => listOrdenesCompra({ search: ordenSearch || undefined, status: 'submitted', billingStatus: 'pending', limit: 20 }),
@@ -802,11 +783,7 @@ export default function CompraForm() {
     queryFn: listWarehouses,
     enabled: !branch,
   })
-  const { data: warehousesForBranch } = useQuery({
-    queryKey: ['almacenes', { branch }],
-    queryFn: () => listAlmacenes({ branch }),
-    enabled: !!branch,
-  })
+  const { data: warehousesForBranch } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch })
   const warehouses = branch ? warehousesForBranch : warehousesAll
 
   const warehouseSelectOptions: SearchSelectOption[] = useMemo(() => {
@@ -831,22 +808,13 @@ export default function CompraForm() {
     enabled: !!authUser?.email,
     staleTime: 60_000,
   })
-  const { data: allSucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    enabled: isSystemManager,
-    staleTime: 60_000,
-  })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
   const branchOptions = useMemo(
     () => (isSystemManager
       ? (allSucursales?.items.map((s) => s.name) ?? [])
       : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],
   )
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchSelectOptions: SearchSelectOption[] = branchOptions
-    .filter((b) => !branchSearch || b.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((b) => ({ value: b, label: b }))
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
@@ -995,7 +963,7 @@ export default function CompraForm() {
   useEffect(() => {
     if (!compraData) return
     let cancelled = false
-    Promise.all(compraData.items.map((ci) => getItem(ci.itemCode).catch(() => null))).then((catalogItems) => {
+    Promise.all(compraData.items.map((ci) => getItemLookup(ci.itemCode).catch(() => null))).then((catalogItems) => {
       if (cancelled) return
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
@@ -1253,8 +1221,8 @@ export default function CompraForm() {
       wasLastRow = idx === prev.length - 1
       return prev.map((row, i) => {
         if (i !== idx) return row
-        // Para compras usamos valuationRate (costo) si existe, si no standardRate
-        const baseRate = catalogItem.valuationRate ?? catalogItem.standardRate ?? 0
+        // El lookup no trae `valuationRate` (costo): el costo de la línea se digita a mano.
+        const baseRate = 0 /* costo no disponible vía lookup: se digita */
         const trackingType = catalogItem.trackingType ?? 'none'
         const newRow: ItemRow = {
           ...row,
@@ -1282,7 +1250,7 @@ export default function CompraForm() {
           Promise.all(
             (catalogItem.components ?? []).map(async (c) => {
               try {
-                const item = await getItem(c.itemCode)
+                const item = await getItemLookup(c.itemCode)
                 if (item.trackingType === 'serial' || item.trackingType === 'batch') {
                   return { itemCode: c.itemCode, itemName: item.itemName, trackingType: item.trackingType, qtyPerCombo: c.qty }
                 }
@@ -1305,12 +1273,12 @@ export default function CompraForm() {
         return newRow
       })
     })
-    // El picker (`listItems`) puede no traer `usaDimensiones`/`dimensiones` del artículo — solo
+    // El picker (`lookupItems`) puede no traer `usaDimensiones`/`dimensiones` del artículo — solo
     // el detalle (`GET /catalog/items/:id`, §4.3 del doc) los garantiza. Si faltan, se completan
     // con el detalle para habilitar la columna Combinación; si el picker ya los trajo, no se
     // dispara ninguna llamada extra.
     if (!catalogItem.dimensiones || catalogItem.dimensiones.length === 0) {
-      getItem(catalogItem.id).then((detail) => {
+      getItemLookup(catalogItem.id).then((detail) => {
         if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
         setItems((prev) => prev.map((row, i) =>
           i === idx && row.itemCode === catalogItem.id && !(row.itemDimensionesDeclaradas?.length)
@@ -1351,7 +1319,7 @@ export default function CompraForm() {
     const startIndex = items.length
     setItems((prev) => [...prev, ...lines.map(() => emptyItem(defaultWh))])
 
-    const catalogItems = await Promise.all(lines.map((l) => getItem(l.itemCode).catch(() => null)))
+    const catalogItems = await Promise.all(lines.map((l) => getItemLookup(l.itemCode).catch(() => null)))
 
     setItems((prev) => prev.map((row, idx) => {
       const li = idx - startIndex
@@ -1444,17 +1412,12 @@ export default function CompraForm() {
                       disabled={isReturn}
                     />
                   ) : (
-                    <SearchSelect
-                      id="supplier"
-                      value={supplierId}
-                      selectedLabel={supplierName}
-                      disabled={isReturn}
-                      onChange={(id, opt) => {
+                    <OpcionesSelect recurso="proveedores" id="supplier" value={supplierId} onChange={(id, opt) => {
                         const resolvedId = id === '' ? '' : (opt?.value ?? id)
                         setSupplierId(resolvedId)
                         setSupplierName(opt?.label ?? '')
-                        const selected = suppliersData?.items.find((s) => s.id === resolvedId)
-                        if (selected) {
+                        // /opciones solo trae value/label: los defaults del proveedor salen de su detalle.
+                        if (resolvedId) getSupplier(resolvedId).then((selected) => {
                           if (!tipoBienes606Touched && selected.defaultTipoBienes606) setTipoBienes606(selected.defaultTipoBienes606)
                           if (!formaPago606Touched && selected.defaultFormaPago606) setFormaPago606(selected.defaultFormaPago606)
                           if (!tipoPagoTouched) {
@@ -1468,14 +1431,8 @@ export default function CompraForm() {
                             base.setDate(base.getDate() + selected.diasCredito)
                             setDueDate(format(base, 'yyyy-MM-dd'))
                           }
-                        }
-                      }}
-                      options={supplierOptions}
-                      onSearch={setSupplierQuery}
-                      loading={suppliersLoading}
-                      placeholder="Buscar proveedor…"
-                      error={!supplierId}
-                      headerContent={
+                        }).catch(() => {})
+                      }} placeholder="Buscar proveedor…" error={!supplierId} disabled={isReturn} headerContent={
                         <button
                           type="button"
                           className="btn btn-ghost btn-size-sm"
@@ -1484,8 +1441,7 @@ export default function CompraForm() {
                         >
                           <UserPlus size={14} /> Agregar proveedor
                         </button>
-                      }
-                    />
+                      } selectedLabel={supplierName} minChars={2} />
                   )}
                 </div>
 
@@ -1555,16 +1511,7 @@ export default function CompraForm() {
 
                 <div className="ff-wrap">
                   <label className="ff-label">Sucursal</label>
-                  <SearchSelect
-                    value={branch}
-                    onChange={(val) => { setBranch(val); setBranchError(false) }}
-                    options={branchSelectOptions}
-                    onSearch={setBranchSearch}
-                    selectedLabel={branch}
-                    placeholder="Sin especificar"
-                    error={branchError}
-                    disabled={isReturn || branchOptions.length === 1}
-                  />
+                  <OpcionesSelect recurso="sucursales" value={branch} onChange={(val) => { setBranch(val); setBranchError(false) }} placeholder="Sin especificar" error={branchError} disabled={isReturn || branchOptions.length === 1} selectedLabel={branch} />
                 </div>
 
                 {usaDepartamentos && (

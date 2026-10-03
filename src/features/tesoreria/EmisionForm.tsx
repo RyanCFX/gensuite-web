@@ -10,7 +10,7 @@ import {
   listTiposDocumento,
 } from '@/shared/api/tesoreria'
 import { getFacturacionConfig } from '@/shared/api/config'
-import type { CreateEmisionDto, CuentaBancaria, TesoreriaLinea, TesoreriaLiquidacion, TipoDocumentoBancario } from '@/shared/api/types'
+import type { CreateEmisionDto, TesoreriaLinea, TesoreriaLiquidacion, TipoDocumentoBancario } from '@/shared/api/types'
 import { CuentaBancariaSelect } from './components/CuentaBancariaSelect'
 import { PartySelect } from './components/PartySelect'
 import { DistribucionCuentasEditor, sumaCoincide } from './components/DistribucionCuentasEditor'
@@ -21,12 +21,12 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
-import { listSucursales } from '@/shared/api/sucursales'
 import { validateRNCDetailed, formatRNC } from '@/lib/validators/dgii'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import type { OpcionLista } from '@/shared/hooks/useOpciones'
 
 function today(): string {
   const d = new Date()
@@ -40,7 +40,7 @@ export default function EmisionForm() {
   const [fecha, setFecha] = useState(today())
   const [tipoDocumentoCode, setTipoDocumentoCode] = useState('')
   const [cuentaBancaria, setCuentaBancaria] = useState('')
-  const [cuentaBancariaObj, setCuentaBancariaObj] = useState<CuentaBancaria | undefined>()
+  const [cuentaBancariaObj, setCuentaBancariaObj] = useState<OpcionLista | undefined>()
   const [descripcion, setDescripcion] = useState('')
   const [monto, setMonto] = useState<number>(0)
 
@@ -67,7 +67,6 @@ export default function EmisionForm() {
 
   const [nota, setNota] = useState('')
   const [branch, setBranch] = useState('')
-  const [branchSearch, setBranchSearch] = useState('')
   const [department, setDepartment] = useState('')
 
   // ── Multimoneda (docs/tasks/64_multimoneda_completo.md §5.1) ──────────────
@@ -146,10 +145,6 @@ export default function EmisionForm() {
   })
 
   // ── Sucursales (branch) ──────────────────────────────────────────────────
-  const { data: sucursalesData } = useQuery({ queryKey: ['sucursales-all'], queryFn: () => listSucursales({ limit: 100 }) })
-  const branchOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
-    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
 
   const rncDetail = useMemo(() => (rnc ? validateRNCDetailed(rnc) : null), [rnc])
 
@@ -560,13 +555,7 @@ export default function EmisionForm() {
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <div className="ff-wrap" style={{ flex: 1, minWidth: 200 }}>
                 <label className="ff-label">Sucursal</label>
-                <SearchSelect
-                  value={branch}
-                  onChange={(v) => setBranch(v)}
-                  options={branchOptions}
-                  onSearch={setBranchSearch}
-                  placeholder="Opcional"
-                />
+                <OpcionesSelect recurso="sucursales" value={branch} onChange={(v) => setBranch(v)} placeholder="Opcional" />
               </div>
               <div className="ff-wrap" style={{ flex: 1, minWidth: 200 }}>
                 <label className="ff-label">Departamento</label>

@@ -7,8 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, AlertTriangle, ArrowRight } from 'lucide-react'
-import { listItems } from '@/shared/api/catalog'
-import { listAlmacenes } from '@/shared/api/config'
+import { lookupItems } from '@/shared/api/catalog'
 import { getStockPorDimension, reclasificarDimension } from '@/shared/api/inventory'
 import type { Item, GetStockPorDimensionParams, DimensionesLinea } from '@/shared/api/types'
 import { mostrarErrorApi } from '@/lib/apiErrors'
@@ -18,6 +17,7 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
+import { esRecursoNoPermitido, useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 function today(): string {
   const d = new Date()
@@ -39,11 +39,13 @@ function ItemDimensionadoSelect({
 }) {
   const [query, setQuery] = useState('')
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, refetch, error: itemsError } = useQuery({
+    retry: false,
     queryKey: ['itemSearch-dimensionado', query],
-    queryFn: () => listItems({ search: query || undefined, disabled: 'false', type: 'product', limit: 20 }),
+    queryFn: () => lookupItems({ search: query || undefined, disabled: 'false', type: 'product', limit: 20 }),
     staleTime: 30_000,
   })
+  const sinAcceso = esRecursoNoPermitido(itemsError)
 
   const itemsDimensionados = (data?.items ?? []).filter((i) => i.usaDimensiones === true)
 
@@ -66,7 +68,8 @@ function ItemDimensionadoSelect({
       onSearch={setQuery}
       onOpen={() => refetch()}
       loading={isLoading}
-      placeholder="Buscar artículo con dimensiones de inventario…"
+      placeholder={sinAcceso ? 'No tiene acceso a esta lista' : "Buscar artículo con dimensiones de inventario…"}
+      disabled={sinAcceso}
     />
   )
 }
@@ -92,11 +95,7 @@ export default function ReclasificacionForm() {
   const [branch, setBranch] = useState('')
   const [resultado, setResultado] = useState<{ qty: number } | null>(null)
 
-  const { data: almacenes } = useQuery({
-    queryKey: ['almacenes-all'],
-    queryFn: () => listAlmacenes(),
-    staleTime: 60_000,
-  })
+  const { data: almacenes } = useOpcionesArray('almacenes', { limit: 100, staleTime: 60_000 })
   const warehouseOptions: SearchSelectOption[] = (almacenes ?? [])
     .filter((a) => !a.disabled && (!warehouseSearch || a.name.toLowerCase().includes(warehouseSearch.toLowerCase())))
     .map((a) => ({ value: a.id, label: a.name }))

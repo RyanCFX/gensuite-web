@@ -8,7 +8,7 @@ import {
   getOrdenCompraPdfBlobUrl, downloadOrdenCompraPdf,
 } from '@/shared/api/ordenes-compra'
 import { getSupplier } from '@/shared/api/suppliers'
-import { getItem } from '@/shared/api/catalog'
+import { getItemLookup } from '@/shared/api/catalog'
 import { getCatalogosFiscales, listImpuestosCompras, getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -692,7 +692,7 @@ function RecibirModal({ items, loading, onClose, onConfirm }: RecibirModalProps)
   const trackingQueries = useQueries({
     queries: items.map((it) => ({
       queryKey: ['item-tracking', it.itemCode],
-      queryFn: () => getItem(it.itemCode),
+      queryFn: () => getItemLookup(it.itemCode),
       staleTime: 5 * 60_000,
     })),
   })

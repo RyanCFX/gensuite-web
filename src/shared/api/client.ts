@@ -64,7 +64,22 @@ function normalizeOrderBy(orderBy: string): string {
   return orderBy
 }
 
+// Mientras > 0, las requests que se construyen quedan marcadas `silent403`: un 403 de permiso/feature
+// NO dispara toast (lo usan los lookups de filtros de tablas, que simplemente ocultan el filtro).
+// Funciona porque el interceptor de request es `synchronous` y estas llamadas arman la request
+// de forma síncrona dentro de `fn`.
+let silent403Depth = 0
+export function conSilencio403<T>(fn: () => Promise<T>): Promise<T> {
+  silent403Depth++
+  try {
+    return fn()
+  } finally {
+    silent403Depth--
+  }
+}
+
 client.interceptors.request.use((config) => {
+  if (silent403Depth > 0) (config as { silent403?: boolean }).silent403 = true
   const token = getAccessToken()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -80,7 +95,7 @@ client.interceptors.request.use((config) => {
   }
 
   return config
-})
+}, null, { synchronous: true })
 
 // ─── Refresh single-flight — docs/tasks/PROMPT_IDENTIDAD_GLOBAL_FRONTEND.md §4.1 ──────────────
 // Instancia de axios SIN estos interceptores (evita recursión: refrescar no debe volver a pasar
@@ -294,12 +309,13 @@ client.interceptors.response.use(
       return Promise.reject(data.error)
     }
 
+    // `silent403`: la request lo pide (ej. filtros de tablas, que se ocultan solos).
+    const silent403 = (error.config as { silent403?: boolean } | undefined)?.silent403
+
     if (!isAuthEndpoint && (errorCode === 'PERMISO_INSUFICIENTE' || errorCode === 'FORBIDDEN')) {
       // Toast throttleado: un mismo mensaje puede llegar en ráfaga (react-query reintenta,
       // varias queries fallan a la vez) — no spamear al usuario con el mismo aviso.
       const msg = data?.error?.message
-      // `silent403`: la request lo pide (ej. selects de filtros en tablas, que se ocultan solos).
-      const silent403 = (error.config as { silent403?: boolean } | undefined)?.silent403
       if (msg && !silent403 && shouldToastPermiso(msg)) toast.error(msg)
       if (errorCode === 'PERMISO_INSUFICIENTE') {
         // Refresco SILENCIOSO: no toca `status`, así ProtectedRoute no re-monta la app (evita el
@@ -317,7 +333,7 @@ client.interceptors.response.use(
     // Mismo import dinámico que arriba (evita el ciclo client.ts → features.store.ts → me.ts).
     if (!isAuthEndpoint && errorCode === 'FEATURE_NO_CONTRATADO') {
       const msg = 'Este módulo no está disponible en tu plan'
-      if (shouldToastPermiso(msg)) toast.error(msg)
+      if (!silent403 && shouldToastPermiso(msg)) toast.error(msg)
       import('@/stores/features.store').then((m) => m.useFeaturesStore.getState().refreshSilencioso())
     }
 

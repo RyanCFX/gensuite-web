@@ -1,4 +1,5 @@
-import type { MetodoPago, Denominacion, PaymentLine, VueltoLine } from '@/shared/api/types'
+import type { Denominacion, PaymentLine, VueltoLine } from '@/shared/api/types'
+import { reglasCuentaBancaria, type MetodoPagoReglas } from '@/lib/pagoBancario'
 
 export const PAYMENT_LINES_TOLERANCE = 0.01
 
@@ -52,7 +53,7 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100
 }
 
-export function cashAmount(payments: PaymentLineDraft[], metodos: MetodoPago[]): number {
+export function cashAmount(payments: PaymentLineDraft[], metodos: MetodoPagoReglas[]): number {
   return payments.reduce((sum, p) => {
     const metodo = metodos.find((m) => m.name === p.modeOfPayment)
     return metodo?.type === 'Cash' ? sum + (Number(p.amount) || 0) : sum
@@ -72,27 +73,11 @@ export function missingAmount(payments: PaymentLineDraft[], amountDue: number): 
 }
 
 /** true si hay 1 o más líneas de pago en efectivo (type Cash) con monto > 0. */
-export function hasCashPayment(payments: PaymentLineDraft[], metodos: MetodoPago[]): boolean {
+export function hasCashPayment(payments: PaymentLineDraft[], metodos: MetodoPagoReglas[]): boolean {
   return payments.some((p) => {
     if (!(Number(p.amount) > 0)) return false
     return metodos.find((m) => m.name === p.modeOfPayment)?.type === 'Cash'
   })
-}
-
-/** Moneda real de un método de pago — nunca se asume del nombre. Se deriva de la Cuenta Bancaria
- * asociada (`defaultBankAccount`) si tiene una, o si no de la cuenta contable directa (`account`,
- * resuelta aparte vía `getCuenta` por quien llame esto — ver `useMetodoPagoCurrencies`). Cae a la
- * moneda base si el método no tiene ninguna cuenta asociada (docs/tasks/70_caja_pos_sin_soporte_multimoneda.md:
- * Caja exige que el método opere en la MISMA moneda que la factura, sin conversión). */
-export function resolveMetodoPagoCurrency(
-  metodo: MetodoPago,
-  cuentasBancariasPorId: Record<string, string>,
-  cuentasPorId: Record<string, string>,
-  monedaBase: string,
-): string {
-  if (metodo.defaultBankAccount) return cuentasBancariasPorId[metodo.defaultBankAccount] ?? monedaBase
-  if (metodo.account) return cuentasPorId[metodo.account] ?? monedaBase
-  return monedaBase
 }
 
 export function sumVuelto(vuelto: VueltoLineDraft[], denominaciones: { denominacion: string; valor: number }[]): number {
@@ -110,7 +95,7 @@ export function declaredVuelto(value: PaymentLinesValue): VueltoLineDraft[] {
 export function isPaymentLinesValid(
   value: PaymentLinesValue,
   amountDue: number,
-  metodos: MetodoPago[],
+  metodos: MetodoPagoReglas[],
   denominaciones: Denominacion[] = [],
 ): boolean {
   const validPayments = value.payments.filter((p) => p.modeOfPayment && Number(p.amount) > 0)
@@ -118,7 +103,7 @@ export function isPaymentLinesValid(
   if (validPayments.length !== value.payments.length) return false
   for (const p of validPayments) {
     const metodo = metodos.find((m) => m.name === p.modeOfPayment)
-    if (metodo?.requiresBankAccount && !metodo.defaultBankAccount && !p.bankAccount) return false
+    if (reglasCuentaBancaria(metodo).cuentaObligatoria && !p.bankAccount) return false
   }
   // El pago parcial (suma < total) se permite — el backend responde fullyPaid=false y cada
   // pantalla lo maneja con su propio flujo. Acá solo se valida el sobrepago.
@@ -168,7 +153,7 @@ export function friendlyPaymentError(message: string | undefined, fallback = 'Er
 export function buildSubmitPayload(
   value: PaymentLinesValue,
   amountDue: number,
-  metodos: MetodoPago[],
+  metodos: MetodoPagoReglas[],
 ): { payments: PaymentLine[]; vuelto?: VueltoLine[]; tenderedCash?: number } {
   const over = overpayAmount(value.payments, amountDue)
   const cash = cashAmount(value.payments, metodos)

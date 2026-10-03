@@ -118,6 +118,9 @@ export const ENDPOINTS = {
     items: {
       list: '/catalog/items',
       byId: (id: string) => `/catalog/items/${id}`,
+      // Lookup para formularios: mismos params y respuesta, autorizado por `lookup.articulos`.
+      lookup: '/catalog/items/lookup',
+      lookupById: (id: string) => `/catalog/items/lookup/${id}`,
       stock: (id: string) => `/catalog/items/${id}/stock`,
       toggle: (id: string) => `/catalog/items/${id}/toggle`,
       variants: (id: string) => `/catalog/items/${id}/variants`,

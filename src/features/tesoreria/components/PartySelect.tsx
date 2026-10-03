@@ -1,9 +1,7 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
-import { listCustomers } from '@/shared/api/customers'
-import { listSuppliers } from '@/shared/api/suppliers'
+import { useOpcionesLista } from '@/shared/hooks/useOpciones'
 
 type PartyTipo = 'Customer' | 'Supplier'
 
@@ -28,19 +26,9 @@ interface PartySelectProps {
 export function PartySelect({ tipo, onTipoChange, id, onIdChange, disabled, tipoLabel = 'Tipo', tiposPermitidos = ['Customer', 'Supplier'] }: PartySelectProps) {
   const [query, setQuery] = useState('')
 
-  const { data: customers, isLoading: loadingCustomers, refetch: refetchCustomers } = useQuery({
-    queryKey: ['party-select-customers', query],
-    queryFn: () => listCustomers({ search: query || undefined, limit: 50 }),
-    enabled: tipo === 'Customer',
-    staleTime: 30_000,
-  })
+  const { data: customers, isLoading: loadingCustomers, refetch: refetchCustomers } = useOpcionesLista('clientes', { q: query, limit: 50, enabled: tipo === 'Customer', staleTime: 30_000 })
 
-  const { data: suppliers, isLoading: loadingSuppliers, refetch: refetchSuppliers } = useQuery({
-    queryKey: ['party-select-suppliers', query],
-    queryFn: () => listSuppliers({ search: query || undefined, limit: 50 }),
-    enabled: tipo === 'Supplier',
-    staleTime: 30_000,
-  })
+  const { data: suppliers, isLoading: loadingSuppliers, refetch: refetchSuppliers } = useOpcionesLista('proveedores', { q: query, limit: 50, enabled: tipo === 'Supplier', staleTime: 30_000 })
 
   const options: SearchSelectOption[] =
     tipo === 'Customer'

@@ -4,33 +4,22 @@ import { toast } from 'sonner'
 import { Download, Loader2, Info } from 'lucide-react'
 import { getAging } from '@/shared/api/cobros'
 import type { AgingGroupBy, AgingInvoiceEntry } from '@/shared/api/types'
-import { listCustomers } from '@/shared/api/customers'
 import { downloadCxcAgingPdf } from '@/shared/api/reportes'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Select, SelectItem } from '@/components/ui/select'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const DEFAULT_LABELS = ['Corriente', '0–30 días', '31–60 días', '61–90 días', '+90 días']
 
 export default function AgingPage() {
   const [customerId, setCustomerId] = useState('')
   const [customerLabel, setCustomerLabel] = useState('')
-  const [customerQuery, setCustomerQuery] = useState('')
   const [groupBy, setGroupBy] = useState<AgingGroupBy>('party')
   const [showCurrent, setShowCurrent] = useState(false)
 
-  const { data: customersData, isLoading: customersLoading } = useQuery({
-    queryKey: ['customerSearch', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-  })
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
-  }))
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['aging', customerId, groupBy],
@@ -97,15 +86,7 @@ export default function AgingPage() {
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
               <div style={{ width: 260 }}>
-                <SearchSelect
-                  value={customerId}
-                  selectedLabel={customerLabel}
-                  onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={customersLoading}
-                  placeholder="Todos los clientes"
-                />
+                <OpcionesSelect recurso="clientes" value={customerId} onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }} placeholder="Todos los clientes" selectedLabel={customerLabel} minChars={2} />
               </div>
               <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
                 <SelectItem value="party">Agrupar por Cliente</SelectItem>

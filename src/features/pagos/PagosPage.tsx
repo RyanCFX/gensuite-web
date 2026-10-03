@@ -3,9 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listPagos } from '@/shared/api/pagos'
 import type { ListPagosParams } from '@/shared/api/pagos'
-import { listSuppliers } from '@/shared/api/suppliers'
-import { listMetodosPago } from '@/shared/api/config'
-import { listSucursales } from '@/shared/api/sucursales'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, SlidersHorizontal } from 'lucide-react'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -13,12 +10,11 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const COLUMNS = [
   { key: 'id', width: 120 },
@@ -48,14 +44,11 @@ export default function PagosPage() {
 
   const [supplierId, setSupplierId] = useState('')
   const [supplierLabel, setSupplierLabel] = useState('')
-  const [supplierQuery, setSupplierQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [modeOfPayment, setModeOfPayment] = useState('')
-  const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState('')
   const [branch, setBranch] = useState('')
-  const [branchSearch, setBranchSearch] = useState('')
   const [paidAmountMin, setPaidAmountMin] = useState('')
   const [paidAmountMax, setPaidAmountMax] = useState('')
   const [referenceNo, setReferenceNo] = useState('')
@@ -63,27 +56,8 @@ export default function PagosPage() {
   const { orderBy, sort } = useSortState()
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['supplierSearch', supplierQuery],
-    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
-  })
-  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
-    value: s.id,
-    label: s.supplierName,
-    sublabel: s.rnc,
-  }))
 
-  const { data: metodos } = useQuery({ queryKey: ['metodos-pago'], queryFn: listMetodosPago })
-  const modeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
-    .filter((m) => !m.disabled)
-    .filter((m) => !modeOfPaymentSearch || m.name.toLowerCase().includes(modeOfPaymentSearch.toLowerCase()))
-    .map((m) => ({ value: m.name, label: m.name }))
 
-  const { data: sucursalesData } = useQuery({ queryKey: ['sucursales-all'], queryFn: () => listSucursales({ limit: 100 }) })
-  const sucursales = sucursalesData?.items ?? []
-  const branchOptions: SearchSelectOption[] = sucursales
-    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
 
   const params: ListPagosParams = {
     supplier: supplierId || undefined,
@@ -139,17 +113,7 @@ export default function PagosPage() {
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <FilterField label="Proveedor" style={{ width: 260 }}>
-                <SearchSelect
-                  value={supplierId}
-                  selectedLabel={supplierLabel}
-                  onChange={(val, opt) => { setSupplierId(val); setSupplierLabel(opt?.label ?? '') }}
-                  options={supplierOptions}
-                  onSearch={setSupplierQuery}
-                  loading={suppliersLoading}
-                  placeholder="Filtrar por proveedor…"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Proveedor" filterStyle={{ width: 260 }} recurso="proveedores" value={supplierId} onChange={(val, opt) => { setSupplierId(val); setSupplierLabel(opt?.label ?? '') }} selectedLabel={supplierLabel} placeholder="Filtrar por proveedor…" />
 
               <FilterField label="Estado">
                 <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
@@ -160,15 +124,7 @@ export default function PagosPage() {
                 </Select>
               </FilterField>
 
-              <FilterField label="Método de pago" style={{ width: 200 }}>
-                <SearchSelect
-                  value={modeOfPayment}
-                  onChange={(val) => setModeOfPayment(val)}
-                  options={modeOfPaymentOptions}
-                  onSearch={setModeOfPaymentSearch}
-                  placeholder="Todos los métodos de pago"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Método de pago" filterStyle={{ width: 200 }} recurso="metodos-pago" value={modeOfPayment} onChange={(val) => setModeOfPayment(val)} placeholder="Todos los métodos de pago" />
 
               <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
                 <SlidersHorizontal size={13} />
@@ -278,14 +234,7 @@ export default function PagosPage() {
 
         <div className="ff-wrap">
           <label className="ff-label">Sucursal</label>
-          <SearchSelect
-            value={branch}
-            onChange={(val) => setBranch(val)}
-            options={branchOptions}
-            onSearch={setBranchSearch}
-            selectedLabel={branch}
-            placeholder="Todas las sucursales"
-          />
+          <OpcionesSelect recurso="sucursales" value={branch} onChange={(val) => setBranch(val)} placeholder="Todas las sucursales" selectedLabel={branch} />
         </div>
 
         <div className="ff-wrap">

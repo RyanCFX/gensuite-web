@@ -5,7 +5,6 @@ import {
   listDevolucionesCompras,
   type ListDevolucionesComprasParams,
 } from '@/shared/api/devoluciones-compras'
-import { listSucursales } from '@/shared/api/sucursales'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -13,8 +12,6 @@ import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, ChevronLeft, ChevronRight, Search, Banknote, SlidersHorizontal } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
@@ -23,6 +20,7 @@ import { ApplyToCxpModal } from './ApplyToCxpModal'
 import type { DevolucionCompra } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const PAGE_SIZE = 20
 
@@ -58,16 +56,7 @@ export default function DevolucionesPage() {
 
   const offset = (page - 1) * PAGE_SIZE
 
-  const { data: sucursalesData } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-  })
-  const sucursales = sucursalesData?.items ?? []
 
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchOptions: SearchSelectOption[] = sucursales
-    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((s) => ({ value: s.name, label: s.name }))
 
   const params: ListDevolucionesComprasParams = {
     supplier: supplier || undefined,
@@ -142,16 +131,7 @@ export default function DevolucionesPage() {
                     <SelectItem value="cancelled">Anulado</SelectItem>
                   </Select>
                 </FilterField>
-                <FilterField label="Sucursal" style={{ width: 200 }}>
-                  <SearchSelect
-                    value={branch}
-                    onChange={(val) => { setBranch(val); setPage(1) }}
-                    options={branchOptions}
-                    onSearch={setBranchSearch}
-                    selectedLabel={branch}
-                    placeholder="Todas las sucursales"
-                  />
-                </FilterField>
+                <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }} recurso="sucursales" value={branch} onChange={(val) => { setBranch(val); setPage(1) }} selectedLabel={branch} placeholder="Todas las sucursales" />
 
                 <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
                   <SlidersHorizontal size={13} />

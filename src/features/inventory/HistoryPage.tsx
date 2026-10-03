@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getInventoryHistory, listWarehouses } from '@/shared/api/inventory'
-import { listSucursales } from '@/shared/api/sucursales'
+import { getInventoryHistory } from '@/shared/api/inventory'
 import { formatDate, formatNumber } from '@/lib/formatters'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -9,13 +8,12 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { ItemHistoryDrawer } from './ItemHistoryDrawer'
 import { STOCK_VOUCHER_TYPES } from '@/lib/constants'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const PAGE_SIZE = 30
 
@@ -42,25 +40,9 @@ export default function HistoryPage() {
 
   const offset = (page - 1) * PAGE_SIZE
 
-  const { data: warehouses } = useQuery({
-    queryKey: ['warehouses'],
-    queryFn: listWarehouses,
-  })
 
-  const { data: sucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-  })
 
-  const [warehouseSearch, setWarehouseSearch] = useState('')
-  const warehouseOptions: SearchSelectOption[] = (warehouses ?? [])
-    .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
-    .map((w) => ({ value: w.name, label: w.name }))
 
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchOptions: SearchSelectOption[] = (sucursales?.items ?? [])
-    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((s) => ({ value: s.id, label: s.name }))
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['inventory-history', { warehouse, branch, voucherType, fromDate, toDate, offset, orderBy }],
@@ -91,28 +73,10 @@ export default function HistoryPage() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <FilterField label="Almacén" style={{ width: 200 }}>
-                <SearchSelect
-                  value={warehouse === 'all' ? '' : warehouse}
-                  onChange={(val) => { setWarehouse(val || 'all'); setPage(1); if (val) setBranch('') }}
-                  options={warehouseOptions}
-                  onSearch={setWarehouseSearch}
-                  selectedLabel={warehouse === 'all' ? '' : warehouse}
-                  placeholder="Todos los almacenes"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Almacén" filterStyle={{ width: 200 }} recurso="almacenes" value={warehouse === 'all' ? '' : warehouse} onChange={(val) => { setWarehouse(val || 'all'); setPage(1); if (val) setBranch('') }} selectedLabel={warehouse === 'all' ? '' : warehouse} placeholder="Todos los almacenes" />
 
               {warehouse === 'all' && (
-                <FilterField label="Sucursal" style={{ width: 200 }}>
-                  <SearchSelect
-                    value={branch}
-                    onChange={(val) => { setBranch(val); setPage(1) }}
-                    options={branchOptions}
-                    onSearch={setBranchSearch}
-                    selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
-                    placeholder="Todas las sucursales"
-                  />
-                </FilterField>
+                <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }} recurso="sucursales" value={branch} onChange={(val) => { setBranch(val); setPage(1) }} placeholder="Todas las sucursales" />
               )}
 
               <FilterField label="Tipo de documento">

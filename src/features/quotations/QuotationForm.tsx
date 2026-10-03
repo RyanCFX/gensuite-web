@@ -1,13 +1,13 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffectOnActive } from 'keepalive-for-react'
 
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTabs } from '@/contexts/TabsContext'
 import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSource } from '@/shared/api/quotations'
-import { listCustomers, getCustomer } from '@/shared/api/customers'
+import { getCustomer } from '@/shared/api/customers'
 import { getDefaultPriceTier } from '@/shared/api/catalog'
-import { listAlmacenes, getFacturacionConfig, getStockSettings } from '@/shared/api/config'
+import { getFacturacionConfig, getStockSettings } from '@/shared/api/config'
 import type { CreateQuotationDto, ItemPrices, Bundle, Customer, MonedaCode } from '@/shared/api/types'
 import type { Item, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
@@ -26,8 +26,6 @@ import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCrea
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
@@ -36,15 +34,15 @@ import { isPinPrecioError } from '@/lib/pinOverride'
 import { isPrecioCatalogoError, precioBloqueadoParaLinea } from '@/lib/precioCatalogo'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
-import { listItems, getItem } from '@/shared/api/catalog'
+import { lookupItems, getItemLookup } from '@/shared/api/catalog'
 import { client } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
-import { listSucursales } from '@/shared/api/sucursales'
 import { getCachedUser } from '@/shared/api/storage'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
-import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -142,7 +140,6 @@ export default function QuotationForm() {
   /** % de descuento por defecto del cliente elegido — solo sugiere el valor al AGREGAR una línea
    *  nueva (selectCatalogItem/selectBundle), nunca reescribe una que el usuario ya haya tocado. */
   const [customerDefaultDiscountPct, setCustomerDefaultDiscountPct] = useState<number | undefined>(undefined)
-  const [customerQuery, setCustomerQuery] = useState('')
   const [showCreateCustomer, setShowCreateCustomer] = useState(false)
   const [esClienteOcasional, setEsClienteOcasional] = useState(false)
   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
@@ -186,9 +183,6 @@ export default function QuotationForm() {
   const [viewItemCode, setViewItemCode] = useState<string | null>(null)
   const [initialized, setInitialized] = useState(false)
   const [branch, setBranch] = useState('')
-  const [branchSearch, setBranchSearch] = useState('')
-  // '' = automático (Cliente.defaultCurrency → moneda base). Al editar, se hidrata con la
-  // moneda/tasa existente — reenviarla es equivalente a omitirla (docs/tasks/64_multimoneda_completo.md §3.2).
   const [currency, setCurrency] = useState('')
   const [conversionRate, setConversionRate] = useState<number | ''>('')
 
@@ -346,7 +340,7 @@ useEffect(() => {
   useEffect(() => {
     if (!existingQuotation) return
     let cancelled = false
-    Promise.all(existingQuotation.items.map((i) => getItem(i.itemCode).catch(() => null))).then((catalogItems) => {
+    Promise.all(existingQuotation.items.map((i) => getItemLookup(i.itemCode).catch(() => null))).then((catalogItems) => {
       if (cancelled) return
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
@@ -414,7 +408,7 @@ useEffect(() => {
   useEffect(() => {
     if (isEdit || !duplicateSource) return
     let cancelled = false
-    Promise.all(duplicateSource.items.map((i) => getItem(i.itemCode).catch(() => null))).then((catalogItems) => {
+    Promise.all(duplicateSource.items.map((i) => getItemLookup(i.itemCode).catch(() => null))).then((catalogItems) => {
       if (cancelled) return
       setItems((prev) => prev.map((row, idx) => {
         const catalogItem = catalogItems[idx]
@@ -444,7 +438,7 @@ useEffect(() => {
         toast.error('Debe seleccionar una sucursal antes de agregar artículos.')
         return
       }
-      const res = await listItems({ barcode: code, limit: 1, branch })
+      const res = await lookupItems({ barcode: code, limit: 1, branch })
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       const existingIndex = items.findIndex((row) => row.itemCode === item.id)
@@ -463,11 +457,6 @@ useEffect(() => {
 
   // ── Customer search ──────────────────────────────────────────────────────
 
-  const { data: customersData, isLoading: loadingCustomers } = useQuery({
-    queryKey: ['customerSearch', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-    enabled: true,
-  })
 
   const { data: defaultPriceTier = 'B' } = useQuery({
     queryKey: ['defaultPriceTier'],
@@ -484,42 +473,20 @@ useEffect(() => {
   })
 
   // ── Sucursal (branch) selector ────────────────────────────────────────────
-  const isSystemManager = useIsSystemManager()
   const { data: myBranches, refetch: refetchMyBranches } = useQuery({
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
     enabled: !!currentUserEmail,
     staleTime: 60_000,
   })
-  const { data: allSucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-    enabled: isSystemManager,
-    staleTime: 60_000,
-  })
-  const branchOptions = useMemo(
-    () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
-    [isSystemManager, allSucursales, myBranches],
-  )
 
-  const branchSelectOptions: SearchSelectOption[] = useMemo(() => {
-    const q = branchSearch.toLowerCase()
-    return branchOptions
-      .filter((b) => !q || b.toLowerCase().includes(q))
-      .map((b) => ({ value: b, label: b }))
-  }, [branchOptions, branchSearch])
 
   useEffect(() => {
     if (myBranches?.defaultBranch && !branch && !isEdit) setBranch(myBranches.defaultBranch)
   }, [myBranches])
 
   // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
-  const { data: branchWarehouses } = useQuery({
-    queryKey: ['almacenes', { branch }],
-    queryFn: () => listAlmacenes({ branch }),
-    enabled: !!branch,
-    staleTime: 60_000,
-  })
+  const { data: branchWarehouses } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch, staleTime: 60_000 })
 
   // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido
   useEffect(() => {
@@ -544,11 +511,6 @@ useEffect(() => {
     )
   }, [branchWarehouses])
 
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
-    sublabel: c.rnc ?? c.cedula,
-  }))
 
   function handleCustomerCreated(customer: Customer) {
     setShowCreateCustomer(false)
@@ -843,7 +805,7 @@ function buildDto(): CreateQuotationDto {
     // El picker puede no traer `dimensiones` — solo el detalle las garantiza (§4.3). Si faltan,
     // se completan para habilitar la columna de dimensión.
     if (!catalogItem.dimensiones || catalogItem.dimensiones.length === 0) {
-      getItem(catalogItem.id).then((detail) => {
+      getItemLookup(catalogItem.id).then((detail) => {
         if (!detail?.usaDimensiones || !detail.dimensiones || detail.dimensiones.length === 0) return
         setItems((prev) => prev.map((row, i) =>
           i === index && row.itemCode === catalogItem.id && !(row.itemDimensionesDeclaradas?.length)
@@ -1103,24 +1065,20 @@ if (esClienteOcasional) {
                      required={esClienteOcasional}
                    />
                  ) : (
-                   <SearchSelect
-                     id="customer"
-                     value={customerId}
-                     onChange={(id, opt) => {
+                   <OpcionesSelect recurso="clientes" id="customer" value={customerId} onChange={(id, opt) => {
                        const cid = id === '' ? '' : (opt?.value ?? id)
                        setCustomerId(cid)
                        setCustomerName(opt?.label ?? '')
-                       const c = cid ? customersData?.items?.find((c) => c.id === cid) : undefined
-                       setCustomerPriceTier(c?.priceTier)
-                       setCustomerDefaultDiscountPct(c?.descuentoDefaultPct ?? undefined)
-                     }}
-                     options={customerOptions}
-                     selectedLabel={customerName}
-                     onSearch={setCustomerQuery}
-                     loading={loadingCustomers}
-                     placeholder="Buscar cliente…"
-                     error={!customerId}
-                     headerContent={
+                       setCustomerPriceTier(undefined)
+                       setCustomerDefaultDiscountPct(undefined)
+                       // /opciones solo trae value/label: tarifa y descuento salen del detalle del cliente.
+                       if (cid) {
+                         getCustomer(cid).then((c) => {
+                           setCustomerPriceTier(c.priceTier)
+                           setCustomerDefaultDiscountPct(c.descuentoDefaultPct ?? undefined)
+                         }).catch(() => {})
+                       }
+                     }} placeholder="Buscar cliente…" error={!customerId} headerContent={
                        <button
                          type="button"
                          className="btn btn-ghost btn-size-sm"
@@ -1129,8 +1087,7 @@ if (esClienteOcasional) {
                        >
                          <UserPlus size={14} /> Agregar cliente
                        </button>
-                     }
-                   />
+                     } selectedLabel={customerName} minChars={2} />
                  )}
                </div>
 
@@ -1232,17 +1189,7 @@ if (esClienteOcasional) {
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>
-                <SearchSelect
-                  id="branch"
-                  value={branch}
-                  selectedLabel={branch}
-                  error={!branch}
-                  onChange={(val) => setBranch(val)}
-                  options={branchSelectOptions}
-                  onSearch={setBranchSearch}
-                  placeholder="Sin especificar"
-                  className="ff-select"
-                />
+                <OpcionesSelect recurso="sucursales" id="branch" value={branch} onChange={(val) => setBranch(val)} placeholder="Sin especificar" error={!branch} className="ff-select" selectedLabel={branch} />
               </div>
 
             </div>

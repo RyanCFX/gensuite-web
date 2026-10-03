@@ -4,8 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { listInvoices, getInvoice } from '@/shared/api/invoices'
-import { listCustomers } from '@/shared/api/customers'
-import { listMetodosPago } from '@/shared/api/config'
 import { getEcfTipos } from '@/shared/api/ecf'
 import { createDevolucion } from '@/shared/api/devoluciones'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -24,6 +22,8 @@ import { ECF_MODIFICATION_CODES_CREDIT_NOTE, ecfTipoElectronicoHabilitado } from
 import { Select, SelectItem } from '@/components/ui/select'
 import { DEVOLUCION_DIAS_LIMITE_ITBIS } from '@/lib/constants'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 const RETURN_RESOLUTION_OPTIONS: SearchSelectOption[] = [
   { value: 'credit_note_only', label: 'Saldo a favor' },
@@ -67,16 +67,6 @@ export default function DevolucionForm() {
 
   const [customerId, setCustomerId] = useState('')
   const [customerLabel, setCustomerLabel] = useState('')
-  const [customerSearch, setCustomerSearch] = useState('')
-  const { data: customersData, isLoading: loadingCustomers } = useQuery({
-    queryKey: ['customerSearch-devolucion', customerSearch],
-    queryFn: () => listCustomers({ search: customerSearch || undefined, limit: 15 }),
-  })
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
-    sublabel: c.rnc ?? c.cedula,
-  }))
 
   const [invoiceId, setInvoiceId] = useState('')
   const [invoiceLabel, setInvoiceLabel] = useState('')
@@ -128,12 +118,7 @@ export default function DevolucionForm() {
     staleTime: 30_000,
   })
 
-  const { data: metodos } = useQuery({
-    queryKey: ['metodos-pago'],
-    queryFn: listMetodosPago,
-    enabled: !!invoiceId,
-    staleTime: 5 * 60_000,
-  })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, enabled: !!invoiceId, staleTime: 5 * 60_000 })
 
   // e-CF: si la Nota de Crédito (typeId 34) se emite como comprobante electrónico para este
   // tenant, el modificationCode (Tabla VI DGII) es obligatorio para poder someterla en Vega.
@@ -369,19 +354,11 @@ export default function DevolucionForm() {
                 </button>
               </div>
             ) : (
-              <SearchSelect
-                value=""
-                onChange={(val, opt) => {
+              <OpcionesSelect recurso="clientes" value="" onChange={(val, opt) => {
                   if (!val) return
                   setCustomerId(val)
                   setCustomerLabel(opt?.label ?? val)
-                }}
-                options={customerOptions}
-                onSearch={setCustomerSearch}
-                selectedLabel=""
-                placeholder="Buscar cliente por nombre, RNC o cédula…"
-                loading={loadingCustomers}
-              />
+                }} placeholder="Buscar cliente por nombre, RNC o cédula…" selectedLabel="" minChars={2} />
             )}
           </div>
         </div>

@@ -10,7 +10,6 @@ import { Plus, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from 'luci
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
-import { fallbackSucursales } from '@/shared/api/opcionesFallback'
 import { useFiltrosPantalla } from '@/shared/permissions/useAcceso'
 import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
@@ -138,7 +137,6 @@ export default function ComprasPage() {
                     onChange={(val) => { setBranch(val); setPage(1) }}
                     selectedLabel={branch}
                     placeholder="Todas las sucursales"
-                    fallback={fallbackSucursales}
                   />
                 )}
 

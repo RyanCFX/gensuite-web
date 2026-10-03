@@ -9,9 +9,8 @@ import {
   getDespacho, updateDespacho, asignarTrackingDespacho, submitDespacho, cancelarDespacho,
   facturarDespacho, devolucionDespacho, downloadDespachoPdf, confirmarStockDespacho, deleteDespacho,
 } from '@/shared/api/despachos'
-import { getItem } from '@/shared/api/catalog'
+import { getItemLookup } from '@/shared/api/catalog'
 import { listWarehouses } from '@/shared/api/inventory'
-import { listAlmacenes } from '@/shared/api/config'
 import type { ComponentTracking, DespachoItemDto, ApiError, ConfirmarStockDespachoResult, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
@@ -25,6 +24,7 @@ import type { TrackedComponent } from '@/components/shared/ComponentTrackingModa
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { DESPACHO_STATUS_BADGE, DESPACHO_STATUS_LABEL, DELIVERY_STATUS_LABEL, extractInvoiceId } from './lib'
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 const DESPACHO_ITEMS_COLUMNS = [
   { key: 'articulo', width: 240 },
@@ -92,7 +92,7 @@ export default function DespachoDetail() {
   const itemQueries = useQueries({
     queries: uniqueItemCodes.map((code) => ({
       queryKey: ['item-tracking-type', code],
-      queryFn: () => getItem(code),
+      queryFn: () => getItemLookup(code),
       staleTime: 5 * 60_000,
       enabled: despacho?.status === 'draft',
     })),
@@ -569,10 +569,7 @@ function ConfirmarStockModal({
   const [warehouseSearch, setWarehouseSearch] = useState('')
   const { widths: colWidths, startResize } = useResizableColumns(CONFIRMAR_STOCK_COLUMNS)
 
-  const { data: almacenesData } = useQuery({
-    queryKey: ['almacenes-confirmar-stock'],
-    queryFn: () => listAlmacenes(),
-  })
+  const { data: almacenesData } = useOpcionesArray('almacenes', { limit: 100 })
   const warehouseOptions = (almacenesData ?? [])
     .filter((a) => !a.disabled)
     .filter((a) => !warehouseSearch || a.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
@@ -703,7 +700,7 @@ function EditDespachoModal({
   // poder mostrar el selector.
   useEffect(() => {
     let cancelled = false
-    Promise.all(items.map((i) => getItem(i.itemCode).catch(() => null))).then((catalogItems) => {
+    Promise.all(items.map((i) => getItemLookup(i.itemCode).catch(() => null))).then((catalogItems) => {
       if (cancelled) return
       setRows((prev) => prev.map((r, i) => {
         const catalogItem = catalogItems[i]

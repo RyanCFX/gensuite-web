@@ -3,18 +3,16 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { listLotesFarmacia } from '@/shared/api/farmacia'
 import type { ListLotesFarmaciaParams } from '@/shared/api/farmacia'
-import { listAseguradoras, nombreAseguradora } from '@/shared/api/aseguradoras'
 import { Plus, Eye } from 'lucide-react'
 import { formatDOP, formatDate } from '@/lib/formatters'
 import { Select, SelectItem } from '@/components/ui/select'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Permitido } from '@/components/shared/Permitido'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { LoteCreateModal } from './LoteCreateModal'
 import type { LoteFarmaciaEstado } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 type EstadoFilter = LoteFarmaciaEstado | 'all'
 
@@ -39,19 +37,10 @@ export default function LotesPage() {
   const navigate = useNavigate()
   const [aseguradoraId, setAseguradoraId] = useState('')
   const [aseguradoraLabel, setAseguradoraLabel] = useState('')
-  const [aseguradoraQuery, setAseguradoraQuery] = useState('')
   const [estado, setEstado] = useState<EstadoFilter>('all')
   const [showCreate, setShowCreate] = useState(false)
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
-  const { data: aseguradorasData, isLoading: aseguradorasLoading } = useQuery({
-    queryKey: ['aseguradoraSearch', aseguradoraQuery],
-    queryFn: () => listAseguradoras({ search: aseguradoraQuery || undefined, limit: 15 }),
-  })
-  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((a) => ({
-    value: a.id,
-    label: nombreAseguradora(a),
-  }))
 
   const params: ListLotesFarmaciaParams = {
     aseguradora: aseguradoraId || undefined,
@@ -86,17 +75,7 @@ export default function LotesPage() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <FilterField label="ARS" style={{ width: 220 }}>
-                <SearchSelect
-                  value={aseguradoraId}
-                  selectedLabel={aseguradoraLabel}
-                  onChange={(val, opt) => { setAseguradoraId(val); setAseguradoraLabel(opt?.label ?? '') }}
-                  options={aseguradoraOptions}
-                  onSearch={setAseguradoraQuery}
-                  loading={aseguradorasLoading}
-                  placeholder="Filtrar por ARS…"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="ARS" filterStyle={{ width: 220 }} recurso="aseguradoras" value={aseguradoraId} onChange={(val, opt) => { setAseguradoraId(val); setAseguradoraLabel(opt?.label ?? '') }} selectedLabel={aseguradoraLabel} placeholder="Filtrar por ARS…" />
               <FilterField label="Estado">
                 <Select value={estado} onValueChange={(val) => setEstado(val as EstadoFilter)}>
                   <SelectItem value="all">Todos los estados</SelectItem>

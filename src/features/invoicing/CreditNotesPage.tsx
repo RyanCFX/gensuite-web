@@ -9,10 +9,8 @@ import {
 import { listInvoices, getInvoice } from '@/shared/api/invoices'
 import { getCatalogosFiscales } from '@/shared/api/config'
 import { getEcfTipos } from '@/shared/api/ecf'
-import { listCustomers, getCustomer } from '@/shared/api/customers'
+import { getCustomer } from '@/shared/api/customers'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { listSucursales } from '@/shared/api/sucursales'
-import { listDepartamentos } from '@/shared/api/departamentos'
 import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo, EcfModificationCode } from '@/shared/api/types'
 import { ECF_MODIFICATION_CODES_CREDIT_NOTE, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -35,6 +33,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { ApplyCreditNoteModal } from './CreditNoteActionModals'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const LIST_COLUMNS = [
   { key: 'expand', width: 28 },
@@ -140,7 +139,6 @@ export default function CreditNotesPage() {
   // ── Filtro por cliente (preseleccionado si viene ?customer= desde Clientes) ──
   const [customerId, setCustomerId] = useState(searchParams.get('customer') ?? '')
   const [customerLabel, setCustomerLabel] = useState('')
-  const [customerQuery, setCustomerQuery] = useState('')
   const [branch, setBranch] = useState('')
   const [department, setDepartment] = useState('')
   const [createdAtFrom, setCreatedAtFrom] = useState('')
@@ -171,25 +169,9 @@ export default function CreditNotesPage() {
     .filter((t) => !ncfTypeSearch || t.label.toLowerCase().includes(ncfTypeSearch.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 
-  const { data: sucursales } = useQuery({
-    queryKey: ['sucursales-all'],
-    queryFn: () => listSucursales({ limit: 100 }),
-  })
 
-  const { data: departamentos } = useQuery({
-    queryKey: ['departamentos-all'],
-    queryFn: () => listDepartamentos({ limit: 100 }),
-  })
 
-  const [branchSearch, setBranchSearch] = useState('')
-  const branchOptions: SearchSelectOption[] = (sucursales?.items ?? [])
-    .filter((s) => !branchSearch || s.name.toLowerCase().includes(branchSearch.toLowerCase()))
-    .map((s) => ({ value: s.id, label: s.name }))
 
-  const [departmentSearch, setDepartmentSearch] = useState('')
-  const departmentOptions: SearchSelectOption[] = (departamentos?.items ?? [])
-    .filter((d) => !departmentSearch || d.name.toLowerCase().includes(departmentSearch.toLowerCase()))
-    .map((d) => ({ value: d.id, label: d.name }))
 
   const { data: preselectedCustomer } = useQuery({
     queryKey: ['customer', customerId],
@@ -202,16 +184,7 @@ export default function CreditNotesPage() {
     if (preselectedCustomer) setCustomerLabel(preselectedCustomer.customerName)
   }, [preselectedCustomer])
 
-  const { data: customersData, isLoading: customersLoading } = useQuery({
-    queryKey: ['customerSearch', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-  })
 
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
-    sublabel: c.rnc ?? c.cedula,
-  }))
 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('')
@@ -428,37 +401,9 @@ export default function CreditNotesPage() {
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <FilterField label="Cliente" style={{ width: 260 }}>
-                <SearchSelect
-                  value={customerId}
-                  selectedLabel={customerLabel}
-                  onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={customersLoading}
-                  placeholder="Filtrar por cliente…"
-                />
-              </FilterField>
-              <FilterField label="Sucursal" style={{ width: 200 }}>
-                <SearchSelect
-                  value={branch}
-                  onChange={setBranch}
-                  options={branchOptions}
-                  onSearch={setBranchSearch}
-                  selectedLabel={sucursales?.items.find((s) => s.id === branch)?.name ?? ''}
-                  placeholder="Todas las sucursales"
-                />
-              </FilterField>
-              <FilterField label="Departamento" style={{ width: 200 }}>
-                <SearchSelect
-                  value={department}
-                  onChange={setDepartment}
-                  options={departmentOptions}
-                  onSearch={setDepartmentSearch}
-                  selectedLabel={departamentos?.items.find((d) => d.id === department)?.name ?? ''}
-                  placeholder="Todos los departamentos"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Cliente" filterStyle={{ width: 260 }} recurso="clientes" value={customerId} onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }} selectedLabel={customerLabel} placeholder="Filtrar por cliente…" minChars={2} />
+              <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }} recurso="sucursales" value={branch} onChange={setBranch} placeholder="Todas las sucursales" />
+              <OpcionesSelect hideOnForbidden filterLabel="Departamento" filterStyle={{ width: 200 }} recurso="departamentos" value={department} onChange={setDepartment} placeholder="Todos los departamentos" />
               <FilterField label="NCF">
                 <input
                   className="ff-input ff-input-sm"

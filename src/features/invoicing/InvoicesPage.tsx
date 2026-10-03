@@ -13,7 +13,6 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
-import { fallbackSucursales, fallbackAseguradoras } from '@/shared/api/opcionesFallback'
 import { useFiltrosPantalla } from '@/shared/permissions/useAcceso'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
@@ -23,6 +22,7 @@ import { EstadoArsBadge } from './EstadoArsBadge'
 import type { EstadoArs } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
+import { useFiltroQuery } from '@/shared/hooks/useFiltroQuery'
 
 type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
 type EstadoArsFilter = EstadoArs | 'all' | 'sinLote'
@@ -110,7 +110,7 @@ export default function InvoicesPage() {
     queryFn: () => listInvoices(params),
   })
 
-  const { data: catalogos } = useQuery({
+  const { data: catalogos, bloqueado: catalogosBloqueado } = useFiltroQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
     queryFn: () => getCatalogosFiscales({ type: 'venta' }),
     staleTime: 60 * 60_000,
@@ -230,7 +230,6 @@ export default function InvoicesPage() {
                   onChange={setBranch}
                   placeholder="Todas las sucursales"
                   selectedLabel={branch}
-                  fallback={fallbackSucursales}
                 />
               )}
               {esFarmacia && filtros.puedeFiltrar('aseguradora') && (
@@ -241,7 +240,6 @@ export default function InvoicesPage() {
                       selectedLabel={aseguradoraLabel}
                       onChange={(val, opt) => { setAseguradora(val); setAseguradoraLabel(opt?.label ?? '') }}
                       placeholder="Todas las ARS"
-                      fallback={fallbackAseguradoras}
                     />
                   {filtros.puedeFiltrar('estadoArs') && (
                   <FilterField label="Estado ARS">
@@ -425,7 +423,7 @@ export default function InvoicesPage() {
           </>
         }
       >
-        {filtros.puedeFiltrar('ncfType') && (
+        {filtros.puedeFiltrar('ncfType') && !catalogosBloqueado && (
         <div className="ff-wrap">
           <label className="ff-label">Tipo NCF</label>
           <SearchSelect

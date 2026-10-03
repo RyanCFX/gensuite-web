@@ -3,34 +3,23 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getAgingProveedores } from '@/shared/api/pagos'
 import type { AgingGroupBy, AgingProveedorInvoiceEntry } from '@/shared/api/types'
-import { listSuppliers } from '@/shared/api/suppliers'
 import { downloadCxpAgingPdf } from '@/shared/api/reportes'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Info, Download, Loader2 } from 'lucide-react'
 import { Select, SelectItem } from '@/components/ui/select'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const DEFAULT_LABELS = ['Corriente', '0–30 días', '31–60 días', '61–90 días', '+90 días']
 
 export default function AgingProveedoresPage() {
   const [supplierId, setSupplierId] = useState('')
   const [supplierLabel, setSupplierLabel] = useState('')
-  const [supplierQuery, setSupplierQuery] = useState('')
   const [groupBy, setGroupBy] = useState<AgingGroupBy>('party')
   const [showCurrent, setShowCurrent] = useState(false)
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['supplierSearch', supplierQuery],
-    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
-  })
-  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
-    value: s.id,
-    label: s.supplierName,
-  }))
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['aging-proveedores', supplierId, groupBy],
@@ -95,15 +84,7 @@ export default function AgingProveedoresPage() {
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
               <div style={{ width: 260 }}>
-                <SearchSelect
-                  value={supplierId}
-                  selectedLabel={supplierLabel}
-                  onChange={(val, opt) => { setSupplierId(val); setSupplierLabel(opt?.label ?? '') }}
-                  options={supplierOptions}
-                  onSearch={setSupplierQuery}
-                  loading={suppliersLoading}
-                  placeholder="Todos los proveedores"
-                />
+                <OpcionesSelect recurso="proveedores" value={supplierId} onChange={(val, opt) => { setSupplierId(val); setSupplierLabel(opt?.label ?? '') }} placeholder="Todos los proveedores" selectedLabel={supplierLabel} minChars={2} />
               </div>
               <Select value={groupBy} onValueChange={(val) => setGroupBy(val as AgingGroupBy)} clearable={false}>
                 <SelectItem value="party">Agrupar por Proveedor</SelectItem>

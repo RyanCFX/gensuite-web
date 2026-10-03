@@ -34,7 +34,7 @@ import {
 } from "@/shared/api/notes";
 import { listMetodosPago, listDenominaciones, getFacturacionConfig, getCatalogosFiscales } from "@/shared/api/config";
 import { createDevolucion } from "@/shared/api/devoluciones";
-import { getItem } from "@/shared/api/catalog";
+import { getItemLookup } from "@/shared/api/catalog";
 import { getBundle } from "@/shared/api/bundles";
 import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
 import { crearDespachoDesdeFactura, listDespachos } from "@/shared/api/despachos";
@@ -114,6 +114,8 @@ import type { SearchSelectOption } from "@/shared/ui/SearchSelect";
 import { ComponentTrackingModal } from "@/components/shared/ComponentTrackingModal";
 import type { TrackedComponent } from "@/components/shared/ComponentTrackingModal";
 import { useResizableColumns } from "@/shared/hooks/useResizableColumns";
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
+import { reglasCuentaBancaria } from '@/lib/pagoBancario';
 
 const PAGOS_COLUMNS = [
   { key: "metodo", width: 110 },
@@ -398,12 +400,7 @@ export default function InvoiceDetail() {
 
   // Usado por el selector de método de pago del reembolso en el modal de Devolución,
   // y por el bloque de "¿Cómo se cobra?" al someter (validación de requiresBankAccount).
-  const { data: metodos } = useQuery({
-    queryKey: ["metodos-pago"],
-    queryFn: listMetodosPago,
-    enabled: invoice?.status === "draft" || invoice?.status === "submitted",
-    staleTime: 5 * 60_000,
-  });
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, enabled: invoice?.status === "draft" || invoice?.status === "submitted", staleTime: 5 * 60_000 });
 
   // Misma key que usa PaymentLinesEditor — cache compartido, sin request extra. Hace falta para
   // validar que el desglose del vuelto suma el excedente cuando hay sobrepago.
@@ -720,7 +717,7 @@ export default function InvoiceDetail() {
     if (flujoCobro === "directo") {
       if (!directoMop) return false;
       const metodo = metodosActivos.find((m) => m.name === directoMop);
-      if (metodo?.requiresBankAccount && !metodo.defaultBankAccount) return false;
+      if (reglasCuentaBancaria(metodo).cuentaObligatoria) return false;
       const amount = Number(directoAmount);
       return amount > 0 && amount <= pendingAmount + 0.01;
     }
@@ -730,7 +727,7 @@ export default function InvoiceDetail() {
     if (filled.length !== payments.payments.length) return false;
     for (const p of filled) {
       const metodo = metodosActivos.find((m) => m.name === p.modeOfPayment);
-      if (metodo?.requiresBankAccount && !metodo.defaultBankAccount && !p.bankAccount) {
+      if (reglasCuentaBancaria(metodo).cuentaObligatoria && !p.bankAccount) {
         return false;
       }
     }
@@ -866,7 +863,7 @@ export default function InvoiceDetail() {
     try {
       const directLine = invoice.items.find((i) => i.itemCode === parsedCode);
       if (directLine) {
-        const item = await getItem(parsedCode).catch(() => null);
+        const item = await getItemLookup(parsedCode).catch(() => null);
         setTrackingRecovery({
           itemCode: parsedCode,
           itemName: item?.itemName,
@@ -883,7 +880,7 @@ export default function InvoiceDetail() {
           const bundle = await getBundle(line.itemCode);
           const comp = bundle.components.find((c) => c.itemCode === parsedCode);
           if (comp) {
-            const item = await getItem(parsedCode).catch(() => null);
+            const item = await getItemLookup(parsedCode).catch(() => null);
             setTrackingRecovery({
               itemCode: parsedCode,
               itemName: item?.itemName ?? comp.itemName,
@@ -899,7 +896,7 @@ export default function InvoiceDetail() {
       }
 
       // No se pudo ubicar la línea/almacén exacto — igual se muestra el selector con lo disponible.
-      const item = await getItem(parsedCode).catch(() => null);
+      const item = await getItemLookup(parsedCode).catch(() => null);
       setTrackingRecovery({
         itemCode: parsedCode,
         itemName: item?.itemName,

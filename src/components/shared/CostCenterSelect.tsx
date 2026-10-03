@@ -1,9 +1,8 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import type { ItemProps } from '@/shared/api/types'
-import { listCentrosCosto } from '@/shared/api/centros-costo'
+import { useOpcionesLista } from '@/shared/hooks/useOpciones'
 
 interface CostCenterSelectProps {
   value: ItemProps | null
@@ -17,11 +16,7 @@ interface CostCenterSelectProps {
 export function CostCenterSelect({ value, onChange, placeholder = 'Buscar centro de costo…', error, disabled, id }: CostCenterSelectProps) {
   const [query, setQuery] = useState('')
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['cost-center-search', query],
-    queryFn: () => listCentrosCosto({ search: query || undefined }),
-    staleTime: 30_000,
-  })
+  const { data, isLoading, refetch } = useOpcionesLista('centros-costo', { q: query, limit: 100, staleTime: 30_000 })
 
   const options: SearchSelectOption[] = (data?.items ?? []).map((c) => ({
     value: c.id,

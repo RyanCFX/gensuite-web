@@ -1,32 +1,21 @@
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createLoteFarmacia } from '@/shared/api/farmacia'
-import { listAseguradoras, nombreAseguradora } from '@/shared/api/aseguradoras'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { X, Loader2, AlertTriangle } from 'lucide-react'
 import type { LoteFacturacionArs } from '@/shared/api/types'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 export function LoteCreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (lote: LoteFacturacionArs) => void }) {
   const [aseguradoraId, setAseguradoraId] = useState('')
   const [aseguradoraLabel, setAseguradoraLabel] = useState('')
-  const [aseguradoraQuery, setAseguradoraQuery] = useState('')
   const [periodoInicio, setPeriodoInicio] = useState('')
   const [periodoFin, setPeriodoFin] = useState('')
   const [responsable, setResponsable] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  const { data: aseguradorasData, isLoading: aseguradorasLoading } = useQuery({
-    queryKey: ['aseguradoraSearch', aseguradoraQuery],
-    queryFn: () => listAseguradoras({ search: aseguradoraQuery || undefined, limit: 15 }),
-  })
-  const aseguradoraOptions: SearchSelectOption[] = (aseguradorasData?.items ?? []).map((a) => ({
-    value: a.id,
-    label: nombreAseguradora(a),
-  }))
-  const aseguradoraSeleccionada = aseguradorasData?.items.find((a) => a.id === aseguradoraId)
+  const [aseguradoraTieneCredito, setAseguradoraTieneCredito] = useState<boolean | null>(null)
 
   const createMutation = useMutation({
     mutationFn: createLoteFarmacia,
@@ -61,19 +50,22 @@ export function LoteCreateModal({ onClose, onCreated }: { onClose: () => void; o
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="ff-wrap">
               <label className="ff-label ff-required">ARS</label>
-              <SearchSelect
+              <OpcionesSelect
+                recurso="aseguradoras"
                 value={aseguradoraId}
                 selectedLabel={aseguradoraLabel}
-                onChange={(val, opt) => { setAseguradoraId(val); setAseguradoraLabel(opt?.label ?? '') }}
-                options={aseguradoraOptions}
-                onSearch={setAseguradoraQuery}
-                loading={aseguradorasLoading}
+                onChange={(val, opt) => {
+                  setAseguradoraId(val)
+                  setAseguradoraLabel(opt?.label ?? '')
+                  const credito = opt?.raw?.custom_tiene_credito
+                  setAseguradoraTieneCredito(val ? credito === 1 || credito === true : null)
+                }}
                 placeholder="Buscar ARS…"
                 error={submitted && !aseguradoraId}
               />
             </div>
 
-            {aseguradoraSeleccionada && aseguradoraSeleccionada.hasCredit === false && (
+            {aseguradoraTieneCredito === false && (
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: 10, borderRadius: 'var(--radius-md)', background: 'var(--warning-bg, rgba(234,179,8,0.1))', fontSize: 12 }}>
                 <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
                 <span>

@@ -3,9 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listCobros } from '@/shared/api/cobros'
 import type { ListCobrosParams } from '@/shared/api/cobros'
-import { listCustomers } from '@/shared/api/customers'
-import { listMetodosPago } from '@/shared/api/config'
-import { listCuentasBancarias } from '@/shared/api/cuentas-bancarias'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Plus, SlidersHorizontal } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -18,6 +15,8 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Drawer } from '@/shared/ui/Drawer'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { useOpcionesLista } from '@/shared/hooks/useOpciones'
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
 
@@ -41,12 +40,10 @@ export default function CobrosPage() {
 
   const [customerId, setCustomerId] = useState('')
   const [customerLabel, setCustomerLabel] = useState('')
-  const [customerQuery, setCustomerQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [modeOfPayment, setModeOfPayment] = useState('')
-  const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState('')
   const [bankAccount, setBankAccount] = useState('')
   const [bankAccountSearch, setBankAccountSearch] = useState('')
   const [paidAmountMin, setPaidAmountMin] = useState('')
@@ -65,25 +62,9 @@ export default function CobrosPage() {
   ]
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
-  const { data: customersData, isLoading: customersLoading } = useQuery({
-    queryKey: ['customerSearch', customerQuery],
-    queryFn: () => listCustomers({ search: customerQuery || undefined, limit: 15 }),
-  })
-  const customerOptions: SearchSelectOption[] = (customersData?.items ?? []).map((c) => ({
-    value: c.id,
-    label: c.customerName,
-  }))
 
-  const { data: metodos } = useQuery({ queryKey: ['metodos-pago'], queryFn: listMetodosPago })
-  const modeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
-    .filter((m) => !m.disabled)
-    .filter((m) => !modeOfPaymentSearch || m.name.toLowerCase().includes(modeOfPaymentSearch.toLowerCase()))
-    .map((m) => ({ value: m.name, label: m.name }))
 
-  const { data: cuentasBancarias } = useQuery({
-    queryKey: ['cuentas-bancarias-activas'],
-    queryFn: () => listCuentasBancarias({ estado: 'Activa', limit: 100 }),
-  })
+  const { data: cuentasBancarias } = useOpcionesLista('cuentas-bancarias', { limit: 100 })
   const bankAccountOptions: SearchSelectOption[] = (cuentasBancarias?.items ?? [])
     .filter((c) => !bankAccountSearch || c.accountName.toLowerCase().includes(bankAccountSearch.toLowerCase()))
     .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))
@@ -141,17 +122,7 @@ export default function CobrosPage() {
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <FilterField label="Cliente" style={{ width: 260 }}>
-                <SearchSelect
-                  value={customerId}
-                  selectedLabel={customerLabel}
-                  onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }}
-                  options={customerOptions}
-                  onSearch={setCustomerQuery}
-                  loading={customersLoading}
-                  placeholder="Filtrar por cliente…"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Cliente" filterStyle={{ width: 260 }} recurso="clientes" value={customerId} onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? '') }} selectedLabel={customerLabel} placeholder="Filtrar por cliente…" minChars={2} />
 
               <FilterField label="Estado">
                 <Select value={status} onValueChange={(val) => setStatus(val as StatusFilter)}>
@@ -162,15 +133,7 @@ export default function CobrosPage() {
                 </Select>
               </FilterField>
 
-              <FilterField label="Método de pago" style={{ width: 200 }}>
-                <SearchSelect
-                  value={modeOfPayment}
-                  onChange={(val) => setModeOfPayment(val)}
-                  options={modeOfPaymentOptions}
-                  onSearch={setModeOfPaymentSearch}
-                  placeholder="Todos los métodos de pago"
-                />
-              </FilterField>
+              <OpcionesSelect hideOnForbidden filterLabel="Método de pago" filterStyle={{ width: 200 }} recurso="metodos-pago" value={modeOfPayment} onChange={(val) => setModeOfPayment(val)} placeholder="Todos los métodos de pago" />
 
               <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
                 <SlidersHorizontal size={13} />

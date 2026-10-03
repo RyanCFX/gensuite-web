@@ -2,20 +2,22 @@ import { useState } from 'react'
 import { FilterField } from './FilterField'
 import { SearchSelect, type SearchSelectOption } from './SearchSelect'
 import { useOpciones } from '@/shared/hooks/useOpciones'
-import type { ApiError, OpcionItem } from '@/shared/api/types'
+import { esErrorDePermiso } from '@/shared/hooks/useFiltroQuery'
 
-// Select alimentado por GET /opciones/:recurso (listas mínimas value/label).
-// docs/tasks/PROMPT_PERMISOS_V2_Y_DASHBOARD_MODULAR_FRONTEND.md §5.3.
-// Así un filtro/select NO exige acceso a la pantalla de administración de la entidad.
+// Select alimentado por GET /opciones/:recurso (listas mínimas value/label + extras).
+// Así un formulario/filtro NO exige acceso a la pantalla de administración de la entidad.
+//  - Formulario: ante 403 RECURSO_NO_PERMITIDO queda deshabilitado con "No tiene acceso a esta lista".
+//  - Filtro de tabla (`hideOnForbidden`): ante 403 no hay alerta y el control no se renderiza.
 
 export interface OpcionesSelectProps {
-  /** Clave sin prefijo (`sucursales`, `clientes`…) — también acepta `lookup.*`. */
+  /** Clave sin prefijo (`sucursales`, `clientes`…). */
   recurso: string
   value: string
   onChange: (value: string, option: SearchSelectOption | null) => void
   placeholder?: string
   disabled?: boolean
   error?: boolean
+  /** Label del valor ya guardado (el documento lo trae) — se muestra aunque no esté en la lista. */
   selectedLabel?: string
   className?: string
   id?: string
@@ -23,13 +25,15 @@ export interface OpcionesSelectProps {
   limit?: number
   headerContent?: React.ReactNode
   onEnterWithoutMatch?: (query: string) => void
-  /** Listado legacy mientras el backend no expone /opciones (404 → fallback). */
-  fallback?: (q: string, limit: number) => Promise<OpcionItem[]>
   /** Filtros de tablas: ante un 403 no hay alerta y el control no se renderiza. */
   hideOnForbidden?: boolean
   /** Con `filterLabel` el select se envuelve en un `FilterField` (y se oculta junto con él). */
   filterLabel?: string
   filterStyle?: React.CSSProperties
+  /** Caracteres mínimos antes de consultar (artículos/clientes: 2). Con 0 consulta al abrir. */
+  minChars?: number
+  /** Excluye opciones por value (ej. "destino ≠ origen"). */
+  excludeValues?: string[]
 }
 
 export function OpcionesSelect({
@@ -46,26 +50,60 @@ export function OpcionesSelect({
   limit,
   headerContent,
   onEnterWithoutMatch,
-  fallback,
   hideOnForbidden = false,
   filterLabel,
   filterStyle,
+  minChars = 0,
+  excludeValues,
 }: OpcionesSelectProps) {
   const [q, setQ] = useState('')
-  const { data, isLoading, error: loadError } = useOpciones(recurso, { q, limit, enabled: !disabled, fallback, silent403: hideOnForbidden })
-  if (hideOnForbidden && (loadError as ApiError | null)?.statusCode === 403) return null
-  const options: SearchSelectOption[] = (data ?? []).map((o) => ({ value: o.value, label: o.label }))
-  const select = (
+  const [picked, setPicked] = useState<{ value: string; label: string } | null>(null)
+  const { data, isLoading, error: loadError, forbidden } = useOpciones(recurso, {
+    q: q.trim().length >= minChars ? q : '',
+    limit,
+    enabled: !disabled && (minChars === 0 || q.trim().length >= minChars),
+    silent403: hideOnForbidden,
+  })
+  if (hideOnForbidden && esErrorDePermiso(loadError)) return null
+
+  const options: SearchSelectOption[] = (data ?? [])
+    .filter((o) => !excludeValues?.includes(o.value))
+    .map((o) => ({ value: o.value, label: o.label, sublabel: o.tax_id, raw: o as unknown as Record<string, unknown> }))
+
+  function handleChange(v: string, opt: SearchSelectOption | null) {
+    setPicked(opt ? { value: opt.value, label: opt.label } : null)
+    onChange(v, opt)
+  }
+  // Label del valor actual: el que el llamador ya conoce (documento guardado) → el recién elegido →
+  // el propio value (nunca dejar el campo en blanco aunque el valor no esté en la primera página).
+  const labelActual = !value ? '' : selectedLabel || (picked?.value === value ? picked.label : '') || options.find((o) => o.value === value)?.label || value
+
+  const select = forbidden ? (
+    <div title="No tiene acceso a esta lista">
+      <SearchSelect
+        value={value}
+        onChange={handleChange}
+        options={[]}
+        onSearch={() => {}}
+        placeholder="No tiene acceso a esta lista"
+        error={error}
+        disabled
+        selectedLabel={labelActual}
+        className={className}
+        id={id}
+      />
+    </div>
+  ) : (
     <SearchSelect
       value={value}
-      onChange={onChange}
+      onChange={handleChange}
       options={options}
       onSearch={setQ}
       loading={isLoading}
       placeholder={placeholder}
       error={error}
       disabled={disabled}
-      selectedLabel={selectedLabel}
+      selectedLabel={labelActual}
       className={className}
       id={id}
       debounceMs={debounceMs}

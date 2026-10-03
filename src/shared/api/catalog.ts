@@ -72,8 +72,22 @@ export async function getItem(id: string) {
   return unwrap(res)
 }
 
+/** Búsqueda de artículos para formularios (agregar a una línea). Sin costos ni márgenes
+ *  (`valuationRate`, `marginA/B/C`, `priceMode`, `actualizarCostoEnCompraOverride` no vienen).
+ *  403 `RECURSO_NO_PERMITIDO` si el usuario no tiene `lookup.articulos`. */
+export async function lookupItems(params?: ListItemsParams) {
+  const res = await client.get<PaginatedResponse<Item>>(ENDPOINTS.catalog.items.lookup, { params })
+  return unwrapPaginated(res)
+}
+
+/** Ficha de un artículo para formularios (precio, stock por almacén, impuestos, dimensiones, UOM). */
+export async function getItemLookup(id: string) {
+  const res = await client.get<{ success: true; data: Item }>(ENDPOINTS.catalog.items.lookupById(id))
+  return unwrap(res)
+}
+
 export async function getDefaultPriceTier() {
-  const res = await listItems({ limit: 1 })
+  const res = await lookupItems({ limit: 1 })
   return res.meta.defaultPriceTier
 }
 

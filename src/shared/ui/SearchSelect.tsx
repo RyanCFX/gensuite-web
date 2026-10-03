@@ -9,6 +9,8 @@ export interface SearchSelectOption {
   value: string       // ID sent to the API
   label: string       // Main display text
   sublabel?: string   // Secondary text (e.g. RNC, NCF)
+  /** Registro de origen (ej. el OpcionItem con sus extras: tax_id, stock_uom…). */
+  raw?: Record<string, unknown>
 }
 
 export interface SearchSelectProps {

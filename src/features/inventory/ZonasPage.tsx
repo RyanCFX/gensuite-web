@@ -8,7 +8,7 @@ import {
   listUbicaciones, createUbicacion, updateUbicacion, deleteUbicacion,
   listUbicacionesPendientes, distribuirUbicaciones, listMovimientosUbicaciones,
 } from '@/shared/api/ubicaciones'
-import { getItem } from '@/shared/api/catalog'
+import { getItemLookup } from '@/shared/api/catalog'
 import type { ZonaResponseDto, UbicacionResponseDto, ApiError, DistribuirUbicacionItemDto, DimensionesLinea } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -655,7 +655,7 @@ function PendienteCombinacionCell({
 }) {
   const { data: catalogItem } = useQuery({
     queryKey: ['item', itemCode],
-    queryFn: () => getItem(itemCode),
+    queryFn: () => getItemLookup(itemCode),
     enabled: editing && !!itemCode,
     staleTime: 5 * 60_000,
   })

@@ -3915,6 +3915,44 @@ export interface MeAcceso {
 export interface OpcionItem {
   value: string;
   label: string;
+  /** Extras de despliegue según el recurso (articulos: stock_uom/item_group; clientes y proveedores:
+   *  tax_id; cuentas-bancarias: bank; cuentas: account_number/root_type). */
+  stock_uom?: string;
+  item_group?: string;
+  tax_id?: string;
+  bank?: string;
+  account_number?: string;
+  root_type?: string;
+  /** almacenes: sucursal del almacén. */
+  custom_branch?: string | null;
+  /** metodos-pago: tipo ERPNext (Cash, Bank, General…). */
+  type?: string | null;
+  /** metodos-pago y cuentas-bancarias: moneda de la cuenta contable asociada (null = sin cuenta). */
+  currency?: string | null;
+  /** metodos-pago y cuentas-bancarias: id de la cuenta contable. */
+  account?: string | null;
+  /** monedas. */
+  symbol?: string | null;
+  fraction?: string | null;
+  number_format?: string | null;
+  /** uom: llega 0/1. */
+  must_be_whole_number?: number | boolean | null;
+  /** centros-costo. */
+  cost_center_number?: string | null;
+  /** grupos-clientes: nivel de precio A/B/C. */
+  custom_precio_tipo?: 'A' | 'B' | 'C' | null;
+  /** aseguradoras: llega 0/1. */
+  custom_tiene_credito?: number | boolean | null;
+  /** metodos-pago */
+  requires_bank_account?: number | boolean | null;
+  default_bank_account?: string | null;
+  es_cheque?: number | boolean | null;
+  /** cuentas-bancarias */
+  bank_account_no?: string | null;
+  custom_tipo_cuenta?: string | null;
+  custom_cheques_manuales?: number | boolean | null;
+  /** cajas-pos: true solo en la caja por defecto del usuario que consulta. */
+  is_user_default?: number | boolean | null;
 }
 
 export type GrantNivel = 'modulo' | 'pantalla' | 'componente';

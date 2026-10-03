@@ -15,7 +15,7 @@ import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDate, formatDateTime } from '@/lib/formatters'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { isApiErrorCode } from '@/shared/api/client'
-import { listAlmacenes, getCatalogosFiscales } from '@/shared/api/config'
+import { getCatalogosFiscales } from '@/shared/api/config'
 import {
   getRelacionComercial,
   actualizarConfiguracionRelacion,
@@ -40,6 +40,7 @@ import type {
 } from '@/shared/api/types'
 import { EstadoRelacionBadge } from './shared'
 import { TerminosComercialesFields } from './TerminosComercialesFields'
+import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 
 const ESTADO_ACTIVANDO = new Set(['invitada', 'activando'])
 // `revocada`/`rechazada` también dejan `configuracion: null` (nunca llegaron a activarse), pero no
@@ -168,11 +169,7 @@ export default function RelacionDetail() {
   // Catálogos para los selects de "Configuración de automatización" — no hay contexto de
   // sucursal en esta pantalla (es una configuración a nivel de relación, no de documento), así
   // que "Almacén destino" ofrece todos los almacenes del tenant en vez de filtrar por sucursal.
-  const { data: almacenesData } = useQuery({
-    queryKey: ['almacenes-todos'],
-    queryFn: () => listAlmacenes(),
-    staleTime: 60_000,
-  })
+  const { data: almacenesData } = useOpcionesArray('almacenes', { limit: 100, staleTime: 60_000 })
   const almacenOptions: SearchSelectOption[] = (almacenesData ?? []).map((w) => ({ value: w.id, label: w.name }))
 
   const { data: catalogosFiscales } = useQuery({

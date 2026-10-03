@@ -7,17 +7,15 @@ import {
   detenerSolicitudCompra, reanudarSolicitudCompra, generarOrdenDesdeSolicitud,
   getSolicitudCompraPdfBlobUrl, downloadSolicitudCompraPdf,
 } from '@/shared/api/solicitudes-compra'
-import { listSuppliers } from '@/shared/api/suppliers'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { Send, X, RotateCcw, Pause, Play, ShoppingCart, FileText, Eye, Download } from 'lucide-react'
-import { SearchSelect } from '@/shared/ui/SearchSelect'
-import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
 import type { OrdenFromSolicitudItemOverrideDto } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const ITEMS_COLUMNS = [
   { key: 'codigo', width: 100 },
@@ -349,7 +347,6 @@ function GenerarOrdenModal({ solicitudId, remanentes, onClose, onSuccess }: Gene
   const { widths: ordenLinesColWidths, startResize: startResizeOrdenLines } = useResizableColumns(ORDEN_LINES_COLUMNS)
   const [supplierId, setSupplierId] = useState('')
   const [supplierName, setSupplierName] = useState('')
-  const [supplierQuery, setSupplierQuery] = useState('')
   const [lines, setLines] = useState(
     remanentes.map((it) => ({
       materialRequestItem: it.id,
@@ -362,15 +359,6 @@ function GenerarOrdenModal({ solicitudId, remanentes, onClose, onSuccess }: Gene
     })),
   )
 
-  const { data: suppliersData, isLoading: suppliersLoading } = useQuery({
-    queryKey: ['supplierSearch', supplierQuery],
-    queryFn: () => listSuppliers({ search: supplierQuery || undefined, limit: 15 }),
-  })
-  const supplierOptions: SearchSelectOption[] = (suppliersData?.items ?? []).map((s) => ({
-    value: s.id,
-    label: s.supplierName,
-    sublabel: s.rnc ?? s.cedula,
-  }))
 
   const generarMutation = useMutation({
     mutationFn: (items: OrdenFromSolicitudItemOverrideDto[]) =>
@@ -406,20 +394,11 @@ function GenerarOrdenModal({ solicitudId, remanentes, onClose, onSuccess }: Gene
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '70vh', overflowY: 'auto' }}>
           <div className="ff-wrap">
             <label className="ff-label">Proveedor <span className="ff-required">*</span></label>
-            <SearchSelect
-              value={supplierId}
-              selectedLabel={supplierName}
-              onChange={(sid, opt) => {
+            <OpcionesSelect recurso="proveedores" value={supplierId} onChange={(sid, opt) => {
                 const resolvedId = sid === '' ? '' : (opt?.value ?? sid)
                 setSupplierId(resolvedId)
                 setSupplierName(opt?.label ?? '')
-              }}
-              options={supplierOptions}
-              onSearch={setSupplierQuery}
-              loading={suppliersLoading}
-              placeholder="Buscar proveedor…"
-              error={!supplierId}
-            />
+              }} placeholder="Buscar proveedor…" error={!supplierId} selectedLabel={supplierName} minChars={2} />
           </div>
 
           <div className="table-scroll">
