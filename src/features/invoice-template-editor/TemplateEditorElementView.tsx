@@ -17,6 +17,8 @@ function formatTextBinding(binding: string | undefined, raw: unknown, values: Re
   if (!binding) return null
   if (MONEDA_BASE_AMOUNT_BINDINGS.has(binding)) {
     if (raw == null || raw === '') return ''
+    // El API ya manda el monto formateado ("RD$22,066.00"): se imprime tal cual.
+    if (typeof raw === 'string') return raw
     const num = typeof raw === 'number' ? raw : Number(raw)
     if (!Number.isFinite(num)) return ''
     const monedaBase = typeof values['empresa.monedaBase'] === 'string' ? (values['empresa.monedaBase'] as string) : undefined
@@ -130,7 +132,8 @@ function evalFormulaWithValues(formula: string, fields: string[], values: Record
   let expr = formula
   for (const key of fields) {
     const raw = resolveBoundValue(values, key)
-    const num = typeof raw === 'number' ? raw : Number(raw) || 0
+    // Los montos llegan formateados ("RD$2,000.00"): para la fórmula se extrae su valor numérico.
+    const num = typeof raw === 'number' ? raw : parseFloat(String(raw ?? '').replace(/[^0-9.\-]/g, '')) || 0
     expr = expr.split(key).join(String(num))
   }
   const result = evalArithmetic(expr)
@@ -202,6 +205,9 @@ function formatMoney(value: unknown, currency?: string): string {
   // `null`/`undefined` deben quedar en blanco, no en "RD$0.00": es lo que traen los campos ARS
   // en una factura sin aseguradora (Number(null) daría 0).
   if (value == null || value === '') return ''
+  // El API ya manda los montos como texto formateado ("RD$2,000.00"): se presentan tal como llegan.
+  // Solo un número (datos de muestra del editor) se formatea como moneda.
+  if (typeof value === 'string') return value
   const num = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(num) ? formatCurrencyAmount(num, currency) : ''
 }
