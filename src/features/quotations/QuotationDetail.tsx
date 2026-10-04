@@ -7,6 +7,7 @@ import type { Quotation } from '@/shared/api/types'
 import { ArrowLeft, Download, FileText, Loader2, Send, Trash2, ClipboardList, XCircle, Copy, Link2, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatMoney, displayId } from '@/lib/formatters'
+import { esCreditoFiscal } from '@/lib/comprobantes'
 import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -144,7 +145,7 @@ export default function QuotationDetail() {
       setConvertDialogOpen(false)
       const invoice = result as Quotation & { invoiceId?: string }
       if (invoice.invoiceId) {
-        const needsRnc = selectedNcfType === 'B01' && !quotation?.clienteOcasionalRnc
+        const needsRnc = esCreditoFiscal(selectedNcfType) && !quotation?.clienteOcasionalRnc
         navigate(needsRnc ? `/facturas/${invoice.invoiceId}/editar` : `/facturas/${invoice.invoiceId}`)
       } else {
         navigate('/facturas')
@@ -606,9 +607,9 @@ export default function QuotationDetail() {
                   placeholder="Seleccionar tipo"
                 />
               </div>
-              {quotation?.esClienteOcasional && selectedNcfType === 'B01' && !quotation.clienteOcasionalRnc && (
+              {quotation?.esClienteOcasional && esCreditoFiscal(selectedNcfType) && !quotation.clienteOcasionalRnc && (
                 <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
-                  Falta el RNC del comprador ocasional. Crédito Fiscal (B01) lo requiere — podrás completarlo en la factura recién creada antes de someterla.
+                  Falta el RNC del comprador ocasional. Crédito Fiscal (B01/E31) lo requiere — podrás completarlo en la factura recién creada antes de someterla.
                 </p>
               )}
               {(selectedNcfType === 'B14' || selectedNcfType === 'E44') && (

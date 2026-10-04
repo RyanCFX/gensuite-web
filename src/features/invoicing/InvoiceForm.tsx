@@ -59,6 +59,7 @@ import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { useItemInventory } from '@/shared/hooks/useItemInventory'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { formatStockInsufficientMessage, formatUomNotAllowedMessage } from '@/lib/stockAlerts'
+import { esCreditoFiscal } from '@/lib/comprobantes'
 import { isPinPrecioError } from '@/lib/pinOverride'
 import { isPrecioCatalogoError, precioBloqueadoParaLinea } from '@/lib/precioCatalogo'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
@@ -1383,8 +1384,8 @@ if (esClienteOcasional) {
          toast.error('Ingresa el nombre del cliente ocasional')
          return
        }
-       if (ncfType === 'B01' && !clienteOcasionalRnc.trim()) {
-         toast.error('El RNC es requerido para comprobante B01 (Crédito Fiscal)')
+       if (esCreditoFiscal(ncfType) && !clienteOcasionalRnc.trim()) {
+         toast.error('El RNC es requerido para comprobante B01/E31 (Crédito Fiscal)')
          return
        }
        const rncDigits = clienteOcasionalRnc.replace(/\D/g, '')
@@ -1397,8 +1398,8 @@ if (esClienteOcasional) {
          toast.error('Selecciona un cliente')
          return
        }
-       if (ncfType === 'B01' && !selectedCustomer?.rnc) {
-         toast.error('El cliente necesita RNC para comprobante B01 (Crédito Fiscal)')
+       if (esCreditoFiscal(ncfType) && !selectedCustomer?.rnc) {
+         toast.error('El cliente necesita RNC para comprobante B01/E31 (Crédito Fiscal)')
          return
        }
      }
@@ -1702,14 +1703,14 @@ persistInvoice(buildInvoiceDto())
                    onSearch={setNcfTypeSearch}
                    className="ff-select"
                  />
-                 {ncfType === 'B01' && !selectedCustomer?.rnc && !esClienteOcasional && (
+                 {esCreditoFiscal(ncfType) && !selectedCustomer?.rnc && !esClienteOcasional && (
                    <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
-                     B01 requiere RNC del cliente
+                     B01/E31 requiere RNC del cliente
                    </p>
                  )}
-                  {ncfType === 'B01' && esClienteOcasional && (
+                  {esCreditoFiscal(ncfType) && esClienteOcasional && (
                     <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
-                      B01 requiere RNC del cliente ocasional
+                      B01/E31 requiere RNC del cliente ocasional
                     </p>
                   )}
                   {(ncfType === 'B14' || ncfType === 'E44') && (
@@ -1722,7 +1723,7 @@ persistInvoice(buildInvoiceDto())
 
                {esClienteOcasional && (
                  <div className="ff-wrap">
-                   <label className={`ff-label${ncfType === 'B01' ? ' ff-required' : ''}`} htmlFor="clienteOcasionalRnc">RNC o Cédula</label>
+                   <label className={`ff-label${esCreditoFiscal(ncfType) ? ' ff-required' : ''}`} htmlFor="clienteOcasionalRnc">RNC o Cédula</label>
                    <input
                      id="clienteOcasionalRnc"
                      type="text"
@@ -1730,7 +1731,7 @@ persistInvoice(buildInvoiceDto())
                      value={clienteOcasionalRnc}
                      onChange={(e) => { customerTouchedRef.current = true; setClienteOcasionalRnc(e.target.value) }}
                      placeholder="132456785 o 00113918866"
-                     required={ncfType === 'B01'}
+                     required={esCreditoFiscal(ncfType)}
                    />
                  </div>
                )}

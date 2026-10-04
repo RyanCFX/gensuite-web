@@ -146,8 +146,6 @@ const [directoMop, setDirectoMop] = useState('')
    const [directoAmount, setDirectoAmount] = useState('')
 
    const [paymentsValue, setPaymentsValue] = useState<PaymentLinesValue>(EMPTY_PAYMENT_LINES_VALUE)
-   const [condicionFiscal, setCondicionFiscal] = useState<'CREDITO_FISCAL' | 'CONSUMO'>('CONSUMO')
-   const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
 
   // ─── Mutation ──────────────────────────────────────────────────────
 
@@ -190,6 +188,12 @@ const [directoMop, setDirectoMop] = useState('')
         toast.error(err.message, { duration: 8000 })
         return
       }
+      // La factura llegó a Caja sin tipo de comprobante (borrador antiguo): hay que asignarlo
+      // en la factura antes de reintentar.
+      if (isApiErrorCode(err, ERROR_CODES.NCF_TIPO_REQUERIDO)) {
+        toast.error(err.message, { duration: 10000 })
+        return
+      }
       if (isApiErrorCode(err, ERROR_CODES.POS_TURNO_DESACTUALIZADO)) {
         toast.error(err.message, {
           duration: 10000,
@@ -213,14 +217,6 @@ const [directoMop, setDirectoMop] = useState('')
 
 function openModal(invoice: Invoice) {
      setSelectedInvoice(invoice)
-     setClienteOcasionalRnc(invoice.clienteOcasionalRnc ?? '')
-     if (invoice.esClienteOcasional) {
-       setCondicionFiscal('CREDITO_FISCAL')
-     } else if (invoice.customer) {
-       setCondicionFiscal('CREDITO_FISCAL')
-     } else {
-       setCondicionFiscal('CONSUMO')
-     }
      const invoiceCurrency = invoice.currency ?? monedaBase
      if (flujoCobro === 'directo') {
        setDirectoMop(resolveDefaultModeOfPago(facturacion, invoiceCurrency))
@@ -249,7 +245,7 @@ function openModal(invoice: Invoice) {
   }
 
   const cobroIsDirty = useDirtyCheck(
-    { directoMop, directoAmount, paymentsValue, condicionFiscal, clienteOcasionalRnc },
+    { directoMop, directoAmount, paymentsValue },
     !!selectedInvoice,
   )
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(cobroIsDirty, closeModal)
@@ -266,8 +262,6 @@ function validateAndSubmit() {
        if (amount > outstanding) { toast.error(`El monto no puede exceder ${formatMoney(outstanding, selectedInvoiceCurrency)}`); return }
        const dto: CobrarFacturaDto = {
          payments: [{ modeOfPayment: directoMop, amount }],
-         condicionFiscal,
-         ...(selectedInvoice.esClienteOcasional && condicionFiscal === 'CREDITO_FISCAL' ? { rnc: clienteOcasionalRnc || undefined } : {}),
        }
        cobrarMutation.mutate(dto)
        return
@@ -303,11 +297,7 @@ function validateAndSubmit() {
       }
 
       const payload = buildSubmitPayload(paymentsValue, outstanding, metodosActivos)
-     cobrarMutation.mutate({
-       ...payload,
-       condicionFiscal,
-       ...(selectedInvoice.esClienteOcasional && condicionFiscal === 'CREDITO_FISCAL' ? { rnc: clienteOcasionalRnc || undefined } : {}),
-     })
+      cobrarMutation.mutate(payload)
    }
 
   const canSubmitCaja =

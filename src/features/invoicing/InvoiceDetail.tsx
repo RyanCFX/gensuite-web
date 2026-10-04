@@ -804,6 +804,26 @@ export default function InvoiceDetail() {
     },
     onError: (err: ApiError) => {
       const msg = err?.message ?? "";
+      // Borrador antiguo sin tipo de comprobante: llevar a asignarlo editando el borrador.
+      if (isApiErrorCode(err, ERROR_CODES.NCF_TIPO_REQUERIDO)) {
+        toast.error(msg || "La factura no tiene tipo de comprobante.", {
+          duration: 10000,
+          action: { label: "Asignar tipo", onClick: () => navigate(`/facturas/${id}/editar`) },
+        });
+        return;
+      }
+      // Solo Crédito Fiscal se valida contra el padrón DGII: corregir el RNC del cliente o
+      // cambiar el tipo de comprobante (ambos se hacen editando el borrador).
+      if (
+        isApiErrorCode(err, ERROR_CODES.RNC_NO_EXISTE_EN_DGII) ||
+        isApiErrorCode(err, ERROR_CODES.COMPRADOR_SIN_RNC)
+      ) {
+        toast.error(msg || "El RNC del comprador no es válido.", {
+          duration: 10000,
+          action: { label: "Revisar factura", onClick: () => navigate(`/facturas/${id}/editar`) },
+        });
+        return;
+      }
       if (isApiErrorCode(err, ERROR_CODES.POS_PAYMENT_CURRENCY_MISMATCH)) {
         toast.error(msg, { duration: 8000 });
         return;
@@ -941,6 +961,15 @@ export default function InvoiceDetail() {
   });
 
   function handleSubmitClick() {
+    // El tipo de comprobante es obligatorio para someter o enviar a Caja (400
+    // NCF_TIPO_REQUERIDO) — solo un borrador antiguo puede no tenerlo. Se lleva al usuario a
+    // asignarlo editando el borrador antes de reintentar.
+    if (!invoice?.ncfType) {
+      toast.error("Esta factura no tiene tipo de comprobante — asígnalo antes de someter.", {
+        action: { label: "Asignar tipo", onClick: () => navigate(`/facturas/${id}/editar`) },
+      });
+      return;
+    }
     // Ya cubierta al 100% por saldo a favor / nota de crédito — no hace falta preguntar forma de pago.
     if (paidByCreditNote) {
       setLastSubmitBody(undefined);

@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { DollarSign, Trash2, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { listPorCobrar, completarCobro, descartarFactura } from '@/shared/api/caja'
 import { getFacturacionConfig, listDenominaciones } from '@/shared/api/config'
-import { getCustomer } from '@/shared/api/customers'
 import { getTurnoActual } from '@/shared/api/pos'
 import { downloadInvoicePdf } from '@/shared/api/invoices'
 import { formatDate, formatMoney } from '@/lib/formatters'
@@ -37,6 +36,8 @@ import {
   type PaymentLinesValue,
 } from '@/lib/paymentLines'
 import type { CobrarFacturaDto, PendienteCobroItem } from '@/shared/api/types'
+import { getCatalogosFiscales } from '@/shared/api/config'
+import { esCreditoFiscal } from '@/lib/comprobantes'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 import { SearchInput } from '@/shared/ui/SearchInput'
@@ -64,6 +65,7 @@ function montoACobrarDe(inv: PendienteCobroItem): number {
 
 export default function PorCobrarPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -78,6 +80,14 @@ export default function PorCobrarPage() {
   const selectedRoundedTotal = selectedInvoice ? montoACobrarDe(selectedInvoice) : 0
   const selectedRoundingAdjustment = selectedInvoice?.roundingAdjustment ?? 0
   const selectedCobertura = selectedInvoice?.aseguradora?.montoCobertura ?? 0
+
+  // El tipo de comprobante lo trae fijado la factura desde su creación — Caja lo respeta y lo
+  // muestra, nunca lo cambia (ya no hay selector Crédito Fiscal/Consumo). El RNC del comprador
+  // ocasional solo se pide y exige cuando el tipo es Crédito Fiscal (B01/E31); si la fila aún
+  // no trae ncfType se mantiene el comportamiento anterior (pedirlo al ocasional).
+  const selectedNcfType = selectedInvoice?.ncfType
+  const selectedEsCreditoFiscal = selectedNcfType ? esCreditoFiscal(selectedNcfType) : !!selectedInvoice?.esClienteOcasional
+  const exigeRncOcasional = !!selectedInvoice?.esClienteOcasional && selectedEsCreditoFiscal
 
   const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
@@ -180,24 +190,19 @@ export default function PorCobrarPage() {
   // ─── Form state ────────────────────────────────────────────────────
 const [directoMop, setDirectoMop] = useState('')
    const [paymentsValue, setPaymentsValue] = useState<PaymentLinesValue>(EMPTY_PAYMENT_LINES_VALUE)
-   const [condicionFiscal, setCondicionFiscal] = useState<'CREDITO_FISCAL' | 'CONSUMO'>('CONSUMO')
    const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
 
-  // ─── Customer fetch (to pre-suggest condicionFiscal) ────────────────
-  const { data: customerData } = useQuery({
-    queryKey: ['customer', selectedInvoice?.customer],
-    queryFn: () => getCustomer(selectedInvoice!.customer),
-    enabled: !!selectedInvoice,
+  // Catálogo de tipos de venta para mostrar el comprobante que la factura trae fijado desde
+  // su creación (caché compartido con el resto de pantallas de venta).
+  const { data: catalogos } = useQuery({
+    queryKey: ['catalogos-fiscales', { type: 'venta' }],
+    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
+    staleTime: 60 * 60_000,
   })
-  useEffect(() => {
-    if (customerData) {
-      setCondicionFiscal(customerData.rnc ? 'CREDITO_FISCAL' : 'CONSUMO')
-    }
-  }, [customerData])
 
   // ─── Completar cobro mutation ───────────────────────────────────────
   const completarMutation = useMutation({
-    mutationFn: (dto: CobrarFacturaDto) => completarCobro(selectedInvoice!.id, { ...dto, condicionFiscal }),
+    mutationFn: (dto: CobrarFacturaDto) => completarCobro(selectedInvoice!.id, dto),
     onSuccess: async (res) => {
       const invoiceId = selectedInvoice!.id
       const msg = `Factura cobrada — NCF: ${res.ncf}`
@@ -230,6 +235,33 @@ const [directoMop, setDirectoMop] = useState('')
         toast.error(err.message, { duration: 8000 })
         return
       }
+      // La factura llegó a Caja sin tipo (borrador antiguo): hay que asignarlo en la factura
+      // (editar el borrador) antes de reintentar.
+      if (isApiErrorCode(err, ERROR_CODES.NCF_TIPO_REQUERIDO)) {
+        const invoiceId = selectedInvoice?.id
+        toast.error(err.message, {
+          duration: 10000,
+          action: invoiceId
+            ? { label: 'Asignar tipo', onClick: () => navigate(`/facturas/${invoiceId}/editar`) }
+            : undefined,
+        })
+        return
+      }
+      // Solo Crédito Fiscal se valida contra el padrón DGII al someter: corregir el RNC del
+      // cliente o cambiar el tipo de comprobante. details.rnc trae el RNC consultado.
+      if (
+        isApiErrorCode(err, ERROR_CODES.RNC_NO_EXISTE_EN_DGII) ||
+        isApiErrorCode(err, ERROR_CODES.COMPRADOR_SIN_RNC)
+      ) {
+        const invoiceId = selectedInvoice?.id
+        toast.error(err.message, {
+          duration: 10000,
+          action: invoiceId
+            ? { label: 'Revisar factura', onClick: () => navigate(`/facturas/${invoiceId}/editar`) }
+            : undefined,
+        })
+        return
+      }
       toast.error(friendlyPaymentError(err?.message, 'Error al completar el cobro'))
     },
   })
@@ -251,13 +283,6 @@ const [directoMop, setDirectoMop] = useState('')
 function openModal(invoice: PendienteCobroItem) {
      setSelectedInvoice(invoice)
      setClienteOcasionalRnc('')
-     if (invoice.esClienteOcasional) {
-       setCondicionFiscal('CREDITO_FISCAL')
-     } else if (customerData?.rnc) {
-       setCondicionFiscal('CREDITO_FISCAL')
-     } else {
-       setCondicionFiscal('CONSUMO')
-     }
      const invoiceCurrency = invoice.currency ?? monedaBase
      if (flujoCobro === 'directo') {
        setDirectoMop(resolveDefaultModeOfPago(facturacion, invoiceCurrency))
@@ -284,7 +309,7 @@ function openModal(invoice: PendienteCobroItem) {
   }
 
   const cobroIsDirty = useDirtyCheck(
-    { directoMop, paymentsValue, condicionFiscal, clienteOcasionalRnc },
+    { directoMop, paymentsValue, clienteOcasionalRnc },
     !!selectedInvoice,
   )
   const { requestClose: requestCloseModal, confirming: confirmingCloseModal, confirmDiscard: confirmDiscardModal, cancelDiscard: cancelDiscardModal } = useConfirmClose(cobroIsDirty, closeModal)
@@ -292,14 +317,19 @@ function openModal(invoice: PendienteCobroItem) {
 function validateAndSubmit() {
      if (!selectedInvoice) return
      if (turnoVencido) { toast.error('Tu turno ha expirado. Cierra el turno actual y abre uno nuevo.'); return }
+     // El RNC es obligatorio cuando el comprador es ocasional y el tipo es Crédito Fiscal
+     // (B01/E31) — la DGII lo exige. Se decide por el ncfType de la factura.
+     if (exigeRncOcasional && !clienteOcasionalRnc.trim()) {
+       toast.error('El RNC es requerido para Crédito Fiscal (B01/E31)')
+       return
+     }
      const total = selectedRoundedTotal
 
      if (flujoCobro === 'directo') {
        if (!directoMop) { toast.error('Selecciona un método de pago'); return }
        const dto: CobrarFacturaDto = {
          payments: [{ modeOfPayment: directoMop, amount: total }],
-         condicionFiscal,
-         ...(selectedInvoice.esClienteOcasional && condicionFiscal === 'CREDITO_FISCAL' ? { rnc: clienteOcasionalRnc || undefined } : {}),
+         ...(exigeRncOcasional ? { rnc: clienteOcasionalRnc || undefined } : {}),
        }
        completarMutation.mutate(dto)
        return
@@ -337,8 +367,7 @@ function validateAndSubmit() {
       const payload = buildSubmitPayload(paymentsValue, total, metodosActivos)
      completarMutation.mutate({
        ...payload,
-       condicionFiscal,
-       ...(selectedInvoice.esClienteOcasional && condicionFiscal === 'CREDITO_FISCAL' ? { rnc: clienteOcasionalRnc || undefined } : {}),
+       ...(exigeRncOcasional ? { rnc: clienteOcasionalRnc || undefined } : {}),
      })
    }
 
@@ -580,64 +609,38 @@ function validateAndSubmit() {
                  </p>
                )}
 
-{(selectedRoundedTotal > 0 || (customerData?.rnc ?? customerData?.cedula) || selectedInvoice.esClienteOcasional) && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                      Condición fiscal del comprobante
-                    </label>
-                    <div style={{ display: 'flex', gap: 12 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-                        <input
-                          type="radio"
-                          name="condicionFiscal"
-                          value="CONSUMO"
-                          checked={condicionFiscal === 'CONSUMO'}
-                          onChange={() => setCondicionFiscal('CONSUMO')}
-                        />
-                        Consumo
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
-                        <input
-                          type="radio"
-                          name="condicionFiscal"
-                          value="CREDITO_FISCAL"
-                          checked={condicionFiscal === 'CREDITO_FISCAL'}
-                          onChange={() => setCondicionFiscal('CREDITO_FISCAL')}
-                        />
-                        Crédito Fiscal
-                      </label>
+                {/* El tipo de comprobante viene fijado desde la creación de la factura — Caja lo
+                    respeta y lo muestra, nunca lo cambia. El RNC del comprador ocasional solo se
+                    pide cuando el tipo es Crédito Fiscal (B01/E31). */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    Tipo de comprobante
+                  </label>
+                  <p style={{ margin: 0, fontSize: 13 }}>
+                    {[...(catalogos?.ncfTypes ?? []), ...(catalogos?.ncfTypesFisicos ?? [])].find((t) => t.value === selectedNcfType)?.label
+                      ?? selectedNcfType
+                      ?? 'Sin tipo asignado'}
+                  </p>
+                  {exigeRncOcasional && (
+                    <div className="ff-wrap" style={{ marginTop: 8 }}>
+                      <label className="ff-label ff-required" htmlFor="ocaRnc">RNC del cliente ocasional</label>
+                      <input
+                        id="ocaRnc"
+                        type="text"
+                        className="ff-input"
+                        value={clienteOcasionalRnc}
+                        onChange={(e) => setClienteOcasionalRnc(e.target.value)}
+                        placeholder="RNC del cliente ocasional"
+                        required
+                      />
                     </div>
-                    {customerData?.rnc && (
-                      <p style={{ margin: 0, fontSize: 11, color: 'var(--text-tertiary)' }}>
-                        Se sugiere Crédito Fiscal (RNC: {customerData.rnc})
-                      </p>
-                    )}
-                    {!customerData?.rnc && customerData?.cedula && (
-                      <p style={{ margin: 0, fontSize: 11, color: 'var(--text-tertiary)' }}>
-                        Se sugiere Consumo (sin RNC registrado)
-                      </p>
-                    )}
-                    {selectedInvoice.esClienteOcasional && condicionFiscal === 'CREDITO_FISCAL' && (
-                      <div className="ff-wrap" style={{ marginTop: 8 }}>
-                        <label className="ff-label ff-required" htmlFor="ocaRnc">RNC del cliente ocasional</label>
-                        <input
-                          id="ocaRnc"
-                          type="text"
-                          className="ff-input"
-                          value={clienteOcasionalRnc}
-                          onChange={(e) => setClienteOcasionalRnc(e.target.value)}
-                          placeholder="RNC del cliente ocasional"
-                          required
-                        />
-                      </div>
-                    )}
-                    {selectedInvoice.esClienteOcasional && condicionFiscal === 'CREDITO_FISCAL' && !clienteOcasionalRnc.trim() && (
-                      <p style={{ margin: 0, fontSize: 11, color: 'var(--color-warning)' }}>
-                        El RNC es requerido para Crédito Fiscal (B01)
-                      </p>
-                    )}
-                  </div>
-                )}
+                  )}
+                  {exigeRncOcasional && !clienteOcasionalRnc.trim() && (
+                    <p style={{ margin: 0, fontSize: 11, color: 'var(--color-warning)' }}>
+                      El RNC es requerido para Crédito Fiscal (B01/E31)
+                    </p>
+                  )}
+                </div>
 
                <div className="divider" />
 

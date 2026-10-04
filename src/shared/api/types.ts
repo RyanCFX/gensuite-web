@@ -719,7 +719,11 @@ export interface CreateInvoiceDto {
    *  enviarla — ver `defaultDueDate` en InvoiceForm.tsx. */
   branch?: string;
   department?: string;
-  ncfType: "B01" | "B02" | "B14" | "B15" | "B16";
+  /** Tipo de comprobante fijado al crear la factura — Caja y el submit lo respetan, nunca lo
+   *  cambian. Se puede enviar el físico (B01, B02, B14, B15, B16) o su equivalente electrónico
+   *  (E31, E32…) cuando el tenant emite e-CF. Obligatorio también para someter o enviar a Caja
+   *  (400 NCF_TIPO_REQUERIDO si un borrador antiguo no lo tiene). */
+  ncfType: string;
   /** Moneda del documento. Si se omite: `Customer.defaultCurrency` del cliente elegido → moneda
    *  base de la compañía (un cliente ocasional también puede facturarse en moneda extranjera,
    *  pasando `currency` explícito). Al editar (PATCH), omitirlo CONGELA la moneda/tasa que la
@@ -5350,16 +5354,16 @@ export interface VueltoLine {
   cantidad: number;
 }
 
-// POST /caja/facturas/:id/cobrar
-export type CondicionFiscal = "CREDITO_FISCAL" | "CONSUMO"
-
+// POST /caja/facturas/:id/completar-cobro y POST /caja/facturas/:id/cobrar — mismo DTO
+// (ver CobrarFacturaDto en openapi.json). `condicionFiscal` ya no existe: el BFF rechaza
+// campos desconocidos con 400. Caja respeta el ncfType que la factura trae desde su creación.
 export interface CobrarFacturaDto {
    payments: PaymentLine[]
    vuelto?: VueltoLine[]
    tenderedCash?: number
-   /** Opcional — si se omite, el backend infiere según el RNC/Cédula del cliente. */
-   condicionFiscal?: CondicionFiscal
-   /** RNC del cliente ocasional — requerido cuando esClienteOcasional=true y condicionFiscal=CREDITO_FISCAL. */
+   /** RNC del comprador — obligatorio en completar-cobro cuando la factura es de un comprador
+    *  ocasional y su ncfType es Crédito Fiscal (B01/E31). Sin efecto para clientes registrados
+    *  (se usa el RNC ya guardado en el Customer). */
    rnc?: string
  }
 
@@ -5389,6 +5393,9 @@ export interface PendienteCobroItem {
    customer: string;
    customerName: string;
    grandTotal: number;
+   /** Tipo de comprobante fijado al crear la factura (B01, B02, B14… o su equivalente
+    *  E31, E32… si ya es e-CF) — Caja lo respeta, nunca lo cambia. */
+   ncfType?: string;
    /** Monto real a cobrar, con redondeo de moneda aplicado — usar en vez de `grandTotal` para
     *  prellenar/validar el cobro. Ver `Invoice.roundedTotal`. */
    roundedTotal?: number;
@@ -5411,7 +5418,6 @@ export interface CompletarCobroResult {
    invoiceId: string;
    ncf: string;
    ncfType?: string;
-   condicionFiscal?: CondicionFiscal;
    isPos: boolean;
    paymentEntryIds: string[];
    outstandingAmount: number;
@@ -5443,13 +5449,8 @@ export interface CajaPendienteItem {
   postingDate: string
 }
 
-// POST /caja/facturas/:id/cobrar
-export interface CobrarFacturaDto {
-  payments: PaymentLine[]
-  vuelto?: VueltoLine[]
-  tenderedCash?: number
-}
-
+// Respuesta de POST /caja/facturas/:id/cobrar (el request usa CobrarFacturaDto, mismo body
+// que completar-cobro según openapi.json).
 export interface CobrarFacturaResult {
   invoiceId: string
   paymentEntryIds: string[]

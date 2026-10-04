@@ -443,6 +443,13 @@ export const ERROR_CODES = {
   // Caja/POS (docs/tasks/70_caja_pos_sin_soporte_multimoneda.md) — a diferencia de /cobros y
   // /pagos, Caja nunca convierte: el método de pago debe operar en la MISMA moneda de la factura.
   POS_PAYMENT_CURRENCY_MISMATCH: 'POS_PAYMENT_CURRENCY_MISMATCH',
+  // Tipo de comprobante y padrón DGII — el tipo se fija al crear la factura y Caja/submit lo
+  // respetan. NCF_TIPO_REQUERIDO: borrador antiguo sin ncfType al someter o llegar a Caja.
+  // RNC_NO_EXISTE_EN_DGII (details.rnc trae el consultado) y COMPRADOR_SIN_RNC: solo Crédito
+  // Fiscal (B01/E31), validado contra el padrón local al someter.
+  NCF_TIPO_REQUERIDO: 'NCF_TIPO_REQUERIDO',
+  RNC_NO_EXISTE_EN_DGII: 'RNC_NO_EXISTE_EN_DGII',
+  COMPRADOR_SIN_RNC: 'COMPRADOR_SIN_RNC',
   // Alertas de stock disponible/reservado (docs/tasks/73_alertas_stock_disponible_reservado.md).
   // Devuelto por /transferencias, /despachos, y submits de Factura/Delivery Note con
   // update_stock=1 cuando la cantidad solicitada excede `disponible` (actualQty - reservedStock).
