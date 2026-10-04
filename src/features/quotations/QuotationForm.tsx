@@ -5,8 +5,7 @@ import { useEffectOnActive } from 'keepalive-for-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTabs } from '@/contexts/TabsContext'
 import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSource } from '@/shared/api/quotations'
-import { getCustomer } from '@/shared/api/customers'
-import { getFacturacionConfig, getStockSettings } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import type { CreateQuotationDto, ItemPrices, Bundle, Customer, MonedaCode } from '@/shared/api/types'
 import type { Item, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
@@ -42,6 +41,7 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 import { useOpcionesArray } from '@/shared/hooks/useOpciones'
+import { getClienteDetalle, getStockSettingsLookup } from '@/shared/api/formularios'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -191,7 +191,7 @@ export default function QuotationForm() {
   })
   const { data: stockSettings } = useQuery({
     queryKey: ['stock-settings'],
-    queryFn: getStockSettings,
+    queryFn: getStockSettingsLookup,
   })
   // Candados "Permitir Modificar Precio Libremente" (servicios/productos por separado) — con el
   // toggle correspondiente apagado, el precio de la línea debe ser exactamente uno de los precios
@@ -364,8 +364,8 @@ useEffect(() => {
   })
 
   const { data: duplicateCustomer } = useQuery({
-    queryKey: ['customer', duplicateSource?.customer],
-    queryFn: () => getCustomer(duplicateSource!.customer),
+    queryKey: ['cliente-detalle', duplicateSource?.customer],
+    queryFn: () => getClienteDetalle(duplicateSource!.customer),
     enabled: !isEdit && !!duplicateSource?.customer,
   })
 
@@ -1066,7 +1066,7 @@ if (esClienteOcasional) {
                        setCustomerDefaultDiscountPct(undefined)
                        // /opciones solo trae value/label: tarifa y descuento salen del detalle del cliente.
                        if (cid) {
-                         getCustomer(cid).then((c) => {
+                         getClienteDetalle(cid).then((c) => {
                            setCustomerPriceTier(c.priceTier)
                            setCustomerDefaultDiscountPct(c.descuentoDefaultPct ?? undefined)
                          }).catch(() => {})

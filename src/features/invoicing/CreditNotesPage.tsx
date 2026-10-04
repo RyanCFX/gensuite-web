@@ -7,9 +7,7 @@ import {
   downloadCreditNotePdf,
 } from '@/shared/api/notes'
 import { listInvoices, getInvoice } from '@/shared/api/invoices'
-import { getCatalogosFiscales } from '@/shared/api/config'
 import { getEcfTipos } from '@/shared/api/ecf'
-import { getCustomer } from '@/shared/api/customers'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import type { Invoice, CreateCreditNoteDto, ApiError, CreditNoteAppliedTo, EcfModificationCode } from '@/shared/api/types'
 import { ECF_MODIFICATION_CODES_CREDIT_NOTE, ecfTipoElectronicoHabilitado } from '@/lib/dgii'
@@ -35,6 +33,7 @@ import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { ApplyCreditNoteModal } from './CreditNoteActionModals'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 import { SearchInput } from '@/shared/ui/SearchInput'
+import { getCatalogosFiscalesLookup, getClienteDetalle } from '@/shared/api/formularios'
 
 const LIST_COLUMNS = [
   { key: 'expand', width: 28 },
@@ -156,7 +155,7 @@ export default function CreditNotesPage() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
-    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'venta' }),
   })
 
   // B04 (Nota de Crédito) → typeId 34. Si el tenant lo tiene habilitado como e-CF, el código de
@@ -174,8 +173,8 @@ export default function CreditNotesPage() {
 
 
   const { data: preselectedCustomer } = useQuery({
-    queryKey: ['customer', customerId],
-    queryFn: () => getCustomer(customerId),
+    queryKey: ['cliente-detalle', customerId],
+    queryFn: () => getClienteDetalle(customerId),
     enabled: !!customerId && !customerLabel,
   })
 

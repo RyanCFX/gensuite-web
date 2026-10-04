@@ -25,17 +25,16 @@ import {
   asignarTrackingFactura,
   recalcularCoberturaFactura,
 } from "@/shared/api/invoices";
-import { getCustomer } from "@/shared/api/customers";
 import { getSaldoFavor } from "@/shared/api/cobros";
 import {
   getCreditNoteSaldoFavor,
   aplicarCreditNoteAFactura,
   removerCreditNoteAplicada,
 } from "@/shared/api/notes";
-import { listDenominaciones, getFacturacionConfig, getCatalogosFiscales } from "@/shared/api/config";
+import { getFacturacionConfig } from "@/shared/api/config";
+import { getCatalogosFiscalesLookup, getComboLookup, getClienteSemaforo, listDenominacionesLookup } from "@/shared/api/formularios";
 import { createDevolucion } from "@/shared/api/devoluciones";
 import { getItemLookup } from "@/shared/api/catalog";
-import { getBundle } from "@/shared/api/bundles";
 import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
 import { crearDespachoDesdeFactura, listDespachos } from "@/shared/api/despachos";
 import { ECF_SUBMIT_UNAVAILABLE_MSG } from "@/shared/api/ecf";
@@ -317,9 +316,11 @@ export default function InvoiceDetail() {
     enabled: !isHistoricalVersion && !!id,
   });
 
-  const { data: customer } = useQuery({
-    queryKey: ["customer", invoice?.customer],
-    queryFn: () => getCustomer(invoice!.customer),
+  // `tieneCredito` del semáforo (GET /opciones/clientes/:id/semaforo): el detalle de formulario del
+  // cliente ya no trae `hasCredit`.
+  const { data: semaforoCliente } = useQuery({
+    queryKey: ["cliente-semaforo", invoice?.customer],
+    queryFn: () => getClienteSemaforo(invoice!.customer),
     enabled: !!invoice?.customer && invoice.status === "draft",
   });
 
@@ -406,7 +407,7 @@ export default function InvoiceDetail() {
   // validar que el desglose del vuelto suma el excedente cuando hay sobrepago.
   const { data: denominaciones } = useQuery({
     queryKey: ["denominaciones"],
-    queryFn: listDenominaciones,
+    queryFn: listDenominacionesLookup,
     enabled: invoice?.status === "draft",
   });
   const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo);
@@ -454,7 +455,7 @@ export default function InvoiceDetail() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
-    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'venta' }),
   });
 
   const returnModeOptions: SearchSelectOption[] = useMemo(() => {
@@ -650,7 +651,7 @@ export default function InvoiceDetail() {
       toast.error(err?.message ?? "No se pudo recalcular la cobertura"),
   });
 
-  const noCredit = invoice?.status === "draft" && customer?.hasCredit === false;
+  const noCredit = invoice?.status === "draft" && semaforoCliente?.tieneCredito === false;
   // Cubierta al 100% por crédito ya aplicado (saldo a favor y/o notas de crédito) — no hace falta preguntar forma de pago.
   const paidByCreditNote =
     !!invoice &&
@@ -900,7 +901,7 @@ export default function InvoiceDetail() {
       // No es una línea directa — busca entre los Combos de la factura cuál lo incluye como componente.
       for (const line of invoice.items) {
         try {
-          const bundle = await getBundle(line.itemCode);
+          const bundle = await getComboLookup(line.itemCode);
           const comp = bundle.components.find((c) => c.itemCode === parsedCode);
           if (comp) {
             const item = await getItemLookup(parsedCode).catch(() => null);

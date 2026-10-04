@@ -4,7 +4,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { DollarSign, Trash2, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { listPorCobrar, completarCobro, descartarFactura } from '@/shared/api/caja'
-import { getFacturacionConfig, listDenominaciones } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { getTurnoActual } from '@/shared/api/pos'
 import { downloadInvoicePdf } from '@/shared/api/invoices'
 import { formatDate, formatMoney } from '@/lib/formatters'
@@ -41,6 +41,7 @@ import { esCreditoFiscal } from '@/lib/comprobantes'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 import { SearchInput } from '@/shared/ui/SearchInput'
+import { listDenominacionesLookup } from '@/shared/api/formularios'
 
 const PAGE_SIZE = 20
 
@@ -108,7 +109,7 @@ export default function PorCobrarPage() {
   // validar que el desglose del vuelto suma el excedente.
   const { data: denominaciones } = useQuery({
     queryKey: ['denominaciones'],
-    queryFn: listDenominaciones,
+    queryFn: listDenominacionesLookup,
   })
   const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo)
 

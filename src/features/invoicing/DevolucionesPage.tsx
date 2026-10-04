@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listDevoluciones } from '@/shared/api/devoluciones'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { getCatalogosFiscales } from '@/shared/api/config'
 import { ChevronLeft, ChevronRight, Plus, SlidersHorizontal } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -18,6 +17,7 @@ import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 import { SearchInput } from '@/shared/ui/SearchInput'
+import { getCatalogosFiscalesLookup } from '@/shared/api/formularios'
 
 const PAGE_SIZE = 20
 
@@ -95,7 +95,7 @@ export default function DevolucionesPage() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
-    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'venta' }),
   })
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
   const ncfTypeOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { listItemVariants } from '@/shared/api/catalog'
+import { listItemVariantsLookup } from '@/shared/api/formularios'
 import type { Item } from '@/shared/api/types'
 import { X, Loader2 } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
@@ -33,9 +33,10 @@ export function VariantsModal({ templateItem, onConfirm, onClose }: VariantsModa
   const isDirty = useDirtyCheck(Array.from(selections.entries()), true)
   const closeModal = useConfirmClose(isDirty, onClose)
 
-  const { data: variants, isLoading } = useQuery({
+  const { data: variants, isLoading, isError, error } = useQuery({
     queryKey: ['item-variants', templateItem.id],
-    queryFn: () => listItemVariants(templateItem.id),
+    queryFn: () => listItemVariantsLookup(templateItem.id),
+    retry: false,
     enabled: !!templateItem.id,
   })
 
@@ -77,6 +78,12 @@ export function VariantsModal({ templateItem, onConfirm, onClose }: VariantsModa
         <div className="modal-body">
           {isLoading ? (
             <div style={{ textAlign: 'center', padding: 32 }}><Loader2 size={20} className="spin" /></div>
+          ) : isError ? (
+            <p style={{ textAlign: 'center', color: 'var(--danger, #c0392b)', padding: 24 }}>
+              {(error as { code?: string } | null)?.code === 'RECURSO_NO_PERMITIDO'
+                ? 'No tiene acceso a las variantes de este artículo.'
+                : ((error as { message?: string } | null)?.message ?? 'No se pudieron cargar las variantes.')}
+            </p>
           ) : !variants?.length ? (
             <p style={{ textAlign: 'center', color: 'var(--text-tertiary)', padding: 24 }}>Este artículo no tiene variantes configuradas.</p>
           ) : (

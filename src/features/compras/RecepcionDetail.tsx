@@ -6,8 +6,7 @@ import {
   getPurchaseReceipt, submitPurchaseReceipt, cancelPurchaseReceipt, amendPurchaseReceipt, facturarPurchaseReceipt,
   getPurchaseReceiptPdfBlobUrl, downloadPurchaseReceiptPdf,
 } from '@/shared/api/purchase-receipt'
-import { getSupplier } from '@/shared/api/suppliers'
-import { getCatalogosFiscales, listImpuestosCompras, getFacturacionConfig } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PrintLabelsModal } from '@/components/shared/PrintLabelsModal'
@@ -21,6 +20,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import type { FacturarPurchaseReceiptDto } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { getCatalogosFiscalesLookup, getProveedorDetalle, listImpuestosComprasLookup } from '@/shared/api/formularios'
 
 const ITEMS_COLUMNS = [
   { key: 'codigo', width: 100 },
@@ -70,12 +70,12 @@ export default function RecepcionDetail() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
-    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'compra' }),
   })
 
   const { data: taxesTemplates } = useQuery({
     queryKey: ['impuestos-compras'],
-    queryFn: listImpuestosCompras,
+    queryFn: listImpuestosComprasLookup,
   })
 
   const { data: facturacionConfig } = useQuery({
@@ -87,8 +87,8 @@ export default function RecepcionDetail() {
   // Defaults 606 del proveedor — igual que al crear una Compra, se usan para
   // pre-llenar el formulario de Facturar, pero el usuario puede editarlos.
   const { data: supplierData } = useQuery({
-    queryKey: ['supplier', receipt?.supplier],
-    queryFn: () => getSupplier(receipt!.supplier),
+    queryKey: ['proveedor-detalle', receipt?.supplier],
+    queryFn: () => getProveedorDetalle(receipt!.supplier),
     enabled: !!receipt?.supplier,
     staleTime: 5 * 60_000,
   })

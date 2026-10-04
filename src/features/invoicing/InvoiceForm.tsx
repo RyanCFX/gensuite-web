@@ -13,12 +13,10 @@ import {
   type AseguradoraFormState,
 } from './aseguradoraForm'
 import { esCoberturaCompleta } from '@/shared/api/types'
-import { getCustomer } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
 import { lookupItems, getItemLookup } from '@/shared/api/catalog'
-import { getCatalogosFiscales, getStockSettings, getFacturacionConfig } from '@/shared/api/config'
-import { getItemUbicaciones } from '@/shared/api/ubicaciones'
-import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
+import { getFacturacionConfig } from '@/shared/api/config'
+import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, ClienteDetalle, SemaforoEntry, Item, ItemPrices, Bundle, ComponentTracking, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { DimensionAxisCell, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { useDimensionesInventario } from '@/shared/hooks/useDimensionesInventario'
 import { mergeLineasIguales } from '@/shared/lib/mergeLineasIguales'
@@ -26,7 +24,6 @@ import { getTasaVigente } from '@/shared/api/monedas'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
-import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP, formatMoney, round2, formatDate } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen, ChevronDown, RotateCcw } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
@@ -48,7 +45,7 @@ import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
-import { getSucursal } from '@/shared/api/sucursales'
+import { useSucursalAlmacenes } from '@/shared/hooks/useSucursalAlmacenes'
 import { getCachedUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
@@ -56,7 +53,6 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
-import { useItemInventory } from '@/shared/hooks/useItemInventory'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { formatStockInsufficientMessage, formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { esCreditoFiscal } from '@/lib/comprobantes'
@@ -65,6 +61,7 @@ import { isPrecioCatalogoError, precioBloqueadoParaLinea } from '@/lib/precioCat
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { getCatalogosFiscalesLookup, getItemUbicacionesLookup, getClienteDetalle, getClienteSemaforo, getStockSettingsLookup } from '@/shared/api/formularios'
 
 type NcfType = string
 
@@ -185,9 +182,10 @@ function todayIso() {
  *  1. Cliente sin crédito (`hasCredit` false): vencimiento = fecha de la factura.
  *  2. Cliente con crédito: vencimiento = fecha de la factura + `creditDays`.
  *  Un cliente ocasional nunca tiene crédito. */
-function computeDueDate(baseDate: Date, customer: Customer | null, esClienteOcasional: boolean): string {
-  if (!esClienteOcasional && customer?.hasCredit) {
-    return format(addDays(baseDate, customer.creditDays || 0), 'yyyy-MM-dd')
+function computeDueDate(baseDate: Date, customer: ClienteDetalle | null, esClienteOcasional: boolean): string {
+  // El detalle de formulario no trae `hasCredit`: con `creditDays` > 0 el cliente tiene crédito.
+  if (!esClienteOcasional && customer?.creditDays) {
+    return format(addDays(baseDate, customer.creditDays), 'yyyy-MM-dd')
   }
   return format(baseDate, 'yyyy-MM-dd')
 }
@@ -224,7 +222,7 @@ function LineUbicacionCell({
 }) {
   const { data } = useQuery({
     queryKey: ['item-ubicaciones', itemCode, warehouse],
-    queryFn: () => getItemUbicaciones(itemCode, warehouse),
+    queryFn: () => getItemUbicacionesLookup(itemCode, warehouse),
     enabled: !!itemCode && !!warehouse,
   })
   const ubicaciones = data?.items ?? []
@@ -294,7 +292,7 @@ export default function InvoiceForm() {
   })
 
   const [customerId, setCustomerId] = useState('')
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [selectedCustomer, setSelectedCustomer] = useState<ClienteDetalle | null>(null)
   const [showCreateCustomer, setShowCreateCustomer] = useState(false)
   const [esClienteOcasional, setEsClienteOcasional] = useState(false)
   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
@@ -310,10 +308,6 @@ export default function InvoiceForm() {
   // en Factura directa (sin despacho) no valida esto por su cuenta (§4.2 del prompt).
   const stockMap = useItemsStock(
     items.map((i) => (i.itemCode && i.itemType !== 'service' && i.itemType !== 'combo' ? i.itemCode : undefined)),
-  )
-  // "En pedido" (reservedQty, informativo, NO bloqueante) — docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §7.4.
-  const inventoryMap = useItemInventory(
-    items.map((i) => (i.itemCode && i.warehouse && i.itemType !== 'service' && i.itemType !== 'combo' ? { itemCode: i.itemCode, warehouse: i.warehouse } : undefined)),
   )
   const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
@@ -429,7 +423,7 @@ export default function InvoiceForm() {
   //    o vía diálogo emergente (ComponentTrackingModal). El catálogo es fijo, se cachea 1h.
   const { data: stockSettings } = useQuery({
     queryKey: ['stock-settings'],
-    queryFn: getStockSettings,
+    queryFn: getStockSettingsLookup,
   })
   const useInlineSerialBatch = stockSettings?.useSerialBatchFields === true
 
@@ -487,7 +481,7 @@ export default function InvoiceForm() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
-    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'venta' }),
   })
 
   const ncfTypeOptions: SearchSelectOption[] = useMemo(() => {
@@ -503,12 +497,7 @@ export default function InvoiceForm() {
   // almacén de venta configurado, TODA venta debe salir de ahí sin excepción: se oculta el
   // selector por línea y se fuerza ese almacén, en vez de dejar elegir y recién enterarse con el
   // 400 de SALE_WAREHOUSE_MISMATCH al someter.
-  const { data: sucursalActual, isFetched: sucursalFetched } = useQuery({
-    queryKey: ['sucursal', branch],
-    queryFn: () => getSucursal(branch),
-    enabled: !!branch,
-  })
-  const almacenVentaSucursal = sucursalActual?.almacenVenta || null
+  const { almacenVenta: almacenVentaSucursal, isFetched: sucursalFetched } = useSucursalAlmacenes(branch)
 
   // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
   // Solo se piden si hace falta el selector: con almacén de venta fijo en la sucursal se oculta.
@@ -633,14 +622,9 @@ export default function InvoiceForm() {
       return
     }
     setLoadingSemaforo(true)
-    client
-      .get<{ success: true; data: SemaforoResult }>(ENDPOINTS.cobros.semaforo, {
-        params: { customer: selectedCustomer.id },
-      })
-      .then((res) => {
-        const entry = res.data.data.clientes.find((s) => s.customer === selectedCustomer.id) ?? null
-        setSemaforo(entry)
-      })
+    // /opciones/clientes/:id/semaforo: el semáforo de ESTE cliente, sin permiso de Cobros.
+    getClienteSemaforo(selectedCustomer.id)
+      .then(setSemaforo)
       .catch(() => setSemaforo(null))
       .finally(() => setLoadingSemaforo(false))
   }, [selectedCustomer])
@@ -688,7 +672,7 @@ export default function InvoiceForm() {
     if (isEdit || !customerId || esClienteOcasional) return
     if (selectedCustomer?.id === customerId && selectedCustomer.ncfTypeDefault) return
     let cancelled = false
-    getCustomer(customerId)
+    getClienteDetalle(customerId)
       .then((full) => {
         if (cancelled) return
         setSelectedCustomer((prev) => (prev?.id === customerId ? { ...prev, ...full } : full))
@@ -899,7 +883,7 @@ export default function InvoiceForm() {
       setClienteOcasionalDireccion(inv.clienteOcasionalDireccion ?? '')
     } else if (inv.customer) {
       setCustomerId(inv.customer)
-      getCustomer(inv.customer).then(setSelectedCustomer).catch(() => {})
+      getClienteDetalle(inv.customer).then(setSelectedCustomer).catch(() => {})
     }
     if (inv.aseguradora) {
       setArsEnabled(true)
@@ -1311,7 +1295,7 @@ export default function InvoiceForm() {
   const ubicacionQueries = useQueries({
     queries: items.map((i) => ({
       queryKey: ['item-ubicaciones', i.itemCode, i.warehouse],
-      queryFn: () => getItemUbicaciones(i.itemCode, i.warehouse!),
+      queryFn: () => getItemUbicacionesLookup(i.itemCode, i.warehouse!),
       enabled: !!i.itemCode && !!i.warehouse,
     })),
   })
@@ -1967,10 +1951,6 @@ persistInvoice(buildInvoiceDto())
                         {(() => {
                           const stockError = validateLineStock(item, stockMap, stockSettings?.allowNegativeStock)
                           const info = item.itemCode && item.warehouse ? resolveDisponible(stockMap.get(item.itemCode), item.warehouse) : undefined
-                          const invItem = item.itemCode && item.warehouse ? inventoryMap.get(`${item.itemCode}::${item.warehouse}`) : undefined
-                          // "En pedido" es puramente informativo — nunca bloquea, no confundir con
-                          // reservedStock (que sí resta de disponible y sí puede bloquear la venta).
-                          const enPedido = invItem?.reservedQty ?? 0
                           return (
                             <>
                               <QtyInput className={`items-input${stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
@@ -1981,11 +1961,6 @@ persistInvoice(buildInvoiceDto())
                               ) : info && info.reservedStock > 0 ? (
                                 <span style={{ fontSize: 11, color: 'var(--warning-text)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
                                   Disponible: {info.disponible} ({info.reservedStock} reservadas para otro cliente)
-                                  {enPedido > 0 ? ` · En pedido: ${enPedido} (informativo)` : ''}
-                                </span>
-                              ) : enPedido > 0 ? (
-                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                  En pedido: {enPedido} (informativo)
                                 </span>
                               ) : null}
                             </>

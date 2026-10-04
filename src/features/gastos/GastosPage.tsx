@@ -6,7 +6,6 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { getCatalogosFiscales } from '@/shared/api/config'
 import { Plus, ChevronLeft, ChevronRight, Receipt, SlidersHorizontal } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -20,6 +19,7 @@ import { useFiltrosPantalla } from '@/shared/permissions/useAcceso'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
 import { SearchInput } from '@/shared/ui/SearchInput'
+import { getCatalogosFiscalesLookup } from '@/shared/api/formularios'
 
 const PAGE_SIZE = 20
 
@@ -78,7 +78,7 @@ export default function GastosPage() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
-    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'compra' }),
   })
   const [tipoComprobanteSearch, setTipoComprobanteSearch] = useState('')
   const tipoComprobanteOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? [])

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getItemLookup } from '@/shared/api/catalog'
-import { getItemUbicaciones } from '@/shared/api/ubicaciones'
+import { getItemUbicacionesLookup } from '@/shared/api/formularios'
 import { formatDOP } from '@/lib/formatters'
 import { X, Package, MapPin, Percent, Tag } from 'lucide-react'
 
@@ -18,7 +18,7 @@ export function ItemDetailModal({ itemCode, onClose }: { itemCode: string; onClo
 
   const { data: ubicacionesData } = useQuery({
     queryKey: ['item-ubicaciones', itemCode],
-    queryFn: () => getItemUbicaciones(itemCode),
+    queryFn: () => getItemUbicacionesLookup(itemCode),
     enabled: !!itemCode && !isLoading,
   })
   const ubicaciones = ubicacionesData?.items ?? []

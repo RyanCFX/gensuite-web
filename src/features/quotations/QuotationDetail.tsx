@@ -2,17 +2,17 @@ import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getQuotation, getQuotationVersion, submitQuotation, deleteQuotation, convertQuotationToInvoice, cancelQuotation, downloadQuotationPdf } from '@/shared/api/quotations'
-import { getCustomer } from '@/shared/api/customers'
 import type { Quotation } from '@/shared/api/types'
 import { ArrowLeft, Download, FileText, Loader2, Send, Trash2, ClipboardList, XCircle, Copy, Link2, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatMoney, displayId } from '@/lib/formatters'
 import { esCreditoFiscal } from '@/lib/comprobantes'
-import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { getCatalogosFiscalesLookup, getClienteDetalle } from '@/shared/api/formularios'
 
 const ITEMS_COLUMNS = [
   { key: 'codigo', width: 100 },
@@ -72,8 +72,8 @@ export default function QuotationDetail() {
   // docs/tasks/81 §5 — al convertir a factura, el selector de NCF arranca prellenado con el
   // `ncfTypeDefault` del cliente (si tiene). Solo prellenado: editable antes de convertir.
   const { data: quotationCustomer } = useQuery({
-    queryKey: ['customer', quotation?.customer],
-    queryFn: () => getCustomer(quotation!.customer),
+    queryKey: ['cliente-detalle', quotation?.customer],
+    queryFn: () => getClienteDetalle(quotation!.customer),
     enabled: !!quotation?.customer && !quotation?.esClienteOcasional,
     staleTime: 5 * 60_000,
   })
@@ -105,7 +105,7 @@ export default function QuotationDetail() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
-    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'venta' }),
   })
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
   const ncfTypeOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])

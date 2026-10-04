@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { esClienteEmisorNoEncontrado, ECF_ADMIN_ROUTE } from '@/lib/ecfErrors'
 import { DollarSign, ChevronLeft, ChevronRight, X, Clock, AlertTriangle } from 'lucide-react'
 import { listPendientes, cobrarFactura } from '@/shared/api/caja'
-import { getFacturacionConfig, listDenominaciones } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { getTurnoActual } from '@/shared/api/pos'
 import { downloadInvoicePdf } from '@/shared/api/invoices'
 import { formatDate, formatMoney } from '@/lib/formatters'
@@ -40,6 +40,7 @@ import type { Invoice, CobrarFacturaDto } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 import { SearchInput } from '@/shared/ui/SearchInput'
+import { listDenominacionesLookup } from '@/shared/api/formularios'
 
 const PAGE_SIZE = 20
 
@@ -79,7 +80,7 @@ export default function CajaPage() {
   // validar que el desglose del vuelto suma el excedente.
   const { data: denominaciones } = useQuery({
     queryKey: ['denominaciones'],
-    queryFn: listDenominaciones,
+    queryFn: listDenominacionesLookup,
   })
   const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo)
 

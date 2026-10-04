@@ -9,7 +9,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import { crearAperturaCompra } from '@/shared/api/apertura'
-import { getFacturacionConfig, getCatalogosFiscales } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import type { CrearFacturaAperturaCompraDto, FacturaAperturaCompra } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -23,6 +23,7 @@ import { formatMoney } from '@/lib/formatters'
 import { today, usePreflightGate } from './lib'
 import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { getCatalogosFiscalesLookup } from '@/shared/api/formularios'
 
 interface FieldErrors {
   supplier?: string
@@ -70,7 +71,7 @@ export default function CompraForm() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
-    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'compra' }),
   })
   const tipoComprobanteOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? [])
     .filter((t) => !tipoComprobanteQuery || t.label.toLowerCase().includes(tipoComprobanteQuery.toLowerCase()))

@@ -4,13 +4,13 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, Clock, Lock, Download, Eye, Loader2 } from 'lucide-react'
 import { getTurnoDetail, downloadTurnoPdf, getTurnoPdfBlobUrl } from '@/shared/api/pos'
-import { listDenominaciones } from '@/shared/api/config'
 import { formatDateTime, formatDOP } from '@/lib/formatters'
 import { CorteCajaView } from '@/components/shared/CorteCajaView'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import type { TurnoClosing } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { listDenominacionesLookup } from '@/shared/api/formularios'
 
 const CONCILIACION_COLUMNS = [
   { key: 'metodo', width: 140 },
@@ -163,7 +163,7 @@ export default function TurnoDetailPage() {
 function ClosingSection({ closing, turnoCajero, closedBy }: { closing: TurnoClosing; turnoCajero: string; closedBy?: string }) {
   const { data: denominaciones } = useQuery({
     queryKey: ['denominaciones'],
-    queryFn: listDenominaciones,
+    queryFn: listDenominacionesLookup,
   })
 
   const denomMap = new Map((denominaciones ?? []).map((d) => [d.denominacion, d.valor]))

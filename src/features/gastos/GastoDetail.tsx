@@ -3,12 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getGasto, submitGasto, cancelGasto, amendGasto, previewAsientosGasto, updateGasto } from '@/shared/api/compras-gastos'
-import { listRetenciones } from '@/shared/api/retenciones'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EcfStatusCard } from '@/components/shared/EcfStatusCard'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { getCatalogosFiscales, listImpuestosCompras } from '@/shared/api/config'
 import { Send, X, RotateCcw, Info, FileText, AlertCircle, BookOpen } from 'lucide-react'
 import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavorCxpSection'
 import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
@@ -17,6 +15,7 @@ import { ECF_SUBMIT_UNAVAILABLE_MSG } from '@/shared/api/ecf'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import type { ImpuestoDistribucionDto, EcfSubmitResult, ApiError, PagoContadoDto } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { getCatalogosFiscalesLookup, listImpuestosComprasLookup, listRetencionesLookup } from '@/shared/api/formularios'
 
 const ITEMS_COLUMNS = [
   { key: 'codigo', width: 110 },
@@ -53,17 +52,17 @@ export default function GastoDetail() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
-    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'compra' }),
   })
 
   const { data: retencionesData } = useQuery({
     queryKey: ['retenciones-all'],
-    queryFn: () => listRetenciones({ limit: 100 }),
+    queryFn: () => listRetencionesLookup({ limit: 100 }),
   })
 
   const { data: impuestosCompras } = useQuery({
     queryKey: ['impuestos-compras'],
-    queryFn: listImpuestosCompras,
+    queryFn: listImpuestosComprasLookup,
   })
   const impuestoTitulo = (templateId: string) =>
     impuestosCompras?.find((t) => String(t.id) === templateId)?.title ?? templateId

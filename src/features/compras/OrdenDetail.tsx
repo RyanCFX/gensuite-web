@@ -7,9 +7,8 @@ import {
   cerrarOrdenCompra, reabrirOrdenCompra, ponerEnEsperaOrdenCompra, recibirOrdenCompra, facturarOrdenCompra,
   getOrdenCompraPdfBlobUrl, downloadOrdenCompraPdf,
 } from '@/shared/api/ordenes-compra'
-import { getSupplier } from '@/shared/api/suppliers'
 import { getItemLookup } from '@/shared/api/catalog'
-import { getCatalogosFiscales, listImpuestosCompras, getFacturacionConfig } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
@@ -24,6 +23,7 @@ import type { CreateInvoiceFromOrdenDto, ReceiptFromOrdenItemOverrideDto, Dimens
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { getCatalogosFiscalesLookup, getProveedorDetalle, listImpuestosComprasLookup } from '@/shared/api/formularios'
 
 const ITEMS_COLUMNS = [
   { key: 'codigo', width: 110 },
@@ -74,12 +74,12 @@ export default function OrdenDetail() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
-    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'compra' }),
   })
 
   const { data: taxesTemplates } = useQuery({
     queryKey: ['impuestos-compras'],
-    queryFn: listImpuestosCompras,
+    queryFn: listImpuestosComprasLookup,
   })
 
   const { data: facturacionConfig } = useQuery({
@@ -89,8 +89,8 @@ export default function OrdenDetail() {
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
 
   const { data: supplierData } = useQuery({
-    queryKey: ['supplier', orden?.supplier],
-    queryFn: () => getSupplier(orden!.supplier),
+    queryKey: ['proveedor-detalle', orden?.supplier],
+    queryFn: () => getProveedorDetalle(orden!.supplier),
     enabled: !!orden?.supplier,
     staleTime: 5 * 60_000,
   })

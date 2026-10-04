@@ -6,16 +6,14 @@ import { toast } from 'sonner'
 import { addDays, format as formatDateFns } from 'date-fns'
 import { useTabs } from '@/contexts/TabsContext'
 import { createGasto, updateGasto, getGasto } from '@/shared/api/compras-gastos'
-import { getSupplier } from '@/shared/api/suppliers'
 import type { CreateGastoDto, DistribucionCuentaDto } from '@/shared/api/types'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { getCatalogosFiscales, getFacturacionConfig, getCuentasEmpresa, listImpuestosCompras } from '@/shared/api/config'
+import { getFacturacionConfig, getCuentasEmpresa } from '@/shared/api/config'
 import { getTasaVigente } from '@/shared/api/monedas'
 import type { MonedaCode } from '@/shared/api/types'
 import { getCuenta } from '@/shared/api/cuentas'
 import { CATEGORIA_GASTO } from '@/lib/constants'
-import { listRetenciones } from '@/shared/api/retenciones'
 import { useSupplierEmisorElectronico } from '@/shared/hooks/useSupplierEmisorElectronico'
 import { Plus, Trash2, Pencil, Info, AlertCircle, AlertTriangle, Save, Loader2 } from 'lucide-react'
 import { Modal } from '@/shared/ui/Modal'
@@ -41,6 +39,7 @@ import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { getCatalogosFiscalesLookup, getProveedorDetalle, listImpuestosComprasLookup, listRetencionesLookup } from '@/shared/api/formularios'
 
 interface ItemRow {
   itemCode: string
@@ -305,7 +304,7 @@ export default function GastoForm() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
-    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'compra' }),
   })
   const [tipoComprobanteSearch, setTipoComprobanteSearch] = useState('')
   const tipoComprobanteOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? [])
@@ -325,14 +324,14 @@ export default function GastoForm() {
   // Impuesto del documento — mismo template/catálogo que usa Compras (config/impuestos-compras).
   const { data: taxesTemplates } = useQuery({
     queryKey: ['impuestos-compras'],
-    queryFn: listImpuestosCompras,
+    queryFn: listImpuestosComprasLookup,
   })
 
 
 
   const { data: supplierDetail } = useQuery({
-    queryKey: ['supplier', supplierId],
-    queryFn: () => getSupplier(supplierId),
+    queryKey: ['proveedor-detalle', supplierId],
+    queryFn: () => getProveedorDetalle(supplierId),
     enabled: !!supplierId && !esProveedorOcasional,
   })
 
@@ -341,7 +340,7 @@ export default function GastoForm() {
   // ── Catálogos de impuestos y retenciones (multiselect) ────────────────────────
   const { data: retencionesData } = useQuery({
     queryKey: ['retenciones-all'],
-    queryFn: () => listRetenciones({ limit: 100 }),
+    queryFn: () => listRetencionesLookup({ limit: 100 }),
   })
   const retencionesOptions: MultiSearchSelectOption[] = useMemo(
     () => (retencionesData?.items ?? []).map((r) => ({ id: r.id, label: r.categoryName })),
