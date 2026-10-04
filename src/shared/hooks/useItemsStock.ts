@@ -1,5 +1,5 @@
 import { useQueries } from '@tanstack/react-query'
-import { getItemStock } from '@/shared/api/catalog'
+import { getItemStockLookup } from '@/shared/api/formularios'
 import type { ItemStock } from '@/shared/api/types'
 
 /** Trae disponibilidad real (físico − reservado) por artículo, para validar líneas de venta antes
@@ -12,7 +12,7 @@ export function useItemsStock(itemCodes: (string | undefined)[]): Map<string, It
   const queries = useQueries({
     queries: uniqueCodes.map((code) => ({
       queryKey: ['item-stock', code],
-      queryFn: () => getItemStock(code),
+      queryFn: () => getItemStockLookup(code),
       staleTime: 30_000,
       retry: false,
     })),

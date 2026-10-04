@@ -2558,8 +2558,9 @@ export type UpdateBrandDto = Partial<CreateBrandDto>;
 export interface ItemStockWarehouse {
   warehouse: string;
   qty: number;
-  valuationRate: number;
-  stockValue: number;
+  /** No vienen en el lookup de formularios (sin costos ni valuación). */
+  valuationRate?: number;
+  stockValue?: number;
   /** Comprometido con otro cliente/proceso en este almacén (Stock Reservation Entry — típicamente
    *  un Apartado). Ver docs/tasks/73_alertas_stock_disponible_reservado.md. */
   reservedStock: number;
@@ -3927,6 +3928,9 @@ export interface OpcionItem {
   bank?: string;
   account_number?: string;
   root_type?: string;
+  /** sucursales: almacén de venta fijo y almacén de compra por defecto de la sucursal. */
+  custom_almacen_venta?: string | null;
+  custom_almacen_compra?: string | null;
   /** almacenes: sucursal del almacén. */
   custom_branch?: string | null;
   /** metodos-pago: tipo ERPNext (Cash, Bank, General…). */
@@ -5629,6 +5633,8 @@ export interface AgingResult {
 }
 
 export interface SemaforoEntry {
+  /** Solo viene en /opciones/clientes/:id/semaforo (formularios). */
+  tieneCredito?: boolean;
   customer: string;
   customerName: string;
   creditLimit: number;
@@ -8684,3 +8690,11 @@ export interface EnlazarTransaccionResponse {
   diff: DiffTransaccion;
   advertenciaFiscal?: string | null;
 }
+
+// ─── Lecturas de formulario vía /opciones/... (sin permisos de pantalla) ───────────────────────
+/** Detalle comercial del cliente para formularios (GET /opciones/clientes/:id/detalle). Un campo
+ *  ausente significa "no disponible para formularios": no trae saldos ni límite de crédito (ver semáforo). */
+export type ClienteDetalle = Partial<Customer> & { id: string; customerName: string };
+
+/** Detalle comercial/fiscal del proveedor para formularios (GET /opciones/proveedores/:id/detalle). */
+export type ProveedorDetalle = Partial<Supplier> & { id: string; supplierName: string };

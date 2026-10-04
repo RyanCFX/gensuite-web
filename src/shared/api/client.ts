@@ -296,7 +296,11 @@ client.interceptors.response.use(
     // el acceso pudo haber cambiado — refresco silencioso con debounce (no tormenta si fallan
     // varias queries a la vez). FILTRO_NO_PERMITIDO además reintenta UNA vez sin los params
     // bloqueados (desfase de versión): quita details.filtros[].parametro de la query y reintenta.
-    if (!isAuthEndpoint && errorCode && ['FILTRO_NO_PERMITIDO', 'RECURSO_NO_PERMITIDO', 'WIDGET_NO_PERMITIDO', 'WIDGET_NO_CONTRATADO'].includes(errorCode)) {
+    // `RECURSO_NO_PERMITIDO` ("este usuario no tiene esta lista") NO refresca el acceso: no significa
+    // que los permisos hayan cambiado. Solo se rechaza y cada selector muestra su estado "sin acceso".
+    if (!isAuthEndpoint && errorCode === 'RECURSO_NO_PERMITIDO') return Promise.reject(data.error)
+
+    if (!isAuthEndpoint && errorCode && ['FILTRO_NO_PERMITIDO', 'WIDGET_NO_PERMITIDO', 'WIDGET_NO_CONTRATADO'].includes(errorCode)) {
       refreshAccesoDebounced()
       if (errorCode === 'FILTRO_NO_PERMITIDO') {
         const config = error.config as (typeof error.config & { _filtroRetried?: boolean }) | undefined

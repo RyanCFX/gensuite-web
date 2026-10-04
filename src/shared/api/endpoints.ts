@@ -1,4 +1,22 @@
 export const ENDPOINTS = {
+  opcionesForm: {
+    facturacion: '/opciones/config/facturacion',
+    ecf: '/opciones/config/ecf',
+    stockSettings: '/opciones/config/stock-settings',
+    catalogosFiscales: '/opciones/config/catalogos-fiscales',
+    denominaciones: '/opciones/config/denominaciones',
+    apartados: '/opciones/config/apartados',
+    impuestos: '/opciones/config/impuestos',
+    clienteDetalle: (id: string) => `/opciones/clientes/${encodeURIComponent(id)}/detalle`,
+    clienteSemaforo: (id: string) => `/opciones/clientes/${encodeURIComponent(id)}/semaforo`,
+    proveedorDetalle: (id: string) => `/opciones/proveedores/${encodeURIComponent(id)}/detalle`,
+    ubicaciones: '/opciones/ubicaciones',
+    combos: '/opciones/combos',
+    comboById: (id: string) => `/opciones/combos/${encodeURIComponent(id)}`,
+    bancos: '/opciones/bancos',
+    itemVariants: (id: string) => `/catalog/items/lookup/${encodeURIComponent(id)}/variants`,
+    itemStock: (id: string) => `/catalog/items/lookup/${encodeURIComponent(id)}/stock`,
+  },
   me: {
     permissions: '/me/permissions',
     acceso: '/me/acceso',

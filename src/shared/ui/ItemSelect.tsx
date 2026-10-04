@@ -13,7 +13,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { lookupItems, listCuentasPorPagar } from '@/shared/api/catalog'
-import { listBundles } from '@/shared/api/bundles'
+import { listCombosLookup, getComboLookup } from '@/shared/api/formularios'
 import type { Item, Bundle, CuentaPorPagar } from '@/shared/api/types'
 import { getCachedUser, getTenant } from '@/shared/api/storage'
 import { esRecursoNoPermitido } from '@/shared/hooks/useOpciones'
@@ -101,7 +101,7 @@ export function ItemSelect({
   const { data: bundlesData, isLoading: bundlesLoading } = useQuery({
     queryKey: ['bundleSearch', query],
     // El backend no soporta filtrar por `disabled` en la query — se filtra en el cliente abajo.
-    queryFn: () => listBundles({ search: query || undefined, limit: 10 }),
+    queryFn: () => listCombosLookup({ search: query || undefined, limit: 10 }),
     enabled: !!includeBundles && abierto,
     staleTime: 30_000,
   })
@@ -184,7 +184,13 @@ export function ItemSelect({
           return
         }
         const foundBundle = activeBundles.find((b) => b.id === val)
-        if (foundBundle && onSelectBundle) { onSelectBundle(foundBundle); return }
+        if (foundBundle && onSelectBundle) {
+          // El detalle del combo elegido sale de /opciones/combos/:id (componentes, precios).
+          getComboLookup(foundBundle.id)
+            .then(onSelectBundle)
+            .catch((err: { message?: string }) => toast.error(err?.message ?? 'No se pudo cargar el combo'))
+          return
+        }
         const foundCuentaPorPagar = activeCuentasPorPagar.find((c) => c.id === val)
         if (foundCuentaPorPagar && onSelectCuentaPorPagar) onSelectCuentaPorPagar(foundCuentaPorPagar)
       }}
