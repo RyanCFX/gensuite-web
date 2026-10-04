@@ -61,7 +61,6 @@ export default function CreditNoteDetail() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
 

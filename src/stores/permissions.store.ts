@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import { getMePermissions } from '@/shared/api/me'
-import { getMiAcceso } from '@/shared/api/acceso'
+import { getMePermissions, normalizeMePermissions } from '@/shared/api/me'
+import { cargarBootstrap } from '@/shared/api/bootstrap'
+import { getMiAcceso, normalizeMeAcceso } from '@/shared/api/acceso'
 import type { MeAcceso, MePermissions } from '@/shared/api/types'
 import { ACCESO_VACIO, type Acceso } from '@/shared/permissions/acceso'
 
@@ -93,22 +94,39 @@ export function sincronizarAccesoEnFoco() {
   })
 }
 
+let fetchEnCurso: Promise<void> | null = null
+
 export const usePermissionsStore = create<PermissionsState>((set, get) => ({
   ...INITIAL,
 
   fetch: async () => {
-    // Solo el primer arranque bloquea la UI con el estado de carga. Un re-fetch cuando ya
-    // estábamos 'ready' (ej. al salir del admin de permisos) no debe re-montar la app.
-    if (get().status !== 'ready') set({ status: 'loading', error: null })
+    // Single-flight: StrictMode (dev) o re-montajes de ProtectedRoute no deben duplicar los GET /me/*.
+    if (fetchEnCurso) return fetchEnCurso
+    let liberar!: () => void
+    fetchEnCurso = new Promise<void>((r) => { liberar = r })
     try {
-      const [data, acceso] = await Promise.all([getMePermissions(), pedirAcceso()])
-      aplicar(set, data)
-      if (acceso) aplicarAcceso(set, acceso)
-      set({ status: 'ready', error: null })
-    } catch (err) {
-      if (get().status === 'ready') return // ya teníamos permisos válidos: no romper la sesión
-      const message = (err as { message?: string } | undefined)?.message ?? 'Error al cargar permisos'
-      set({ status: 'error', error: message })
+      // Solo el primer arranque bloquea la UI con el estado de carga. Un re-fetch cuando ya
+      // estábamos 'ready' (ej. al salir del admin de permisos) no debe re-montar la app.
+      if (get().status !== 'ready') set({ status: 'loading', error: null })
+      try {
+        // Arranque: UNA llamada (/me/bootstrap) trae permisos + acceso (y siembra config/usuario en la caché);
+        // si no está disponible se cae a los endpoints individuales.
+        const boot = await cargarBootstrap()
+        const [data, acceso] = boot?.permisos
+          ? [normalizeMePermissions(boot.permisos), boot.acceso ? normalizeMeAcceso(boot.acceso) : null]
+          : await Promise.all([getMePermissions(), pedirAcceso()])
+        aplicar(set, data)
+        if (acceso) aplicarAcceso(set, acceso)
+        set({ status: 'ready', error: null })
+      } catch (err) {
+        if (get().status === 'ready') return // ya teníamos permisos válidos: no romper la sesión
+        const message = (err as { message?: string } | undefined)?.message ?? 'Error al cargar permisos'
+        set({ status: 'error', error: message })
+      }
+  
+    } finally {
+      fetchEnCurso = null
+      liberar()
     }
   },
 

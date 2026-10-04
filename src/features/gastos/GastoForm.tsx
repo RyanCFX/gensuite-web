@@ -168,7 +168,6 @@ export default function GastoForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
@@ -177,7 +176,7 @@ export default function GastoForm() {
   // ── Multimoneda (docs/tasks/60_multimoneda_dop_usd_eur.md §4) ──────────────
   const [selectedCurrency, setSelectedCurrency] = useState('')
   const [conversionRate, setConversionRate] = useState<number | ''>('')
-  const { data: monedas } = useOpcionesArray('monedas', { limit: 100, enabled: multimonedaHabilitada, staleTime: 5 * 60_000 })
+  const { data: monedas } = useOpcionesArray('monedas', { limit: 100, enabled: multimonedaHabilitada})
   const monedasHabilitadasOptions = (monedas ?? [])
   const { data: tasaVigente } = useQuery({
     queryKey: ['monedas-tasa-vigente', selectedCurrency, monedaBase],
@@ -195,7 +194,6 @@ export default function GastoForm() {
   const { data: cuentasEmpresa } = useQuery({
     queryKey: ['cuentas-empresa'],
     queryFn: getCuentasEmpresa,
-    staleTime: 5 * 60_000,
   })
 
   const currentUserEmail = getCachedUser()?.email
@@ -206,9 +204,8 @@ export default function GastoForm() {
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 60_000,
   })
-  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager})
   const branchOptions = useMemo(
     () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],
@@ -309,7 +306,6 @@ export default function GastoForm() {
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
     queryFn: () => getCatalogosFiscales({ type: 'compra' }),
-    staleTime: 60 * 60_000,
   })
   const [tipoComprobanteSearch, setTipoComprobanteSearch] = useState('')
   const tipoComprobanteOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? [])
@@ -330,7 +326,6 @@ export default function GastoForm() {
   const { data: taxesTemplates } = useQuery({
     queryKey: ['impuestos-compras'],
     queryFn: listImpuestosCompras,
-    staleTime: 5 * 60_000,
   })
 
 
@@ -347,7 +342,6 @@ export default function GastoForm() {
   const { data: retencionesData } = useQuery({
     queryKey: ['retenciones-all'],
     queryFn: () => listRetenciones({ limit: 100 }),
-    staleTime: 5 * 60_000,
   })
   const retencionesOptions: MultiSearchSelectOption[] = useMemo(
     () => (retencionesData?.items ?? []).map((r) => ({ id: r.id, label: r.categoryName })),

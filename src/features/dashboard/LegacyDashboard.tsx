@@ -209,6 +209,7 @@ export default function LegacyDashboard() {
     queryKey: ['dashboard', period],
     queryFn: () => getDashboardData(period),
     retry: false,
+    staleTime: 5 * 60_000,
   })
 
   // ── Acciones pendientes — 3 llamadas independientes, sin depender del `period` ──

@@ -15,7 +15,7 @@ import {
 import { esCoberturaCompleta } from '@/shared/api/types'
 import { getCustomer } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
-import { lookupItems, getDefaultPriceTier, getItemLookup } from '@/shared/api/catalog'
+import { lookupItems, getItemLookup } from '@/shared/api/catalog'
 import { getCatalogosFiscales, getStockSettings, getFacturacionConfig } from '@/shared/api/config'
 import { getItemUbicaciones } from '@/shared/api/ubicaciones'
 import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
@@ -372,7 +372,6 @@ export default function InvoiceForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   // ── Multimoneda (docs/tasks/64_multimoneda_completo.md §3.1) ──────────────
@@ -430,7 +429,6 @@ export default function InvoiceForm() {
   const { data: stockSettings } = useQuery({
     queryKey: ['stock-settings'],
     queryFn: getStockSettings,
-    staleTime: 60 * 60_000,
   })
   const useInlineSerialBatch = stockSettings?.useSerialBatchFields === true
 
@@ -461,18 +459,15 @@ export default function InvoiceForm() {
 
   // ── Customer search ───────────────────────────────────────────────────────
 
-  const { data: defaultPriceTier = 'B' } = useQuery({
-    queryKey: ['defaultPriceTier'],
-    queryFn: getDefaultPriceTier,
-    staleTime: 5 * 60_000,
-  })
+  // Viene en GET /config/facturacion (ya cargado arriba): sin consulta de catálogo aparte.
+  const defaultPriceTier = facturacionConfig?.defaultPriceTier ?? 'B'
 
   const currentUserEmail = getCachedUser()?.email
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser', currentUserEmail],
     queryFn: () => getUsuario(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 5 * 60_000,
+    staleTime: 15 * 60_000,
   })
 
   // ── Sucursal (branch) selector ────────────────────────────────────────────
@@ -481,9 +476,8 @@ export default function InvoiceForm() {
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 60_000,
   })
-  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager})
   const branchOptions = useMemo(
     () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],
@@ -493,7 +487,6 @@ export default function InvoiceForm() {
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
     queryFn: () => getCatalogosFiscales({ type: 'venta' }),
-    staleTime: 60 * 60_000,
   })
 
   const ncfTypeOptions: SearchSelectOption[] = useMemo(() => {
@@ -505,20 +498,24 @@ export default function InvoiceForm() {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
   }, [myBranches])
 
-  // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
-  const { data: branchWarehouses } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch, staleTime: 60_000 })
-
   // docs/tasks/75_almacen_venta_confirmar_stock_uoms_permitidas.md §1.4 — si la sucursal tiene
   // almacén de venta configurado, TODA venta debe salir de ahí sin excepción: se oculta el
   // selector por línea y se fuerza ese almacén, en vez de dejar elegir y recién enterarse con el
   // 400 de SALE_WAREHOUSE_MISMATCH al someter.
-  const { data: sucursalActual } = useQuery({
+  const { data: sucursalActual, isFetched: sucursalFetched } = useQuery({
     queryKey: ['sucursal', branch],
     queryFn: () => getSucursal(branch),
     enabled: !!branch,
-    staleTime: 60_000,
   })
   const almacenVentaSucursal = sucursalActual?.almacenVenta || null
+
+  // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
+  // Solo se piden si hace falta el selector: con almacén de venta fijo en la sucursal se oculta.
+  const { data: branchWarehouses } = useOpcionesArray('almacenes', {
+    branch: branch,
+    limit: 100,
+    enabled: !!branch && sucursalFetched && !almacenVentaSucursal,
+  })
 
   // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido.
   // En edición se ignora el cambio de sucursal que produce la propia hidratación del borrador,
@@ -1306,7 +1303,7 @@ export default function InvoiceForm() {
   // Dimensión: una columna por cada eje que declare AL MENOS un artículo de la factura (no todas
   // las dimensiones del catálogo del tenant), a la derecha de "Artículo".
   const dimensionCodes = Array.from(new Set(items.flatMap((i) => i._itemDimensiones?.map((d) => d.dimension) ?? [])))
-  const { etiquetaDe: dimensionEtiquetaDe } = useDimensionesInventario()
+  const { etiquetaDe: dimensionEtiquetaDe } = useDimensionesInventario({ enabled: items.some((i) => i._usaDimensiones) })
 
   // Ubicación: solo si algún artículo tiene más de una ubicación asignada en su almacén — con 0 o
   // 1 no hay nada real que elegir (mismo criterio que `LineUbicacionCell` para ocultar la celda).

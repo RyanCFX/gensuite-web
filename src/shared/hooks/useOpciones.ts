@@ -18,6 +18,8 @@ export interface UseOpcionesOpts {
   silent403?: boolean
   /** Solo `almacenes`. */
   branch?: string
+  /** Resuelve estos values en lugar de buscar (labels de valores guardados). */
+  ids?: string[]
 }
 
 export function esRecursoNoPermitido(err: unknown): boolean {
@@ -30,8 +32,8 @@ export function useOpciones(recurso: string, opts?: UseOpcionesOpts) {
   const tenant = getTenant()?.slug ?? ''
   const usuario = getCachedUser()?.email ?? ''
   const query = useQuery({
-    queryKey: ['opciones', tenant, usuario, recurso, q, limit, opts?.branch ?? ''],
-    queryFn: (): Promise<OpcionItem[]> => getOpciones(recurso, { q: q || undefined, limit, branch: opts?.branch || undefined, silent403: opts?.silent403 }),
+    queryKey: ['opciones', tenant, usuario, recurso, q, limit, opts?.branch ?? '', opts?.ids?.join(',') ?? ''],
+    queryFn: (): Promise<OpcionItem[]> => getOpciones(recurso, { q: q || undefined, limit, branch: opts?.branch || undefined, ids: opts?.ids, silent403: opts?.silent403 }),
     enabled: opts?.enabled ?? true,
     retry: false,
     staleTime: opts?.staleTime ?? 5 * 60_000,

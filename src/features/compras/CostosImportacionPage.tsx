@@ -16,10 +16,11 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { formatDate, formatDOP, todayIso } from '@/lib/formatters'
-import { Plus, ChevronLeft, ChevronRight, Search, Trash2 } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -243,15 +244,7 @@ export default function CostosImportacionPage() {
           <div className="card-body">
             <div className="filter-bar" style={{ margin: 0 }}>
               <div className="filter-bar-left">
-                <div className="search-input-wrap">
-                  <Search size={14} className="search-input-icon" />
-                  <input
-                    className="search-input"
-                    placeholder="Buscar por número…"
-                    value={search}
-                    onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-                  />
-                </div>
+                <SearchInput placeholder="Buscar por número…" value={search} onChange={(v) => { setSearch(v); setPage(1) }} />
                 <Select
                   value={status}
                   onValueChange={(val) => { setStatus(val); setPage(1) }}

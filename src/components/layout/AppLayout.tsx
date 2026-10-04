@@ -67,7 +67,7 @@ import { CommandPalette } from "./CommandPalette";
 import { Toaster, toast } from "sonner";
 import { TabsProvider, useTabs } from "@/contexts/TabsContext";
 import { KeepAlive } from "keepalive-for-react";
-import { RefetchOnNavigate } from "@/components/RefetchOnNavigate";
+import { ScreenQueryGate } from "@/components/ScreenQueryGate";
 import { TurnoCajaIndicator } from "@/components/shared/TurnoCajaIndicator";
 
 import logo from "@/assets/logo.png";
@@ -1592,7 +1592,7 @@ function AppLayoutInner() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ["facturacion-config"],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
+    meta: { global: true },
   });
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true;
@@ -1600,7 +1600,7 @@ function AppLayoutInner() {
   const { data: ecfConfig } = useQuery({
     queryKey: ["ecf-config"],
     queryFn: getEcfConfig,
-    staleTime: 5 * 60_000,
+    meta: { global: true },
   });
   const ecfHabilitado = ecfConfig?.habilitado ?? false;
   const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false;
@@ -2134,8 +2134,6 @@ function AppLayoutInner() {
             </div>
           )}*/}
           {multiTab && <TabBar />}
-          {/* Re-consulta los GETs al cambiar de pantalla — con y sin pestañas */}
-          <RefetchOnNavigate />
           <div style={{ flex: 1, overflowY: "auto" }}>
             {multiTab ? (
               <KeepAlive
@@ -2143,7 +2141,7 @@ function AppLayoutInner() {
                 max={15}
                 aliveRef={keepAliveRef}
               >
-                {outlet}
+                <ScreenQueryGate>{outlet}</ScreenQueryGate>
               </KeepAlive>
             ) : (
               // Sin multipestañas, cada navegación debe partir de cero — se fuerza remount

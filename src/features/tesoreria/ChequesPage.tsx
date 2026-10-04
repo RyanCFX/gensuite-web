@@ -17,6 +17,7 @@ import { Printer, SlidersHorizontal } from 'lucide-react'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const COLUMNS = [
   { key: 'fecha', width: 100 },
@@ -96,14 +97,7 @@ export default function ChequesPage() {
                 <CuentaBancariaSelect value={cuentaBancaria} onChange={setCuentaBancaria} placeholder="Todas las cuentas" />
               </FilterField>
               <FilterField label="Número de cheque">
-                <input
-                  className="ff-input"
-                  style={{ width: 140 }}
-                  placeholder="Buscar número…"
-                  value={chequeNo}
-                  onChange={(e) => setChequeNo(e.target.value)}
-                />
-              </FilterField>
+                <SearchInput variant="field" style={{ width: 140 }} placeholder="Buscar número…" value={chequeNo} onChange={(v) => setChequeNo(v)} /></FilterField>
               <OpcionesSelect hideOnForbidden filterLabel="Beneficiario" filterStyle={{ width: 220 }} recurso="proveedores" value={beneficiario} onChange={(val, opt) => { setBeneficiario(val); setBeneficiarioLabel(opt?.label ?? '') }} selectedLabel={beneficiarioLabel} placeholder="Filtrar por proveedor…" />
               <FilterField label="Estado">
                 <Select value={estado} onValueChange={(v) => setEstado(v as EstadoFilter)} clearable={false}>

@@ -6,7 +6,6 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTabs } from '@/contexts/TabsContext'
 import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSource } from '@/shared/api/quotations'
 import { getCustomer } from '@/shared/api/customers'
-import { getDefaultPriceTier } from '@/shared/api/catalog'
 import { getFacturacionConfig, getStockSettings } from '@/shared/api/config'
 import type { CreateQuotationDto, ItemPrices, Bundle, Customer, MonedaCode } from '@/shared/api/types'
 import type { Item, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
@@ -189,12 +188,10 @@ export default function QuotationForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const { data: stockSettings } = useQuery({
     queryKey: ['stock-settings'],
     queryFn: getStockSettings,
-    staleTime: 5 * 60_000,
   })
   // Candados "Permitir Modificar Precio Libremente" (servicios/productos por separado) — con el
   // toggle correspondiente apagado, el precio de la línea debe ser exactamente uno de los precios
@@ -458,11 +455,8 @@ useEffect(() => {
   // ── Customer search ──────────────────────────────────────────────────────
 
 
-  const { data: defaultPriceTier = 'B' } = useQuery({
-    queryKey: ['defaultPriceTier'],
-    queryFn: getDefaultPriceTier,
-    staleTime: 5 * 60_000,
-  })
+  // Viene en GET /config/facturacion (ya cargado arriba): sin consulta de catálogo aparte.
+  const defaultPriceTier = facturacionConfig?.defaultPriceTier ?? 'B'
 
   const currentUserEmail = getCachedUser()?.email
   const { data: currentUser } = useQuery({
@@ -477,7 +471,6 @@ useEffect(() => {
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 60_000,
   })
 
 
@@ -486,7 +479,7 @@ useEffect(() => {
   }, [myBranches])
 
   // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
-  const { data: branchWarehouses } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch, staleTime: 60_000 })
+  const { data: branchWarehouses } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch})
 
   // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido
   useEffect(() => {

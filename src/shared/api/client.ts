@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/react'
 import { toast } from 'sonner'
 import { getAccessToken, getTenant, getRefreshToken, setAccessToken, setRefreshToken, setTenant, clearSession } from './storage'
 import { ocultarErp } from '@/lib/ocultarErp'
+import { invalidarReferenciaTrasEscritura, registrarVersionReferencia } from './queryClient'
 import type { ApiError, ApiErrorResponse, ApiResponse, PaginatedResponse, RefreshTokenResult } from './types'
 
 // Ruta relativa por defecto: el dev server hace de proxy hacia el backend
@@ -157,7 +158,11 @@ const CODIGOS_ESTRUCTURALES_CONOCIDOS = new Set([
 ])
 
 client.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    invalidarReferenciaTrasEscritura(response.config.method, response.config.url)
+    registrarVersionReferencia(response.headers?.['x-reference-version'])
+    return response
+  },
   async (error) => {
     const requestUrl = axios.isAxiosError(error) ? error.config?.url : undefined
     const requestMethod = axios.isAxiosError(error) ? error.config?.method : undefined

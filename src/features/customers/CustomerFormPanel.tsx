@@ -93,13 +93,12 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
   const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
 
 
-  const { data: metodosPagoData } = useOpcionesArray('metodos-pago', { limit: 100, staleTime: 60_000 })
+  const { data: metodosPagoData } = useOpcionesArray('metodos-pago', { limit: 100})
   const [formaPagoQuery, setFormaPagoQuery] = useState('')
   const formaPagoOptions: SearchSelectOption[] = (metodosPagoData ?? [])
     .filter((m) => !m.disabled)
@@ -109,7 +108,6 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
   const { data: impuestosVentasData } = useQuery({
     queryKey: ['impuestos-ventas'],
     queryFn: listImpuestosVentas,
-    staleTime: 5 * 60_000,
   })
   const [impuestoVentasSearch, setImpuestoVentasSearch] = useState('')
 
@@ -119,7 +117,6 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
     queryFn: () => getCatalogosFiscales({ type: 'venta' }),
-    staleTime: 60 * 60_000,
   })
   const [ncfDefaultSearch, setNcfDefaultSearch] = useState('')
   const ncfDefaultOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])

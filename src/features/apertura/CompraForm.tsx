@@ -61,25 +61,23 @@ export default function CompraForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
 
-  const { data: monedas } = useOpcionesArray('monedas', { limit: 100, enabled: multimonedaHabilitada, staleTime: 5 * 60_000 })
+  const { data: monedas } = useOpcionesArray('monedas', { limit: 100, enabled: multimonedaHabilitada})
   const monedasOptions = (monedas ?? []).filter((m) => m.code !== monedaBase)
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
     queryFn: () => getCatalogosFiscales({ type: 'compra' }),
-    staleTime: 60 * 60_000,
   })
   const tipoComprobanteOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? [])
     .filter((t) => !tipoComprobanteQuery || t.label.toLowerCase().includes(tipoComprobanteQuery.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 
 
-  const { data: sucursalesData } = useOpcionesLista('sucursales', { limit: 100, staleTime: 60_000 })
+  const { data: sucursalesData } = useOpcionesLista('sucursales', { limit: 100})
   const mostrarSucursal = (sucursalesData?.items.length ?? 0) > 1
 
   const mostrarTasaCambio = multimonedaHabilitada && !!form.moneda && form.moneda !== monedaBase

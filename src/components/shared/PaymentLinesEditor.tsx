@@ -49,10 +49,10 @@ interface PaymentLinesEditorProps {
 }
 
 export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP' }: PaymentLinesEditorProps) {
-  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, staleTime: 5 * 60_000 })
-  const { data: bancos } = useQuery({ queryKey: ['bancos'], queryFn: listBancos, staleTime: 5 * 60_000 })
-  const { data: denominaciones } = useQuery({ queryKey: ['denominaciones'], queryFn: listDenominaciones, staleTime: 5 * 60_000 })
-  const { data: cuentasBancarias } = useOpcionesLista('cuentas-bancarias', { limit: 100, staleTime: 60_000 })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100})
+  const { data: bancos } = useQuery({ queryKey: ['bancos'], queryFn: listBancos})
+  const { data: denominaciones } = useQuery({ queryKey: ['denominaciones'], queryFn: listDenominaciones})
+  const { data: cuentasBancarias } = useOpcionesLista('cuentas-bancarias', { limit: 100})
 
   const [metodoSearch, setMetodoSearch] = useState<Record<number, string>>({})
   const [bancoSearch, setBancoSearch] = useState<Record<number, string>>({})

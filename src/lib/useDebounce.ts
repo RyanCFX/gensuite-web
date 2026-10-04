@@ -15,3 +15,13 @@ export function useDebounce<T>(value: T, delay: number): T {
 
   return debouncedValue
 }
+
+/** Espera antes de consultar al API mientras el usuario escribe (buscadores y selects remotos). */
+export const REMOTE_SEARCH_DEBOUNCE_MS = 2000
+
+/** `debounced` es el valor a consultar; `pending` es true mientras el usuario sigue escribiendo
+ *  y todavía no se lanzó la consulta (para mostrar el input como "cargando"). */
+export function useDebouncedValue<T>(value: T, delay: number = REMOTE_SEARCH_DEBOUNCE_MS): { debounced: T; pending: boolean } {
+  const debounced = useDebounce(value, delay)
+  return { debounced, pending: debounced !== value }
+}

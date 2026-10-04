@@ -77,7 +77,6 @@ export default function RegistrarPagoPage() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
@@ -90,9 +89,8 @@ export default function RegistrarPagoPage() {
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 60_000,
   })
-  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager})
   const branchOptions = useMemo(
     () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],

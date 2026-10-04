@@ -38,8 +38,10 @@ function ItemDimensionadoSelect({
   onClear: () => void
 }) {
   const [query, setQuery] = useState('')
+  const [abierto, setAbierto] = useState(false)
 
-  const { data, isLoading, refetch, error: itemsError } = useQuery({
+  const { data, isLoading, error: itemsError } = useQuery({
+    enabled: abierto,
     retry: false,
     queryKey: ['itemSearch-dimensionado', query],
     queryFn: () => lookupItems({ search: query || undefined, disabled: 'false', type: 'product', limit: 20 }),
@@ -66,7 +68,7 @@ function ItemDimensionadoSelect({
       }}
       options={options}
       onSearch={setQuery}
-      onOpen={() => refetch()}
+      onOpen={() => setAbierto(true)}
       loading={isLoading}
       placeholder={sinAcceso ? 'No tiene acceso a esta lista' : "Buscar artículo con dimensiones de inventario…"}
       disabled={sinAcceso}
@@ -95,7 +97,7 @@ export default function ReclasificacionForm() {
   const [branch, setBranch] = useState('')
   const [resultado, setResultado] = useState<{ qty: number } | null>(null)
 
-  const { data: almacenes } = useOpcionesArray('almacenes', { limit: 100, staleTime: 60_000 })
+  const { data: almacenes } = useOpcionesArray('almacenes', { limit: 100})
   const warehouseOptions: SearchSelectOption[] = (almacenes ?? [])
     .filter((a) => !a.disabled && (!warehouseSearch || a.name.toLowerCase().includes(warehouseSearch.toLowerCase())))
     .map((a) => ({ value: a.id, label: a.name }))

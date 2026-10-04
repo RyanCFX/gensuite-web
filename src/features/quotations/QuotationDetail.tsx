@@ -85,7 +85,6 @@ export default function QuotationDetail() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
 
@@ -106,7 +105,6 @@ export default function QuotationDetail() {
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
     queryFn: () => getCatalogosFiscales({ type: 'venta' }),
-    staleTime: 60 * 60_000,
   })
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
   const ncfTypeOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])

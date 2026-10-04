@@ -169,13 +169,12 @@ export default function RelacionDetail() {
   // Catálogos para los selects de "Configuración de automatización" — no hay contexto de
   // sucursal en esta pantalla (es una configuración a nivel de relación, no de documento), así
   // que "Almacén destino" ofrece todos los almacenes del tenant en vez de filtrar por sucursal.
-  const { data: almacenesData } = useOpcionesArray('almacenes', { limit: 100, staleTime: 60_000 })
+  const { data: almacenesData } = useOpcionesArray('almacenes', { limit: 100})
   const almacenOptions: SearchSelectOption[] = (almacenesData ?? []).map((w) => ({ value: w.id, label: w.name }))
 
   const { data: catalogosFiscales } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
     queryFn: () => getCatalogosFiscales({ type: 'compra' }),
-    staleTime: 60 * 60_000,
   })
   const [cfgTipoBienes606Search, setCfgTipoBienes606Search] = useState('')
   const cfgTipoBienes606Options: SearchSelectOption[] = (catalogosFiscales?.tipoBienes606 ?? [])

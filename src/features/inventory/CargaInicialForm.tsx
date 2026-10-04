@@ -71,21 +71,19 @@ export default function CargaInicialForm() {
   const { data: cuentasEmpresa, isLoading: loadingCuentas } = useQuery({
     queryKey: ['cuentas-empresa'],
     queryFn: getCuentasEmpresa,
-    staleTime: 60_000,
   })
   const cuentaAjusteConfigurada = !!cuentasEmpresa?.stockAdjustmentAccount
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
 
-  const { data: sucursalesData } = useOpcionesLista('sucursales', { limit: 100, staleTime: 60_000 })
+  const { data: sucursalesData } = useOpcionesLista('sucursales', { limit: 100})
   const mostrarSucursal = (sucursalesData?.items.length ?? 0) > 1
 
-  const { data: almacenes } = useOpcionesArray('almacenes', { limit: 100, staleTime: 60_000 })
+  const { data: almacenes } = useOpcionesArray('almacenes', { limit: 100})
   const warehouseOptions: SearchSelectOption[] = (almacenes ?? [])
     .filter((a) => !a.disabled && (!warehouseSearch || a.name.toLowerCase().includes(warehouseSearch.toLowerCase())))
     .map((a) => ({ value: a.id, label: a.name }))

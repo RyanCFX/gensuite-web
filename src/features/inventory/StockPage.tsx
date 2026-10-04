@@ -13,6 +13,7 @@ import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 import { useFiltrosPantalla } from '@/shared/permissions/useAcceso'
 import { FilterField } from '@/shared/ui/FilterField'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const COLUMNS = [
   { key: 'codigo', width: 110 },
@@ -157,23 +158,9 @@ export default function StockPage() {
                   />
               )}
               <FilterField label="Categoría / nombre">
-                <input
-                  className="ff-input ff-input-sm"
-                  placeholder="Categoría / nombre"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  style={{ width: 180 }}
-                />
-              </FilterField>
+                <SearchInput variant="field" style={{ width: 180 }} placeholder="Categoría / nombre" value={category} onChange={(v) => setCategory(v)} /></FilterField>
               <FilterField label="Marca">
-                <input
-                  className="ff-input ff-input-sm"
-                  placeholder="Marca"
-                  value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
-                  style={{ width: 160 }}
-                />
-              </FilterField>
+                <SearchInput variant="field" style={{ width: 160 }} placeholder="Marca" value={brand} onChange={(v) => setBrand(v)} /></FilterField>
               <FilterField label="Estado">
                 <Select value={stockFilter} onValueChange={setStockFilter}>
                   <SelectItem value="all">Todos los estados</SelectItem>

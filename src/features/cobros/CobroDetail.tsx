@@ -49,7 +49,6 @@ export default function CobroDetail() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? 'a4'
   const formatosPermitidos = facturacionConfig?.formatosPermitidos

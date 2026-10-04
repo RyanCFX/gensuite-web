@@ -19,6 +19,7 @@ import { Modal } from '@/shared/ui/Modal'
 import { today } from '@/features/despachos/lib'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -139,11 +140,9 @@ export default function AbastecimientoPage() {
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
               <FilterField label="Artículo">
-                <input className="ff-input filter-select" placeholder="Código del artículo" value={itemCode} onChange={(e) => { setItemCode(e.target.value); setPage(1) }} />
-              </FilterField>
+                <SearchInput variant="field" placeholder="Código del artículo" value={itemCode} onChange={(v) => { setItemCode(v); setPage(1) }} /></FilterField>
               <FilterField label="Cliente">
-                <input className="ff-input filter-select" placeholder="ID del cliente" value={customer} onChange={(e) => { setCustomer(e.target.value); setPage(1) }} />
-              </FilterField>
+                <SearchInput variant="field" placeholder="ID del cliente" value={customer} onChange={(v) => { setCustomer(v); setPage(1) }} /></FilterField>
             </div>
             {puedeCrear && (
               <div className="filter-bar-right">

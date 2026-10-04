@@ -74,12 +74,11 @@ export default function JournalForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
 
   const [sucursalQuery, setSucursalQuery] = useState('')
-  const { data: sucursalesData, isLoading: sucursalesLoading } = useOpcionesLista('sucursales', { limit: 100, staleTime: 30_000 })
+  const { data: sucursalesData, isLoading: sucursalesLoading } = useOpcionesLista('sucursales', { limit: 100})
   const sucursalOptions: SearchSelectOption[] = (sucursalesData?.items ?? [])
     .filter((s) => !sucursalQuery || s.name.toLowerCase().includes(sucursalQuery.toLowerCase()))
     .map((s) => ({ value: s.id, label: s.name }))

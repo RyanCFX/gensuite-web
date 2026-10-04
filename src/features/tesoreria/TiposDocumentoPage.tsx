@@ -11,7 +11,7 @@ import {
   disableTipoDocumento,
 } from '@/shared/api/tesoreria'
 import type { TipoDocumentoBancario, TesoreriaNaturaleza, TesoreriaTipoTransaccion } from '@/shared/api/types'
-import { Plus, Pencil, Ban, Search, ChevronLeft, ChevronRight, ReceiptText, CircleCheck, ArrowDownToLine, ArrowUpFromLine, FileWarning, SlidersHorizontal, X } from 'lucide-react'
+import { Plus, Pencil, Ban, ChevronLeft, ChevronRight, ReceiptText, CircleCheck, ArrowDownToLine, ArrowUpFromLine, FileWarning, SlidersHorizontal, X } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -20,11 +20,11 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { Select, SelectItem } from '@/components/ui/select'
 import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
-import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import './TiposDocumento.css'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -117,7 +117,7 @@ export default function TiposDocumentoPage() {
   // al cambiar nature. Se resetea cada vez que se abre el diálogo (ver openCreate/openEdit).
   const transactionTypeTouched = useRef(false)
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
@@ -381,15 +381,7 @@ export default function TiposDocumentoPage() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <div className="search-input-wrap">
-                <Search size={14} className="search-input-icon" />
-                <input
-                  className="search-input"
-                  placeholder="Buscar por código o descripción…"
-                  value={search}
-                  onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-                />
-              </div>
+              <SearchInput placeholder="Buscar por código o descripción…" value={search} onChange={(v) => { setSearch(v); setPage(1) }} />
               <FilterField label="Naturaleza">
                 <Select value={natureFilter} onValueChange={(v) => { setNatureFilter(v); setPage(1) }} placeholder="Todas las naturalezas">
                   {NATURALEZAS.map((n) => (

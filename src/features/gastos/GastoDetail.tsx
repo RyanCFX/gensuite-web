@@ -54,19 +54,16 @@ export default function GastoDetail() {
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
     queryFn: () => getCatalogosFiscales({ type: 'compra' }),
-    staleTime: 60 * 60_000,
   })
 
   const { data: retencionesData } = useQuery({
     queryKey: ['retenciones-all'],
     queryFn: () => listRetenciones({ limit: 100 }),
-    staleTime: 60 * 60_000,
   })
 
   const { data: impuestosCompras } = useQuery({
     queryKey: ['impuestos-compras'],
     queryFn: listImpuestosCompras,
-    staleTime: 60 * 60_000,
   })
   const impuestoTitulo = (templateId: string) =>
     impuestosCompras?.find((t) => String(t.id) === templateId)?.title ?? templateId

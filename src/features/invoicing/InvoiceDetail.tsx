@@ -400,7 +400,7 @@ export default function InvoiceDetail() {
 
   // Usado por el selector de método de pago del reembolso en el modal de Devolución,
   // y por el bloque de "¿Cómo se cobra?" al someter (validación de requiresBankAccount).
-  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, enabled: invoice?.status === "draft" || invoice?.status === "submitted", staleTime: 5 * 60_000 });
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, enabled: invoice?.status === "draft" || invoice?.status === "submitted"});
 
   // Misma key que usa PaymentLinesEditor — cache compartido, sin request extra. Hace falta para
   // validar que el desglose del vuelto suma el excedente cuando hay sobrepago.
@@ -408,14 +408,12 @@ export default function InvoiceDetail() {
     queryKey: ["denominaciones"],
     queryFn: listDenominaciones,
     enabled: invoice?.status === "draft",
-    staleTime: 5 * 60_000,
   });
   const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo);
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ["facturacion-config"],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   });
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
   const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false;
@@ -435,7 +433,7 @@ export default function InvoiceDetail() {
     queryKey: ['turno-actual'],
     queryFn: getTurnoActual,
     enabled: !!invoice && invoice.status === "draft" && usaModuloPos,
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   });
 
   const abrirTurnoMutation = useMutation({
@@ -457,7 +455,6 @@ export default function InvoiceDetail() {
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
     queryFn: () => getCatalogosFiscales({ type: 'venta' }),
-    staleTime: 60 * 60_000,
   });
 
   const returnModeOptions: SearchSelectOption[] = useMemo(() => {

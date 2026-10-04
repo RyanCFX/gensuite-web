@@ -1,15 +1,14 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Search, DollarSign, Trash2, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
+import { DollarSign, Trash2, ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { listPorCobrar, completarCobro, descartarFactura } from '@/shared/api/caja'
 import { getFacturacionConfig, listDenominaciones } from '@/shared/api/config'
 import { getCustomer } from '@/shared/api/customers'
 import { getTurnoActual } from '@/shared/api/pos'
 import { downloadInvoicePdf } from '@/shared/api/invoices'
 import { formatDate, formatMoney } from '@/lib/formatters'
-import { useDebounce } from '@/lib/useDebounce'
 import { PaymentLinesEditor } from '@/components/shared/PaymentLinesEditor'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -40,6 +39,7 @@ import {
 import type { CobrarFacturaDto, PendienteCobroItem } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useOpcionesArray } from '@/shared/hooks/useOpciones'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -79,7 +79,7 @@ export default function PorCobrarPage() {
   const selectedRoundingAdjustment = selectedInvoice?.roundingAdjustment ?? 0
   const selectedCobertura = selectedInvoice?.aseguradora?.montoCobertura ?? 0
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading } = useQuery({
@@ -90,17 +90,15 @@ export default function PorCobrarPage() {
   const { data: facturacion, isLoading: facturacionLoading } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
 
-  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, staleTime: 5 * 60_000 })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100})
 
   // Misma key que usa PaymentLinesEditor — cache compartido, sin request extra. Hace falta para
   // validar que el desglose del vuelto suma el excedente.
   const { data: denominaciones } = useQuery({
     queryKey: ['denominaciones'],
     queryFn: listDenominaciones,
-    staleTime: 5 * 60_000,
   })
   const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo)
 
@@ -124,7 +122,7 @@ export default function PorCobrarPage() {
     queryKey: ['turno-actual'],
     queryFn: getTurnoActual,
     enabled: usaModuloPos,
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   })
    const pendientes = data?.items ?? []
    const totalPages = data?.meta ? Math.ceil((data.meta.total ?? 0) / PAGE_SIZE) : 1
@@ -355,10 +353,6 @@ function validateAndSubmit() {
       ? selectedRoundedTotal
       : sumPayments(paymentsValue.payments)
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value)
-    setPage(1)
-  }, [])
 
   const { widths: pendientesColWidths, startResize: startResizePendientes } = useResizableColumns(PENDIENTES_COLUMNS)
 
@@ -403,15 +397,10 @@ function validateAndSubmit() {
           <div className="card-body">
             <div className="filter-bar" style={{ margin: 0 }}>
               <div className="filter-bar-left">
-                <div className="search-input-wrap">
-                  <Search size={14} className="search-input-icon" />
-                  <input
-                    className="search-input"
-                    placeholder="Buscar factura o cliente…"
-                    value={search}
-                    onChange={handleSearchChange}
-                  />
-                </div>
+                <SearchInput placeholder="Buscar factura o cliente…" value={search} onChange={(v) => {
+    setSearch(v)
+    setPage(1)
+  }} />
               </div>
             </div>
           </div>

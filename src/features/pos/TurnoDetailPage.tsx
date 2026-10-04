@@ -164,7 +164,6 @@ function ClosingSection({ closing, turnoCajero, closedBy }: { closing: TurnoClos
   const { data: denominaciones } = useQuery({
     queryKey: ['denominaciones'],
     queryFn: listDenominaciones,
-    staleTime: 5 * 60_000,
   })
 
   const denomMap = new Map((denominaciones ?? []).map((d) => [d.denominacion, d.valor]))

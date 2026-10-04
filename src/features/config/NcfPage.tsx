@@ -163,7 +163,6 @@ function CreateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
     queryFn: () => getCatalogosFiscales({ type: 'venta' }),
-    staleTime: 60 * 60_000,
   })
   const ncfTypeOptions = catalogos?.ncfTypesFisicos ?? []
 
@@ -325,7 +324,6 @@ function EditModal({ serie, onClose }: { serie: NcfSerie; onClose: () => void })
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
     queryFn: () => getCatalogosFiscales({ type: 'venta' }),
-    staleTime: 60 * 60_000,
   })
   const ncfTypeOptions = catalogos?.ncfTypesFisicos ?? []
 
@@ -496,7 +494,6 @@ function DetailDrawer({ serieId }: { serieId: number; onClose?: () => void }) {
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
     queryFn: () => getCatalogosFiscales({ type: 'venta' }),
-    staleTime: 60 * 60_000,
   })
 
   if (isLoading) {
@@ -712,7 +709,6 @@ export default function NcfPage() {
   const { data: ecfConfig } = useQuery({
     queryKey: ['ecf-config'],
     queryFn: getEcfConfig,
-    staleTime: 5 * 60_000,
   })
   const ecfHabilitado = ecfConfig?.habilitado ?? false
   // Si la facturación electrónica está habilitada, "Electrónico" es la pestaña por defecto.

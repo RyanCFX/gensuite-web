@@ -57,16 +57,15 @@ export default function VentaForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
 
-  const { data: monedas } = useOpcionesArray('monedas', { limit: 100, enabled: multimonedaHabilitada, staleTime: 5 * 60_000 })
+  const { data: monedas } = useOpcionesArray('monedas', { limit: 100, enabled: multimonedaHabilitada})
   const monedasOptions = (monedas ?? []).filter((m) => m.code !== monedaBase)
 
 
-  const { data: sucursalesData } = useOpcionesLista('sucursales', { limit: 100, staleTime: 60_000 })
+  const { data: sucursalesData } = useOpcionesLista('sucursales', { limit: 100})
   const mostrarSucursal = (sucursalesData?.items.length ?? 0) > 1
 
   const mostrarTasaCambio = multimonedaHabilitada && !!form.moneda && form.moneda !== monedaBase

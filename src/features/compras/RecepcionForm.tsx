@@ -515,7 +515,6 @@ export default function RecepcionForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
 
@@ -559,9 +558,8 @@ export default function RecepcionForm() {
     queryKey: ['usuarioSucursales', authUser?.email],
     queryFn: () => getUsuarioSucursales(authUser!.email),
     enabled: !!authUser?.email,
-    staleTime: 60_000,
   })
-  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager})
   const branchOptions = useMemo(
     () => (isSystemManager
       ? (allSucursales?.items.map((s) => s.name) ?? [])

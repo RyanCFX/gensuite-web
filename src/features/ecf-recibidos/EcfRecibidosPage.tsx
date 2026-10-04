@@ -5,14 +5,13 @@
 // CONSTANCIA: las pruebas end-to-end con datos reales quedan pendientes — ningún tenant tiene Vega
 // conectado y no existe todavía ningún e-CF recibido de un tercero en los entornos de prueba.
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, Search, Upload, Link2, SlidersHorizontal } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Upload, Link2, SlidersHorizontal } from 'lucide-react'
 import { listEcfRecibidos, vincularEcfRecibido } from '@/shared/api/ecf-recibidos'
 import type { EcfRecibidoListItem, EcfStatusDgii, EcfTipoElectronico } from '@/shared/api/types'
-import { useDebounce } from '@/lib/useDebounce'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import {
   ecfStatusLabel, ecfStatusBadge, ecfConciliacionLabel, ecfConciliacionBadge,
@@ -26,6 +25,7 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { CargarXmlModal } from './CargarXmlModal'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -59,8 +59,8 @@ export default function EcfRecibidosPage() {
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
-  const debouncedSearch = useDebounce(search, 300)
-  const debouncedRnc = useDebounce(rnc, 300)
+  const debouncedSearch = search
+  const debouncedRnc = rnc
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
@@ -88,10 +88,6 @@ export default function EcfRecibidosPage() {
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo vincular'),
   })
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value)
-    setPage(1)
-  }, [])
 
   const items = (data?.items ?? []) as EcfRecibidoListItem[]
   const totalPages = data ? Math.max(1, Math.ceil(data.meta.total / PAGE_SIZE)) : 1
@@ -123,24 +119,12 @@ export default function EcfRecibidosPage() {
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <div className="search-input-wrap">
-                <Search size={15} className="search-input-icon" />
-                <input
-                  className="search-input"
-                  placeholder="Buscar por NCF, proveedor…"
-                  value={search}
-                  onChange={handleSearchChange}
-                />
-              </div>
+              <SearchInput placeholder="Buscar por NCF, proveedor…" value={search} onChange={(v) => {
+    setSearch(v)
+    setPage(1)
+  }} />
               <FilterField label="RNC emisor">
-                <input
-                  className="ff-input ff-input-sm"
-                  style={{ width: 160 }}
-                  placeholder="RNC / Cédula"
-                  value={rnc}
-                  onChange={(e) => { setRnc(e.target.value); setPage(1) }}
-                />
-              </FilterField>
+                <SearchInput variant="field" style={{ width: 160 }} placeholder="RNC / Cédula" value={rnc} onChange={(v) => { setRnc(v); setPage(1) }} /></FilterField>
               <FilterField label="Estado DGII" style={{ width: 220 }}>
                 <Select value={estado} onValueChange={(v) => { setEstado(v); setPage(1) }} placeholder="Todos los estados">
                   {ESTADOS_DGII.map((s) => (

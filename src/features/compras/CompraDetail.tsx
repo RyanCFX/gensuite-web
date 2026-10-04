@@ -65,19 +65,16 @@ export default function CompraDetail() {
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
     queryFn: () => getCatalogosFiscales({ type: 'compra' }),
-    staleTime: 60 * 60_000,
   })
 
   const { data: retencionesData } = useQuery({
     queryKey: ['retenciones-all'],
     queryFn: () => listRetenciones({ limit: 100 }),
-    staleTime: 60 * 60_000,
   })
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? 'a4'
   const formatosPermitidos = facturacionConfig?.formatosPermitidos

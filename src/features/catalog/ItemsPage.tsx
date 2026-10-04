@@ -1,13 +1,12 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listItems, toggleItem } from '@/shared/api/catalog'
 import { listUOMs } from '@/shared/api/config'
 import type { Item } from '@/shared/api/types'
-import { useDebounce } from '@/lib/useDebounce'
 import { formatDOP } from '@/lib/formatters'
-import { Plus, Eye, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from 'lucide-react'
+import { Plus, Eye, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -22,6 +21,7 @@ import { listPrincipiosActivos } from '@/shared/api/principios-activos'
 import { usePermissionsStore } from '@/stores/permissions.store'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -99,7 +99,7 @@ export default function ItemsPage() {
   const [principioActivoFilter, setPrincipioActivoFilter] = useState('')
   const [esMedicamentoFilter, setEsMedicamentoFilter] = useState(false)
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
@@ -154,6 +154,8 @@ export default function ItemsPage() {
     queryKey: ['uoms-all'],
     queryFn: () => listUOMs(),
     staleTime: 60 * 60_000,
+    // Solo alimenta el filtro de UOM del modal de más filtros.
+    enabled: moreFiltersOpen,
   })
 
 
@@ -174,10 +176,6 @@ export default function ItemsPage() {
     },
   })
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value)
-    setPage(1)
-  }, [])
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
@@ -241,15 +239,10 @@ export default function ItemsPage() {
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <div className="search-input-wrap">
-                <Search size={14} className="search-input-icon" />
-                <input
-                  className="search-input"
-                  placeholder="Buscar por código o nombre…"
-                  value={search}
-                  onChange={handleSearchChange}
-                />
-              </div>
+              <SearchInput placeholder="Buscar por código o nombre…" value={search} onChange={(v) => {
+    setSearch(v)
+    setPage(1)
+  }} />
               <OpcionesSelect hideOnForbidden filterLabel="Categoría" filterStyle={{ width: 200 }} recurso="categorias" value={categoryFilter} onChange={(val) => { setCategoryFilter(val); setPage(1) }} placeholder="Todas las categorías" />
               <OpcionesSelect hideOnForbidden filterLabel="Marca" filterStyle={{ width: 200 }} recurso="marcas" value={brandFilter} onChange={(val) => { setBrandFilter(val); setPage(1) }} placeholder="Todas las marcas" />
               <FilterField label="Estado">

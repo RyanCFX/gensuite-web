@@ -2850,12 +2850,12 @@ function FacturacionConfigSection() {
    const { data: roles } = useQuery({ queryKey: ['roles'], queryFn: listRoles, staleTime: 5 * 60_000 })
    const { data: almacenes } = useQuery({ queryKey: ['almacenes-all'], queryFn: () => listAlmacenes(), staleTime: 5 * 60_000 })
    const { data: metodosPago } = useQuery({ queryKey: ['metodos-pago-config'], queryFn: listMetodosPago, staleTime: 5 * 60_000 })
-   const { data: plantillasVentas } = useQuery({ queryKey: ['impuestos-ventas'], queryFn: listImpuestosVentas, staleTime: 5 * 60_000 })
-   const { data: plantillasCompras } = useQuery({ queryKey: ['impuestos-compras'], queryFn: listImpuestosCompras, staleTime: 5 * 60_000 })
+   const { data: plantillasVentas } = useQuery({ queryKey: ['impuestos-ventas'], queryFn: listImpuestosVentas})
+   const { data: plantillasCompras } = useQuery({ queryKey: ['impuestos-compras'], queryFn: listImpuestosCompras})
   // docs/tasks/PROMPT_NCF_DEFAULT_REGIMENES_ESPECIALES_REDONDEO_FRONTEND.md §1 — catálogo de
   // NCF de venta para el selector de "Tipo de Comprobante por Defecto" (mismo que usa Nueva
   // Factura; ya viene filtrado a físicos o electrónicos según el tenant).
-  const { data: catalogosVenta } = useQuery({ queryKey: ['catalogos-fiscales', { type: 'venta' }], queryFn: () => getCatalogosFiscales({ type: 'venta' }), staleTime: 5 * 60_000 })
+  const { data: catalogosVenta } = useQuery({ queryKey: ['catalogos-fiscales', { type: 'venta' }], queryFn: () => getCatalogosFiscales({ type: 'venta' })})
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
   const [posWarehouseSearch, setPosWarehouseSearch] = useState('')
   const posWarehouseOptions: SearchSelectOption[] = (almacenes ?? [])

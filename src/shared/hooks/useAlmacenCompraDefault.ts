@@ -41,7 +41,6 @@ export function useAlmacenCompraDefault<T extends { warehouse: string }>(opts: {
     queryKey: ['sucursal', branch],
     queryFn: () => getSucursal(branch),
     enabled: !!branch,
-    staleTime: 60_000,
   })
 
   const autoWarehouse = supplierDetail?.almacenCompraDefault || sucursalDetail?.almacenCompra || ''

@@ -70,7 +70,6 @@ export function CerrarTurnoModal({
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
 
   const arqueoEfectivoRequerido =
@@ -81,7 +80,6 @@ export function CerrarTurnoModal({
     queryKey: ['denominaciones'],
     queryFn: listDenominaciones,
     enabled: open,
-    staleTime: 5 * 60_000,
   })
 
   const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo)

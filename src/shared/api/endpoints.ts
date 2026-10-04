@@ -2,6 +2,8 @@ export const ENDPOINTS = {
   me: {
     permissions: '/me/permissions',
     acceso: '/me/acceso',
+    bootstrap: '/me/bootstrap',
+    referenceVersion: '/me/reference-version',
     permissionsByDoc: (doctype: string, name: string) =>
       `/me/permissions/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
     features: '/me/features',
@@ -326,6 +328,7 @@ export const ENDPOINTS = {
   dashboard: {
     catalogo: '/dashboard/catalogo',
     widget: (key: string) => `/dashboard/widgets/${encodeURIComponent(key)}`,
+    widgetsLote: '/dashboard/widgets',
   },
   permisos: {
     catalogo: '/permisos/catalogo',

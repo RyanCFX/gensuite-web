@@ -34,6 +34,7 @@ import { Drawer } from '@/shared/ui/Drawer'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { ApplyCreditNoteModal } from './CreditNoteActionModals'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const LIST_COLUMNS = [
   { key: 'expand', width: 28 },
@@ -156,12 +157,11 @@ export default function CreditNotesPage() {
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
     queryFn: () => getCatalogosFiscales({ type: 'venta' }),
-    staleTime: 60 * 60_000,
   })
 
   // B04 (Nota de Crédito) → typeId 34. Si el tenant lo tiene habilitado como e-CF, el código de
   // modificación DGII es obligatorio al crear la nota.
-  const { data: ecfTipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos, staleTime: 60 * 60_000 })
+  const { data: ecfTipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos})
   const ncEsEcf = ecfTipoElectronicoHabilitado(ecfTipos, '34')
 
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
@@ -405,14 +405,7 @@ export default function CreditNotesPage() {
               <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }} recurso="sucursales" value={branch} onChange={setBranch} placeholder="Todas las sucursales" />
               <OpcionesSelect hideOnForbidden filterLabel="Departamento" filterStyle={{ width: 200 }} recurso="departamentos" value={department} onChange={setDepartment} placeholder="Todos los departamentos" />
               <FilterField label="NCF">
-                <input
-                  className="ff-input ff-input-sm"
-                  style={{ width: 160 }}
-                  placeholder="Buscar NCF…"
-                  value={ncf}
-                  onChange={(e) => setNcf(e.target.value)}
-                />
-              </FilterField>
+                <SearchInput variant="field" style={{ width: 160 }} placeholder="Buscar NCF…" value={ncf} onChange={(v) => setNcf(v)} /></FilterField>
 
               <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
                 <SlidersHorizontal size={13} />

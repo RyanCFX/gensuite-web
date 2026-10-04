@@ -15,8 +15,9 @@ interface CostCenterSelectProps {
 
 export function CostCenterSelect({ value, onChange, placeholder = 'Buscar centro de costo…', error, disabled, id }: CostCenterSelectProps) {
   const [query, setQuery] = useState('')
+  const [abierto, setAbierto] = useState(false)
 
-  const { data, isLoading, refetch } = useOpcionesLista('centros-costo', { q: query, limit: 100, staleTime: 30_000 })
+  const { data, isLoading } = useOpcionesLista('centros-costo', { q: query, limit: 100, enabled: abierto })
 
   const options: SearchSelectOption[] = (data?.items ?? []).map((c) => ({
     value: c.id,
@@ -40,7 +41,7 @@ export function CostCenterSelect({ value, onChange, placeholder = 'Buscar centro
       }}
       options={options}
       onSearch={setQuery}
-      onOpen={() => refetch()}
+      onOpen={() => setAbierto(true)}
       loading={isLoading}
       placeholder={placeholder}
       error={error}

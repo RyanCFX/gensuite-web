@@ -1,15 +1,14 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { esClienteEmisorNoEncontrado, ECF_ADMIN_ROUTE } from '@/lib/ecfErrors'
-import { Search, DollarSign, ChevronLeft, ChevronRight, X, Clock, AlertTriangle } from 'lucide-react'
+import { DollarSign, ChevronLeft, ChevronRight, X, Clock, AlertTriangle } from 'lucide-react'
 import { listPendientes, cobrarFactura } from '@/shared/api/caja'
 import { getFacturacionConfig, listDenominaciones } from '@/shared/api/config'
 import { getTurnoActual } from '@/shared/api/pos'
 import { downloadInvoicePdf } from '@/shared/api/invoices'
 import { formatDate, formatMoney } from '@/lib/formatters'
-import { useDebounce } from '@/lib/useDebounce'
 import { PaymentLinesEditor } from '@/components/shared/PaymentLinesEditor'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -40,6 +39,7 @@ import {
 import type { Invoice, CobrarFacturaDto } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useOpcionesArray } from '@/shared/hooks/useOpciones'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -60,7 +60,7 @@ export default function CajaPage() {
   const [page, setPage] = useState(1)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading } = useQuery({
@@ -71,17 +71,15 @@ export default function CajaPage() {
   const { data: facturacion } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
 
-  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, staleTime: 5 * 60_000 })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100})
 
   // Misma key que usa PaymentLinesEditor — cache compartido, sin request extra. Hace falta para
   // validar que el desglose del vuelto suma el excedente.
   const { data: denominaciones } = useQuery({
     queryKey: ['denominaciones'],
     queryFn: listDenominaciones,
-    staleTime: 5 * 60_000,
   })
   const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo)
 
@@ -107,7 +105,7 @@ export default function CajaPage() {
      queryKey: ['turno-actual'],
      queryFn: getTurnoActual,
      enabled: usaModuloPos,
-     staleTime: 30_000,
+     staleTime: 2 * 60_000,
    })
 
    const turnoBlocked = usaModuloPos && !turno
@@ -333,10 +331,6 @@ function validateAndSubmit() {
     return ''
   }
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value)
-    setPage(1)
-  }, [])
 
   const { widths: pendientesColWidths, startResize: startResizePendientes } = useResizableColumns(PENDIENTES_COLUMNS)
 
@@ -372,15 +366,10 @@ function validateAndSubmit() {
       {/* ── Filtros ──────────────────────────────────────────────────── */}
       <div className="filter-bar">
         <div className="filter-bar-left">
-          <div className="search-input-wrap">
-            <Search size={15} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar factura o cliente…"
-              value={search}
-              onChange={handleSearchChange}
-            />
-          </div>
+          <SearchInput placeholder="Buscar factura o cliente…" value={search} onChange={(v) => {
+    setSearch(v)
+    setPage(1)
+  }} />
         </div>
       </div>
 

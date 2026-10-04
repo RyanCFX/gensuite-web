@@ -5,8 +5,9 @@ import { getPagosPendientes } from '@/shared/api/pagos'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { Search, Wallet } from 'lucide-react'
+import { Wallet } from 'lucide-react'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const COLUMNS = [
   { key: 'factura', width: 140 },
@@ -42,15 +43,7 @@ export default function PendientesPagoPage() {
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <div className="search-input-wrap">
-                <Search size={15} className="search-input-icon" />
-                <input
-                  className="search-input"
-                  placeholder="Buscar por proveedor…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
+              <SearchInput placeholder="Buscar por proveedor…" value={search} onChange={(v) => setSearch(v)} />
             </div>
           </div>
 

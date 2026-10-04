@@ -73,7 +73,6 @@ export default function EmisionForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
   const [showMonedaOptions, setShowMonedaOptions] = useState(false)
@@ -82,7 +81,7 @@ export default function EmisionForm() {
 
   // ── Catálogo de tipos de documento ──────────────────────────────────────
   const { data: tiposData } = useQuery({
-    queryKey: ['tesoreria-tipos-documento-form'],
+    queryKey: ['tesoreria-tipos-documento', 'activos'],
     queryFn: () => listTiposDocumento({ enabled: true, limit: 100 }),
   })
   const tipos = tiposData?.items ?? []

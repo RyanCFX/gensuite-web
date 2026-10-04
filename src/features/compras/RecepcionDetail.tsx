@@ -71,19 +71,16 @@ export default function RecepcionDetail() {
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
     queryFn: () => getCatalogosFiscales({ type: 'compra' }),
-    staleTime: 60 * 60_000,
   })
 
   const { data: taxesTemplates } = useQuery({
     queryKey: ['impuestos-compras'],
     queryFn: listImpuestosCompras,
-    staleTime: 5 * 60_000,
   })
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
 

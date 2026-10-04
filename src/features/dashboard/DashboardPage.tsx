@@ -1,8 +1,8 @@
 import './Dashboard.css'
-import { useState, type ComponentType } from 'react'
+import { createContext, useContext, useMemo, useState, type ComponentType } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { getDashboardCatalogo, getDashboardWidget, type DashboardPeriod } from '@/shared/api/dashboard'
+import { getDashboardCatalogo, getDashboardWidgetsLote, type DashboardPeriod, type DashboardWidgetLoteItem } from '@/shared/api/dashboard'
 import type { ApiError, DashboardTipoReporte } from '@/shared/api/types'
 import { isApiErrorCode } from '@/shared/api/client'
 import LegacyDashboard from './LegacyDashboard'
@@ -63,15 +63,6 @@ const WIDGETS_KPI = new Set([
   'dashboard.finanzas.utilidad',
 ])
 
-/** Widgets de lista: el `limit` sí aplica (openapi: 1–20, default 5). */
-const WIDGETS_LISTA = new Set([
-  'dashboard.ventas.top-productos',
-  'dashboard.ventas.top-clientes',
-  'dashboard.inventario.bajo-minimo',
-  'dashboard.actividad.reciente',
-  'dashboard.actividad.pendientes',
-])
-
 /** Widgets "grandes" que son gráficos (van en la fila `.dash-charts`, 2 columnas) — el resto de
  *  los no-KPI son listas (van en `.dash-bottom-grid`, 3 columnas). Cada componente en widgets.tsx
  *  ya se renderiza con la clase de grilla correcta (dash-chart-primary/secondary,
@@ -115,20 +106,29 @@ function statusCodeOf(err: unknown): number | undefined {
   return (err as unknown as ApiError | null)?.statusCode
 }
 
-function WidgetCard({ widgetKey, titulo, period }: {
+interface LoteCtx {
+  data: Record<string, DashboardWidgetLoteItem> | undefined
+  isLoading: boolean
+  error: unknown
+  refetch: () => void
+}
+
+const LoteContext = createContext<LoteCtx>({ data: undefined, isLoading: false, error: null, refetch: () => {} })
+
+function WidgetCard({ widgetKey, titulo }: {
   widgetKey: string
   titulo: string
-  period: DashboardPeriod
 }) {
   const queryClient = useQueryClient()
-  // `limit` solo aplica a reportes de lista (tops, actividad, bajo mínimo): 20 para no
-  // truncar respecto al dashboard legacy. El resto usa el default del backend.
-  const limit = WIDGETS_LISTA.has(widgetKey) ? 20 : undefined
-  const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['dashboard-widget', widgetKey, period, limit],
-    queryFn: () => getDashboardWidget(widgetKey, { period, limit }),
-    retry: false,
-  })
+  // Todos los widgets llegan en UNA solicitud por lote (ver DashboardPage); un widget que falla
+  // no afecta a los demás.
+  const lote = useContext(LoteContext)
+  const item = lote.data?.[widgetKey]
+  const isLoading = lote.isLoading
+  const error = item && 'error' in item ? item.error : lote.error
+  const isError = !!error
+  const data = item && 'data' in item ? item : undefined
+  const refetch = lote.refetch
 
   const Visual = WIDGETS[widgetKey]
   if (!Visual) {
@@ -221,10 +221,26 @@ export default function DashboardPage() {
     </div>
   )
 
+  const claves = useMemo(() => reportesConocidos(catalogo ?? []).map((r) => r.key).sort(), [catalogo])
+  const loteQuery = useQuery({
+    queryKey: ['dashboard-widgets-lote', claves.join(','), period],
+    // `limit` solo aplica a reportes de lista (tops, actividad, bajo mínimo): 20 para no truncar
+    // respecto al dashboard legacy; el resto lo ignora.
+    queryFn: () => getDashboardWidgetsLote(claves, { period, limit: 20 }),
+    enabled: claves.length > 0,
+    retry: false,
+    staleTime: 5 * 60_000,
+  })
+  const loteValue = useMemo<LoteCtx>(
+    () => ({ data: loteQuery.data, isLoading: loteQuery.isLoading, error: loteQuery.error, refetch: () => { void loteQuery.refetch() } }),
+    [loteQuery.data, loteQuery.isLoading, loteQuery.error, loteQuery.refetch],
+  )
+
   // Backend anterior a v2 (sin /dashboard/catalogo): dashboard legacy con /dashboard/summary.
   if (isError && statusCodeOf(error) === 404) return <LegacyDashboard />
 
   return (
+    <LoteContext.Provider value={loteValue}>
     <div className="dashboard-page">
       {header}
       {isLoading ? (
@@ -276,21 +292,21 @@ export default function DashboardPage() {
             {kpis.length > 0 && (
               <div className="kpi-grid">
                 {kpis.map((r) => (
-                  <WidgetCard key={r.key} widgetKey={r.key} titulo={r.nombre} period={period} />
+                  <WidgetCard key={r.key} widgetKey={r.key} titulo={r.nombre} />
                 ))}
               </div>
             )}
             {charts.length > 0 && (
               <div className="dash-charts">
                 {charts.map((r) => (
-                  <WidgetCard key={r.key} widgetKey={r.key} titulo={r.nombre} period={period} />
+                  <WidgetCard key={r.key} widgetKey={r.key} titulo={r.nombre} />
                 ))}
               </div>
             )}
             {listas.length > 0 && (
               <div className="dash-bottom-grid">
                 {listas.map((r) => (
-                  <WidgetCard key={r.key} widgetKey={r.key} titulo={r.nombre} period={period} />
+                  <WidgetCard key={r.key} widgetKey={r.key} titulo={r.nombre} />
                 ))}
               </div>
             )}
@@ -301,5 +317,6 @@ export default function DashboardPage() {
         )
       })()}
     </div>
+    </LoteContext.Provider>
   )
 }

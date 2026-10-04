@@ -66,7 +66,6 @@ export default function RepostValuacionPage() {
   const { data: warehouses } = useQuery({
     queryKey: ['warehouses'],
     queryFn: listWarehouses,
-    staleTime: 5 * 60_000,
   })
   const warehouseOptions: SearchSelectOption[] = (warehouses ?? [])
     .filter((w) => !warehouseSearch || w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))

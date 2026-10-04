@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { Plus, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
@@ -17,6 +17,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -108,15 +109,7 @@ export default function ComprasPage() {
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="filter-bar" style={{ margin: 0 }}>
               <div className="filter-bar-left">
-                <div className="search-input-wrap">
-                  <Search size={14} className="search-input-icon" />
-                  <input
-                    className="search-input"
-                    placeholder="Buscar proveedor…"
-                    value={supplier}
-                    onChange={(e) => { setSupplier(e.target.value); setPage(1) }}
-                  />
-                </div>
+                <SearchInput placeholder="Buscar proveedor…" value={supplier} onChange={(v) => { setSupplier(v); setPage(1) }} />
                 {filtros.puedeFiltrar('status') && (
                 <FilterField label="Estado">
                   <Select

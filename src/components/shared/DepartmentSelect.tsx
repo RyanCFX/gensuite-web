@@ -14,8 +14,9 @@ interface DepartmentSelectProps {
 
 export function DepartmentSelect({ value, onChange, placeholder = 'Buscar departamento…', error, disabled, id }: DepartmentSelectProps) {
   const [query, setQuery] = useState('')
+  const [abierto, setAbierto] = useState(false)
 
-  const { data, isLoading, refetch } = useOpcionesLista('departamentos', { q: query, limit: 20, staleTime: 30_000 })
+  const { data, isLoading } = useOpcionesLista('departamentos', { q: query, limit: 20, enabled: abierto })
 
   const options: SearchSelectOption[] = (data?.items ?? []).map((d) => ({
     value: d.id,
@@ -29,7 +30,7 @@ export function DepartmentSelect({ value, onChange, placeholder = 'Buscar depart
       onChange={onChange}
       options={options}
       onSearch={setQuery}
-      onOpen={() => refetch()}
+      onOpen={() => setAbierto(true)}
       loading={isLoading}
       placeholder={placeholder}
       error={error}

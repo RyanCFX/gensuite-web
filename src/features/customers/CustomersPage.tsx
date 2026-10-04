@@ -5,7 +5,6 @@ import { toast } from 'sonner'
 import { listCustomers, deleteCustomer } from '@/shared/api/customers'
 import { downloadEstadoCuentaPdf } from '@/shared/api/cobros'
 import type { Customer, ApiError } from '@/shared/api/types'
-import { useDebounce } from '@/lib/useDebounce'
 import { Plus, Pencil, Ban, ChevronLeft, ChevronRight, Download, SlidersHorizontal } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -18,6 +17,7 @@ import { TIPO_IDENTIFICACION } from '@/lib/constants'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -54,8 +54,8 @@ export default function CustomersPage() {
   ]
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
-  const debouncedCustomerName = useDebounce(customerName, 300)
-  const debouncedIdentificacion = useDebounce(identificacion, 300)
+  const debouncedCustomerName = customerName
+  const debouncedIdentificacion = identificacion
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
@@ -152,13 +152,7 @@ export default function CustomersPage() {
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
               <FilterField label="Cliente" style={{ width: 200 }}>
-                <input
-                  className="ff-input ff-input-sm"
-                  placeholder="Nombre del cliente…"
-                  value={customerName}
-                  onChange={(e) => { setCustomerName(e.target.value); setPage(1) }}
-                />
-              </FilterField>
+                <SearchInput variant="field" placeholder="Nombre del cliente…" value={customerName} onChange={(v) => { setCustomerName(v); setPage(1) }} /></FilterField>
               <FilterField label="Tipo">
                 <Select value={customerType} onValueChange={(val) => { setCustomerType(val); setPage(1) }}>
                   <SelectItem value="all">Todos los tipos</SelectItem>
@@ -175,13 +169,7 @@ export default function CustomersPage() {
                 </Select>
               </FilterField>
               <FilterField label="RNC/Cédula" style={{ width: 180 }}>
-                <input
-                  className="ff-input ff-input-sm"
-                  placeholder="RNC o Cédula…"
-                  value={identificacion}
-                  onChange={(e) => { setIdentificacion(e.target.value); setPage(1) }}
-                />
-              </FilterField>
+                <SearchInput variant="field" placeholder="RNC o Cédula…" value={identificacion} onChange={(v) => { setIdentificacion(v); setPage(1) }} /></FilterField>
               <FilterField label="Crédito">
                 <Select value={hasCredit} onValueChange={(val) => { setHasCredit(val); setPage(1) }}>
                   <SelectItem value="all">Todos</SelectItem>

@@ -91,7 +91,6 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
   const monedasHabilitadas = facturacionConfig?.monedasHabilitadas ?? ['DOP']
@@ -99,7 +98,6 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
     queryFn: () => getCatalogosFiscales({ type: 'compra' }),
-    staleTime: 60 * 60_000,
   })
   const [defaultTipoBienes606Search, setDefaultTipoBienes606Search] = useState('')
   const defaultTipoBienes606Options: SearchSelectOption[] = (catalogos?.tipoBienes606 ?? [])
@@ -121,7 +119,7 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   // Sin contexto de sucursal en esta pantalla (es un default a nivel de proveedor, no de
   // documento) — ofrece todos los almacenes del tenant, igual que "Almacén destino" en
   // RelacionDetail (misma naturaleza de campo: override que gana sobre la resolución normal).
-  const { data: almacenesData } = useOpcionesArray('almacenes', { limit: 100, staleTime: 60_000 })
+  const { data: almacenesData } = useOpcionesArray('almacenes', { limit: 100})
   const almacenCompraDefaultOptions: SearchSelectOption[] = (almacenesData ?? []).map((w) => ({ value: w.id, label: w.name }))
 
   const { data: paisesData, isLoading: paisesLoading } = useQuery({
@@ -142,13 +140,11 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   const { data: bancosData } = useQuery({
     queryKey: ['bancos'],
     queryFn: listBancos,
-    staleTime: 60 * 60_000,
   })
 
   const { data: retencionesData } = useQuery({
     queryKey: ['retenciones-all'],
     queryFn: () => listRetenciones({ limit: 100 }),
-    staleTime: 60_000,
   })
   const retencionesOptions = retencionesData?.items ?? []
   const [retencionSearch, setRetencionSearch] = useState('')
@@ -157,7 +153,6 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   const { data: impuestosComprasData } = useQuery({
     queryKey: ['impuestos-compras'],
     queryFn: listImpuestosCompras,
-    staleTime: 5 * 60_000,
   })
   const [impuestoComprasSearch, setImpuestoComprasSearch] = useState('')
   const [impuestoGastosSearch, setImpuestoGastosSearch] = useState('')

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
@@ -12,11 +12,10 @@ import {
   deleteCentroCosto,
 } from '@/shared/api/centros-costo'
 import type { CostCenter } from '@/shared/api/types'
-import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon, List, Network } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightIcon, List, Network } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -24,6 +23,7 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -56,7 +56,7 @@ export default function CentrosCostoPage() {
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
@@ -87,10 +87,6 @@ export default function CentrosCostoPage() {
     [parentOptionsData],
   )
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value)
-    setPage(1)
-  }, [])
 
   const [parentSearch, setParentSearch] = useState('')
   const parentSelectOptions: SearchSelectOption[] = parentOptions
@@ -211,15 +207,10 @@ export default function CentrosCostoPage() {
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
               {view === 'list' && (
-                <div className="search-input-wrap">
-                  <Search size={14} className="search-input-icon" />
-                  <input
-                    className="search-input"
-                    placeholder="Buscar por nombre…"
-                    value={search}
-                    onChange={handleSearchChange}
-                  />
-                </div>
+                <SearchInput placeholder="Buscar por nombre…" value={search} onChange={(v) => {
+    setSearch(v)
+    setPage(1)
+  }} />
               )}
             </div>
             <div className="filter-bar-right" style={{ display: 'flex', gap: 8 }}>

@@ -4282,6 +4282,8 @@ export type MonedaPdfImpresion = "dop" | "factura"
 
 // GET/PUT /config/facturacion
 export interface FacturacionConfig {
+  /** Nivel de precio por defecto del tenant (antes salía de `meta.defaultPriceTier` del listado de artículos). */
+  defaultPriceTier?: "A" | "B" | "C";
   rolesCancelacionFactura: string[];
   /** "directo": un solo método de pago al cobrar (default, histórico). "caja": múltiples métodos + vuelto. */
   flujoCobro: "directo" | "caja";

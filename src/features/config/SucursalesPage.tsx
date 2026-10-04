@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -7,11 +7,10 @@ import { toast } from 'sonner'
 import { listSucursales, createSucursal, updateSucursal, deleteSucursal } from '@/shared/api/sucursales'
 import { listAlmacenes } from '@/shared/api/config'
 import type { Sucursal } from '@/shared/api/types'
-import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, Warehouse } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, Warehouse } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { ConfirmModal } from '@/shared/ui/Modal'
@@ -23,6 +22,7 @@ import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -56,7 +56,7 @@ export default function SucursalesPage() {
   const limiteAlcanzado = limiteSucursalesAlcanzado(limites)
   const contador = textoContadorSucursales(limites)
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
@@ -69,10 +69,6 @@ export default function SucursalesPage() {
     }),
   })
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value)
-    setPage(1)
-  }, [])
 
   const {
     register,
@@ -213,15 +209,10 @@ export default function SucursalesPage() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <div className="search-input-wrap">
-                <Search size={14} className="search-input-icon" />
-                <input
-                  className="search-input"
-                  placeholder="Buscar por nombre…"
-                  value={search}
-                  onChange={handleSearchChange}
-                />
-              </div>
+              <SearchInput placeholder="Buscar por nombre…" value={search} onChange={(v) => {
+    setSearch(v)
+    setPage(1)
+  }} />
             </div>
           </div>
         </div>

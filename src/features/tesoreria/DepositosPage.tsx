@@ -51,7 +51,7 @@ export default function DepositosPage() {
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data: tiposData } = useQuery({
-    queryKey: ['tesoreria-tipos-documento-select-deposito'],
+    queryKey: ['tesoreria-tipos-documento', 'activos'],
     queryFn: () => listTiposDocumento({ enabled: true, limit: 100 }),
   })
   // Convención (no filtro estricto): los tipos de naturaleza Débito son los típicos para Depósitos —

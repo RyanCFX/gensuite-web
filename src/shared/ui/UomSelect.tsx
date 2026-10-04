@@ -40,7 +40,8 @@ interface UomSelectProps {
 // ─── Modo simple: select nativo (usado en ItemForm) ───────────────────────────
 
 function SimpleUomSelect({ value, onChange, disabled, error }: Omit<UomSelectProps, 'itemCode' | 'className'>) {
-  const { data: uoms, isLoading, refetch } = useOpcionesArray('uom', { limit: 100, staleTime: 5 * 60_000 })
+  const [abierto, setAbierto] = useState(false)
+  const { data: uoms, isLoading } = useOpcionesArray('uom', { limit: 100, enabled: abierto })
   const [search, setSearch] = useState('')
 
   if (isLoading || !uoms?.length) {
@@ -65,7 +66,7 @@ function SimpleUomSelect({ value, onChange, disabled, error }: Omit<UomSelectPro
       onChange={(val) => onChange(val, 1)}
       options={options}
       onSearch={setSearch}
-      onOpen={() => refetch()}
+      onOpen={() => setAbierto(true)}
       selectedLabel={value}
       placeholder="—"
       disabled={disabled}
@@ -90,7 +91,7 @@ function ItemUomSelect({ value, onChange, itemCode, direction, className = 'item
   })
 
   // Todas las UOMs de config — se cargan cuando el usuario pide "más opciones"
-  const { data: allUoms, isLoading: loadingAll, refetch: refetchAllUoms } = useOpcionesArray('uom', { limit: 100, enabled: showAll, staleTime: 5 * 60_000 })
+  const { data: allUoms, isLoading: loadingAll, refetch: refetchAllUoms } = useOpcionesArray('uom', { limit: 100, enabled: showAll})
 
   const handleToggle = () => {
     const wasOpen = open

@@ -31,7 +31,7 @@ import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { lookupItems, getDefaultPriceTier, getItemLookup } from '@/shared/api/catalog'
+import { lookupItems, getItemLookup } from '@/shared/api/catalog'
 import { client, isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { getSucursal } from '@/shared/api/sucursales'
@@ -184,13 +184,11 @@ const [customerId, setCustomerId] = useState('')
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   const { data: stockSettings } = useQuery({
     queryKey: ['stock-settings'],
     queryFn: getStockSettings,
-    staleTime: 5 * 60_000,
   })
   // Candados "Permitir Modificar Precio Libremente" (servicios/productos por separado) — con el
   // toggle correspondiente apagado, el precio de la línea debe ser exactamente uno de los precios
@@ -289,7 +287,6 @@ const [customerId, setCustomerId] = useState('')
     queryKey: ['layaway-config'],
     queryFn: getLayawayConfig,
     enabled: !isEdit,
-    staleTime: 5 * 60_000,
   })
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
@@ -474,11 +471,8 @@ useEffect(() => {
     return () => { cancelled = true }
   }, [existing])
 
-  const { data: defaultPriceTier = 'B' } = useQuery({
-    queryKey: ['defaultPriceTier'],
-    queryFn: getDefaultPriceTier,
-    staleTime: 5 * 60_000,
-  })
+  // Viene en GET /config/facturacion (ya cargado arriba): sin consulta de catálogo aparte.
+  const defaultPriceTier = facturacionConfig?.defaultPriceTier ?? 'B'
 
   const currentUserEmail = getCachedUser()?.email
   const { data: currentUser } = useQuery({
@@ -504,9 +498,8 @@ useEffect(() => {
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 60_000,
   })
-  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager})
   const branchOptions = isSystemManager
     ? (allSucursales?.items.map((s) => s.name) ?? [])
     : (myBranches?.branches ?? [])
@@ -522,7 +515,7 @@ useEffect(() => {
   }, [branchOptions, branch, isEdit])
 
   // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
-  const { data: branchWarehouses } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch, staleTime: 60_000 })
+  const { data: branchWarehouses } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch})
 
   // docs/tasks/75_almacen_venta_confirmar_stock_uoms_permitidas.md §1.4 — si la sucursal tiene
   // almacén de venta configurado, TODA venta debe salir de ahí sin excepción: se oculta el
@@ -532,7 +525,6 @@ useEffect(() => {
     queryKey: ['sucursal', branch],
     queryFn: () => getSucursal(branch),
     enabled: !!branch,
-    staleTime: 60_000,
   })
   const almacenVentaSucursal = sucursalActual?.almacenVenta || null
 

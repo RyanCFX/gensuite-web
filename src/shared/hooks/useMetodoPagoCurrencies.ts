@@ -6,7 +6,7 @@ import { useOpcionesArray } from '@/shared/hooks/useOpciones'
  * Usado por Caja/POS (docs/tasks/70_caja_pos_sin_soporte_multimoneda.md) para solo ofrecer al
  * cajero los métodos que operan en la misma moneda que la factura que se está cobrando. */
 export function useMetodoPagoCurrencies(metodos: { name: string }[], monedaBase: string): Record<string, string> {
-  const { data } = useOpcionesArray('metodos-pago', { limit: 100, staleTime: 60_000 })
+  const { data } = useOpcionesArray('metodos-pago', { limit: 100})
 
   return useMemo(() => {
     const porNombre = new Map((data ?? []).map((m) => [m.name, m.currencyCode]))

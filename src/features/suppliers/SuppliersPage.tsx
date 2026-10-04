@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -17,6 +17,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -46,7 +47,7 @@ export default function SuppliersPage() {
   const { orderBy, sort } = useSortState()
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const debouncedRnc = useDebounce(rnc, 300)
   const offset = (page - 1) * PAGE_SIZE
 
@@ -78,10 +79,6 @@ export default function SuppliersPage() {
     },
   })
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value)
-    setPage(1)
-  }, [])
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
@@ -122,15 +119,10 @@ export default function SuppliersPage() {
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="filter-bar" style={{ margin: 0 }}>
               <div className="filter-bar-left">
-                <div className="search-input-wrap">
-                  <Search size={14} className="search-input-icon" />
-                  <input
-                    className="search-input"
-                    placeholder="Buscar por nombre, RNC…"
-                    value={search}
-                    onChange={handleSearchChange}
-                  />
-                </div>
+                <SearchInput placeholder="Buscar por nombre, RNC…" value={search} onChange={(v) => {
+    setSearch(v)
+    setPage(1)
+  }} />
                 <div className="search-input-wrap">
                   <Search size={14} className="search-input-icon" />
                   <input

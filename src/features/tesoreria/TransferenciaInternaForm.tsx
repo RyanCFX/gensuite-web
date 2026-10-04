@@ -47,7 +47,6 @@ export default function TransferenciaInternaForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
   const [montoDestino, setMontoDestino] = useState<number | ''>('')
@@ -59,7 +58,7 @@ export default function TransferenciaInternaForm() {
 
   // tipoDocumento es opcional acá — nunca hay ambigüedad de contrapartida, solo categoriza el listado.
   const { data: tiposData } = useQuery({
-    queryKey: ['tesoreria-tipos-documento-form-transferencia'],
+    queryKey: ['tesoreria-tipos-documento', 'activos', 'Transferencia interna'],
     queryFn: () => listTiposDocumento({ enabled: true, nature: 'Transferencia interna', limit: 100 }),
   })
   const tipos = tiposData?.items ?? []

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { getMeFeatures } from '@/shared/api/me'
+import { getMeFeatures, normalizeMeFeatures } from '@/shared/api/me'
+import { cargarBootstrap } from '@/shared/api/bootstrap'
 import type { MeFeatures } from '@/shared/api/types'
 
 type FeaturesStatus = 'idle' | 'loading' | 'ready' | 'error'
@@ -45,21 +46,34 @@ function aplicar(set: (partial: Partial<FeaturesState>) => void, data: MeFeature
   })
 }
 
+let fetchEnCurso: Promise<void> | null = null
+
 export const useFeaturesStore = create<FeaturesState>((set, get) => ({
   ...INITIAL,
 
   fetch: async () => {
-    // Solo el primer arranque bloquea la UI con el estado de carga. Un re-fetch cuando ya
-    // estábamos 'ready' (ej. cambio de tenant con datos previos) no debe re-montar la app.
-    if (get().status !== 'ready') set({ status: 'loading', error: null })
+    // Single-flight: StrictMode (dev) o re-montajes de ProtectedRoute no deben duplicar los GET /me/*.
+    if (fetchEnCurso) return fetchEnCurso
+    let liberar!: () => void
+    fetchEnCurso = new Promise<void>((r) => { liberar = r })
     try {
-      const data = await getMeFeatures()
-      aplicar(set, data)
-      set({ status: 'ready', error: null })
-    } catch (err) {
-      if (get().status === 'ready') return // ya teníamos features válidos: no romper la sesión
-      const message = (err as { message?: string } | undefined)?.message ?? 'Error al cargar los módulos contratados'
-      set({ status: 'error', error: message })
+      // Solo el primer arranque bloquea la UI con el estado de carga. Un re-fetch cuando ya
+      // estábamos 'ready' (ej. cambio de tenant con datos previos) no debe re-montar la app.
+      if (get().status !== 'ready') set({ status: 'loading', error: null })
+      try {
+        const boot = await cargarBootstrap()
+        const data = boot?.features ? normalizeMeFeatures(boot.features) : await getMeFeatures()
+        aplicar(set, data)
+        set({ status: 'ready', error: null })
+      } catch (err) {
+        if (get().status === 'ready') return // ya teníamos features válidos: no romper la sesión
+        const message = (err as { message?: string } | undefined)?.message ?? 'Error al cargar los módulos contratados'
+        set({ status: 'error', error: message })
+      }
+  
+    } finally {
+      fetchEnCurso = null
+      liberar()
     }
   },
 

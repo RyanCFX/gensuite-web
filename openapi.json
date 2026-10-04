@@ -26124,6 +26124,73 @@
         ]
       }
     },
+    "/api/v1/dashboard/widgets": {
+      "get": {
+        "description": "`keys` = claves separadas por coma (máx. 20); `period` y `limit` aplican a todos. Responde `data: { [key]: { data, meta } | { error: { code, message, statusCode } } }` — un reporte no permitido, no contratado, inexistente o que falle NO tumba a los demás (el HTTP es 200 mientras la solicitud sea válida). Mismos datos que GET /dashboard/widgets/:key por cada key.",
+        "operationId": "DashboardController_widgets",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "description": "Período del resumen",
+            "schema": {
+              "default": "month",
+              "type": "string",
+              "enum": [
+                "today",
+                "7d",
+                "month",
+                "year"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 20,
+              "default": 5,
+              "type": "number"
+            }
+          },
+          {
+            "name": "keys",
+            "required": true,
+            "in": "query",
+            "description": "Keys de reportes separadas por coma (máx. 20).",
+            "schema": {
+              "example": "dashboard.ventas.total,dashboard.cobros.total,dashboard.ventas.top-productos",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Varios reportes del dashboard en UNA solicitud (lote)",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
     "/api/v1/dashboard/widgets/{key}": {
       "get": {
         "description": "key = clave del reporte (ej. dashboard.ventas.total). 403 WIDGET_NO_PERMITIDO / WIDGET_NO_CONTRATADO, 404 si no existe. `limit` aplica a los reportes de lista (tops, actividad, bajo mínimo).",
@@ -31773,6 +31840,36 @@
         ]
       }
     },
+    "/api/v1/me/reference-version": {
+      "get": {
+        "description": "Contador que sube cada vez que alguien escribe config, catálogos fiscales, impuestos, sucursales/almacenes, dimensiones, cuentas bancarias o permisos. Es el mismo valor que llega en el header `X-Reference-Version` de cada respuesta. Cambia también al reiniciar el servidor. Barato: sin consultas a ERPNext.",
+        "operationId": "MeController_getReferenceVersion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Versión de los datos de referencia del tenant (para invalidar caché del frontend)",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
     "/api/v1/me/permissions/{doctype}/{name}": {
       "get": {
         "description": "Evalúa `if_owner`, User Permissions y los controller permissions del doctype — cosas que dependen del documento y que el endpoint de nivel sesión no puede saber. Es lo que deben usar los botones de una pantalla de detalle.\n\n⚠️ No considera `docstatus`: sobre una factura ya sometida sigue devolviendo `submit: 1`, porque el permiso existe — lo que no aplica es el estado.",
@@ -32163,6 +32260,36 @@
           }
         ],
         "summary": "Desvincula una cuenta externa",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/me/bootstrap": {
+      "get": {
+        "description": "`data`: `permisos` (= GET /me/permissions data), `acceso` (= GET /me/acceso data), `features` (= GET /me/features data), `facturacion` (= GET /config/facturacion data; null sin `config.facturacion.ver`), `ecf` (= GET /config/ecf data; null sin `config.ecf.ver`), `usuario` { email, maxDiscountPct, branches, defaultBranch, allBranches, almacenesPermitidos }, `referenceVersion` (= X-Reference-Version) y `errores` { [bloque]: { code, message, statusCode } }. Con ETag: responde 304 si no cambió. No incluye el turno de caja (GET /pos/turnos/actual).",
+        "operationId": "MeBootstrapController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Arranque de sesión en una sola respuesta (permisos, acceso, features, config, usuario)",
         "tags": [
           "Mis permisos"
         ]
@@ -33089,6 +33216,15 @@
             "required": false,
             "in": "query",
             "description": "Solo para `almacenes`: devuelve únicamente los almacenes de esta sucursal (se combina con el data-scope del usuario).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ids",
+            "required": false,
+            "in": "query",
+            "description": "Ids (`value`) separados por coma, máx. 50. Devuelve las opciones de esos ids aunque no estén en la primera página (para mostrar el label de un valor ya guardado al editar). Mismo contrato de respuesta; respeta filtros fijos y data-scope del recurso.",
             "schema": {
               "type": "string"
             }

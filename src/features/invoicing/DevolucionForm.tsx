@@ -118,11 +118,11 @@ export default function DevolucionForm() {
     staleTime: 30_000,
   })
 
-  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, enabled: !!invoiceId, staleTime: 5 * 60_000 })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, enabled: !!invoiceId})
 
   // e-CF: si la Nota de Crédito (typeId 34) se emite como comprobante electrónico para este
   // tenant, el modificationCode (Tabla VI DGII) es obligatorio para poder someterla en Vega.
-  const { data: ecfTipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos, staleTime: 60 * 60_000 })
+  const { data: ecfTipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos})
   const notaCreditoEsEcf = ecfTipoElectronicoHabilitado(ecfTipos, '34')
 
   const [returnFullInvoice, setReturnFullInvoice] = useState(true)
