@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Lock } from 'lucide-react'
-import { getFacturacionConfig, listDenominaciones } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { getPreviewCierreTurno, cerrarTurno, getTurnoPdfBlobUrl } from '@/shared/api/pos'
 import type {
   ApiError,
@@ -12,7 +12,11 @@ import type {
 } from '@/shared/api/types'
 import { formatDOP } from '@/lib/formatters'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { listDenominacionesLookup } from '@/shared/api/formularios'
 
 const PREVIEW_COLUMNS = [
   { key: 'metodo', width: 200 },
@@ -78,7 +82,7 @@ export function CerrarTurnoModal({
 
   const { data: denominaciones } = useQuery({
     queryKey: ['denominaciones'],
-    queryFn: listDenominaciones,
+    queryFn: listDenominacionesLookup,
     enabled: open,
   })
 
@@ -148,6 +152,16 @@ export function CerrarTurnoModal({
     setClosingAmounts([])
     onClose()
   }
+
+  // Pide confirmación si el cajero intenta cerrar con montos contados sin guardar — igual que
+  // los demás modales de cobro. Solo aplica al paso de conciliación: en el paso de resultado
+  // el turno ya quedó cerrado y no hay nada que perder. Se espera al prellenado inicial
+  // (`seededKey`) para que los montos automáticos no cuenten como "cambios del usuario".
+  const cierreIsDirty = useDirtyCheck(
+    { closingAmounts },
+    open && cierreStep === 'preview' && seededKey !== null,
+  )
+  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(cierreIsDirty, closeModal)
 
   function isCajaMethod(mopName: string): boolean {
     return mopName === modoPagoCaja
@@ -224,7 +238,7 @@ export function CerrarTurnoModal({
 
   return (
     <>
-    <div className="modal-overlay" onClick={closeModal}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div
         className="modal-box"
         style={{ maxWidth: 640 }}
@@ -240,7 +254,7 @@ export function CerrarTurnoModal({
               ? 'Cerrar turno de caja'
               : 'Turno cerrado'}
           </h2>
-          <button className="modal-close" onClick={closeModal}>
+          <button className="modal-close" onClick={requestClose}>
             ×
           </button>
         </div>
@@ -632,7 +646,7 @@ export function CerrarTurnoModal({
             <>
               <button
                 className="btn btn-secondary"
-                onClick={closeModal}
+                onClick={requestClose}
               >
                 Cancelar
               </button>
@@ -656,6 +670,15 @@ export function CerrarTurnoModal({
         </div>
       </div>
     </div>
+    <ConfirmModal
+      open={confirming}
+      onClose={cancelDiscard}
+      onConfirm={confirmDiscard}
+      title="¿Descartar cambios?"
+      description="Tienes montos contados sin guardar. Si continúas, se perderán y el turno seguirá abierto."
+      confirmLabel="Descartar cambios"
+      variant="danger"
+    />
     <PdfPreviewModal
       url={pdfPreviewUrl}
       onClose={() => {
