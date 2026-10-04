@@ -13,7 +13,7 @@ import type {
 import { formatDOP } from '@/lib/formatters'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import { ConfirmModal } from '@/shared/ui/Modal'
-import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { listDenominacionesLookup } from '@/shared/api/formularios'
@@ -153,15 +153,33 @@ export function CerrarTurnoModal({
     onClose()
   }
 
-  // Pide confirmación si el cajero intenta cerrar con montos contados sin guardar — igual que
-  // los demás modales de cobro. Solo aplica al paso de conciliación: en el paso de resultado
-  // el turno ya quedó cerrado y no hay nada que perder. Se espera al prellenado inicial
-  // (`seededKey`) para que los montos automáticos no cuenten como "cambios del usuario".
+  // Siempre pide confirmación al intentar salir en el paso de conciliación, haya o no
+  // cambios digitados — cerrar por accidente pierde el arqueo y obliga a recontar. En el paso
+  // de resultado el turno ya quedó cerrado y se sale directo. Se mantiene además el aviso
+  // nativo del navegador al recargar/cerrar la pestaña mientras haya montos sin guardar.
   const cierreIsDirty = useDirtyCheck(
     { closingAmounts },
     open && cierreStep === 'preview' && seededKey !== null,
   )
-  const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(cierreIsDirty, closeModal)
+  useBeforeUnloadWarning(cierreIsDirty)
+  const [confirmingClose, setConfirmingClose] = useState(false)
+
+  function requestClose() {
+    if (cierreStep !== 'preview') {
+      closeModal()
+      return
+    }
+    setConfirmingClose(true)
+  }
+
+  function confirmDiscardClose() {
+    setConfirmingClose(false)
+    closeModal()
+  }
+
+  function cancelDiscardClose() {
+    setConfirmingClose(false)
+  }
 
   function isCajaMethod(mopName: string): boolean {
     return mopName === modoPagoCaja
@@ -671,12 +689,12 @@ export function CerrarTurnoModal({
       </div>
     </div>
     <ConfirmModal
-      open={confirming}
-      onClose={cancelDiscard}
-      onConfirm={confirmDiscard}
-      title="¿Descartar cambios?"
-      description="Tienes montos contados sin guardar. Si continúas, se perderán y el turno seguirá abierto."
-      confirmLabel="Descartar cambios"
+      open={confirmingClose}
+      onClose={cancelDiscardClose}
+      onConfirm={confirmDiscardClose}
+      title="¿Salir del cierre de turno?"
+      description="El turno seguirá abierto y se perderá lo digitado en el arqueo."
+      confirmLabel="Sí, salir"
       variant="danger"
     />
     <PdfPreviewModal
