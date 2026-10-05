@@ -414,7 +414,7 @@ export default function DevolucionDetail() {
             </div>
             <div className="modal-foot">
               <button className="btn btn-secondary" disabled={isPending} onClick={() => setConfirmAction(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={handleConfirm} disabled={isPending}>
+              <button className="btn btn-navy" onClick={handleConfirm} disabled={isPending}>
                 {isPending ? 'Procesando…' : confirmMessages[confirmAction].actionLabel}
               </button>
             </div>

@@ -1189,7 +1189,7 @@ export default function GastoForm() {
         footer={
           <>
             <button type="button" className="btn btn-secondary" onClick={closeAdHocModal}>Cancelar</button>
-            <button type="button" className="btn btn-primary" onClick={saveAdHocModal}>Guardar</button>
+            <button type="button" className="btn btn-navy" onClick={saveAdHocModal}>Guardar</button>
           </>
         }
       >

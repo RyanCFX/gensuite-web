@@ -126,7 +126,7 @@ export function UtilidadWidget({ data, meta, titulo }: WidgetProps) {
   )
 }
 
-export function VentasGraficoWidget({ data, meta, titulo }: WidgetProps) {
+export function VentasGraficoWidget({ data, meta }: WidgetProps) {
   return (
     <div className="dash-chart-primary">
       <div>
@@ -134,7 +134,7 @@ export function VentasGraficoWidget({ data, meta, titulo }: WidgetProps) {
           <div className="chart-heading">
             <span className="chart-icon"><ShoppingCart size={20} /></span>
             <div>
-              <h3 className="card-title-dash">{titulo}</h3>
+              <h3 className="card-title-dash">Ventas VS créditos pendientes</h3>
               <p className="chart-subtitle">Ventas emitidas vs. saldo pendiente de cobro</p>
             </div>
           </div>
@@ -159,7 +159,7 @@ export function TopProductosWidget({ data, meta, titulo }: WidgetProps) {
         </div>
         <Link to="/inventario/productos" className="btn-dash-dark">Ver catálogo</Link>
       </div>
-      <TopProductosLista items={topProductos(data)} currency={meta.currency} />
+      <TopProductosLista items={topProductos(data).slice(0, 5)} currency={meta.currency} />
     </div>
   )
 }

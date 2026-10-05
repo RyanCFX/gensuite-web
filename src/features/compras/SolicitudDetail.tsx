@@ -308,7 +308,7 @@ export default function SolicitudDetail() {
             </div>
             <div className="modal-foot">
               <button className="btn btn-secondary" disabled={isPending} onClick={() => setConfirmAction(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={handleConfirm} disabled={isPending}>
+              <button className="btn btn-navy" onClick={handleConfirm} disabled={isPending}>
                 {isPending ? 'Procesando…' : confirmMessages[confirmAction].actionLabel}
               </button>
             </div>
@@ -464,7 +464,7 @@ function GenerarOrdenModal({ solicitudId, remanentes, onClose, onSuccess }: Gene
         </div>
         <div className="modal-foot">
           <button className="btn btn-secondary" onClick={onClose} disabled={generarMutation.isPending}>Cancelar</button>
-          <button className="btn btn-primary" onClick={handleConfirm} disabled={generarMutation.isPending}>
+          <button className="btn btn-navy" onClick={handleConfirm} disabled={generarMutation.isPending}>
             {generarMutation.isPending ? 'Generando…' : 'Generar Orden'}
           </button>
         </div>

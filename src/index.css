@@ -944,6 +944,12 @@ button {
 
 .stat-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
 
+/* Variante estilo kpi-card del dashboard (contenedor, labels y números) — usar con
+ * `className="stat-card kpi"`. Los valores con color semántico propio lo conservan. */
+.stat-card.kpi { border-radius: 12px; padding: 16px; box-shadow: var(--shadow); }
+.stat-card.kpi .stat-label { font-size: 12px; font-weight: 700; letter-spacing: 0.025em; color: #167382; }
+.stat-card.kpi .stat-value { font-size: 20px; font-weight: 700; letter-spacing: -0.015em; color: #0E3D51; }
+
 .stat-card-top {
   display: flex;
   align-items: flex-start;
@@ -1850,21 +1856,24 @@ label.ff-label.ff-required { color: #0E3D51; }
 }
 
 .modal-close {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: none;
   border: none;
   border-radius: var(--radius-md);
-  color: var(--icon-muted);
+  color: var(--text-secondary);
   cursor: pointer;
+  font-size: 18px;
   transition:
     background-color 150ms,
     color 150ms;
   margin-left: auto;
 }
+
+.modal-close svg { width: 18px; height: 18px; }
 
 .modal-close:hover { background: var(--surface-hover); color: var(--text-primary); }
 

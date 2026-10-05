@@ -208,7 +208,7 @@ export default function RecepcionesPage() {
                             <td>
                               {r.status === 'submitted' && r.perBilled < 100 ? (
                                 <button
-                                  className="btn btn-primary btn-size-xs"
+                                  className="btn btn-navy btn-size-xs"
                                   onClick={(e) => { e.stopPropagation(); navigate(`/compras/recepciones/${r.id}`) }}
                                 >
                                   Facturar

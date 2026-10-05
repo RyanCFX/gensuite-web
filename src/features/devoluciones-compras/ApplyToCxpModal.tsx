@@ -157,7 +157,7 @@ export function ApplyToCxpModal({ devolucionId, supplier, supplierName, availabl
           <div style={{ flex: 1 }} />
           <button className="btn btn-secondary btn-size-sm" onClick={onClose}>Cancelar</button>
           <button
-            className="btn btn-primary btn-size-sm"
+            className="btn btn-navy btn-size-sm"
             onClick={handleApply}
             disabled={aplicarMutation.isPending || !invoiceId}
           >

@@ -36,7 +36,7 @@ export function CargarXmlModal({ onClose }: { onClose: () => void }) {
             Cancelar
           </button>
           <button
-            className="btn btn-primary btn-size-sm"
+            className="btn btn-navy btn-size-sm"
             onClick={() => mutation.mutate()}
             disabled={!signedXml.trim() || mutation.isPending}
           >

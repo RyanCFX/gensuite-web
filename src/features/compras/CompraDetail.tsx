@@ -624,7 +624,7 @@ export default function CompraDetail() {
             </div>
             <div className="modal-foot">
               <button className="btn btn-secondary" disabled={isPending} onClick={() => setConfirmAction(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={handleConfirm} disabled={isPending}>
+              <button className="btn btn-navy" onClick={handleConfirm} disabled={isPending}>
                 {isPending ? 'Procesando…' : confirmMessages[confirmAction].actionLabel}
               </button>
             </div>
@@ -668,7 +668,7 @@ export default function CompraDetail() {
             }
           >
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-              <input type="checkbox" checked={autoSometer} onChange={(e) => setAutoSometer(e.target.checked)} />
+              <input type="checkbox" className="ff-check" checked={autoSometer} onChange={(e) => setAutoSometer(e.target.checked)} />
               Someter automáticamente al aceptar
             </label>
           </Permitido>
