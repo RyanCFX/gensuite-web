@@ -5,9 +5,7 @@ import { useEffectOnActive } from 'keepalive-for-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTabs } from '@/contexts/TabsContext'
 import { createQuotation, updateQuotation, getQuotation, getQuotationDuplicateSource } from '@/shared/api/quotations'
-import { getCustomer } from '@/shared/api/customers'
-import { getDefaultPriceTier } from '@/shared/api/catalog'
-import { getFacturacionConfig, getStockSettings } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import type { CreateQuotationDto, ItemPrices, Bundle, Customer, MonedaCode } from '@/shared/api/types'
 import type { Item, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
@@ -43,6 +41,7 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 import { useOpcionesArray } from '@/shared/hooks/useOpciones'
+import { getClienteDetalle, getStockSettingsLookup } from '@/shared/api/formularios'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -189,12 +188,10 @@ export default function QuotationForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const { data: stockSettings } = useQuery({
     queryKey: ['stock-settings'],
-    queryFn: getStockSettings,
-    staleTime: 5 * 60_000,
+    queryFn: getStockSettingsLookup,
   })
   // Candados "Permitir Modificar Precio Libremente" (servicios/productos por separado) — con el
   // toggle correspondiente apagado, el precio de la línea debe ser exactamente uno de los precios
@@ -367,8 +364,8 @@ useEffect(() => {
   })
 
   const { data: duplicateCustomer } = useQuery({
-    queryKey: ['customer', duplicateSource?.customer],
-    queryFn: () => getCustomer(duplicateSource!.customer),
+    queryKey: ['cliente-detalle', duplicateSource?.customer],
+    queryFn: () => getClienteDetalle(duplicateSource!.customer),
     enabled: !isEdit && !!duplicateSource?.customer,
   })
 
@@ -458,11 +455,8 @@ useEffect(() => {
   // ── Customer search ──────────────────────────────────────────────────────
 
 
-  const { data: defaultPriceTier = 'B' } = useQuery({
-    queryKey: ['defaultPriceTier'],
-    queryFn: getDefaultPriceTier,
-    staleTime: 5 * 60_000,
-  })
+  // Viene en GET /config/facturacion (ya cargado arriba): sin consulta de catálogo aparte.
+  const defaultPriceTier = facturacionConfig?.defaultPriceTier ?? 'B'
 
   const currentUserEmail = getCachedUser()?.email
   const { data: currentUser } = useQuery({
@@ -477,7 +471,6 @@ useEffect(() => {
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 60_000,
   })
 
 
@@ -486,7 +479,7 @@ useEffect(() => {
   }, [myBranches])
 
   // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
-  const { data: branchWarehouses } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch, staleTime: 60_000 })
+  const { data: branchWarehouses } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch})
 
   // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido
   useEffect(() => {
@@ -1073,7 +1066,7 @@ if (esClienteOcasional) {
                        setCustomerDefaultDiscountPct(undefined)
                        // /opciones solo trae value/label: tarifa y descuento salen del detalle del cliente.
                        if (cid) {
-                         getCustomer(cid).then((c) => {
+                         getClienteDetalle(cid).then((c) => {
                            setCustomerPriceTier(c.priceTier)
                            setCustomerDefaultDiscountPct(c.descuentoDefaultPct ?? undefined)
                          }).catch(() => {})

@@ -271,7 +271,6 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false
 
@@ -317,7 +316,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     staleTime: 30_000,
     retry: false,
   })
-  const qClientes = useOpcionesLista('clientes', { q: debounced, limit: 5, enabled: canData && puedeClientes, staleTime: 30_000 })
+  const qClientes = useOpcionesLista('clientes', { q: debounced, limit: 5, enabled: canData && puedeClientes})
   const qArticulos = useQuery({
     queryKey: ['cmd-search', 'articulos', debounced],
     queryFn: () => listInventory({ limit: 5, search: debounced }),

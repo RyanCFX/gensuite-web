@@ -6,8 +6,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { getCatalogosFiscales } from '@/shared/api/config'
-import { Plus, ChevronLeft, ChevronRight, Search, Receipt, SlidersHorizontal } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, Receipt, SlidersHorizontal } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -19,6 +18,8 @@ import { Drawer } from '@/shared/ui/Drawer'
 import { useFiltrosPantalla } from '@/shared/permissions/useAcceso'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
+import { SearchInput } from '@/shared/ui/SearchInput'
+import { getCatalogosFiscalesLookup } from '@/shared/api/formularios'
 
 const PAGE_SIZE = 20
 
@@ -77,8 +78,7 @@ export default function GastosPage() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
-    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
-    staleTime: 60 * 60_000,
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'compra' }),
   })
   const [tipoComprobanteSearch, setTipoComprobanteSearch] = useState('')
   const tipoComprobanteOptions: SearchSelectOption[] = (catalogos?.ncfTypesCompra ?? [])
@@ -189,15 +189,7 @@ export default function GastosPage() {
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="filter-bar" style={{ margin: 0 }}>
               <div className="filter-bar-left">
-                <div className="search-input-wrap">
-                  <Search size={14} className="search-input-icon" />
-                  <input
-                    className="search-input"
-                    placeholder="Buscar proveedor…"
-                    value={supplier}
-                    onChange={(e) => { setSupplier(e.target.value); setPage(1) }}
-                  />
-                </div>
+                <SearchInput placeholder="Buscar proveedor…" value={supplier} onChange={(v) => { setSupplier(v); setPage(1) }} />
                 {filtros.puedeFiltrar('status') && (
                 <FilterField label="Estado">
                   <Select value={status} onValueChange={(val) => { setStatus(val); setPage(1) }}>

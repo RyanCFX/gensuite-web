@@ -1,4 +1,6 @@
-import { client, unwrap } from './client'
+import { client, unwrap, conSilencio403 } from './client'
+import { cargarBootstrap } from './bootstrap'
+import { getEcfConfigLookup, getFacturacionConfigLookup } from './formularios'
 import { ENDPOINTS } from './endpoints'
 import type {
   Empresa,
@@ -96,9 +98,16 @@ export async function updateCobrosConfig(data: Partial<CobrosConfig>) {
   return unwrap(res)
 }
 
-export async function getFacturacionConfig() {
-  const res = await client.get<{ success: true; data: FacturacionConfig }>(ENDPOINTS.config.facturacion)
-  return unwrap(res)
+// Al vencer la caché se renueva con /me/bootstrap (una llamada que además refresca ecf-config, el
+// usuario y sus sucursales). Solo si el bootstrap no trae el bloque (sin permiso de config, o
+// backend sin bootstrap) se pide el endpoint propio.
+export async function getFacturacionConfig(): Promise<FacturacionConfig | null> {
+  const boot = await cargarBootstrap()
+  if (boot?.facturacion) return boot.facturacion
+  // Bootstrap `null` sin error en `errores` = el usuario no tiene `config.facturacion.ver`: pedir el
+  // endpoint solo daría un 403 seguro (y su toast).
+  if (boot && !boot.errores?.facturacion) return null
+  return getFacturacionConfigLookup()
 }
 
 export async function updateFacturacionConfig(data: Partial<FacturacionConfig>) {
@@ -137,7 +146,7 @@ export async function actualizarDespachoFuturo(data: UpdateDespachoFuturoDto) {
 }
 
 export async function getLayawayConfig() {
-  const res = await client.get<{ success: true; data: LayawayConfig }>(ENDPOINTS.config.apartados)
+  const res = await conSilencio403(() => client.get<{ success: true; data: LayawayConfig }>(ENDPOINTS.config.apartados))
   return unwrap(res)
 }
 
@@ -167,7 +176,7 @@ export async function listBancos() {
 }
 
 export async function listDenominaciones() {
-  const res = await client.get<{ success: true; data: Denominacion[] }>(ENDPOINTS.config.denominaciones)
+  const res = await conSilencio403(() => client.get<{ success: true; data: Denominacion[] }>(ENDPOINTS.config.denominaciones))
   return unwrap(res)
 }
 
@@ -227,9 +236,11 @@ export async function updateUOM(id: string, data: UpdateUOMDto) {
   return unwrap(res)
 }
 
-export async function getEcfConfig() {
-  const res = await client.get<{ success: true; data: EcfConfig }>(ENDPOINTS.config.ecf)
-  return unwrap(res)
+export async function getEcfConfig(): Promise<EcfConfig | null> {
+  const boot = await cargarBootstrap()
+  if (boot?.ecf) return boot.ecf
+  if (boot && !boot.errores?.ecf) return null
+  return getEcfConfigLookup()
 }
 
 export async function updateEcfConfig(data: UpdateEcfConfigDto) {
@@ -337,14 +348,14 @@ export async function updateCuentasEmpresa(data: UpdateCuentasEmpresaDto) {
 // ─── Tax Templates — Ventas (solo lectura: ahora se gestionan desde tasas-impuesto) ─────
 
 export async function listImpuestosVentas(): Promise<TaxTemplate[]> {
-  const res = await client.get<{ success: true; data: TaxTemplate[] }>(ENDPOINTS.config.impuestosVentas)
+  const res = await conSilencio403(() => client.get<{ success: true; data: TaxTemplate[] }>(ENDPOINTS.config.impuestosVentas))
   return unwrap(res)
 }
 
 // ─── Tax Templates — Compras (solo lectura: ahora se gestionan desde tasas-impuesto) ────
 
 export async function listImpuestosCompras(): Promise<TaxTemplate[]> {
-  const res = await client.get<{ success: true; data: TaxTemplate[] }>(ENDPOINTS.config.impuestosCompras)
+  const res = await conSilencio403(() => client.get<{ success: true; data: TaxTemplate[] }>(ENDPOINTS.config.impuestosCompras))
   return unwrap(res)
 }
 
@@ -399,7 +410,7 @@ export async function updateAccountsSettings(data: UpdateAccountsSettingsDto) {
 }
 
 export async function getStockSettings() {
-  const res = await client.get<{ success: true; data: StockSettings }>(ENDPOINTS.settings.stock)
+  const res = await conSilencio403(() => client.get<{ success: true; data: StockSettings }>(ENDPOINTS.settings.stock))
   return unwrap(res)
 }
 
@@ -483,9 +494,9 @@ export async function getCatalogosFiscales(params: { type: 'venta' }): Promise<C
 export async function getCatalogosFiscales(params: { type: 'compra' }): Promise<CatalogosFiscalesCompra>
 export async function getCatalogosFiscales(params?: { type?: CatalogosFiscalesType }): Promise<CatalogosFiscales>
 export async function getCatalogosFiscales(params?: { type?: CatalogosFiscalesType }) {
-  const res = await client.get<{ success: true; data: CatalogosFiscales }>(ENDPOINTS.config.catalogosFiscales, {
+  const res = await conSilencio403(() => client.get<{ success: true; data: CatalogosFiscales }>(ENDPOINTS.config.catalogosFiscales, {
     params: params?.type ? { type: params.type } : undefined,
-  })
+  }))
   return unwrap(res)
 }
 

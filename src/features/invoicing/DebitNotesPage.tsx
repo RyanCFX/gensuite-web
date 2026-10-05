@@ -33,6 +33,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const LIST_COLUMNS = [
   { key: 'id', width: 100 },
@@ -162,7 +163,7 @@ export default function DebitNotesPage() {
 
   // B03 (Nota de Débito) → typeId 33. Si el tenant lo tiene habilitado como e-CF, el código de
   // modificación DGII es obligatorio al crear la nota.
-  const { data: ecfTipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos, staleTime: 60 * 60_000 })
+  const { data: ecfTipos } = useQuery({ queryKey: ['ecf-tipos'], queryFn: getEcfTipos})
   const ndEsEcf = ecfTipoElectronicoHabilitado(ecfTipos, '33')
 
   // A diferencia de la nota de crédito, la nota de débito solo admite el código 3 (aumento de
@@ -316,14 +317,7 @@ export default function DebitNotesPage() {
                 <DepartmentSelect value={filterDepartment} onChange={setFilterDepartment} placeholder="Todos los departamentos" />
               </FilterField>
               <FilterField label="NCF">
-                <input
-                  className="ff-input ff-input-sm"
-                  style={{ width: 160 }}
-                  placeholder="Buscar NCF…"
-                  value={ncf}
-                  onChange={(e) => setNcf(e.target.value)}
-                />
-              </FilterField>
+                <SearchInput variant="field" style={{ width: 160 }} placeholder="Buscar NCF…" value={ncf} onChange={(v) => setNcf(v)} /></FilterField>
 
               <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
                 <SlidersHorizontal size={13} />

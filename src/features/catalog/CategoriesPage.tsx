@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
@@ -12,16 +12,16 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { Select, SelectItem } from '@/components/ui/select'
-import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightSmall, FolderOpen, Tag, Folder } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightSmall, FolderOpen, Tag, Folder } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { useDebounce } from '@/lib/useDebounce'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -145,7 +145,7 @@ export default function CategoriesPage() {
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
   // Lista tab query
@@ -183,10 +183,6 @@ export default function CategoriesPage() {
     return map
   }, [data])
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value)
-    setPage(1)
-  }, [])
 
   const {
     register,
@@ -356,15 +352,10 @@ export default function CategoriesPage() {
             <div className="card-body">
               <div className="filter-bar" style={{ margin: 0 }}>
                 <div className="filter-bar-left">
-                  <div className="search-input-wrap">
-                    <Search size={14} className="search-input-icon" />
-                    <input
-                      className="search-input"
-                      placeholder="Buscar por nombre…"
-                      value={search}
-                      onChange={handleSearchChange}
-                    />
-                  </div>
+                  <SearchInput placeholder="Buscar por nombre…" value={search} onChange={(v) => {
+    setSearch(v)
+    setPage(1)
+  }} />
                 </div>
               </div>
             </div>

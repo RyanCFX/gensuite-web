@@ -130,7 +130,7 @@ export function isPaymentLinesValid(
  *  pre-seleccionar el método de pago al cobrar, dejando que el usuario lo cambie. '' si no hay
  *  ningún default configurado para esa moneda. */
 export function resolveDefaultModeOfPago(
-  config: { modoPagoCaja?: string | null; modoPagoCajaUsd?: string | null; modoPagoCajaEur?: string | null } | undefined,
+  config: { modoPagoCaja?: string | null; modoPagoCajaUsd?: string | null; modoPagoCajaEur?: string | null } | null | undefined,
   currency: string,
 ): string {
   if (!config) return ''

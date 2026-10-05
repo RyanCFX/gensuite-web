@@ -9,6 +9,9 @@ import { esErrorDePermiso } from '@/shared/hooks/useFiltroQuery'
 //  - Formulario: ante 403 RECURSO_NO_PERMITIDO queda deshabilitado con "No tiene acceso a esta lista".
 //  - Filtro de tabla (`hideOnForbidden`): ante 403 no hay alerta y el control no se renderiza.
 
+// Recursos cuyo label NO es igual al value (id): para mostrar el valor ya guardado hay que resolverlo.
+const RESOLVER_LABEL_POR_IDS = new Set(['clientes', 'proveedores', 'usuarios', 'aseguradoras', 'cuentas-bancarias', 'departamentos', 'centros-costo', 'articulos'])
+
 export interface OpcionesSelectProps {
   /** Clave sin prefijo (`sucursales`, `clientes`…). */
   recurso: string
@@ -57,13 +60,22 @@ export function OpcionesSelect({
   excludeValues,
 }: OpcionesSelectProps) {
   const [q, setQ] = useState('')
+  // Los selects de formulario piden su lista recién cuando el usuario los abre (un formulario puede
+  // tener varios y casi nunca se usan todos). Los filtros de tabla (`hideOnForbidden`) la piden al
+  // montar para poder ocultarse si no hay acceso; el resultado se cachea por recurso+búsqueda.
+  const [abierto, setAbierto] = useState(hideOnForbidden)
   const [picked, setPicked] = useState<{ value: string; label: string } | null>(null)
   const { data, isLoading, error: loadError, forbidden } = useOpciones(recurso, {
     q: q.trim().length >= minChars ? q : '',
     limit,
-    enabled: !disabled && (minChars === 0 || q.trim().length >= minChars),
+    enabled: !disabled && abierto && (minChars === 0 || q.trim().length >= minChars),
     silent403: hideOnForbidden,
   })
+  // Valor guardado sin label conocido (documento en edición): se resuelve con `?ids=` en vez de
+  // depender de que esté en la primera página de resultados.
+  const necesitaLabel = !!value && !selectedLabel && picked?.value !== value && RESOLVER_LABEL_POR_IDS.has(recurso)
+  const { data: resueltas } = useOpciones(recurso, { ids: [value], enabled: necesitaLabel && !disabled, silent403: hideOnForbidden })
+
   if (hideOnForbidden && esErrorDePermiso(loadError)) return null
 
   const options: SearchSelectOption[] = (data ?? [])
@@ -76,7 +88,7 @@ export function OpcionesSelect({
   }
   // Label del valor actual: el que el llamador ya conoce (documento guardado) → el recién elegido →
   // el propio value (nunca dejar el campo en blanco aunque el valor no esté en la primera página).
-  const labelActual = !value ? '' : selectedLabel || (picked?.value === value ? picked.label : '') || options.find((o) => o.value === value)?.label || value
+  const labelActual = !value ? '' : selectedLabel || (picked?.value === value ? picked.label : '') || options.find((o) => o.value === value)?.label || resueltas?.find((o) => o.value === value)?.label || value
 
   const select = forbidden ? (
     <div title="No tiene acceso a esta lista">
@@ -99,6 +111,7 @@ export function OpcionesSelect({
       onChange={handleChange}
       options={options}
       onSearch={setQ}
+      onOpen={() => setAbierto(true)}
       loading={isLoading}
       placeholder={placeholder}
       error={error}

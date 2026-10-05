@@ -67,7 +67,6 @@ export default function DepositoForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
   const [showMonedaOptions, setShowMonedaOptions] = useState(false)
@@ -75,7 +74,7 @@ export default function DepositoForm() {
   const [bankConversionRate, setBankConversionRate] = useState<number | ''>('')
 
   const { data: tiposData } = useQuery({
-    queryKey: ['tesoreria-tipos-documento-form-deposito'],
+    queryKey: ['tesoreria-tipos-documento', 'activos'],
     queryFn: () => listTiposDocumento({ enabled: true, limit: 100 }),
   })
   const tipos = [...(tiposData?.items ?? [])].sort((a, b) => {

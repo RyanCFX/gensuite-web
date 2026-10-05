@@ -18,7 +18,7 @@ import type { PricingRule, CreatePricingRuleDto, UpdatePricingRuleDto } from '@/
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
-import { Plus, Pencil, Power, ChevronLeft, ChevronRight, Search, Info } from 'lucide-react'
+import { Plus, Pencil, Power, ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useDebounce } from '@/lib/useDebounce'
 import { formatDOP } from '@/lib/formatters'
@@ -29,6 +29,7 @@ import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -204,7 +205,7 @@ export default function PricingRulesPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<PricingRule | null>(null)
   const { orderBy, sort } = useSortState()
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
@@ -440,10 +441,7 @@ export default function PricingRulesPage() {
                   <SelectItem value="true">Desactivadas</SelectItem>
                 </Select>
               </FilterField>
-              <div className="search-input-wrap">
-                <Search size={14} className="search-input-icon" />
-                <input className="search-input" placeholder="Buscar por título…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
-              </div>
+              <SearchInput placeholder="Buscar por título…" value={search} onChange={(v) => { setSearch(v); setPage(1) }} />
             </div>
           </div>
         </div>

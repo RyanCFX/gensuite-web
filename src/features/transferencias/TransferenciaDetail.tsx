@@ -53,7 +53,6 @@ export default function TransferenciaDetail() {
     queryKey: ['usuarioAlmacenesPermitidos', currentUserEmail],
     queryFn: () => getUsuarioAlmacenesPermitidos(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 60_000,
   })
   const canConfirm = !myWarehouses || !t ? true : myWarehouses.warehouses.includes(t.toWarehouse)
 

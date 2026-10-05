@@ -12,7 +12,7 @@ import {
 } from '@/shared/api/catalog'
 import { getCatalogosFiscales } from '@/shared/api/config'
 import type { CuentaPorPagar, CreateCuentaPorPagarDto, TipoDocumentoCuentaPorPagar } from '@/shared/api/types'
-import { Plus, Pencil, Ban, Search } from 'lucide-react'
+import { Plus, Pencil, Ban } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -24,6 +24,7 @@ import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const COLUMNS = [
   { key: 'titulo', width: 220 },
@@ -78,7 +79,6 @@ export default function CuentasPorPagarPage() {
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
     queryFn: () => getCatalogosFiscales({ type: 'compra' }),
-    staleTime: 60 * 60_000,
   })
   const [claseFiscalSearch, setClaseFiscalSearch] = useState('')
   const claseFiscalOptions: SearchSelectOption[] = (catalogos?.tipoBienes606 ?? [])
@@ -195,15 +195,7 @@ export default function CuentasPorPagarPage() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <div className="search-input-wrap">
-                <Search size={14} className="search-input-icon" />
-                <input
-                  className="search-input"
-                  placeholder="Buscar por título…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
+              <SearchInput placeholder="Buscar por título…" value={search} onChange={(v) => setSearch(v)} />
             </div>
           </div>
         </div>

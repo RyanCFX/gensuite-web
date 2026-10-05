@@ -26,9 +26,9 @@ interface PartySelectProps {
 export function PartySelect({ tipo, onTipoChange, id, onIdChange, disabled, tipoLabel = 'Tipo', tiposPermitidos = ['Customer', 'Supplier'] }: PartySelectProps) {
   const [query, setQuery] = useState('')
 
-  const { data: customers, isLoading: loadingCustomers, refetch: refetchCustomers } = useOpcionesLista('clientes', { q: query, limit: 50, enabled: tipo === 'Customer', staleTime: 30_000 })
+  const { data: customers, isLoading: loadingCustomers, refetch: refetchCustomers } = useOpcionesLista('clientes', { q: query, limit: 50, enabled: tipo === 'Customer'})
 
-  const { data: suppliers, isLoading: loadingSuppliers, refetch: refetchSuppliers } = useOpcionesLista('proveedores', { q: query, limit: 50, enabled: tipo === 'Supplier', staleTime: 30_000 })
+  const { data: suppliers, isLoading: loadingSuppliers, refetch: refetchSuppliers } = useOpcionesLista('proveedores', { q: query, limit: 50, enabled: tipo === 'Supplier'})
 
   const options: SearchSelectOption[] =
     tipo === 'Customer'

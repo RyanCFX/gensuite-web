@@ -172,14 +172,12 @@ export default function SupplierDetail() {
   const { data: impuestosCompras } = useQuery({
     queryKey: ['impuestos-compras'],
     queryFn: listImpuestosCompras,
-    staleTime: 5 * 60_000,
   })
   const impuestoTitulo = (templateId: string) => impuestosCompras?.find((t) => String(t.id) === templateId)?.title ?? templateId
 
   const { data: retencionesData } = useQuery({
     queryKey: ['retenciones-all'],
     queryFn: () => listRetenciones({ limit: 100 }),
-    staleTime: 5 * 60_000,
   })
   const retencionTitulo = (retencionId: string) =>
     retencionesData?.items?.find((r) => r.id === retencionId)?.categoryName ?? retencionId

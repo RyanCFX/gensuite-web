@@ -5,8 +5,7 @@ import { toast } from 'sonner'
 import { registerPago } from '@/shared/api/cobros'
 import { listInvoices } from '@/shared/api/invoices'
 import { listPedidos } from '@/shared/api/pedidos'
-import { getCustomer } from '@/shared/api/customers'
-import { getLayawayConfig, getFacturacionConfig } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { CheckCircle2, AlertTriangle, Wallet, PackageOpen } from 'lucide-react'
@@ -23,6 +22,7 @@ import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 import { reglasCuentaBancaria } from '@/lib/pagoBancario'
+import { getClienteDetalle, getLayawayConfigLookup } from '@/shared/api/formularios'
 
 const FACTURAS_COLUMNS = [
   { key: 'checked', width: 36 },
@@ -92,7 +92,6 @@ export default function PagoPage() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
@@ -105,9 +104,8 @@ export default function PagoPage() {
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 60_000,
   })
-  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager})
   const branchOptions = useMemo(
     () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],
@@ -125,8 +123,8 @@ export default function PagoPage() {
   // ── Customer search ──────────────────────────────────────────────────────
 
   const { data: customerDetail } = useQuery({
-    queryKey: ['customer', customerId],
-    queryFn: () => getCustomer(customerId),
+    queryKey: ['cliente-detalle', customerId],
+    queryFn: () => getClienteDetalle(customerId),
     enabled: !!customerId,
     staleTime: 60_000,
   })
@@ -168,8 +166,7 @@ export default function PagoPage() {
 
   const { data: layawayConfig } = useQuery({
     queryKey: ['layaway-config'],
-    queryFn: getLayawayConfig,
-    staleTime: 5 * 60_000,
+    queryFn: getLayawayConfigLookup,
   })
 
   const { data: pedidosData, isLoading: pedidosLoading } = useQuery({

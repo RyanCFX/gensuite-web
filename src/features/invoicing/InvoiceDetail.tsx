@@ -25,17 +25,16 @@ import {
   asignarTrackingFactura,
   recalcularCoberturaFactura,
 } from "@/shared/api/invoices";
-import { getCustomer } from "@/shared/api/customers";
 import { getSaldoFavor } from "@/shared/api/cobros";
 import {
   getCreditNoteSaldoFavor,
   aplicarCreditNoteAFactura,
   removerCreditNoteAplicada,
 } from "@/shared/api/notes";
-import { listDenominaciones, getFacturacionConfig, getCatalogosFiscales } from "@/shared/api/config";
+import { getFacturacionConfig } from "@/shared/api/config";
+import { getCatalogosFiscalesLookup, getComboLookup, getClienteSemaforo, listDenominacionesLookup } from "@/shared/api/formularios";
 import { createDevolucion } from "@/shared/api/devoluciones";
 import { getItemLookup } from "@/shared/api/catalog";
-import { getBundle } from "@/shared/api/bundles";
 import { getTurnoActual, abrirTurno } from "@/shared/api/pos";
 import { crearDespachoDesdeFactura, listDespachos } from "@/shared/api/despachos";
 import { ECF_SUBMIT_UNAVAILABLE_MSG } from "@/shared/api/ecf";
@@ -317,9 +316,11 @@ export default function InvoiceDetail() {
     enabled: !isHistoricalVersion && !!id,
   });
 
-  const { data: customer } = useQuery({
-    queryKey: ["customer", invoice?.customer],
-    queryFn: () => getCustomer(invoice!.customer),
+  // `tieneCredito` del semáforo (GET /opciones/clientes/:id/semaforo): el detalle de formulario del
+  // cliente ya no trae `hasCredit`.
+  const { data: semaforoCliente } = useQuery({
+    queryKey: ["cliente-semaforo", invoice?.customer],
+    queryFn: () => getClienteSemaforo(invoice!.customer),
     enabled: !!invoice?.customer && invoice.status === "draft",
   });
 
@@ -400,22 +401,20 @@ export default function InvoiceDetail() {
 
   // Usado por el selector de método de pago del reembolso en el modal de Devolución,
   // y por el bloque de "¿Cómo se cobra?" al someter (validación de requiresBankAccount).
-  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, enabled: invoice?.status === "draft" || invoice?.status === "submitted", staleTime: 5 * 60_000 });
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, enabled: invoice?.status === "draft" || invoice?.status === "submitted"});
 
   // Misma key que usa PaymentLinesEditor — cache compartido, sin request extra. Hace falta para
   // validar que el desglose del vuelto suma el excedente cuando hay sobrepago.
   const { data: denominaciones } = useQuery({
     queryKey: ["denominaciones"],
-    queryFn: listDenominaciones,
+    queryFn: listDenominacionesLookup,
     enabled: invoice?.status === "draft",
-    staleTime: 5 * 60_000,
   });
   const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo);
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ["facturacion-config"],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   });
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
   const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false;
@@ -429,13 +428,13 @@ export default function InvoiceDetail() {
   const formatosPermitidosPdf = formatosPermitidos?.filter((f) => f !== "pos");
   const permitePos = formatosPermitidos?.includes("pos") ?? false;
 
-  // Precalienta el caché de ['turno-actual'] (lo lee TurnoCajaIndicator) — el `data` no se
-  // usa acá directamente.
-  useQuery({
+  // Turno abierto del usuario (lo lee también TurnoCajaIndicator con la misma key) — se usa
+  // al someter: solo se redirige a Caja si hay un turno abierto; sin turno no hay cobro posible.
+  const { data: turnoActual, isLoading: turnoActualLoading } = useQuery({
     queryKey: ['turno-actual'],
     queryFn: getTurnoActual,
     enabled: !!invoice && invoice.status === "draft" && usaModuloPos,
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
   });
 
   const abrirTurnoMutation = useMutation({
@@ -456,8 +455,7 @@ export default function InvoiceDetail() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
-    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
-    staleTime: 60 * 60_000,
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'venta' }),
   });
 
   const returnModeOptions: SearchSelectOption[] = useMemo(() => {
@@ -653,7 +651,7 @@ export default function InvoiceDetail() {
       toast.error(err?.message ?? "No se pudo recalcular la cobertura"),
   });
 
-  const noCredit = invoice?.status === "draft" && customer?.hasCredit === false;
+  const noCredit = invoice?.status === "draft" && semaforoCliente?.tieneCredito === false;
   // Cubierta al 100% por crédito ya aplicado (saldo a favor y/o notas de crédito) — no hace falta preguntar forma de pago.
   const paidByCreditNote =
     !!invoice &&
@@ -760,13 +758,19 @@ export default function InvoiceDetail() {
       setDirectoMop("");
       setDirectoAmount("");
 
-      // Nuevo flujo POS: la factura va a "por cobrar" sin NCF — redirigir a Caja. Si el usuario
-      // no tiene acceso a Caja, se queda en esta pantalla (la factura ya quedó en la cola en el
-      // servidor de todos modos; alguien con permiso la cobrará después).
+      // Nuevo flujo POS: la factura va a "por cobrar" sin NCF — redirigir a Caja solo si el
+      // usuario tiene acceso Y un turno abierto (sin turno el drawer de cobro no puede operar;
+      // PorCobrarPage mostraría "Caja bloqueada"). Sin turno se queda en esta pantalla; la
+      // factura igual quedó en la cola en el servidor. Si no tiene acceso a Caja, igual que
+      // antes: se queda acá y otro usuario con acceso la cobrará después.
       if ("status" in updated && updated.status === "pendiente_cobro") {
-        if (puedeAccederCaja) {
+        // Si el estado del turno aún está cargando no se puede validar — se redirige igual que
+        // antes y PorCobrarPage muestra "Caja bloqueada" si resulta no haber turno.
+        if (puedeAccederCaja && (turnoActual || turnoActualLoading)) {
           toast.success(updated.message);
           navigate(`/caja/por-cobrar?invoiceId=${updated.invoiceId}`);
+        } else if (puedeAccederCaja) {
+          toast.success("Factura sometida — abre un turno de caja para cobrarla.");
         } else {
           toast.success("Factura sometida — pendiente de cobro en Caja.");
         }
@@ -801,6 +805,26 @@ export default function InvoiceDetail() {
     },
     onError: (err: ApiError) => {
       const msg = err?.message ?? "";
+      // Borrador antiguo sin tipo de comprobante: llevar a asignarlo editando el borrador.
+      if (isApiErrorCode(err, ERROR_CODES.NCF_TIPO_REQUERIDO)) {
+        toast.error(msg || "La factura no tiene tipo de comprobante.", {
+          duration: 10000,
+          action: { label: "Asignar tipo", onClick: () => navigate(`/facturas/${id}/editar`) },
+        });
+        return;
+      }
+      // Solo Crédito Fiscal se valida contra el padrón DGII: corregir el RNC del cliente o
+      // cambiar el tipo de comprobante (ambos se hacen editando el borrador).
+      if (
+        isApiErrorCode(err, ERROR_CODES.RNC_NO_EXISTE_EN_DGII) ||
+        isApiErrorCode(err, ERROR_CODES.COMPRADOR_SIN_RNC)
+      ) {
+        toast.error(msg || "El RNC del comprador no es válido.", {
+          duration: 10000,
+          action: { label: "Revisar factura", onClick: () => navigate(`/facturas/${id}/editar`) },
+        });
+        return;
+      }
       if (isApiErrorCode(err, ERROR_CODES.POS_PAYMENT_CURRENCY_MISMATCH)) {
         toast.error(msg, { duration: 8000 });
         return;
@@ -877,7 +901,7 @@ export default function InvoiceDetail() {
       // No es una línea directa — busca entre los Combos de la factura cuál lo incluye como componente.
       for (const line of invoice.items) {
         try {
-          const bundle = await getBundle(line.itemCode);
+          const bundle = await getComboLookup(line.itemCode);
           const comp = bundle.components.find((c) => c.itemCode === parsedCode);
           if (comp) {
             const item = await getItemLookup(parsedCode).catch(() => null);
@@ -938,6 +962,15 @@ export default function InvoiceDetail() {
   });
 
   function handleSubmitClick() {
+    // El tipo de comprobante es obligatorio para someter o enviar a Caja (400
+    // NCF_TIPO_REQUERIDO) — solo un borrador antiguo puede no tenerlo. Se lleva al usuario a
+    // asignarlo editando el borrador antes de reintentar.
+    if (!invoice?.ncfType) {
+      toast.error("Esta factura no tiene tipo de comprobante — asígnalo antes de someter.", {
+        action: { label: "Asignar tipo", onClick: () => navigate(`/facturas/${id}/editar`) },
+      });
+      return;
+    }
     // Ya cubierta al 100% por saldo a favor / nota de crédito — no hace falta preguntar forma de pago.
     if (paidByCreditNote) {
       setLastSubmitBody(undefined);

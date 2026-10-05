@@ -6,14 +6,13 @@
 // CONSTANCIA: las pruebas end-to-end con datos reales quedan pendientes — ningún tenant tiene Vega
 // conectado en producción. Contra el sandbox de Vega sí hay datos.
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ChevronLeft, ChevronRight, Search, RefreshCw, ExternalLink, SlidersHorizontal } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw, ExternalLink, SlidersHorizontal } from 'lucide-react'
 import { listEcfEmitidos, refreshEcfEmitido } from '@/shared/api/ecf-emitidos'
 import type { VoucherEmitido, EcfStatusDgii, EcfTipoElectronico, EcfEnv } from '@/shared/api/types'
-import { useDebounce } from '@/lib/useDebounce'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import {
   ecfStatusLabel, ecfFlujoStatusLabel, ecfStatusBadge, ecfTipoLabel, ecfEnvChip, ecfPuedeRefrescar, ECF_TIPOS,
@@ -24,6 +23,7 @@ import { Drawer } from '@/shared/ui/Drawer'
 import { Select, SelectItem } from '@/components/ui/select'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -72,8 +72,8 @@ export default function EcfEmitidosPage() {
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false)
   const { widths: colWidths, startResize } = useResizableColumns(ECF_EMITIDOS_COLUMNS)
 
-  const debouncedSearch = useDebounce(search, 300)
-  const debouncedRnc = useDebounce(rnc, 300)
+  const debouncedSearch = search
+  const debouncedRnc = rnc
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
@@ -107,10 +107,6 @@ export default function EcfEmitidosPage() {
     onError: (err: { message?: string }) => toast.error(err?.message ?? 'No se pudo consultar el estado'),
   })
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value)
-    setPage(1)
-  }, [])
 
   const items = (data?.items ?? []) as VoucherEmitido[]
   const totalPages = data ? Math.max(1, Math.ceil(data.meta.total / PAGE_SIZE)) : 1
@@ -147,24 +143,12 @@ export default function EcfEmitidosPage() {
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <div className="search-input-wrap">
-                <Search size={15} className="search-input-icon" />
-                <input
-                  className="search-input"
-                  placeholder="Buscar por e-NCF exacto…"
-                  value={search}
-                  onChange={handleSearchChange}
-                />
-              </div>
+              <SearchInput placeholder="Buscar por e-NCF exacto…" value={search} onChange={(v) => {
+    setSearch(v)
+    setPage(1)
+  }} />
               <FilterField label="RNC comprador">
-                <input
-                  className="ff-input ff-input-sm"
-                  style={{ width: 160 }}
-                  placeholder="RNC / Cédula"
-                  value={rnc}
-                  onChange={(e) => { setRnc(e.target.value); setPage(1) }}
-                />
-              </FilterField>
+                <SearchInput variant="field" style={{ width: 160 }} placeholder="RNC / Cédula" value={rnc} onChange={(v) => { setRnc(v); setPage(1) }} /></FilterField>
               <FilterField label="Estado DGII" style={{ width: 220 }}>
                 <Select value={estado} onValueChange={(v) => { setEstado(v); setPage(1) }} placeholder="Todos los estados">
                   {ESTADOS_DGII.map((s) => (

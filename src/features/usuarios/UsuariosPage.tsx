@@ -140,12 +140,12 @@ export default function UsuariosPage() {
   // `roles` sigue viviendo acá (nombres planos, para mostrar en la tabla) — lo que cambia es que
   // el FORMULARIO de invitar/editar ya no arma esa lista a mano, usa `perfiles` (§6.2/§6.3).
   const { data: roles } = useQuery({ queryKey: ['roles'], queryFn: listRoles })
-  const { data: perfiles, isError: perfilesError } = useQuery({ queryKey: ['roles-perfiles'], queryFn: getPerfiles })
+  const { data: perfiles, isError: perfilesError } = useQuery({ queryKey: ['roles-perfiles'], queryFn: getPerfiles, enabled: showForm })
 
   const { data: perfilesAcceso, isError: perfilesAccesoError } = useQuery({
     queryKey: ['acceso-perfiles'],
     queryFn: listPerfilesAcceso,
-    enabled: v2Activo,
+    enabled: v2Activo && showForm,
     retry: false,
   })
   const { data: usuarioAcceso } = useQuery({
@@ -176,6 +176,7 @@ export default function UsuariosPage() {
   const { data: sucursalesData } = useQuery({
     queryKey: ['sucursales-all'],
     queryFn: () => listSucursales({ limit: 100 }),
+    enabled: showForm,
   })
   const sucursales = sucursalesData?.items ?? []
 
@@ -200,6 +201,7 @@ export default function UsuariosPage() {
   const { data: cajas } = useQuery({
     queryKey: ['cajas'],
     queryFn: listCajas,
+    enabled: showForm,
   })
   const cajasHabilitadas = (cajas ?? []).filter((c) => !c.disabled)
 

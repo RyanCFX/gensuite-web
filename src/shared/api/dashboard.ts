@@ -103,3 +103,26 @@ export async function getDashboardWidget(
   )
   return { data: res.data.data, meta: res.data.meta }
 }
+
+/** Un widget dentro de la respuesta por lote: datos, o el error de ESE widget (no tumba a los demás). */
+export type DashboardWidgetLoteItem =
+  | { data: DashboardWidgetResp['data']; meta: DashboardWidgetResp['meta'] }
+  | { error: { code: string; message: string; statusCode: number; details?: unknown } }
+
+const MAX_KEYS_LOTE = 20
+
+/** Varios widgets en UNA solicitud (GET /dashboard/widgets?keys=a,b,c). Máx. 20 keys por llamada. */
+export async function getDashboardWidgetsLote(
+  keys: string[],
+  params: { period?: DashboardPeriod; limit?: number },
+): Promise<Record<string, DashboardWidgetLoteItem>> {
+  const out: Record<string, DashboardWidgetLoteItem> = {}
+  for (let i = 0; i < keys.length; i += MAX_KEYS_LOTE) {
+    const res = await client.get<{ success: true; data: Record<string, DashboardWidgetLoteItem> }>(
+      ENDPOINTS.dashboard.widgetsLote,
+      { params: { ...params, keys: keys.slice(i, i + MAX_KEYS_LOTE).join(',') } },
+    )
+    Object.assign(out, res.data.data)
+  }
+  return out
+}

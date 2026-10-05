@@ -6,7 +6,6 @@ import { useTabs } from '@/contexts/TabsContext'
 import { createPago, getPagosPendientes } from '@/shared/api/pagos'
 import { getSiguienteChequeCuenta } from '@/shared/api/tesoreria'
 import { SaldoFavorProveedorPagosSection } from './SaldoFavorProveedorPagosSection'
-import { getSupplier } from '@/shared/api/suppliers'
 import { getFacturacionConfig } from '@/shared/api/config'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
@@ -25,6 +24,7 @@ import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 import { reglasCuentaBancaria, cuentasElegibles, chequeManual } from '@/lib/pagoBancario'
+import { getProveedorDetalle } from '@/shared/api/formularios'
 
 const REFERENCIAS_COLUMNS = [
   { key: 'check', width: 36 },
@@ -77,7 +77,6 @@ export default function RegistrarPagoPage() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   const multimonedaHabilitada = facturacionConfig?.multimonedaHabilitada ?? false
@@ -90,9 +89,8 @@ export default function RegistrarPagoPage() {
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 60_000,
   })
-  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager})
   const branchOptions = useMemo(
     () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],
@@ -110,8 +108,8 @@ export default function RegistrarPagoPage() {
   // ── Supplier search ───────────────────────────────────────────────────────
 
   const { data: supplierDetail } = useQuery({
-    queryKey: ['supplier', supplierId],
-    queryFn: () => getSupplier(supplierId),
+    queryKey: ['proveedor-detalle', supplierId],
+    queryFn: () => getProveedorDetalle(supplierId),
     enabled: !!supplierId,
     staleTime: 60_000,
   })

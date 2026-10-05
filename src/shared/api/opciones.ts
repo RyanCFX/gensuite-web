@@ -30,6 +30,8 @@ export interface OpcionesParams {
   limit?: number
   /** Solo en `almacenes`: filtra por sucursal (se combina con las sucursales asignadas al usuario). */
   branch?: string
+  /** Resuelve esos values (máx. 50) aunque no estén en la primera página — para mostrar el label de un valor ya guardado. */
+  ids?: string[]
   /** No mostrar el toast global si la request da 403 (el llamador oculta el control). */
   silent403?: boolean
 }
@@ -41,7 +43,8 @@ export interface OpcionesParams {
  * que dependa del recurso (modo activo).
  */
 export async function getOpciones(recurso: string, params?: OpcionesParams): Promise<OpcionItem[]> {
-  const { silent403, ...query } = params ?? {}
+  const { silent403, ids, ...rest } = params ?? {}
+  const query = { ...rest, ...(ids?.length ? { ids: ids.slice(0, 50).join(',') } : {}) }
   const get = () => client.get<{ success: true; data: unknown }>(ENDPOINTS.opciones.porRecurso(recurso), { params: query })
   const res = await (silent403 ? conSilencio403(get) : get())
   return normalizeOpciones(res.data.data)

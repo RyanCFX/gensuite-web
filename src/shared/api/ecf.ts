@@ -1,4 +1,4 @@
-import { client, unwrap } from './client'
+import { client, unwrap, conSilencio403 } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
   EcfSequence,
@@ -77,7 +77,7 @@ export async function voidEcfRanges(company: string, data: VoidEcfRangesDto) {
 }
 
 export async function getEcfTipos() {
-  const res = await client.get<{ success: true; data: EcfTipoCatalogo[] }>(ENDPOINTS.config.ecfTipos)
+  const res = await conSilencio403(() => client.get<{ success: true; data: EcfTipoCatalogo[] }>(ENDPOINTS.config.ecfTipos))
   return unwrap(res)
 }
 

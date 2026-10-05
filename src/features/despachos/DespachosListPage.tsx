@@ -20,6 +20,7 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { DESPACHO_STATUS_BADGE, DESPACHO_STATUS_LABEL } from './lib'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const DESPACHOS_COLUMNS = [
   { key: 'id', width: 110 },
@@ -148,8 +149,7 @@ function DespachosTable() {
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
               <FilterField label="Cliente">
-                <input className="ff-input filter-select" placeholder="ID del cliente" value={customer} onChange={(e) => { setCustomer(e.target.value); setPage(1) }} />
-              </FilterField>
+                <SearchInput variant="field" placeholder="ID del cliente" value={customer} onChange={(v) => { setCustomer(v); setPage(1) }} /></FilterField>
               <FilterField label="Estado">
                 <Select value={status} onValueChange={(v) => { setStatus(v as DespachoStatus | 'all'); setPage(1) }} clearable={false}>
                   <SelectItem value="all">Todos</SelectItem>
@@ -268,7 +268,6 @@ function PendientesTable() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const stockNoReservado = facturacionConfig?.despachoFuturoBloqueaVenta === false
 
@@ -301,11 +300,9 @@ function PendientesTable() {
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
               <FilterField label="Cliente">
-                <input className="ff-input filter-select" placeholder="ID del cliente" value={customer} onChange={(e) => { setCustomer(e.target.value); setPage(1) }} />
-              </FilterField>
+                <SearchInput variant="field" placeholder="ID del cliente" value={customer} onChange={(v) => { setCustomer(v); setPage(1) }} /></FilterField>
               <FilterField label="Artículo">
-                <input className="ff-input filter-select" placeholder="Código del artículo" value={itemCode} onChange={(e) => { setItemCode(e.target.value); setPage(1) }} />
-              </FilterField>
+                <SearchInput variant="field" placeholder="Código del artículo" value={itemCode} onChange={(v) => { setItemCode(v); setPage(1) }} /></FilterField>
             </div>
           </div>
         </div>
@@ -457,14 +454,11 @@ function ConfirmacionesTable() {
                 </Select>
               </FilterField>
               <FilterField label="Pedido / Cliente">
-                <input className="ff-input filter-select" placeholder="SO-... o texto libre" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
-              </FilterField>
+                <SearchInput variant="field" placeholder="SO-... o texto libre" value={search} onChange={(v) => { setSearch(v); setPage(1) }} /></FilterField>
               <FilterField label="Cliente (ID)">
-                <input className="ff-input filter-select" placeholder="ID del cliente" value={customer} onChange={(e) => { setCustomer(e.target.value); setPage(1) }} />
-              </FilterField>
+                <SearchInput variant="field" placeholder="ID del cliente" value={customer} onChange={(v) => { setCustomer(v); setPage(1) }} /></FilterField>
               <FilterField label="Sucursal">
-                <input className="ff-input filter-select" placeholder="Sucursal" value={branch} onChange={(e) => { setBranch(e.target.value); setPage(1) }} />
-              </FilterField>
+                <SearchInput variant="field" placeholder="Sucursal" value={branch} onChange={(v) => { setBranch(v); setPage(1) }} /></FilterField>
             </div>
           </div>
         </div>

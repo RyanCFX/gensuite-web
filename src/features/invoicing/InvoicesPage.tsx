@@ -4,9 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { listInvoices } from '@/shared/api/invoices'
 import type { ListInvoicesParams } from '@/shared/api/invoices'
-import { Plus, Eye, Search, GitBranch, SlidersHorizontal } from 'lucide-react'
+import { Plus, Eye, GitBranch, SlidersHorizontal } from 'lucide-react'
 import { formatDate, formatDOP, displayId } from '@/lib/formatters'
-import { getCatalogosFiscales } from '@/shared/api/config'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -23,6 +22,8 @@ import type { EstadoArs } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
 import { useFiltroQuery } from '@/shared/hooks/useFiltroQuery'
+import { SearchInput } from '@/shared/ui/SearchInput'
+import { getCatalogosFiscalesLookup } from '@/shared/api/formularios'
 
 type StatusFilter = 'draft' | 'submitted' | 'cancelled' | 'all'
 type EstadoArsFilter = EstadoArs | 'all' | 'sinLote'
@@ -112,8 +113,10 @@ export default function InvoicesPage() {
 
   const { data: catalogos, bloqueado: catalogosBloqueado } = useFiltroQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
-    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'venta' }),
     staleTime: 60 * 60_000,
+    // Solo alimenta el filtro "Tipo NCF" del modal de más filtros.
+    enabled: moreFiltersOpen,
   })
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
   const ncfTypeOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])
@@ -195,15 +198,7 @@ export default function InvoicesPage() {
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
               <FilterField label="Buscar por cliente">
-                <div className="search-input-wrap">
-                  <Search size={15} className="search-input-icon" />
-                  <input
-                    className="search-input"
-                    placeholder="Cliente"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </div>
+                <SearchInput placeholder="Cliente" value={search} onChange={(v) => setSearch(v)} />
               </FilterField>
               {filtros.puedeFiltrar('status') && (
               <FilterField label="Estado">

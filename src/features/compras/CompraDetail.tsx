@@ -19,8 +19,7 @@ import { Permitido } from '@/components/shared/Permitido'
 import { usePuede } from '@/shared/permissions/can'
 import { EcfStatusCard } from '@/components/shared/EcfStatusCard'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
-import { listRetenciones } from '@/shared/api/retenciones'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { Send, X, RotateCcw, Undo2, Info, FileText, Trash2, Eye, BookOpen, Link2, Scale } from 'lucide-react'
 import { PdfFormatButton } from '@/components/shared/PdfFormatButton'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
@@ -31,6 +30,7 @@ import { ECF_SUBMIT_UNAVAILABLE_MSG } from '@/shared/api/ecf'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import type { FormatoImpresion, ImpuestoDistribucionDto, EcfSubmitResult, ApiError, PagoContadoDto } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { getCatalogosFiscalesLookup, listRetencionesLookup } from '@/shared/api/formularios'
 
 const ITEMS_COLUMNS = [
   { key: 'codigo', width: 100 },
@@ -64,20 +64,17 @@ export default function CompraDetail() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
-    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
-    staleTime: 60 * 60_000,
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'compra' }),
   })
 
   const { data: retencionesData } = useQuery({
     queryKey: ['retenciones-all'],
-    queryFn: () => listRetenciones({ limit: 100 }),
-    staleTime: 60 * 60_000,
+    queryFn: () => listRetencionesLookup({ limit: 100 }),
   })
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const formatoImpresionDefault = facturacionConfig?.formatoImpresionDefault ?? 'a4'
   const formatosPermitidos = facturacionConfig?.formatosPermitidos

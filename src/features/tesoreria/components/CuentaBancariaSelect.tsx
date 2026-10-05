@@ -19,8 +19,9 @@ interface CuentaBancariaSelectProps {
 
 export function CuentaBancariaSelect({ value, onChange, placeholder = 'Buscar cuenta bancaria…', error, disabled, id, excludeId }: CuentaBancariaSelectProps) {
   const [query, setQuery] = useState('')
+  const [abierto, setAbierto] = useState(false)
 
-  const { data, isLoading, refetch } = useOpcionesLista('cuentas-bancarias', { q: query, limit: 50, staleTime: 30_000 })
+  const { data, isLoading } = useOpcionesLista('cuentas-bancarias', { q: query, limit: 50, enabled: abierto })
 
   const items = (data?.items ?? []).filter((c) => c.id !== excludeId)
   const options: SearchSelectOption[] = items.map((c) => ({
@@ -36,7 +37,7 @@ export function CuentaBancariaSelect({ value, onChange, placeholder = 'Buscar cu
       onChange={(v) => onChange(v, items.find((c) => c.id === v))}
       options={options}
       onSearch={setQuery}
-      onOpen={() => refetch()}
+      onOpen={() => setAbierto(true)}
       loading={isLoading}
       placeholder={placeholder}
       error={error}

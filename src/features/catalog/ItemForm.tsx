@@ -175,7 +175,6 @@ export default function ItemForm() {
   const { data: empresa } = useQuery({
     queryKey: ['empresa'],
     queryFn: getEmpresa,
-    staleTime: 5 * 60_000,
   })
 
   // "Impuesto de Compra"/"Impuesto de Venta" del artículo son Item Tax Template — mismo
@@ -210,7 +209,6 @@ export default function ItemForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const actualizarCostoEnCompraDefault = facturacionConfig?.actualizarCostoEnCompra ?? true
 

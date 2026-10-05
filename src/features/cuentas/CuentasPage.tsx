@@ -1,16 +1,16 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listCuentas, getCuentasTree } from '@/shared/api/cuentas'
 import type { Cuenta } from '@/shared/api/types'
 import type { ListCuentasParams } from '@/shared/api/cuentas'
-import { useDebounce } from '@/lib/useDebounce'
-import { Plus, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightSmall, Folder, FileText, BarChart2 } from 'lucide-react'
+import { Plus, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronRightSmall, Folder, FileText, BarChart2 } from 'lucide-react'
 import { CuentaMovimientosModal } from '@/features/contabilidad/CuentaMovimientosModal'
 import { Select, SelectItem } from '@/components/ui/select'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 25
 
@@ -171,7 +171,7 @@ export default function CuentasPage() {
 
   const { widths: colWidths, startResize } = useResizableColumns(CUENTAS_COLUMNS)
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
   const listParams: ListCuentasParams = {
@@ -194,10 +194,6 @@ export default function CuentasPage() {
     enabled: activeTab === 'arbol',
   })
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value)
-    setPage(1)
-  }, [])
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
@@ -244,15 +240,10 @@ export default function CuentasPage() {
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="filter-bar" style={{ margin: 0 }}>
                 <div className="filter-bar-left">
-                  <div className="search-input-wrap">
-                    <Search size={15} className="search-input-icon" />
-                    <input
-                      className="search-input"
-                      placeholder="Buscar por nombre o código…"
-                      value={search}
-                      onChange={handleSearchChange}
-                    />
-                  </div>
+                  <SearchInput placeholder="Buscar por nombre o código…" value={search} onChange={(v) => {
+    setSearch(v)
+    setPage(1)
+  }} />
 
                   <Select
                     value={rootTypeFilter}

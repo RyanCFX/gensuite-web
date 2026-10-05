@@ -15,9 +15,9 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { FilterField } from '@/shared/ui/FilterField'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { ConfirmModal } from '@/shared/ui/Modal'
-import { useDebounce } from '@/lib/useDebounce'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -49,7 +49,7 @@ export default function VentasListPage() {
   const [toCancel, setToCancel] = useState<FacturaAperturaVenta | null>(null)
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
 
@@ -106,8 +106,7 @@ export default function VentasListPage() {
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left" style={{ flexWrap: 'wrap', gap: 10 }}>
               <FilterField label="Buscar">
-                <input className="ff-input filter-select" placeholder="Referencia, NCF…" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} />
-              </FilterField>
+                <SearchInput variant="field" placeholder="Referencia, NCF…" value={search} onChange={(v) => { setSearch(v); setPage(1) }} /></FilterField>
               <OpcionesSelect hideOnForbidden filterLabel="Cliente" filterStyle={{ width: 220 }} recurso="clientes" value={customerId} onChange={(id, opt) => { setCustomerId(id); setCustomerLabel(opt?.label ?? ''); setPage(1) }} selectedLabel={customerLabel} placeholder="Todos los clientes" minChars={2} />
               <FilterField label="Desde">
                 <DatePicker className="ff-input" value={fromDate} onChange={(v) => { setFromDate(v); setPage(1) }} clearable />

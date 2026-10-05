@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listBundles, getBundle, createBundle, updateBundle, deleteBundle } from '@/shared/api/bundles'
@@ -8,8 +8,7 @@ import { RecargarButton } from '@/components/shared/RecargarButton'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { formatDOP } from '@/lib/formatters'
-import { useDebounce } from '@/lib/useDebounce'
-import { Plus, Trash2, X, Loader2, Search, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Trash2, X, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { ConfirmModal } from '@/shared/ui/Modal'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
@@ -17,6 +16,7 @@ import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { Select, SelectItem } from '@/components/ui/select'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -42,13 +42,9 @@ export default function BundlesPage() {
   ]
   const { widths: colWidths, startResize } = useResizableColumns(BUNDLES_COLUMNS)
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value)
-    setPage(1)
-  }, [])
 
   const { data, isLoading } = useQuery({
     queryKey: ['bundles', { search: debouncedSearch, offset, orderBy }],
@@ -91,15 +87,10 @@ export default function BundlesPage() {
 
       <div className="card filter-card-navy" style={{ marginBottom: 20 }}>
         <div className="card-body" style={{ display: 'flex', gap: 8 }}>
-          <div className="search-input-wrap">
-            <Search size={14} className="search-input-icon" />
-            <input
-              className="search-input"
-              placeholder="Buscar combo por nombre…"
-              value={search}
-              onChange={handleSearchChange}
-            />
-          </div>
+          <SearchInput placeholder="Buscar combo por nombre…" value={search} onChange={(v) => {
+    setSearch(v)
+    setPage(1)
+  }} />
           <Select value={statusFilter} onValueChange={(val) => { setStatusFilter(val as 'all' | 'active' | 'disabled'); setPage(1) }}>
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="active">Activos</SelectItem>

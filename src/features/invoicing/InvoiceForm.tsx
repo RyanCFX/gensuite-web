@@ -13,12 +13,10 @@ import {
   type AseguradoraFormState,
 } from './aseguradoraForm'
 import { esCoberturaCompleta } from '@/shared/api/types'
-import { getCustomer } from '@/shared/api/customers'
 import { client } from '@/shared/api/client'
-import { lookupItems, getDefaultPriceTier, getItemLookup } from '@/shared/api/catalog'
-import { getCatalogosFiscales, getStockSettings, getFacturacionConfig } from '@/shared/api/config'
-import { getItemUbicaciones } from '@/shared/api/ubicaciones'
-import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, SemaforoEntry, SemaforoResult, Item, ItemPrices, Bundle, ComponentTracking, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
+import { lookupItems, getItemLookup } from '@/shared/api/catalog'
+import { getFacturacionConfig } from '@/shared/api/config'
+import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, ClienteDetalle, SemaforoEntry, Item, ItemPrices, Bundle, ComponentTracking, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { DimensionAxisCell, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { useDimensionesInventario } from '@/shared/hooks/useDimensionesInventario'
 import { mergeLineasIguales } from '@/shared/lib/mergeLineasIguales'
@@ -26,7 +24,6 @@ import { getTasaVigente } from '@/shared/api/monedas'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
-import { ENDPOINTS } from '@/shared/api/endpoints'
 import { formatDOP, formatMoney, round2, formatDate } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen, ChevronDown, RotateCcw } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
@@ -48,7 +45,7 @@ import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
-import { getSucursal } from '@/shared/api/sucursales'
+import { useSucursalAlmacenes } from '@/shared/hooks/useSucursalAlmacenes'
 import { getCachedUser } from '@/shared/api/storage'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
@@ -56,14 +53,15 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
-import { useItemInventory } from '@/shared/hooks/useItemInventory'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { formatStockInsufficientMessage, formatUomNotAllowedMessage } from '@/lib/stockAlerts'
+import { esCreditoFiscal } from '@/lib/comprobantes'
 import { isPinPrecioError } from '@/lib/pinOverride'
 import { isPrecioCatalogoError, precioBloqueadoParaLinea } from '@/lib/precioCatalogo'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { getCatalogosFiscalesLookup, getItemUbicacionesLookup, getClienteDetalle, getClienteSemaforo, getStockSettingsLookup } from '@/shared/api/formularios'
 
 type NcfType = string
 
@@ -184,9 +182,10 @@ function todayIso() {
  *  1. Cliente sin crédito (`hasCredit` false): vencimiento = fecha de la factura.
  *  2. Cliente con crédito: vencimiento = fecha de la factura + `creditDays`.
  *  Un cliente ocasional nunca tiene crédito. */
-function computeDueDate(baseDate: Date, customer: Customer | null, esClienteOcasional: boolean): string {
-  if (!esClienteOcasional && customer?.hasCredit) {
-    return format(addDays(baseDate, customer.creditDays || 0), 'yyyy-MM-dd')
+function computeDueDate(baseDate: Date, customer: ClienteDetalle | null, esClienteOcasional: boolean): string {
+  // El detalle de formulario no trae `hasCredit`: con `creditDays` > 0 el cliente tiene crédito.
+  if (!esClienteOcasional && customer?.creditDays) {
+    return format(addDays(baseDate, customer.creditDays), 'yyyy-MM-dd')
   }
   return format(baseDate, 'yyyy-MM-dd')
 }
@@ -223,7 +222,7 @@ function LineUbicacionCell({
 }) {
   const { data } = useQuery({
     queryKey: ['item-ubicaciones', itemCode, warehouse],
-    queryFn: () => getItemUbicaciones(itemCode, warehouse),
+    queryFn: () => getItemUbicacionesLookup(itemCode, warehouse),
     enabled: !!itemCode && !!warehouse,
   })
   const ubicaciones = data?.items ?? []
@@ -293,7 +292,7 @@ export default function InvoiceForm() {
   })
 
   const [customerId, setCustomerId] = useState('')
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
+  const [selectedCustomer, setSelectedCustomer] = useState<ClienteDetalle | null>(null)
   const [showCreateCustomer, setShowCreateCustomer] = useState(false)
   const [esClienteOcasional, setEsClienteOcasional] = useState(false)
   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
@@ -309,10 +308,6 @@ export default function InvoiceForm() {
   // en Factura directa (sin despacho) no valida esto por su cuenta (§4.2 del prompt).
   const stockMap = useItemsStock(
     items.map((i) => (i.itemCode && i.itemType !== 'service' && i.itemType !== 'combo' ? i.itemCode : undefined)),
-  )
-  // "En pedido" (reservedQty, informativo, NO bloqueante) — docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §7.4.
-  const inventoryMap = useItemInventory(
-    items.map((i) => (i.itemCode && i.warehouse && i.itemType !== 'service' && i.itemType !== 'combo' ? { itemCode: i.itemCode, warehouse: i.warehouse } : undefined)),
   )
   const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
@@ -372,7 +367,6 @@ export default function InvoiceForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   // ── Multimoneda (docs/tasks/64_multimoneda_completo.md §3.1) ──────────────
@@ -429,8 +423,7 @@ export default function InvoiceForm() {
   //    o vía diálogo emergente (ComponentTrackingModal). El catálogo es fijo, se cachea 1h.
   const { data: stockSettings } = useQuery({
     queryKey: ['stock-settings'],
-    queryFn: getStockSettings,
-    staleTime: 60 * 60_000,
+    queryFn: getStockSettingsLookup,
   })
   const useInlineSerialBatch = stockSettings?.useSerialBatchFields === true
 
@@ -461,18 +454,15 @@ export default function InvoiceForm() {
 
   // ── Customer search ───────────────────────────────────────────────────────
 
-  const { data: defaultPriceTier = 'B' } = useQuery({
-    queryKey: ['defaultPriceTier'],
-    queryFn: getDefaultPriceTier,
-    staleTime: 5 * 60_000,
-  })
+  // Viene en GET /config/facturacion (ya cargado arriba): sin consulta de catálogo aparte.
+  const defaultPriceTier = facturacionConfig?.defaultPriceTier ?? 'B'
 
   const currentUserEmail = getCachedUser()?.email
   const { data: currentUser } = useQuery({
     queryKey: ['currentUser', currentUserEmail],
     queryFn: () => getUsuario(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 5 * 60_000,
+    staleTime: 15 * 60_000,
   })
 
   // ── Sucursal (branch) selector ────────────────────────────────────────────
@@ -481,9 +471,8 @@ export default function InvoiceForm() {
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 60_000,
   })
-  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager})
   const branchOptions = useMemo(
     () => (isSystemManager ? (allSucursales?.items.map((s) => s.name) ?? []) : (myBranches?.branches ?? [])),
     [isSystemManager, allSucursales, myBranches],
@@ -492,8 +481,7 @@ export default function InvoiceForm() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
-    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
-    staleTime: 60 * 60_000,
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'venta' }),
   })
 
   const ncfTypeOptions: SearchSelectOption[] = useMemo(() => {
@@ -505,20 +493,19 @@ export default function InvoiceForm() {
     if (myBranches?.defaultBranch && !branch) setBranch(myBranches.defaultBranch)
   }, [myBranches])
 
-  // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
-  const { data: branchWarehouses } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch, staleTime: 60_000 })
-
   // docs/tasks/75_almacen_venta_confirmar_stock_uoms_permitidas.md §1.4 — si la sucursal tiene
   // almacén de venta configurado, TODA venta debe salir de ahí sin excepción: se oculta el
   // selector por línea y se fuerza ese almacén, en vez de dejar elegir y recién enterarse con el
   // 400 de SALE_WAREHOUSE_MISMATCH al someter.
-  const { data: sucursalActual } = useQuery({
-    queryKey: ['sucursal', branch],
-    queryFn: () => getSucursal(branch),
-    enabled: !!branch,
-    staleTime: 60_000,
+  const { almacenVenta: almacenVentaSucursal, isFetched: sucursalFetched } = useSucursalAlmacenes(branch)
+
+  // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
+  // Solo se piden si hace falta el selector: con almacén de venta fijo en la sucursal se oculta.
+  const { data: branchWarehouses } = useOpcionesArray('almacenes', {
+    branch: branch,
+    limit: 100,
+    enabled: !!branch && sucursalFetched && !almacenVentaSucursal,
   })
-  const almacenVentaSucursal = sucursalActual?.almacenVenta || null
 
   // Al cambiar de sucursal, el almacén elegido en cada línea deja de ser válido.
   // En edición se ignora el cambio de sucursal que produce la propia hidratación del borrador,
@@ -635,14 +622,9 @@ export default function InvoiceForm() {
       return
     }
     setLoadingSemaforo(true)
-    client
-      .get<{ success: true; data: SemaforoResult }>(ENDPOINTS.cobros.semaforo, {
-        params: { customer: selectedCustomer.id },
-      })
-      .then((res) => {
-        const entry = res.data.data.clientes.find((s) => s.customer === selectedCustomer.id) ?? null
-        setSemaforo(entry)
-      })
+    // /opciones/clientes/:id/semaforo: el semáforo de ESTE cliente, sin permiso de Cobros.
+    getClienteSemaforo(selectedCustomer.id)
+      .then(setSemaforo)
       .catch(() => setSemaforo(null))
       .finally(() => setLoadingSemaforo(false))
   }, [selectedCustomer])
@@ -690,7 +672,7 @@ export default function InvoiceForm() {
     if (isEdit || !customerId || esClienteOcasional) return
     if (selectedCustomer?.id === customerId && selectedCustomer.ncfTypeDefault) return
     let cancelled = false
-    getCustomer(customerId)
+    getClienteDetalle(customerId)
       .then((full) => {
         if (cancelled) return
         setSelectedCustomer((prev) => (prev?.id === customerId ? { ...prev, ...full } : full))
@@ -901,7 +883,7 @@ export default function InvoiceForm() {
       setClienteOcasionalDireccion(inv.clienteOcasionalDireccion ?? '')
     } else if (inv.customer) {
       setCustomerId(inv.customer)
-      getCustomer(inv.customer).then(setSelectedCustomer).catch(() => {})
+      getClienteDetalle(inv.customer).then(setSelectedCustomer).catch(() => {})
     }
     if (inv.aseguradora) {
       setArsEnabled(true)
@@ -1306,14 +1288,14 @@ export default function InvoiceForm() {
   // Dimensión: una columna por cada eje que declare AL MENOS un artículo de la factura (no todas
   // las dimensiones del catálogo del tenant), a la derecha de "Artículo".
   const dimensionCodes = Array.from(new Set(items.flatMap((i) => i._itemDimensiones?.map((d) => d.dimension) ?? [])))
-  const { etiquetaDe: dimensionEtiquetaDe } = useDimensionesInventario()
+  const { etiquetaDe: dimensionEtiquetaDe } = useDimensionesInventario({ enabled: items.some((i) => i._usaDimensiones) })
 
   // Ubicación: solo si algún artículo tiene más de una ubicación asignada en su almacén — con 0 o
   // 1 no hay nada real que elegir (mismo criterio que `LineUbicacionCell` para ocultar la celda).
   const ubicacionQueries = useQueries({
     queries: items.map((i) => ({
       queryKey: ['item-ubicaciones', i.itemCode, i.warehouse],
-      queryFn: () => getItemUbicaciones(i.itemCode, i.warehouse!),
+      queryFn: () => getItemUbicacionesLookup(i.itemCode, i.warehouse!),
       enabled: !!i.itemCode && !!i.warehouse,
     })),
   })
@@ -1386,8 +1368,8 @@ if (esClienteOcasional) {
          toast.error('Ingresa el nombre del cliente ocasional')
          return
        }
-       if (ncfType === 'B01' && !clienteOcasionalRnc.trim()) {
-         toast.error('El RNC es requerido para comprobante B01 (Crédito Fiscal)')
+       if (esCreditoFiscal(ncfType) && !clienteOcasionalRnc.trim()) {
+         toast.error('El RNC es requerido para comprobante B01/E31 (Crédito Fiscal)')
          return
        }
        const rncDigits = clienteOcasionalRnc.replace(/\D/g, '')
@@ -1400,8 +1382,8 @@ if (esClienteOcasional) {
          toast.error('Selecciona un cliente')
          return
        }
-       if (ncfType === 'B01' && !selectedCustomer?.rnc) {
-         toast.error('El cliente necesita RNC para comprobante B01 (Crédito Fiscal)')
+       if (esCreditoFiscal(ncfType) && !selectedCustomer?.rnc) {
+         toast.error('El cliente necesita RNC para comprobante B01/E31 (Crédito Fiscal)')
          return
        }
      }
@@ -1705,14 +1687,14 @@ persistInvoice(buildInvoiceDto())
                    onSearch={setNcfTypeSearch}
                    className="ff-select"
                  />
-                 {ncfType === 'B01' && !selectedCustomer?.rnc && !esClienteOcasional && (
+                 {esCreditoFiscal(ncfType) && !selectedCustomer?.rnc && !esClienteOcasional && (
                    <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
-                     B01 requiere RNC del cliente
+                     B01/E31 requiere RNC del cliente
                    </p>
                  )}
-                  {ncfType === 'B01' && esClienteOcasional && (
+                  {esCreditoFiscal(ncfType) && esClienteOcasional && (
                     <p className="ff-hint" style={{ color: 'var(--color-warning)' }}>
-                      B01 requiere RNC del cliente ocasional
+                      B01/E31 requiere RNC del cliente ocasional
                     </p>
                   )}
                   {(ncfType === 'B14' || ncfType === 'E44') && (
@@ -1725,7 +1707,7 @@ persistInvoice(buildInvoiceDto())
 
                {esClienteOcasional && (
                  <div className="ff-wrap">
-                   <label className={`ff-label${ncfType === 'B01' ? ' ff-required' : ''}`} htmlFor="clienteOcasionalRnc">RNC o Cédula</label>
+                   <label className={`ff-label${esCreditoFiscal(ncfType) ? ' ff-required' : ''}`} htmlFor="clienteOcasionalRnc">RNC o Cédula</label>
                    <input
                      id="clienteOcasionalRnc"
                      type="text"
@@ -1733,7 +1715,7 @@ persistInvoice(buildInvoiceDto())
                      value={clienteOcasionalRnc}
                      onChange={(e) => { customerTouchedRef.current = true; setClienteOcasionalRnc(e.target.value) }}
                      placeholder="132456785 o 00113918866"
-                     required={ncfType === 'B01'}
+                     required={esCreditoFiscal(ncfType)}
                    />
                  </div>
                )}
@@ -1969,10 +1951,6 @@ persistInvoice(buildInvoiceDto())
                         {(() => {
                           const stockError = validateLineStock(item, stockMap, stockSettings?.allowNegativeStock)
                           const info = item.itemCode && item.warehouse ? resolveDisponible(stockMap.get(item.itemCode), item.warehouse) : undefined
-                          const invItem = item.itemCode && item.warehouse ? inventoryMap.get(`${item.itemCode}::${item.warehouse}`) : undefined
-                          // "En pedido" es puramente informativo — nunca bloquea, no confundir con
-                          // reservedStock (que sí resta de disponible y sí puede bloquear la venta).
-                          const enPedido = invItem?.reservedQty ?? 0
                           return (
                             <>
                               <QtyInput className={`items-input${stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
@@ -1983,11 +1961,6 @@ persistInvoice(buildInvoiceDto())
                               ) : info && info.reservedStock > 0 ? (
                                 <span style={{ fontSize: 11, color: 'var(--warning-text)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
                                   Disponible: {info.disponible} ({info.reservedStock} reservadas para otro cliente)
-                                  {enPedido > 0 ? ` · En pedido: ${enPedido} (informativo)` : ''}
-                                </span>
-                              ) : enPedido > 0 ? (
-                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                  En pedido: {enPedido} (informativo)
                                 </span>
                               ) : null}
                             </>

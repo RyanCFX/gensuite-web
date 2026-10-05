@@ -6,12 +6,10 @@ import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createCompra, updateCompra, getCompra } from '@/shared/api/compras-gastos'
-import { getSupplier } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
-import { getCatalogosFiscales, getFacturacionConfig } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { getTasaVigente } from '@/shared/api/monedas'
 import type { MonedaCode } from '@/shared/api/types'
-import { listRetenciones } from '@/shared/api/retenciones'
 import { useSupplierEmisorElectronico } from '@/shared/hooks/useSupplierEmisorElectronico'
 import { getUsuarioSucursales } from '@/shared/api/usuarios'
 import { todayIso } from '@/lib/formatters'
@@ -53,6 +51,7 @@ import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useAlmacenCompraDefault } from '@/shared/hooks/useAlmacenCompraDefault'
 import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { getCatalogosFiscalesLookup, getProveedorDetalle, listRetencionesLookup } from '@/shared/api/formularios'
 
 interface ItemRow {
   itemCode: string
@@ -632,7 +631,6 @@ export default function CompraForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true
@@ -644,7 +642,7 @@ export default function CompraForm() {
   const [currency, setCurrency] = useState('')
   const [currencyTouched, setCurrencyTouched] = useState(false)
   const [conversionRate, setConversionRate] = useState<number | ''>('')
-  const { data: monedas } = useOpcionesArray('monedas', { limit: 100, enabled: multimonedaHabilitada, staleTime: 5 * 60_000 })
+  const { data: monedas } = useOpcionesArray('monedas', { limit: 100, enabled: multimonedaHabilitada})
   const monedasHabilitadasOptions = (monedas ?? [])
   const { data: tasaVigente } = useQuery({
     queryKey: ['monedas-tasa-vigente', currency, monedaBase],
@@ -670,6 +668,7 @@ export default function CompraForm() {
   const [tipoPagoTouched, setTipoPagoTouched] = useState(false)
   const [variantTemplate, setVariantTemplate] = useState<Item | null>(null)
   const [ordenSearch, setOrdenSearch] = useState('')
+  const [ordenAbierto, setOrdenAbierto] = useState(false)
   const [viewItemCode, setViewItemCode] = useState<string | null>(null)
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
@@ -689,8 +688,7 @@ export default function CompraForm() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'compra' }],
-    queryFn: () => getCatalogosFiscales({ type: 'compra' }),
-    staleTime: 60 * 60_000,
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'compra' }),
   })
   const [tipoBienes606Search, setTipoBienes606Search] = useState('')
   const tipoBienes606Options: SearchSelectOption[] = (catalogos?.tipoBienes606 ?? [])
@@ -711,6 +709,7 @@ export default function CompraForm() {
   const { data: ordenesData, isLoading: ordenesLoading } = useQuery({
     queryKey: ['ordenes-compra-para-enlazar', ordenSearch],
     queryFn: () => listOrdenesCompra({ search: ordenSearch || undefined, status: 'submitted', billingStatus: 'pending', limit: 20 }),
+    enabled: ordenAbierto,
   })
   const ordenOptions: SearchSelectOption[] = (ordenesData?.items ?? []).map((o) => ({
     value: o.id,
@@ -806,9 +805,8 @@ export default function CompraForm() {
     queryKey: ['usuarioSucursales', authUser?.email],
     queryFn: () => getUsuarioSucursales(authUser!.email),
     enabled: !!authUser?.email,
-    staleTime: 60_000,
   })
-  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager})
   const branchOptions = useMemo(
     () => (isSystemManager
       ? (allSucursales?.items.map((s) => s.name) ?? [])
@@ -833,8 +831,7 @@ export default function CompraForm() {
   // ── Catálogos de retenciones (multiselect) ─────────────────────────────────
   const { data: retencionesData } = useQuery({
     queryKey: ['retenciones-all'],
-    queryFn: () => listRetenciones({ limit: 100 }),
-    staleTime: 5 * 60_000,
+    queryFn: () => listRetencionesLookup({ limit: 100 }),
   })
   const retencionesOptions: MultiSearchSelectOption[] = useMemo(
     () => (retencionesData?.items ?? []).map((r) => ({ id: r.id, label: r.categoryName })),
@@ -847,8 +844,8 @@ export default function CompraForm() {
   )
 
   const { data: supplierDetail } = useQuery({
-    queryKey: ['supplier', supplierId],
-    queryFn: () => getSupplier(supplierId),
+    queryKey: ['proveedor-detalle', supplierId],
+    queryFn: () => getProveedorDetalle(supplierId),
     enabled: !!supplierId && !esProveedorOcasional,
   })
 
@@ -1417,7 +1414,7 @@ export default function CompraForm() {
                         setSupplierId(resolvedId)
                         setSupplierName(opt?.label ?? '')
                         // /opciones solo trae value/label: los defaults del proveedor salen de su detalle.
-                        if (resolvedId) getSupplier(resolvedId).then((selected) => {
+                        if (resolvedId) getProveedorDetalle(resolvedId).then((selected) => {
                           if (!tipoBienes606Touched && selected.defaultTipoBienes606) setTipoBienes606(selected.defaultTipoBienes606)
                           if (!formaPago606Touched && selected.defaultFormaPago606) setFormaPago606(selected.defaultFormaPago606)
                           if (!tipoPagoTouched) {
@@ -1563,6 +1560,7 @@ export default function CompraForm() {
                     value=""
                     onChange={(val) => handleSelectOrden(val)}
                     options={ordenOptions}
+                    onOpen={() => setOrdenAbierto(true)}
                     onSearch={setOrdenSearch}
                     loading={ordenesLoading}
                     placeholder="Buscar por número o proveedor…"

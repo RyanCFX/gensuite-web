@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react'
 import { ChevronDown, X } from 'lucide-react'
-import { useDebounce } from '@/lib/useDebounce'
+import { useDebounce, REMOTE_SEARCH_DEBOUNCE_MS } from '@/lib/useDebounce'
 import { FloatingPortal, useFloatingDropdown } from '@/lib/useFloatingPortal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,8 +54,8 @@ export function SearchSelect({
   options,
   onSearch,
   onOpen,
-  debounceMs = 300,
-  loading = false,
+  debounceMs,
+  loading,
   placeholder = 'Buscar…',
   error = false,
   disabled = false,
@@ -79,7 +79,12 @@ export function SearchSelect({
   )
 
   // Debounce the search query
-  const debouncedQuery = useDebounce(inputValue, debounceMs)
+  // Un select "remoto" (el padre pasa `loading`, porque `onSearch` dispara un GET) espera 2 s sin
+  // escribir antes de consultar y se muestra cargando mientras tanto; uno que filtra en memoria
+  // mantiene el debounce corto.
+  const remote = loading !== undefined
+  const debouncedQuery = useDebounce(inputValue, debounceMs ?? (remote ? REMOTE_SEARCH_DEBOUNCE_MS : 300))
+  const busy = remote && (loading || (open && inputValue !== debouncedQuery))
   // Callers frequently pass an inline onSearch (e.g. closing over a row index), which gets a new
   // identity every render. Depending on `onSearch` directly below would re-fire this effect after
   // every state update it causes — an infinite loop. Read it from a ref instead so the effect only
@@ -217,8 +222,10 @@ export function SearchSelect({
           </button>
         )}
 
+        {busy && <span className="spinner spinner-brand spinner-sm search-select-spinner" aria-hidden="true" />}
+
         {/* Chevron when nothing selected */}
-        {!isSelected && (
+        {!isSelected && !busy && (
           <ChevronDown
             size={14}
             aria-hidden="true"
@@ -235,7 +242,7 @@ export function SearchSelect({
               {headerContent}
             </div>
           )}
-          {loading ? (
+          {busy ? (
             <div className="search-select-loading">
               <span className="spinner spinner-brand spinner-sm" aria-hidden="true" />
               Buscando…

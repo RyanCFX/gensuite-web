@@ -52,7 +52,7 @@ export default function EmisionesPage() {
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
   const { data: tiposData } = useQuery({
-    queryKey: ['tesoreria-tipos-documento-select', 'Cheque,Transferencia,Otro'],
+    queryKey: ['tesoreria-tipos-documento', 'activos'],
     queryFn: () => listTiposDocumento({ enabled: true, limit: 100 }),
   })
   const tipos = tiposData?.items ?? []

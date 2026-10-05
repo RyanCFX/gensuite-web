@@ -1,11 +1,9 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listDevoluciones } from '@/shared/api/devoluciones'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { getCatalogosFiscales } from '@/shared/api/config'
-import { useDebounce } from '@/lib/useDebounce'
-import { ChevronLeft, ChevronRight, Search, Plus, SlidersHorizontal } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, SlidersHorizontal } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -18,6 +16,8 @@ import { Select, SelectItem } from '@/components/ui/select'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { SearchInput } from '@/shared/ui/SearchInput'
+import { getCatalogosFiscalesLookup } from '@/shared/api/formularios'
 
 const PAGE_SIZE = 20
 
@@ -95,15 +95,14 @@ export default function DevolucionesPage() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
-    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
-    staleTime: 60 * 60_000,
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'venta' }),
   })
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
   const ncfTypeOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])
     .filter((t) => !ncfTypeSearch || t.label.toLowerCase().includes(ncfTypeSearch.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
 
@@ -142,10 +141,6 @@ export default function DevolucionesPage() {
       }),
   })
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value)
-    setPage(1)
-  }, [])
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
@@ -190,15 +185,10 @@ export default function DevolucionesPage() {
         <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <div className="search-input-wrap">
-                <Search size={15} className="search-input-icon" />
-                <input
-                  className="search-input"
-                  placeholder="Buscar por cliente, NCF…"
-                  value={search}
-                  onChange={handleSearchChange}
-                />
-              </div>
+              <SearchInput placeholder="Buscar por cliente, NCF…" value={search} onChange={(v) => {
+    setSearch(v)
+    setPage(1)
+  }} />
               <OpcionesSelect hideOnForbidden filterLabel="Cliente" filterStyle={{ width: 220 }} recurso="clientes" value={customerId} onChange={(val, opt) => { setCustomerId(val); setCustomerLabel(opt?.label ?? ''); setPage(1) }} selectedLabel={customerLabel} placeholder="Filtrar por cliente…" minChars={2} />
               <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }} recurso="sucursales" value={branch} onChange={(val) => { setBranch(val); setPage(1) }} placeholder="Todas las sucursales" />
               <OpcionesSelect hideOnForbidden filterLabel="Departamento" filterStyle={{ width: 200 }} recurso="departamentos" value={department} onChange={(val) => { setDepartment(val); setPage(1) }} placeholder="Todos los departamentos" />

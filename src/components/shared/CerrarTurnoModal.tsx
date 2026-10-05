@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Lock } from 'lucide-react'
-import { getFacturacionConfig, listDenominaciones } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import { getPreviewCierreTurno, cerrarTurno, getTurnoPdfBlobUrl } from '@/shared/api/pos'
 import type {
   ApiError,
@@ -12,7 +12,11 @@ import type {
 } from '@/shared/api/types'
 import { formatDOP } from '@/lib/formatters'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
+import { ConfirmModal } from '@/shared/ui/Modal'
+import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { listDenominacionesLookup } from '@/shared/api/formularios'
 
 const PREVIEW_COLUMNS = [
   { key: 'metodo', width: 200 },
@@ -70,7 +74,6 @@ export function CerrarTurnoModal({
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
 
   const arqueoEfectivoRequerido =
@@ -79,9 +82,8 @@ export function CerrarTurnoModal({
 
   const { data: denominaciones } = useQuery({
     queryKey: ['denominaciones'],
-    queryFn: listDenominaciones,
+    queryFn: listDenominacionesLookup,
     enabled: open,
-    staleTime: 5 * 60_000,
   })
 
   const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo)
@@ -149,6 +151,34 @@ export function CerrarTurnoModal({
     setCierreResult(null)
     setClosingAmounts([])
     onClose()
+  }
+
+  // Siempre pide confirmación al intentar salir en el paso de conciliación, haya o no
+  // cambios digitados — cerrar por accidente pierde el arqueo y obliga a recontar. En el paso
+  // de resultado el turno ya quedó cerrado y se sale directo. Se mantiene además el aviso
+  // nativo del navegador al recargar/cerrar la pestaña mientras haya montos sin guardar.
+  const cierreIsDirty = useDirtyCheck(
+    { closingAmounts },
+    open && cierreStep === 'preview' && seededKey !== null,
+  )
+  useBeforeUnloadWarning(cierreIsDirty)
+  const [confirmingClose, setConfirmingClose] = useState(false)
+
+  function requestClose() {
+    if (cierreStep !== 'preview') {
+      closeModal()
+      return
+    }
+    setConfirmingClose(true)
+  }
+
+  function confirmDiscardClose() {
+    setConfirmingClose(false)
+    closeModal()
+  }
+
+  function cancelDiscardClose() {
+    setConfirmingClose(false)
   }
 
   function isCajaMethod(mopName: string): boolean {
@@ -226,7 +256,7 @@ export function CerrarTurnoModal({
 
   return (
     <>
-    <div className="modal-overlay" onClick={closeModal}>
+    <div className="modal-overlay" onClick={requestClose}>
       <div
         className="modal-box"
         style={{ maxWidth: 640 }}
@@ -242,7 +272,7 @@ export function CerrarTurnoModal({
               ? 'Cerrar turno de caja'
               : 'Turno cerrado'}
           </h2>
-          <button className="modal-close" onClick={closeModal}>
+          <button className="modal-close" onClick={requestClose}>
             ×
           </button>
         </div>
@@ -634,7 +664,7 @@ export function CerrarTurnoModal({
             <>
               <button
                 className="btn btn-secondary"
-                onClick={closeModal}
+                onClick={requestClose}
               >
                 Cancelar
               </button>
@@ -658,6 +688,15 @@ export function CerrarTurnoModal({
         </div>
       </div>
     </div>
+    <ConfirmModal
+      open={confirmingClose}
+      onClose={cancelDiscardClose}
+      onConfirm={confirmDiscardClose}
+      title="¿Salir del cierre de turno?"
+      description="El turno seguirá abierto y se perderá lo digitado en el arqueo."
+      confirmLabel="Sí, salir"
+      variant="danger"
+    />
     <PdfPreviewModal
       url={pdfPreviewUrl}
       onClose={() => {

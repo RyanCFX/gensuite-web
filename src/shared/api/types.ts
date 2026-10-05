@@ -719,7 +719,11 @@ export interface CreateInvoiceDto {
    *  enviarla — ver `defaultDueDate` en InvoiceForm.tsx. */
   branch?: string;
   department?: string;
-  ncfType: "B01" | "B02" | "B14" | "B15" | "B16";
+  /** Tipo de comprobante fijado al crear la factura — Caja y el submit lo respetan, nunca lo
+   *  cambian. Se puede enviar el físico (B01, B02, B14, B15, B16) o su equivalente electrónico
+   *  (E31, E32…) cuando el tenant emite e-CF. Obligatorio también para someter o enviar a Caja
+   *  (400 NCF_TIPO_REQUERIDO si un borrador antiguo no lo tiene). */
+  ncfType: string;
   /** Moneda del documento. Si se omite: `Customer.defaultCurrency` del cliente elegido → moneda
    *  base de la compañía (un cliente ocasional también puede facturarse en moneda extranjera,
    *  pasando `currency` explícito). Al editar (PATCH), omitirlo CONGELA la moneda/tasa que la
@@ -2554,8 +2558,9 @@ export type UpdateBrandDto = Partial<CreateBrandDto>;
 export interface ItemStockWarehouse {
   warehouse: string;
   qty: number;
-  valuationRate: number;
-  stockValue: number;
+  /** No vienen en el lookup de formularios (sin costos ni valuación). */
+  valuationRate?: number;
+  stockValue?: number;
   /** Comprometido con otro cliente/proceso en este almacén (Stock Reservation Entry — típicamente
    *  un Apartado). Ver docs/tasks/73_alertas_stock_disponible_reservado.md. */
   reservedStock: number;
@@ -3923,6 +3928,9 @@ export interface OpcionItem {
   bank?: string;
   account_number?: string;
   root_type?: string;
+  /** sucursales: almacén de venta fijo y almacén de compra por defecto de la sucursal. */
+  custom_almacen_venta?: string | null;
+  custom_almacen_compra?: string | null;
   /** almacenes: sucursal del almacén. */
   custom_branch?: string | null;
   /** metodos-pago: tipo ERPNext (Cash, Bank, General…). */
@@ -4282,6 +4290,8 @@ export type MonedaPdfImpresion = "dop" | "factura"
 
 // GET/PUT /config/facturacion
 export interface FacturacionConfig {
+  /** Nivel de precio por defecto del tenant (antes salía de `meta.defaultPriceTier` del listado de artículos). */
+  defaultPriceTier?: "A" | "B" | "C";
   rolesCancelacionFactura: string[];
   /** "directo": un solo método de pago al cobrar (default, histórico). "caja": múltiples métodos + vuelto. */
   flujoCobro: "directo" | "caja";
@@ -5348,16 +5358,16 @@ export interface VueltoLine {
   cantidad: number;
 }
 
-// POST /caja/facturas/:id/cobrar
-export type CondicionFiscal = "CREDITO_FISCAL" | "CONSUMO"
-
+// POST /caja/facturas/:id/completar-cobro y POST /caja/facturas/:id/cobrar — mismo DTO
+// (ver CobrarFacturaDto en openapi.json). `condicionFiscal` ya no existe: el BFF rechaza
+// campos desconocidos con 400. Caja respeta el ncfType que la factura trae desde su creación.
 export interface CobrarFacturaDto {
    payments: PaymentLine[]
    vuelto?: VueltoLine[]
    tenderedCash?: number
-   /** Opcional — si se omite, el backend infiere según el RNC/Cédula del cliente. */
-   condicionFiscal?: CondicionFiscal
-   /** RNC del cliente ocasional — requerido cuando esClienteOcasional=true y condicionFiscal=CREDITO_FISCAL. */
+   /** RNC del comprador — obligatorio en completar-cobro cuando la factura es de un comprador
+    *  ocasional y su ncfType es Crédito Fiscal (B01/E31). Sin efecto para clientes registrados
+    *  (se usa el RNC ya guardado en el Customer). */
    rnc?: string
  }
 
@@ -5387,6 +5397,9 @@ export interface PendienteCobroItem {
    customer: string;
    customerName: string;
    grandTotal: number;
+   /** Tipo de comprobante fijado al crear la factura (B01, B02, B14… o su equivalente
+    *  E31, E32… si ya es e-CF) — Caja lo respeta, nunca lo cambia. */
+   ncfType?: string;
    /** Monto real a cobrar, con redondeo de moneda aplicado — usar en vez de `grandTotal` para
     *  prellenar/validar el cobro. Ver `Invoice.roundedTotal`. */
    roundedTotal?: number;
@@ -5409,7 +5422,6 @@ export interface CompletarCobroResult {
    invoiceId: string;
    ncf: string;
    ncfType?: string;
-   condicionFiscal?: CondicionFiscal;
    isPos: boolean;
    paymentEntryIds: string[];
    outstandingAmount: number;
@@ -5441,13 +5453,8 @@ export interface CajaPendienteItem {
   postingDate: string
 }
 
-// POST /caja/facturas/:id/cobrar
-export interface CobrarFacturaDto {
-  payments: PaymentLine[]
-  vuelto?: VueltoLine[]
-  tenderedCash?: number
-}
-
+// Respuesta de POST /caja/facturas/:id/cobrar (el request usa CobrarFacturaDto, mismo body
+// que completar-cobro según openapi.json).
 export interface CobrarFacturaResult {
   invoiceId: string
   paymentEntryIds: string[]
@@ -5626,6 +5633,8 @@ export interface AgingResult {
 }
 
 export interface SemaforoEntry {
+  /** Solo viene en /opciones/clientes/:id/semaforo (formularios). */
+  tieneCredito?: boolean;
   customer: string;
   customerName: string;
   creditLimit: number;
@@ -8681,3 +8690,11 @@ export interface EnlazarTransaccionResponse {
   diff: DiffTransaccion;
   advertenciaFiscal?: string | null;
 }
+
+// ─── Lecturas de formulario vía /opciones/... (sin permisos de pantalla) ───────────────────────
+/** Detalle comercial del cliente para formularios (GET /opciones/clientes/:id/detalle). Un campo
+ *  ausente significa "no disponible para formularios": no trae saldos ni límite de crédito (ver semáforo). */
+export type ClienteDetalle = Partial<Customer> & { id: string; customerName: string };
+
+/** Detalle comercial/fiscal del proveedor para formularios (GET /opciones/proveedores/:id/detalle). */
+export type ProveedorDetalle = Partial<Supplier> & { id: string; supplierName: string };

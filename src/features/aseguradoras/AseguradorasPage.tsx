@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listAseguradoras, deleteAseguradora, nombreAseguradora } from '@/shared/api/aseguradoras'
 import type { Aseguradora, ApiError } from '@/shared/api/types'
-import { useDebounce } from '@/lib/useDebounce'
 import { Plus, Pencil, Ban, ChevronLeft, ChevronRight } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -15,6 +14,7 @@ import { Permitido } from '@/components/shared/Permitido'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 20
 
@@ -38,7 +38,7 @@ export default function AseguradorasPage() {
   const [toDisable, setToDisable] = useState<Aseguradora | null>(null)
   const { orderBy, sort } = useSortState()
 
-  const debouncedNombre = useDebounce(nombre, 300)
+  const debouncedNombre = nombre
   const offset = (page - 1) * PAGE_SIZE
 
   const { data, isLoading, isError } = useQuery({
@@ -96,13 +96,7 @@ export default function AseguradorasPage() {
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
               <FilterField label="Nombre" style={{ width: 220 }}>
-                <input
-                  className="ff-input ff-input-sm"
-                  placeholder="Nombre de la aseguradora…"
-                  value={nombre}
-                  onChange={(e) => { setNombre(e.target.value); setPage(1) }}
-                />
-              </FilterField>
+                <SearchInput variant="field" placeholder="Nombre de la aseguradora…" value={nombre} onChange={(v) => { setNombre(v); setPage(1) }} /></FilterField>
               <FilterField label="Crédito">
                 <Select value={hasCredit} onValueChange={(val) => { setHasCredit(val); setPage(1) }}>
                   <SelectItem value="all">Crédito: Todos</SelectItem>

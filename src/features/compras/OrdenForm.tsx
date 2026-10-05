@@ -6,7 +6,6 @@ import { format, addDays } from 'date-fns'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createOrdenCompra, updateOrdenCompra, getOrdenCompra } from '@/shared/api/ordenes-compra'
-import { getSupplier } from '@/shared/api/suppliers'
 import { listWarehouses } from '@/shared/api/inventory'
 import { getFacturacionConfig } from '@/shared/api/config'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
@@ -32,6 +31,7 @@ import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useAlmacenCompraDefault } from '@/shared/hooks/useAlmacenCompraDefault'
 import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { getProveedorDetalle } from '@/shared/api/formularios'
 
 const SYSTEM_MANAGER_ROLE = 'System Manager'
 
@@ -130,7 +130,6 @@ export default function OrdenForm() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
 
@@ -162,9 +161,8 @@ export default function OrdenForm() {
     queryKey: ['usuarioSucursales', authUser?.email],
     queryFn: () => getUsuarioSucursales(authUser!.email),
     enabled: !!authUser?.email,
-    staleTime: 60_000,
   })
-  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager})
   const branchOptions = useMemo(
     () => (isSystemManager
       ? (allSucursales?.items.map((s) => s.name) ?? [])
@@ -188,8 +186,8 @@ export default function OrdenForm() {
   // como referencia de las condiciones configuradas del proveedor; la moneda sí
   // se aplica al documento.
   const { data: supplierDetail } = useQuery({
-    queryKey: ['supplier', supplierId],
-    queryFn: () => getSupplier(supplierId),
+    queryKey: ['proveedor-detalle', supplierId],
+    queryFn: () => getProveedorDetalle(supplierId),
     enabled: !!supplierId,
     staleTime: 5 * 60_000,
   })

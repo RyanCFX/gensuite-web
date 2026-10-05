@@ -1210,7 +1210,6 @@ export default function ItemDetail() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const actualizarCostoEnCompraDefault = facturacionConfig?.actualizarCostoEnCompra ?? true
 

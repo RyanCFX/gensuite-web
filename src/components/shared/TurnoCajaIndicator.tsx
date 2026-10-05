@@ -30,7 +30,6 @@ export function TurnoCajaIndicator() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
 
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false
@@ -39,10 +38,11 @@ export function TurnoCajaIndicator() {
     queryKey: ['turno-actual'],
     queryFn: getTurnoActual,
     enabled: usaModuloPos,
-    staleTime: 30_000,
+    staleTime: 2 * 60_000,
+    meta: { global: true },
   })
 
-  const { data: cajas } = useOpcionesArray('cajas-pos', { limit: 100, enabled: usaModuloPos && modalOpen, staleTime: 30_000 })
+  const { data: cajas } = useOpcionesArray('cajas-pos', { limit: 100, enabled: usaModuloPos && modalOpen})
   const cajasHabilitadas = (cajas ?? []).filter((c) => !c.disabled)
   const posProfileOptions: SearchSelectOption[] = cajasHabilitadas
     .filter((c) => !posProfileSearch || c.label.toLowerCase().includes(posProfileSearch.toLowerCase()))

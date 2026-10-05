@@ -89,7 +89,6 @@ export default function PedidoDetail() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const monedaBase = facturacionConfig?.monedaBase ?? 'DOP'
   const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false
@@ -104,7 +103,7 @@ export default function PedidoDetail() {
     && !pedido.despachoFuturo
   const pendienteConfirmarDespacho = elegibleParaConfirmarDespacho && !pedido?.despachoConfirmado
 
-  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, enabled: cancelApartadoOpen, staleTime: 5 * 60_000 })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, enabled: cancelApartadoOpen})
   const [modeOfPaymentSearch, setModeOfPaymentSearch] = useState('')
   const modeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
     .filter((m) => !m.disabled)

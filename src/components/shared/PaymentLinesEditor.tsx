@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { listBancos, listDenominaciones } from '@/shared/api/config'
+import { listBancosLookup } from '@/shared/api/formularios'
 import {
   emptyPaymentLine,
   sumPayments,
@@ -21,6 +21,7 @@ import { useMetodoPagoCurrencies } from '@/shared/hooks/useMetodoPagoCurrencies'
 import { Plus, Trash2, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 import { useOpcionesLista, useOpcionesArray } from '@/shared/hooks/useOpciones'
 import { reglasCuentaBancaria, cuentasElegibles } from '@/lib/pagoBancario'
+import { listDenominacionesLookup } from '@/shared/api/formularios'
 
 function calcularVuelto(monto: number, denominaciones: { denominacion: string; valor: number }[]): VueltoLineDraft[] {
   const sorted = [...denominaciones].sort((a, b) => b.valor - a.valor)
@@ -49,10 +50,10 @@ interface PaymentLinesEditorProps {
 }
 
 export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP' }: PaymentLinesEditorProps) {
-  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, staleTime: 5 * 60_000 })
-  const { data: bancos } = useQuery({ queryKey: ['bancos'], queryFn: listBancos, staleTime: 5 * 60_000 })
-  const { data: denominaciones } = useQuery({ queryKey: ['denominaciones'], queryFn: listDenominaciones, staleTime: 5 * 60_000 })
-  const { data: cuentasBancarias } = useOpcionesLista('cuentas-bancarias', { limit: 100, staleTime: 60_000 })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100})
+  const { data: bancos } = useQuery({ queryKey: ['bancos'], queryFn: listBancosLookup})
+  const { data: denominaciones } = useQuery({ queryKey: ['denominaciones'], queryFn: listDenominacionesLookup})
+  const { data: cuentasBancarias } = useOpcionesLista('cuentas-bancarias', { limit: 100})
 
   const [metodoSearch, setMetodoSearch] = useState<Record<number, string>>({})
   const [bancoSearch, setBancoSearch] = useState<Record<number, string>>({})

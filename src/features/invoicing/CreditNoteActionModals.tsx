@@ -37,7 +37,7 @@ export function RefundCreditNoteModal({ note, onClose }: { note: CreditNoteActio
   const [refundModeOfPayment, setRefundModeOfPayment] = useState('')
   const [refundBankAccount, setRefundBankAccount] = useState('')
 
-  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100, staleTime: 5 * 60_000 })
+  const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100})
   const [refundModeOfPaymentSearch, setRefundModeOfPaymentSearch] = useState('')
   const refundModeOfPaymentOptions: SearchSelectOption[] = (metodos ?? [])
     .filter((m) => !m.disabled)

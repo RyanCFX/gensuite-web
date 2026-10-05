@@ -12,7 +12,7 @@ import type {
  * `getPermisosCatalogo()` en `./permisos.ts`. Cualquier valor de `vertical` que no sea
  * literalmente "farmacia" (incluido ausente) se trata como "general".
  */
-function normalizeMePermissions(raw: unknown): MePermissions {
+export function normalizeMePermissions(raw: unknown): MePermissions {
   const d = (raw ?? {}) as Record<string, unknown>
   return {
     email: typeof d.email === 'string' ? d.email : '',
@@ -51,7 +51,7 @@ const FEATURE_KEYS = [
   'devoluciones', 'notasCredito', 'notasDebito', 'pedidos',
 ] as const
 
-function normalizeMeFeatures(raw: unknown): MeFeatures {
+export function normalizeMeFeatures(raw: unknown): MeFeatures {
   const d = (raw ?? {}) as Record<string, unknown>
   const rawFeatures = (d.features ?? {}) as Record<string, unknown>
   const features = {} as MeFeatures['features']

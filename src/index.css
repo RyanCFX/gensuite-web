@@ -1652,6 +1652,17 @@ label.ff-label.ff-required { color: #0E3D51; }
     box-shadow 150ms;
 }
 
+.search-input-field { position: relative; }
+.search-input-field .ff-input { padding-right: 30px; }
+
+.search-input-spinner {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  margin-top: -7px;
+  pointer-events: none;
+}
+
 .search-input::placeholder { color: var(--text-tertiary); }
 .search-input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(255, 69, 56, 0.1); }
 
@@ -2964,6 +2975,14 @@ label.ff-label.ff-required { color: #0E3D51; }
 
 .search-select-input--error {
   border-color: var(--error-border);
+}
+
+.search-select-spinner {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  margin-top: -7px;
+  pointer-events: none;
 }
 
 .search-select-clear {

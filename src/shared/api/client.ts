@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/react'
 import { toast } from 'sonner'
 import { getAccessToken, getTenant, getRefreshToken, setAccessToken, setRefreshToken, setTenant, clearSession } from './storage'
 import { ocultarErp } from '@/lib/ocultarErp'
+import { invalidarReferenciaTrasEscritura, registrarVersionReferencia } from './queryClient'
 import type { ApiError, ApiErrorResponse, ApiResponse, PaginatedResponse, RefreshTokenResult } from './types'
 
 // Ruta relativa por defecto: el dev server hace de proxy hacia el backend
@@ -157,7 +158,11 @@ const CODIGOS_ESTRUCTURALES_CONOCIDOS = new Set([
 ])
 
 client.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    invalidarReferenciaTrasEscritura(response.config.method, response.config.url)
+    registrarVersionReferencia(response.headers?.['x-reference-version'])
+    return response
+  },
   async (error) => {
     const requestUrl = axios.isAxiosError(error) ? error.config?.url : undefined
     const requestMethod = axios.isAxiosError(error) ? error.config?.method : undefined
@@ -291,7 +296,11 @@ client.interceptors.response.use(
     // el acceso pudo haber cambiado — refresco silencioso con debounce (no tormenta si fallan
     // varias queries a la vez). FILTRO_NO_PERMITIDO además reintenta UNA vez sin los params
     // bloqueados (desfase de versión): quita details.filtros[].parametro de la query y reintenta.
-    if (!isAuthEndpoint && errorCode && ['FILTRO_NO_PERMITIDO', 'RECURSO_NO_PERMITIDO', 'WIDGET_NO_PERMITIDO', 'WIDGET_NO_CONTRATADO'].includes(errorCode)) {
+    // `RECURSO_NO_PERMITIDO` ("este usuario no tiene esta lista") NO refresca el acceso: no significa
+    // que los permisos hayan cambiado. Solo se rechaza y cada selector muestra su estado "sin acceso".
+    if (!isAuthEndpoint && errorCode === 'RECURSO_NO_PERMITIDO') return Promise.reject(data.error)
+
+    if (!isAuthEndpoint && errorCode && ['FILTRO_NO_PERMITIDO', 'WIDGET_NO_PERMITIDO', 'WIDGET_NO_CONTRATADO'].includes(errorCode)) {
       refreshAccesoDebounced()
       if (errorCode === 'FILTRO_NO_PERMITIDO') {
         const config = error.config as (typeof error.config & { _filtroRetried?: boolean }) | undefined
@@ -438,6 +447,13 @@ export const ERROR_CODES = {
   // Caja/POS (docs/tasks/70_caja_pos_sin_soporte_multimoneda.md) — a diferencia de /cobros y
   // /pagos, Caja nunca convierte: el método de pago debe operar en la MISMA moneda de la factura.
   POS_PAYMENT_CURRENCY_MISMATCH: 'POS_PAYMENT_CURRENCY_MISMATCH',
+  // Tipo de comprobante y padrón DGII — el tipo se fija al crear la factura y Caja/submit lo
+  // respetan. NCF_TIPO_REQUERIDO: borrador antiguo sin ncfType al someter o llegar a Caja.
+  // RNC_NO_EXISTE_EN_DGII (details.rnc trae el consultado) y COMPRADOR_SIN_RNC: solo Crédito
+  // Fiscal (B01/E31), validado contra el padrón local al someter.
+  NCF_TIPO_REQUERIDO: 'NCF_TIPO_REQUERIDO',
+  RNC_NO_EXISTE_EN_DGII: 'RNC_NO_EXISTE_EN_DGII',
+  COMPRADOR_SIN_RNC: 'COMPRADOR_SIN_RNC',
   // Alertas de stock disponible/reservado (docs/tasks/73_alertas_stock_disponible_reservado.md).
   // Devuelto por /transferencias, /despachos, y submits de Factura/Delivery Note con
   // update_stock=1 cuando la cantidad solicitada excede `disponible` (actualQty - reservedStock).

@@ -86,11 +86,6 @@ export async function getItemLookup(id: string) {
   return unwrap(res)
 }
 
-export async function getDefaultPriceTier() {
-  const res = await lookupItems({ limit: 1 })
-  return res.meta.defaultPriceTier
-}
-
 export async function createItem(data: CreateItemDto) {
   const res = await client.post<{ success: true; data: Item }>(ENDPOINTS.catalog.items.list, data)
   return unwrap(res)

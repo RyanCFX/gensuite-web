@@ -66,7 +66,6 @@ export default function TransferenciasPage() {
     queryKey: ['usuarioAlmacenesPermitidos', currentUserEmail],
     queryFn: () => getUsuarioAlmacenesPermitidos(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 60_000,
   })
 
   function canConfirm(t: Transferencia) {

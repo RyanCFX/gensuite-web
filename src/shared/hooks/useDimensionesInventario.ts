@@ -20,11 +20,12 @@ export function valoresDimensionQueryKey(codigo: string, padre?: string) {
 }
 
 /** Catálogo completo de dimensiones del tenant (activas e inactivas). */
-export function useDimensionesInventario() {
+export function useDimensionesInventario(opts?: { enabled?: boolean }) {
   const query = useQuery({
     queryKey: dimensionesInventarioQueryKey(),
     queryFn: listDimensiones,
     staleTime: STALE_TIME,
+    enabled: opts?.enabled ?? true,
   })
 
   const porCodigo = useMemo(() => {

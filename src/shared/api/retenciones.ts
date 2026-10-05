@@ -1,4 +1,4 @@
-import { client, unwrap, unwrapPaginated } from './client'
+import { client, unwrap, unwrapPaginated, conSilencio403 } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
   Retencion,
@@ -10,7 +10,7 @@ import type {
 } from './types'
 
 export async function listRetenciones(params?: PaginationParams) {
-  const res = await client.get<PaginatedResponse<RetencionListItem>>(ENDPOINTS.retenciones.list, { params })
+  const res = await conSilencio403(() => client.get<PaginatedResponse<RetencionListItem>>(ENDPOINTS.retenciones.list, { params }))
   return unwrapPaginated(res)
 }
 

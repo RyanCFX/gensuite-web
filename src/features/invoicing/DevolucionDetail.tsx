@@ -6,11 +6,11 @@ import { getDevolucion, cancelDevolucion, emitirNcAseguradora } from '@/shared/a
 import { downloadCreditNotePdf } from '@/shared/api/notes'
 import { ArrowLeft, Receipt, Wallet, Download, Ban, ShieldCheck, Send } from 'lucide-react'
 import { formatDate, formatDOP } from '@/lib/formatters'
-import { getCatalogosFiscales } from '@/shared/api/config'
 import { Modal } from '@/shared/ui/Modal'
 import type { ApiError } from '@/shared/api/types'
 import { EstadoArsBadge } from './EstadoArsBadge'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { getCatalogosFiscalesLookup } from '@/shared/api/formularios'
 
 const ITEMS_COLUMNS = [
   { key: 'codigo', width: 120 },
@@ -93,8 +93,7 @@ export default function DevolucionDetail() {
 
   const { data: catalogos } = useQuery({
     queryKey: ['catalogos-fiscales', { type: 'venta' }],
-    queryFn: () => getCatalogosFiscales({ type: 'venta' }),
-    staleTime: 60 * 60_000,
+    queryFn: () => getCatalogosFiscalesLookup({ type: 'venta' }),
   })
 
   const downloadMutation = useMutation({

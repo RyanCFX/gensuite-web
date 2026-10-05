@@ -27,6 +27,7 @@ const LIBRO_DIARIO_COLUMNS = [
   { key: 'credito', width: 110 },
   { key: 'saldo', width: 110 },
   { key: 'parte', width: 160 },
+  { key: 'sucursal', width: 140 },
 ]
 
 function firstOfMonth(): string {
@@ -311,13 +312,17 @@ export default function LibroDiarioPage() {
                   <span className="col-resize-handle" onMouseDown={startResize('saldo')} />
                 </th>
                 <th>Parte</th>
+                <th>
+                  Sucursal
+                  <span className="col-resize-handle" onMouseDown={startResize('sucursal')} />
+                </th>
               </tr>
             </thead>
             <tbody>
               {isLoading
                 ? Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 9 }).map((__, j) => (
+                      {Array.from({ length: 10 }).map((__, j) => (
                         <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                       ))}
                     </tr>
@@ -325,7 +330,7 @@ export default function LibroDiarioPage() {
                 : queryParams === null
                   ? (
                       <tr>
-                        <td colSpan={9}>
+                        <td colSpan={10}>
                           <div className="empty-state">
                             <div className="empty-icon"><BookOpen size={28} /></div>
                             <p className="empty-title">Selecciona un rango de fechas</p>
@@ -337,7 +342,7 @@ export default function LibroDiarioPage() {
                   : rows.length === 0
                     ? (
                         <tr>
-                          <td colSpan={9}>
+                          <td colSpan={10}>
                             <div className="empty-state">
                               <div className="empty-icon"><BookOpen size={28} /></div>
                               <p className="empty-title">Sin movimientos</p>
@@ -359,6 +364,7 @@ export default function LibroDiarioPage() {
                               <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>{debit ? formatDOP(debit) : '—'}</td>
                               <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>{credit ? formatDOP(credit) : '—'}</td>
                               <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>{balance != null ? formatDOP(balance) : '—'}</td>
+                              <td />
                               <td />
                             </tr>
                           )
@@ -397,6 +403,9 @@ export default function LibroDiarioPage() {
                             </td>
                             <td className="td-muted" style={{ fontSize: 12 }}>
                               {(row.party as string | null) ?? '—'}
+                            </td>
+                            <td className="td-muted" style={{ fontSize: 12 }}>
+                              {(row.branch as string | null) ?? '—'}
                             </td>
                           </tr>
                         )

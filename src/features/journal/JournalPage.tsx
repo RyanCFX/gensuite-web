@@ -1,17 +1,17 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listJournalEntries } from '@/shared/api/journal-entry'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { Plus, Search, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react'
-import { useDebounce } from '@/lib/useDebounce'
+import { Plus, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { SearchInput } from '@/shared/ui/SearchInput'
 
 const PAGE_SIZE = 25
 
@@ -35,7 +35,7 @@ export default function JournalPage() {
   const { orderBy, sort } = useSortState()
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
-  const debouncedSearch = useDebounce(search, 300)
+  const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
 
@@ -54,10 +54,6 @@ export default function JournalPage() {
     }),
   })
 
-  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value)
-    setPage(1)
-  }, [])
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
@@ -83,15 +79,10 @@ export default function JournalPage() {
         <div className="card-body">
           <div className="filter-bar" style={{ margin: 0 }}>
             <div className="filter-bar-left">
-              <div className="search-input-wrap">
-                <Search size={15} className="search-input-icon" />
-                <input
-                  className="search-input"
-                  placeholder="Buscar por ID o descripción…"
-                  value={search}
-                  onChange={handleSearchChange}
-                />
-              </div>
+              <SearchInput placeholder="Buscar por ID o descripción…" value={search} onChange={(v) => {
+    setSearch(v)
+    setPage(1)
+  }} />
               <OpcionesSelect hideOnForbidden filterLabel="Sucursal" filterStyle={{ width: 200 }} recurso="sucursales" value={branch} onChange={(val) => { setBranch(val); setPage(1) }} placeholder="Todas las sucursales" />
               <OpcionesSelect hideOnForbidden filterLabel="Departamento" filterStyle={{ width: 200 }} recurso="departamentos" value={department} onChange={(val) => { setDepartment(val); setPage(1) }} placeholder="Todos los departamentos" />
             </div>

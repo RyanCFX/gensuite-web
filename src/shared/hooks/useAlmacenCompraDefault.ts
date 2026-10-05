@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getSupplier } from '@/shared/api/suppliers'
-import { getSucursal } from '@/shared/api/sucursales'
+import { useSucursalAlmacenes } from '@/shared/hooks/useSucursalAlmacenes'
+import { getProveedorDetalle } from '@/shared/api/formularios'
 
 /**
  * Almacén de compra por defecto para las líneas de un documento de compra
@@ -31,20 +31,14 @@ export function useAlmacenCompraDefault<T extends { warehouse: string }>(opts: {
 
   // Comparte caché con los `['supplier', id]` que ya piden los formularios.
   const { data: supplierDetail } = useQuery({
-    queryKey: ['supplier', supplierId],
-    queryFn: () => getSupplier(supplierId),
+    queryKey: ['proveedor-detalle', supplierId],
+    queryFn: () => getProveedorDetalle(supplierId),
     enabled: !!supplierId,
     staleTime: 5 * 60_000,
   })
-  // Misma key que InvoiceForm — sin fetch duplicado.
-  const { data: sucursalDetail } = useQuery({
-    queryKey: ['sucursal', branch],
-    queryFn: () => getSucursal(branch),
-    enabled: !!branch,
-    staleTime: 60_000,
-  })
+  const { almacenCompra: almacenCompraSucursal } = useSucursalAlmacenes(branch)
 
-  const autoWarehouse = supplierDetail?.almacenCompraDefault || sucursalDetail?.almacenCompra || ''
+  const autoWarehouse = supplierDetail?.almacenCompraDefault || almacenCompraSucursal || ''
   const prevAutoRef = useRef<string | null>(null)
 
   /* eslint-disable react-hooks/exhaustive-deps --

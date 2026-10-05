@@ -13918,7 +13918,7 @@
             "bearer": []
           }
         ],
-        "summary": "Completa el cobro de una factura enviada a Caja: somete la factura de verdad, fija la condición fiscal (Crédito Fiscal/Consumo, ver `condicionFiscal` en el body) y asigna el NCF en este momento (nunca antes). Mismo body que /cobrar.",
+        "summary": "Completa el cobro de una factura enviada a Caja: somete la factura de verdad, respeta el tipo de comprobante de la factura (fijado al crearla) y asigna el NCF en este momento (nunca antes). Mismo body que /cobrar.",
         "tags": [
           "Caja"
         ]
@@ -19598,6 +19598,90 @@
           }
         ],
         "summary": "Buscar artículos para un formulario (mismos filtros y respuesta que GET /catalog/items, sin costos ni márgenes)",
+        "tags": [
+          "Catalog - Items (lookup para formularios)"
+        ]
+      }
+    },
+    "/api/v1/catalog/items/lookup/{id}/variants": {
+      "get": {
+        "description": "Recurso `lookup.articulos`. Sin costos ni márgenes.",
+        "operationId": "ItemsLookupController_variantes",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.articulos\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Variantes de un artículo plantilla para un formulario (reemplaza GET /catalog/items/:id/variants)",
+        "tags": [
+          "Catalog - Items (lookup para formularios)"
+        ]
+      }
+    },
+    "/api/v1/catalog/items/lookup/{id}/stock": {
+      "get": {
+        "description": "Recurso `lookup.stock-articulo`. `data: { itemCode, totalQty, totalReservedStock, totalDisponible, warehouses: [{ warehouse, qty, reservedStock, disponible }] }`. Usar `disponible` (físico − reservado), no `qty`. `?warehouse=` limita a un almacén (y recalcula los totales). SIN costos ni valuación (`valuationRate`, `stockValue`).",
+        "operationId": "ItemsLookupController_stock",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.stock-articulo\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Existencia de un artículo por almacén para validar disponibilidad (reemplaza GET /catalog/items/:id/stock y GET /inventory?itemCode=)",
         "tags": [
           "Catalog - Items (lookup para formularios)"
         ]
@@ -26124,6 +26208,73 @@
         ]
       }
     },
+    "/api/v1/dashboard/widgets": {
+      "get": {
+        "description": "`keys` = claves separadas por coma (máx. 20); `period` y `limit` aplican a todos. Responde `data: { [key]: { data, meta } | { error: { code, message, statusCode } } }` — un reporte no permitido, no contratado, inexistente o que falle NO tumba a los demás (el HTTP es 200 mientras la solicitud sea válida). Mismos datos que GET /dashboard/widgets/:key por cada key.",
+        "operationId": "DashboardController_widgets",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "description": "Período del resumen",
+            "schema": {
+              "default": "month",
+              "type": "string",
+              "enum": [
+                "today",
+                "7d",
+                "month",
+                "year"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 20,
+              "default": 5,
+              "type": "number"
+            }
+          },
+          {
+            "name": "keys",
+            "required": true,
+            "in": "query",
+            "description": "Keys de reportes separadas por coma (máx. 20).",
+            "schema": {
+              "example": "dashboard.ventas.total,dashboard.cobros.total,dashboard.ventas.top-productos",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Varios reportes del dashboard en UNA solicitud (lote)",
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
     "/api/v1/dashboard/widgets/{key}": {
       "get": {
         "description": "key = clave del reporte (ej. dashboard.ventas.total). 403 WIDGET_NO_PERMITIDO / WIDGET_NO_CONTRATADO, 404 si no existe. `limit` aplica a los reportes de lista (tops, actividad, bajo mínimo).",
@@ -31773,6 +31924,36 @@
         ]
       }
     },
+    "/api/v1/me/reference-version": {
+      "get": {
+        "description": "Contador que sube cada vez que alguien escribe config, catálogos fiscales, impuestos, sucursales/almacenes, dimensiones, cuentas bancarias o permisos. Es el mismo valor que llega en el header `X-Reference-Version` de cada respuesta. Cambia también al reiniciar el servidor. Barato: sin consultas a ERPNext.",
+        "operationId": "MeController_getReferenceVersion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Versión de los datos de referencia del tenant (para invalidar caché del frontend)",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
     "/api/v1/me/permissions/{doctype}/{name}": {
       "get": {
         "description": "Evalúa `if_owner`, User Permissions y los controller permissions del doctype — cosas que dependen del documento y que el endpoint de nivel sesión no puede saber. Es lo que deben usar los botones de una pantalla de detalle.\n\n⚠️ No considera `docstatus`: sobre una factura ya sometida sigue devolviendo `submit: 1`, porque el permiso existe — lo que no aplica es el estado.",
@@ -32165,6 +32346,542 @@
         "summary": "Desvincula una cuenta externa",
         "tags": [
           "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/me/bootstrap": {
+      "get": {
+        "description": "`data`: `permisos` (= GET /me/permissions data), `acceso` (= GET /me/acceso data), `features` (= GET /me/features data), `facturacion` (= GET /config/facturacion data con `config.facturacion.ver`; el subconjunto no sensible con el recurso `lookup.config-facturacion`; si no, null), `ecf` (idem con `config.ecf.ver` / `lookup.config-ecf`), `usuario` { email, maxDiscountPct, branches, defaultBranch, allBranches, almacenesPermitidos }, `referenceVersion` (= X-Reference-Version) y `errores` { [bloque]: { code, message, statusCode } }. Con ETag: responde 304 si no cambió. No incluye el turno de caja (GET /pos/turnos/actual).",
+        "operationId": "MeBootstrapController_get",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Arranque de sesión en una sola respuesta (permisos, acceso, features, config, usuario)",
+        "tags": [
+          "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/opciones/config/facturacion": {
+      "get": {
+        "description": "Recurso `lookup.config-facturacion`. Ver CAMPOS_FACTURACION_PUBLICOS en config-publica.helpers.ts.",
+        "operationId": "OpcionesFormularioController_facturacion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Subconjunto no sensible de la configuración de facturación (reemplaza GET /config/facturacion en formularios)",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/config/ecf": {
+      "get": {
+        "operationId": "OpcionesFormularioController_ecfConfig",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Subconjunto de la configuración e-CF que decide el formulario (reemplaza GET /config/ecf)",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/config/stock-settings": {
+      "get": {
+        "operationId": "OpcionesFormularioController_stockSettings",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configuración de inventario para formularios de venta/compra (reemplaza GET /config/stock-settings)",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/config/catalogos-fiscales": {
+      "get": {
+        "operationId": "OpcionesFormularioController_catalogosFiscales",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Si se omite (default), la respuesta trae ambos bloques (venta y compra), igual que hoy — compatibilidad hacia atrás. \"venta\" devuelve solo ncfTypes/ncfTypesFisicos; \"compra\" devuelve solo ncfTypesCompra.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "venta",
+                "compra"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Catálogos fiscales (?type=venta|compra) — reemplaza GET /config/catalogos-fiscales",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/config/denominaciones": {
+      "get": {
+        "operationId": "OpcionesFormularioController_denominaciones",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Denominaciones de billetes para el vuelto (reemplaza GET /config/denominaciones)",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/config/apartados": {
+      "get": {
+        "operationId": "OpcionesFormularioController_apartados",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configuración de apartados (reemplaza GET /config/apartados)",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/config/impuestos": {
+      "get": {
+        "description": "`data: { impuestosVentas, impuestosCompras, itemTaxTemplates, retenciones }` — mismos datos que GET /config/impuestos-ventas, /impuestos-compras, /item-tax-templates y /retenciones.",
+        "operationId": "OpcionesFormularioController_impuestos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Impuestos y retenciones de solo lectura",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/bancos": {
+      "get": {
+        "operationId": "OpcionesFormularioController_bancos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bancos (reemplaza GET /config/bancos) — recurso `lookup.bancos`",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/combos": {
+      "get": {
+        "description": "Mismos filtros y respuesta que GET /catalog/bundles.",
+        "operationId": "OpcionesFormularioController_combos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Combos para el buscador de artículos (reemplaza GET /catalog/bundles) — recurso `lookup.combos`",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/combos/{id}": {
+      "get": {
+        "operationId": "OpcionesFormularioController_combo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle y componentes de un combo (reemplaza GET /catalog/bundles/:id)",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/ubicaciones": {
+      "get": {
+        "description": "`?itemCode=` obligatorio; `?warehouse=` opcional.",
+        "operationId": "OpcionesFormularioController_ubicacionesDeArticulo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemCode",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "warehouse",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ubicaciones activas de un artículo con su existencia (reemplaza GET /inventory/ubicaciones/item/:code) — recurso `lookup.ubicaciones`",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/clientes/{id}/detalle": {
+      "get": {
+        "description": "Recurso `lookup.cliente-detalle`. Sin saldos, límite de crédito ni datos administrativos.",
+        "operationId": "OpcionesFormularioController_clienteDetalle",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Datos comerciales de un cliente para formularios de venta (reemplaza GET /customers/:id)",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/clientes/{id}/semaforo": {
+      "get": {
+        "operationId": "OpcionesFormularioController_clienteSemaforo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Semáforo de crédito de un cliente (reemplaza GET /cobros/semaforo/:customerId)",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/proveedores/{id}/detalle": {
+      "get": {
+        "operationId": "OpcionesFormularioController_proveedorDetalle",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Datos comerciales de un proveedor para formularios de compra/gasto (reemplaza GET /suppliers/:id)",
+        "tags": [
+          "Opciones para formularios (lookup)"
         ]
       }
     },
@@ -33089,6 +33806,15 @@
             "required": false,
             "in": "query",
             "description": "Solo para `almacenes`: devuelve únicamente los almacenes de esta sucursal (se combina con el data-scope del usuario).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ids",
+            "required": false,
+            "in": "query",
+            "description": "Ids (`value`) separados por coma, máx. 50. Devuelve las opciones de esos ids aunque no estén en la primera página (para mostrar el label de un valor ya guardado al editar). Mismo contrato de respuesta; respeta filtros fijos y data-scope del recurso.",
             "schema": {
               "type": "string"
             }
@@ -40195,7 +40921,7 @@
             "description": "Fuerza el cobro al contado aunque el cliente tenga crédito establecido (solo afecta si se valida el crédito disponible al someter). Se marca automáticamente en true si se envía `payments`."
           },
           "payments": {
-            "description": "Opcional — indica que esta es una venta al contado. Si el tenant NO tiene usaModuloPos habilitado, la factura se somete y se cobra en la misma llamada (is_pos nativo). Si el tenant SÍ tiene usaModuloPos habilitado y el cliente NO tiene crédito fiscal establecido (\"de consumo\"), la factura NO se somete en esta llamada — queda en Draft, enviada a la cola de Caja (custom_enviada_a_caja=1), se hayan enviado `payments` o no; el submit real, el NCF y la condición fiscal final (Crédito Fiscal/Consumo) ocurren recién en POST /caja/facturas/:id/completar-cobro. Si el cliente SÍ tiene crédito fiscal establecido (empresa), la factura sigue el flujo histórico: se somete de inmediato, al contado (con `payments`) o a crédito para cobrarse después por separado (GET /caja/pendientes → POST /caja/facturas/:id/cobrar).",
+            "description": "Opcional — indica que esta es una venta al contado. Si el tenant NO tiene usaModuloPos habilitado, la factura se somete y se cobra en la misma llamada (is_pos nativo). Si el tenant SÍ tiene usaModuloPos habilitado y el cliente NO tiene crédito fiscal establecido (\"de consumo\"), la factura NO se somete en esta llamada — queda en Draft, enviada a la cola de Caja (custom_enviada_a_caja=1), se hayan enviado `payments` o no; el submit real y el NCF (del tipo de comprobante de la factura, obligatorio para someter o enviar a Caja) ocurren recién en POST /caja/facturas/:id/completar-cobro. Si el cliente SÍ tiene crédito fiscal establecido (empresa), la factura sigue el flujo histórico: se somete de inmediato, al contado (con `payments`) o a crédito para cobrarse después por separado (GET /caja/pendientes → POST /caja/facturas/:id/cobrar).",
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PaymentLineDto"
@@ -42189,14 +42915,6 @@
           "tenderedCash": {
             "type": "number",
             "description": "Efectivo entregado por el cliente, usado para validar el desglose de `vuelto`."
-          },
-          "condicionFiscal": {
-            "type": "string",
-            "enum": [
-              "CREDITO_FISCAL",
-              "CONSUMO"
-            ],
-            "description": "Solo tiene efecto en POST /caja/facturas/:id/completar-cobro (factura aún en Draft, sin NCF asignado) — el cajero confirma en el momento del cobro si el comprobante debe ser de Crédito Fiscal (B01, cliente empresa con RNC) o de Consumo (B02, persona física). Si se omite, se infiere automáticamente: Crédito Fiscal si el cliente tiene RNC registrado, Consumo en caso contrario. Sin efecto en POST /caja/facturas/:id/cobrar (factura ya sometida, el NCF ya está fijo y no puede cambiar)."
           },
           "rnc": {
             "type": "string",

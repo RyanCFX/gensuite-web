@@ -4,15 +4,13 @@ import { useEffectOnActive } from 'keepalive-for-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useTabs } from '@/contexts/TabsContext'
 import { createPedido, updatePedido, getPedido, getPedidoDuplicateSource } from '@/shared/api/pedidos'
-import { getCustomer } from '@/shared/api/customers'
 import { getQuotation } from '@/shared/api/quotations'
-import { getLayawayConfig, getFacturacionConfig, getStockSettings } from '@/shared/api/config'
+import { getFacturacionConfig } from '@/shared/api/config'
 import type { Item, ItemPrices, CreatePedidoDto, Bundle, Customer, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
 import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { mergeLineasIguales } from '@/shared/lib/mergeLineasIguales'
 import { getTasaVigente } from '@/shared/api/monedas'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
-import { useItemInventory } from '@/shared/hooks/useItemInventory'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
@@ -31,10 +29,10 @@ import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { lookupItems, getDefaultPriceTier, getItemLookup } from '@/shared/api/catalog'
+import { lookupItems, getItemLookup } from '@/shared/api/catalog'
 import { client, isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
-import { getSucursal } from '@/shared/api/sucursales'
+import { useSucursalAlmacenes } from '@/shared/hooks/useSucursalAlmacenes'
 import { getCachedUser } from '@/shared/api/storage'
 import { DepartmentSelect } from '@/components/shared/DepartmentSelect'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
@@ -45,6 +43,7 @@ import { isPinPrecioError } from '@/lib/pinOverride'
 import { isPrecioCatalogoError, precioBloqueadoParaLinea } from '@/lib/precioCatalogo'
 import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { getClienteDetalle, getLayawayConfigLookup, getStockSettingsLookup } from '@/shared/api/formularios'
 
 interface LineItem {
   itemCode: string
@@ -148,10 +147,6 @@ const [customerId, setCustomerId] = useState('')
   const stockMap = useItemsStock(
     items.map((i) => (i.itemCode && i.itemType !== 'service' && i.itemType !== 'combo' ? i.itemCode : undefined)),
   )
-  // "En pedido" (reservedQty, informativo, NO bloqueante) — docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §7.4.
-  const inventoryMap = useItemInventory(
-    items.map((i) => (i.itemCode && i.warehouse && i.itemType !== 'service' && i.itemType !== 'combo' ? { itemCode: i.itemCode, warehouse: i.warehouse } : undefined)),
-  )
   const [highlightedRow, setHighlightedRow] = useState<number | null>(null)
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([])
   const flashRow = useCallback((index: number) => {
@@ -184,13 +179,11 @@ const [customerId, setCustomerId] = useState('')
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaDepartamentos = facturacionConfig?.usaDepartamentos ?? true
   const { data: stockSettings } = useQuery({
     queryKey: ['stock-settings'],
-    queryFn: getStockSettings,
-    staleTime: 5 * 60_000,
+    queryFn: getStockSettingsLookup,
   })
   // Candados "Permitir Modificar Precio Libremente" (servicios/productos por separado) — con el
   // toggle correspondiente apagado, el precio de la línea debe ser exactamente uno de los precios
@@ -287,9 +280,8 @@ const [customerId, setCustomerId] = useState('')
 
   const { data: layawayConfig } = useQuery({
     queryKey: ['layaway-config'],
-    queryFn: getLayawayConfig,
+    queryFn: getLayawayConfigLookup,
     enabled: !isEdit,
-    staleTime: 5 * 60_000,
   })
 
   // ── Barcode scanner ───────────────────────────────────────────────────────
@@ -390,7 +382,7 @@ const [customerId, setCustomerId] = useState('')
           itemDimensionesDeclaradas: catalogItem?.usaDimensiones ? catalogItem.dimensiones : undefined,
         }
       }))
-      getCustomer(src.customer).then((c) => {
+      getClienteDetalle(src.customer).then((c) => {
         setCustomerName(c.customerName)
         setCustomerPriceTier(c.priceTier)
         setCustomerDefaultDiscountPct(c.descuentoDefaultPct ?? undefined)
@@ -474,11 +466,8 @@ useEffect(() => {
     return () => { cancelled = true }
   }, [existing])
 
-  const { data: defaultPriceTier = 'B' } = useQuery({
-    queryKey: ['defaultPriceTier'],
-    queryFn: getDefaultPriceTier,
-    staleTime: 5 * 60_000,
-  })
+  // Viene en GET /config/facturacion (ya cargado arriba): sin consulta de catálogo aparte.
+  const defaultPriceTier = facturacionConfig?.defaultPriceTier ?? 'B'
 
   const currentUserEmail = getCachedUser()?.email
   const { data: currentUser } = useQuery({
@@ -504,9 +493,8 @@ useEffect(() => {
     queryKey: ['usuarioSucursales', currentUserEmail],
     queryFn: () => getUsuarioSucursales(currentUserEmail!),
     enabled: !!currentUserEmail,
-    staleTime: 60_000,
   })
-  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager, staleTime: 60_000 })
+  const { data: allSucursales } = useOpcionesLista('sucursales', { limit: 100, enabled: isSystemManager})
   const branchOptions = isSystemManager
     ? (allSucursales?.items.map((s) => s.name) ?? [])
     : (myBranches?.branches ?? [])
@@ -521,20 +509,19 @@ useEffect(() => {
     if (!isEdit && branchOptions.length === 1 && branch !== branchOptions[0]) setBranch(branchOptions[0])
   }, [branchOptions, branch, isEdit])
 
-  // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
-  const { data: branchWarehouses } = useOpcionesArray('almacenes', { branch: branch, limit: 100, enabled: !!branch, staleTime: 60_000 })
-
   // docs/tasks/75_almacen_venta_confirmar_stock_uoms_permitidas.md §1.4 — si la sucursal tiene
   // almacén de venta configurado, TODA venta debe salir de ahí sin excepción: se oculta el
   // selector por línea y se fuerza ese almacén, en vez de dejar elegir y recién enterarse con el
   // 400 de SALE_WAREHOUSE_MISMATCH al someter.
-  const { data: sucursalActual } = useQuery({
-    queryKey: ['sucursal', branch],
-    queryFn: () => getSucursal(branch),
-    enabled: !!branch,
-    staleTime: 60_000,
+  const { almacenVenta: almacenVentaSucursal, isFetched: sucursalFetched } = useSucursalAlmacenes(branch)
+
+  // ── Almacenes de la sucursal seleccionada (para el selector por línea) ───
+  // Con almacén de venta fijo en la sucursal el selector no existe: no se piden.
+  const { data: branchWarehouses } = useOpcionesArray('almacenes', {
+    branch: branch,
+    limit: 100,
+    enabled: !!branch && sucursalFetched && !almacenVentaSucursal,
   })
-  const almacenVentaSucursal = sucursalActual?.almacenVenta || null
 
   const ITEMS_COLUMNS = [
     { key: 'codigo', width: 100 },
@@ -1048,7 +1035,7 @@ try {
                        setCustomerDefaultDiscountPct(undefined)
                        // /opciones solo trae value/label: tarifa y descuento salen del detalle del cliente.
                        if (cid) {
-                         getCustomer(cid).then((c) => {
+                         getClienteDetalle(cid).then((c) => {
                            setCustomerPriceTier(c.priceTier)
                            setCustomerDefaultDiscountPct(c.descuentoDefaultPct ?? undefined)
                          }).catch(() => {})
@@ -1295,8 +1282,6 @@ try {
                         {(() => {
                           const stockError = validateLineStock(item, stockMap, stockSettings?.allowNegativeStock)
                           const info = item.itemCode && item.warehouse ? resolveDisponible(stockMap.get(item.itemCode), item.warehouse) : undefined
-                          const invItem = item.itemCode && item.warehouse ? inventoryMap.get(`${item.itemCode}::${item.warehouse}`) : undefined
-                          const enPedido = invItem?.reservedQty ?? 0
                           return (
                             <>
                               <QtyInput className={`items-input${(submitted && (!item.qty || item.qty <= 0)) || stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
@@ -1307,11 +1292,6 @@ try {
                               ) : info && info.reservedStock > 0 ? (
                                 <span style={{ fontSize: 11, color: 'var(--warning-text)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                   Disponible: {info.disponible} ({info.reservedStock} reservadas para otro cliente)
-                                  {enPedido > 0 ? ` · En pedido: ${enPedido} (informativo)` : ''}
-                                </span>
-                              ) : enPedido > 0 ? (
-                                <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
-                                  En pedido: {enPedido} (informativo)
                                 </span>
                               ) : null}
                             </>

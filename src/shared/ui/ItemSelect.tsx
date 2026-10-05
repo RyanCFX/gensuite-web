@@ -13,7 +13,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { lookupItems, listCuentasPorPagar } from '@/shared/api/catalog'
-import { listBundles } from '@/shared/api/bundles'
+import { listCombosLookup, getComboLookup } from '@/shared/api/formularios'
 import type { Item, Bundle, CuentaPorPagar } from '@/shared/api/types'
 import { getCachedUser, getTenant } from '@/shared/api/storage'
 import { esRecursoNoPermitido } from '@/shared/hooks/useOpciones'
@@ -73,8 +73,10 @@ export function ItemSelect({
   onQueryChange,
 }: ItemSelectProps) {
   const [query, setQuery] = useState('')
+  // La lista de artículos se pide recién al abrir el buscador (cada línea de un documento tiene uno).
+  const [abierto, setAbierto] = useState(false)
 
-  const { data, isLoading, refetch, error: itemsError } = useQuery({
+  const { data, isLoading, error: itemsError } = useQuery({
     queryKey: ['itemSearch', getTenant()?.slug ?? '', getCachedUser()?.email ?? '', query, typeFilter, branch],
     // `branch` ya filtra a artículos con stock en almacenes de esa sucursal — combinarlo con
     // `validateStock` hace que el backend devuelva 0 resultados, así que se omite validateStock
@@ -89,26 +91,26 @@ export function ItemSelect({
       }
       return lookupItems(params)
     },
-    enabled: !excludeItems,
+    enabled: !excludeItems && abierto,
     staleTime: 30_000,
     retry: false,
   })
   // 403 RECURSO_NO_PERMITIDO (sin `lookup.articulos`): el buscador queda deshabilitado.
   const sinAccesoArticulos = !excludeItems && !includeBundles && !includeCuentasPorPagar && esRecursoNoPermitido(itemsError)
 
-  const { data: bundlesData, isLoading: bundlesLoading, refetch: refetchBundles } = useQuery({
+  const { data: bundlesData, isLoading: bundlesLoading } = useQuery({
     queryKey: ['bundleSearch', query],
     // El backend no soporta filtrar por `disabled` en la query — se filtra en el cliente abajo.
-    queryFn: () => listBundles({ search: query || undefined, limit: 10 }),
-    enabled: !!includeBundles,
+    queryFn: () => listCombosLookup({ search: query || undefined, limit: 10 }),
+    enabled: !!includeBundles && abierto,
     staleTime: 30_000,
   })
   const activeBundles = (bundlesData?.items ?? []).filter((b) => !b.disabled)
 
-  const { data: cuentasPorPagarData, isLoading: cuentasPorPagarLoading, refetch: refetchCuentasPorPagar } = useQuery({
+  const { data: cuentasPorPagarData, isLoading: cuentasPorPagarLoading } = useQuery({
     queryKey: ['cuentaPorPagarSearch', query],
     queryFn: () => listCuentasPorPagar({ search: query || undefined, limit: 10 }),
-    enabled: !!includeCuentasPorPagar,
+    enabled: !!includeCuentasPorPagar && abierto,
     staleTime: 30_000,
   })
   const activeCuentasPorPagar = (cuentasPorPagarData?.items ?? []).filter((c) => !c.disabled)
@@ -182,17 +184,19 @@ export function ItemSelect({
           return
         }
         const foundBundle = activeBundles.find((b) => b.id === val)
-        if (foundBundle && onSelectBundle) { onSelectBundle(foundBundle); return }
+        if (foundBundle && onSelectBundle) {
+          // El detalle del combo elegido sale de /opciones/combos/:id (componentes, precios).
+          getComboLookup(foundBundle.id)
+            .then(onSelectBundle)
+            .catch((err: { message?: string }) => toast.error(err?.message ?? 'No se pudo cargar el combo'))
+          return
+        }
         const foundCuentaPorPagar = activeCuentasPorPagar.find((c) => c.id === val)
         if (foundCuentaPorPagar && onSelectCuentaPorPagar) onSelectCuentaPorPagar(foundCuentaPorPagar)
       }}
       options={options}
       onSearch={(q) => { setQuery(q); onQueryChange?.(q) }}
-      onOpen={() => {
-        refetch()
-        if (includeBundles) refetchBundles()
-        if (includeCuentasPorPagar) refetchCuentasPorPagar()
-      }}
+      onOpen={() => setAbierto(true)}
       onEnterWithoutMatch={handleEnterWithoutMatch}
       loading={(!excludeItems && isLoading) || (!!includeBundles && bundlesLoading) || (!!includeCuentasPorPagar && cuentasPorPagarLoading)}
       placeholder={sinAccesoArticulos ? 'No tiene acceso a esta lista' : placeholder}

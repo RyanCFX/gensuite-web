@@ -3131,7 +3131,6 @@ export default function ReportesPage() {
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
     queryFn: getFacturacionConfig,
-    staleTime: 5 * 60_000,
   })
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false
   const despachoHabilitado = facturacionConfig?.despachoHabilitado ?? false
