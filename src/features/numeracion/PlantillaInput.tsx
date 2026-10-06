@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { PLANTILLA_OPCIONES } from './numeracionReferencia'
 import './Numeracion.css'
 
@@ -48,7 +49,52 @@ export function PlantillaInput({
   const [abierto, setAbierto] = useState(false)
   const [query, setQuery] = useState('')
   const [resaltado, setResaltado] = useState(0)
-  const [left, setLeft] = useState(0)
+  const [pos, setPos] = useState<{ top: number; left: number; flip: boolean } | null>(null)
+
+  // Refs vivas para recalcular la posición ante scroll/resize sin clausuras viejas.
+  const valueRef = useRef(value)
+  valueRef.current = value
+  const caretRef = useRef(caret)
+  caretRef.current = caret
+
+  // Posición fija en viewport (el menú vive en un portal a document.body para que ningún
+  // contenedor con overflow lo recorte). Se ancla al cursor dentro del input.
+  const calcularPos = useCallback(() => {
+    const el = internoRef.current
+    const c = caretRef.current
+    if (!el || c === null) return null
+    const antes = valueRef.current.slice(0, c)
+    const rect = el.getBoundingClientRect()
+    const cs = getComputedStyle(el)
+    const x =
+      rect.left +
+      parseFloat(cs.paddingLeft || '0') +
+      parseFloat(cs.borderLeftWidth || '0') +
+      anchoTexto(el, antes) -
+      el.scrollLeft
+    const flip = rect.bottom + 280 > window.innerHeight && rect.top > 280
+    return {
+      top: (flip ? rect.top : rect.bottom) + 4,
+      left: Math.max(8, Math.min(x, window.innerWidth - 248)),
+      flip,
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!abierto) return
+    const actualizar = () => {
+      const p = calcularPos()
+      if (p) setPos(p)
+      else setAbierto(false)
+    }
+    actualizar()
+    window.addEventListener('scroll', actualizar, true)
+    window.addEventListener('resize', actualizar)
+    return () => {
+      window.removeEventListener('scroll', actualizar, true)
+      window.removeEventListener('resize', actualizar)
+    }
+  }, [abierto, value, caret, calcularPos])
 
   function setRef(el: HTMLInputElement | null) {
     internoRef.current = el
@@ -77,16 +123,6 @@ export function PlantillaInput({
     setQuery(m[2])
     setResaltado(0)
     setAbierto(true)
-    const el = internoRef.current
-    if (el) {
-      const cs = getComputedStyle(el)
-      const x =
-        parseFloat(cs.paddingLeft || '0') +
-        parseFloat(cs.borderLeftWidth || '0') +
-        anchoTexto(el, antes) -
-        el.scrollLeft
-      setLeft(Math.max(0, Math.min(x, Math.max(0, el.clientWidth - 250))))
-    }
   }, [value, caret])
 
   const opciones = PLANTILLA_OPCIONES.filter((o) =>
@@ -174,33 +210,44 @@ export function PlantillaInput({
         onKeyDown={manejarKeyDown}
         onBlur={() => setAbierto(false)}
       />
-      {abierto && (
-        <span className="num-plantilla-menu" role="listbox" style={{ left }}>
-          {opciones.length === 0 ? (
-            <span className="num-plantilla-vacio">Sin coincidencias — podés escribirlo manual</span>
-          ) : (
-            opciones.map((o, i) => (
-              <span
-                key={o.token}
-                role="option"
-                aria-selected={i === resaltado}
-                className={`num-plantilla-item${i === resaltado ? ' on' : ''}`}
-                onMouseDown={(e) => {
-                  // Antes del blur: inserta sin perder el foco ni cerrar de golpe.
-                  e.preventDefault()
-                  insertar(o.token)
-                }}
-                onMouseEnter={() => setResaltado(i)}
-              >
-                <code>{o.token}</code>
-                <span className="num-plantilla-item-sub">
-                  {o.etiqueta} · {o.muestra}
+      {abierto &&
+        pos &&
+        createPortal(
+          <span
+            className="num-plantilla-menu num-plantilla-menu-flotante"
+            role="listbox"
+            style={{
+              top: pos.top,
+              left: pos.left,
+              transform: pos.flip ? 'translateY(calc(-100% - 8px))' : undefined,
+            }}
+          >
+            {opciones.length === 0 ? (
+              <span className="num-plantilla-vacio">Sin coincidencias — podés escribirlo manual</span>
+            ) : (
+              opciones.map((o, i) => (
+                <span
+                  key={o.token}
+                  role="option"
+                  aria-selected={i === resaltado}
+                  className={`num-plantilla-item${i === resaltado ? ' on' : ''}`}
+                  onMouseDown={(e) => {
+                    // Antes del blur: inserta sin perder el foco ni cerrar de golpe.
+                    e.preventDefault()
+                    insertar(o.token)
+                  }}
+                  onMouseEnter={() => setResaltado(i)}
+                >
+                  <code>{o.token}</code>
+                  <span className="num-plantilla-item-sub">
+                    {o.etiqueta} · {o.muestra}
+                  </span>
                 </span>
-              </span>
-            ))
-          )}
-        </span>
-      )}
+              ))
+            )}
+          </span>,
+          document.body,
+        )}
     </span>
   )
 }

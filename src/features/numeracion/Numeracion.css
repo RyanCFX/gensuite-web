@@ -71,6 +71,15 @@
   flex-direction: column;
 }
 
+/* El menú vive en un portal a document.body con posición fija: se sobrepone a tarjetas,
+ * scrolls y modales en vez de quedar recortado por el overflow de sus contenedores. */
+.num-plantilla-menu-flotante {
+  position: fixed;
+  top: auto;
+  margin: 0;
+  z-index: 9999;
+}
+
 .num-plantilla-item {
   display: flex;
   align-items: baseline;
