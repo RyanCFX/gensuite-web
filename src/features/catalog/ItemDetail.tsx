@@ -22,6 +22,9 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePermissionsStore } from '@/stores/permissions.store'
 import { usePuede } from '@/shared/permissions/can'
+import { useDatosArticulo, veAlgunPrecio, restringidosDe } from '@/shared/permissions/datosArticulo'
+import type { VisibilidadArticulo } from '@/shared/permissions/datosArticulo'
+import { DatoRestringido } from '@/shared/ui/DatoRestringido'
 import { ComposicionPanel } from './ComposicionPanel'
 import { EquivalentesPanel } from './EquivalentesPanel'
 
@@ -43,11 +46,15 @@ function costPlusPreview(purchasePrice: string, margin: string): number | undefi
 function UpdatePricesModal({
   item,
   actualizarCostoEnCompraDefault,
+  visibilidad,
   onClose,
   onSuccess,
 }: {
   item: Item
   actualizarCostoEnCompraDefault: boolean
+  /** Qué datos ve el usuario (Fuente A): los inputs de datos restringidos se ocultan — y como
+   *  el submit solo manda lo cambiado, lo oculto nunca se envía (§8.2). */
+  visibilidad: VisibilidadArticulo
   onClose: () => void
   onSuccess: (updated: ItemPricesResult) => void
 }) {
@@ -64,6 +71,9 @@ function UpdatePricesModal({
   const [actualizarCostoOverride, setActualizarCostoOverride] = useState<'' | 'si' | 'no'>(item.actualizarCostoEnCompraOverride ?? '')
 
   const isCostPlus = priceMode === 'cost_plus'
+  // Sin costo visible no hay modo cost_plus que configurar (los márgenes lo revelarían).
+  const puedeVerCosto = visibilidad.costo
+  const puedeVerPrecio = visibilidad.precioA || visibilidad.precioB || visibilidad.precioC
 
   const isDirty = useDirtyCheck(
     { purchasePrice, standardRate, priceMode, priceA, priceB, priceC, marginA, marginB, marginC, actualizarCostoOverride },
@@ -131,6 +141,11 @@ function UpdatePricesModal({
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {!puedeVerCosto && !puedeVerPrecio && (
+              <div className="inline-alert inline-alert-warn">
+                No tenés acceso a los datos de costo ni precios de este artículo.
+              </div>
+            )}
             {isCostPlus && (
               <div className="inline-alert inline-alert-warn">
                 En modo "Sobre Costo" los precios A/B/C se calculan automáticamente a partir del
@@ -139,6 +154,7 @@ function UpdatePricesModal({
                 servidor al guardar.
               </div>
             )}
+            {puedeVerCosto && (
             <div className="ff-wrap">
               <label className="ff-label">Precio de Compra</label>
               <input
@@ -151,6 +167,8 @@ function UpdatePricesModal({
                 placeholder="0.00"
               />
             </div>
+            )}
+            {puedeVerPrecio && (
             <div className="ff-wrap">
               <label className="ff-label">Precio de Venta (base)</label>
               <input
@@ -163,6 +181,8 @@ function UpdatePricesModal({
                 placeholder="0.00"
               />
             </div>
+            )}
+            {puedeVerCosto && (
             <div className="ff-wrap">
               <label className="ff-label">Modo de Precio</label>
               <Select value={priceMode} onValueChange={(val) => setPriceMode(val as 'manual' | 'cost_plus')}>
@@ -170,7 +190,9 @@ function UpdatePricesModal({
                 <SelectItem value="cost_plus">Sobre Costo</SelectItem>
               </Select>
             </div>
+            )}
 
+            {puedeVerCosto && (
             <div className="ff-wrap">
               <label className="ff-label">Actualizar costo al comprar</label>
               <Select value={actualizarCostoOverride} onValueChange={(val) => setActualizarCostoOverride(val as '' | 'si' | 'no')}>
@@ -181,8 +203,10 @@ function UpdatePricesModal({
                 <SelectItem value="no">No, nunca actualizar</SelectItem>
               </Select>
             </div>
+            )}
 
             {isCostPlus ? (
+              puedeVerCosto ? (
               <div className="form-row form-row-3">
                 {([
                   { label: 'Margen A — Máximo', value: marginA, setValue: setMarginA },
@@ -208,8 +232,14 @@ function UpdatePricesModal({
                   )
                 })}
               </div>
+              ) : (
+                <div className="inline-alert inline-alert-warn">
+                  Este artículo usa modo "Sobre costo" y no tenés acceso a sus datos de costo.
+                </div>
+              )
             ) : (
               <div className="form-row form-row-3">
+                {visibilidad.precioA && (
                 <div className="ff-wrap">
                   <label className="ff-label">Precio A — Máximo</label>
                   <input
@@ -222,6 +252,8 @@ function UpdatePricesModal({
                     placeholder="0.00"
                   />
                 </div>
+                )}
+                {visibilidad.precioB && (
                 <div className="ff-wrap">
                   <label className="ff-label">Precio B — Promedio</label>
                   <input
@@ -234,6 +266,8 @@ function UpdatePricesModal({
                     placeholder="0.00"
                   />
                 </div>
+                )}
+                {visibilidad.precioC && (
                 <div className="ff-wrap">
                   <label className="ff-label">Precio C — Mínimo</label>
                   <input
@@ -246,6 +280,7 @@ function UpdatePricesModal({
                     placeholder="0.00"
                   />
                 </div>
+                )}
               </div>
             )}
           </div>
@@ -464,17 +499,24 @@ function CreateVariantModal({
 function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
   const qc = useQueryClient()
   const navigate = useNavigate()
+  // Cada variante se pinta con §5 (Fuente B de SU respuesta); la estructura (columnas) sale de
+  // la Fuente A. Política de columnas: se ocultan cuando no hay nada visible.
+  const datos = useDatosArticulo()
+  const colPrecioVar = veAlgunPrecio(datos)
+  const colStockVar = datos.stock
 
   const [showCreateVariant, setShowCreateVariant] = useState(false)
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false)
   const [generateResult, setGenerateResult] = useState<GenerateVariantsResult | null>(null)
   const [generating, setGenerating] = useState(false)
 
-  const { data: variants, isLoading } = useQuery({
+  const { data: variantsData, isLoading } = useQuery({
     queryKey: ['item-variants', itemId],
     queryFn: () => listItemVariants(itemId),
     enabled: Boolean(itemId),
   })
+  const variants = variantsData?.items
+  const restrVar = restringidosDe(variantsData ?? {})
 
   async function handleGenerate() {
     setGenerating(true)
@@ -496,8 +538,8 @@ function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
     { key: 'codigo', width: 120 },
     { key: 'nombre', width: 200 },
     ...attrCols.map((a) => ({ key: `attr-${a.attribute}`, width: 110 })),
-    { key: 'precio', width: 110 },
-    { key: 'stock', width: 90 },
+    ...(colPrecioVar ? [{ key: 'precio', width: 110 }] : []),
+    ...(colStockVar ? [{ key: 'stock', width: 90 }] : []),
   ]
   const { widths: variantsColWidths, startResize: startResizeVariants } = useResizableColumns(VARIANTS_COLUMNS)
 
@@ -563,21 +605,25 @@ function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
                   <span className="col-resize-handle" onMouseDown={startResizeVariants(`attr-${a.attribute}`)} />
                 </th>
               ))}
-              <th style={{ textAlign: 'right' }}>
-                Precio
-                <span className="col-resize-handle" onMouseDown={startResizeVariants('precio')} />
-              </th>
-              <th style={{ textAlign: 'right' }}>
-                Stock
-                <span className="col-resize-handle" onMouseDown={startResizeVariants('stock')} />
-              </th>
+              {colPrecioVar && (
+                <th style={{ textAlign: 'right' }}>
+                  Precio
+                  <span className="col-resize-handle" onMouseDown={startResizeVariants('precio')} />
+                </th>
+              )}
+              {colStockVar && (
+                <th style={{ textAlign: 'right' }}>
+                  Stock
+                  <span className="col-resize-handle" onMouseDown={startResizeVariants('stock')} />
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
             {isLoading
               ? Array.from({ length: 3 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 4 + attrCols.length }).map((__, j) => (
+                    {Array.from({ length: 2 + attrCols.length + (colPrecioVar ? 1 : 0) + (colStockVar ? 1 : 0) }).map((__, j) => (
                       <td key={j}>
                         <span className="skeleton-box" style={{ height: 13, width: '80%', display: 'block' }} />
                       </td>
@@ -587,7 +633,7 @@ function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
               : (variants ?? []).length === 0
                 ? (
                     <tr>
-                      <td colSpan={4 + attrCols.length}>
+                      <td colSpan={2 + attrCols.length + (colPrecioVar ? 1 : 0) + (colStockVar ? 1 : 0)}>
                         <div className="empty-state">
                           <p className="empty-title">Sin variantes</p>
                           <p className="empty-sub">Genera todas las variantes automáticamente o añade una manual.</p>
@@ -607,12 +653,22 @@ function VariantsPanel({ itemId, item }: { itemId: string; item: Item }) {
                         const av = (v.attributes ?? []).find((va) => va.attribute === a.attribute)
                         return <td key={a.attribute}>{av?.attributeValue ?? '—'}</td>
                       })}
-                      <td style={{ textAlign: 'right' }}>
-                        {v.standardRate > 0
-                          ? formatDOP(v.standardRate)
-                          : <span className="td-muted">RD$0</span>}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>{v.currentStock ?? 0}</td>
+                      {colPrecioVar && (
+                        <td style={{ textAlign: 'right' }}>
+                          {v.standardRate == null
+                            ? <DatoRestringido bloqueante={restrVar.has('precioA') || restrVar.has('precioB') || restrVar.has('precioC')}>—</DatoRestringido>
+                            : v.standardRate > 0
+                              ? formatDOP(v.standardRate)
+                              : <span className="td-muted">RD$0</span>}
+                        </td>
+                      )}
+                      {colStockVar && (
+                        <td style={{ textAlign: 'right' }}>
+                          {v.currentStock == null
+                            ? <DatoRestringido bloqueante={restrVar.has('stock')}>—</DatoRestringido>
+                            : v.currentStock}
+                        </td>
+                      )}
                     </tr>
                   ))}
           </tbody>
@@ -788,10 +844,12 @@ function MoverUbicacionModal({
 
   // Mismo queryKey ['item', itemCode] que PendienteCombinacionCell en ZonasPage.tsx — se benefician
   // del mismo cache de react-query si ambas pantallas se visitan en la misma sesión.
-  const { data: catalogItem } = useQuery({
+  // getItem devuelve { item, meta }; acá solo importan dimensiones (nunca recortadas).
+  const { data: catalogDetail } = useQuery({
     queryKey: ['item', itemCode],
     queryFn: () => getItem(itemCode),
   })
+  const catalogItem = catalogDetail?.item
   const usaDimensiones = !!catalogItem?.usaDimensiones && (catalogItem?.dimensiones?.length ?? 0) > 0
   const combinacionOk = !usaDimensiones || combinacionCompleta(catalogItem!.dimensiones!, dimensiones)
 
@@ -1084,11 +1142,15 @@ export default function ItemDetail() {
   // `catalogo.servicios.*` (editar/actualizar-precios/activar).
   const puedeActivar = usePuede(rutaEsServicio ? 'catalogo.servicios.activar' : 'catalogo.items.activar')
 
-  const { data: item, isLoading, isError } = useQuery({
+  const { data: detalle, isLoading, isError } = useQuery({
     queryKey: ['item', id],
     queryFn: () => (rutaEsServicio ? getServicio(id!) : getItem(id!)),
     enabled: Boolean(id),
   })
+  // Fuente A para estructura/controles; Fuente B (meta) para pintar cada valor.
+  const datos = useDatosArticulo()
+  const hayPrecioDetalle = veAlgunPrecio(datos)
+  const item = detalle?.item
 
   // Defensivo: si se abre la URL de un módulo con el id del otro tipo, se redirige al módulo
   // correcto en vez de mostrar un 403/vacío del endpoint del otro tipo.
@@ -1152,8 +1214,14 @@ export default function ItemDetail() {
   // real del artículo cargado, sin importar desde qué módulo se haya llegado a esta pantalla.
   const basePath = item.type === 'product' ? '/inventario/productos' : '/catalogo/servicios'
   const moduleLabel = item.type === 'product' ? 'Productos' : 'Servicios'
+  // Fuente B: lo recortado en ESTA respuesta. Si la respuesta recorta algo que el store creía
+  // visible, el acceso cambió a mitad de pantalla (se refresca solo; acá se pinta con la respuesta).
+  const restr = restringidosDe(detalle ?? {})
 
-  const stock = item.currentStock ?? 0
+  // §5.5: el estado de stock no puede derivarse si el dato está recortado — ni de un null
+  // por permiso (sería "Sin Stock" falso) ni a ciegas. Solo se muestra con número real.
+  const stockConocido = datos.stock && item.currentStock != null
+  const stock = stockConocido ? item.currentStock as number : 0
   let stockStatus: 'in-stock' | 'low-stock' | 'out-stock'
   if (stock <= 0) stockStatus = 'out-stock'
   else if (stock <= 10) stockStatus = 'low-stock'
@@ -1194,7 +1262,7 @@ export default function ItemDetail() {
           <button className="btn btn-secondary" style={{ border: '1.457px solid var(--Gris-Forms, #CCDBE2)', color: '#0E3D51' }} onClick={() => navigate(`${basePath}/${item.id}/editar`)}>
             <Pencil size={15} /> Editar
           </button>
-          {!item.hasVariants && (
+          {!item.hasVariants && (datos.costo || hayPrecioDetalle) && (
             <button className="btn btn-secondary" style={{ border: '1.457px solid var(--Gris-Forms, #CCDBE2)', color: '#0E3D51' }} onClick={() => setShowPricesModal(true)}>
               <DollarSign size={15} /> Actualizar Precios
             </button>
@@ -1233,6 +1301,7 @@ export default function ItemDetail() {
 
       {item.type === 'product' && !item.hasVariants && (
         <div className="stats-row" style={{ marginBottom: 16 }}>
+          {stockConocido && (
           <div className="stat-card kpi">
             <div className="stat-card-top">
               <span className="stat-label">Stock Actual</span>
@@ -1242,14 +1311,15 @@ export default function ItemDetail() {
               <span style={{ color: stockColor, fontWeight: 500, fontSize: 13 }}>{stockLabel}</span>
             </div>
           </div>
+          )}
 
-           {!!item.standardRate && (
+           {!!item.standardRate && hayPrecioDetalle && (
             <div className="stat-card kpi">
               <div className="stat-card-top">
                 <span className="stat-label">Precio de Venta</span>
               </div>
               <div className="stat-value">{formatDOP(item.standardRate)}</div>
-              {item.autoDiscount && (
+              {item.autoDiscount && !restr.has('descuento') && (
                 <div className="stat-footer">
                   <span className="badge badge-discount" style={{ fontSize: 11 }}>
                     {item.autoDiscount.discountType === 'Discount Percentage'
@@ -1270,7 +1340,7 @@ export default function ItemDetail() {
         </div>
       )}
 
-      {item.type === 'service' && !item.hasVariants && !!item.standardRate && (
+      {item.type === 'service' && !item.hasVariants && !!item.standardRate && hayPrecioDetalle && (
         <div className="stats-row" style={{ marginBottom: 16 }}>
           <div className="stat-card kpi">
             <div className="stat-card-top">
@@ -1293,11 +1363,13 @@ export default function ItemDetail() {
           <div className="card-header navy-card-header"><h2 className="card-title">Venta</h2></div>
           <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="fields-grid fields-grid-3">
+              {!restr.has('costo') && (
               <div className="detail-field">
                 <span className="detail-label">Modo de precio</span>
                 <span className="detail-value">{item.priceMode === 'cost_plus' ? 'Sobre costo' : 'Manual'}</span>
               </div>
-              {item.allowsDiscount != null && (
+              )}
+              {item.allowsDiscount != null && !restr.has('descuento') && (
                 <div className="detail-field">
                   <span className="detail-label">Descuento</span>
                   <span className="detail-value">{item.allowsDiscount ? `Hasta ${item.maxDiscountPct ?? 0}%` : 'No permitido'}</span>
@@ -1471,13 +1543,17 @@ export default function ItemDetail() {
       )}
 
 
-{item.type === 'product' && !item.hasVariants && (
+{item.type === 'product' && !item.hasVariants && datos.existenciasAlmacen && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header navy-card-header">
             <h2 className="card-title">Existencias por almacén</h2>
           </div>
           <div className="card-body">
-            {(() => {
+            {restr.has('existenciasAlmacen') ? (
+              <p style={{ color: 'var(--text-tertiary)', fontSize: 13, margin: 0 }}>
+                <DatoRestringido bloqueante>—</DatoRestringido> No tenés acceso al desglose por almacén.
+              </p>
+            ) : (() => {
               const entries = Object.entries(item.stockByWarehouse ?? {}).sort((a, b) => b[1] - a[1])
               if (entries.length === 0) {
                 return <p style={{ color: 'var(--text-tertiary)', fontSize: 13, margin: 0 }}>Sin existencias</p>
@@ -1512,10 +1588,11 @@ export default function ItemDetail() {
                 </div>
               )
             })()}
-            {item.enPedido !== undefined && item.reservado !== undefined && item.disponible !== undefined && (
+            {item.enPedido != null && item.reservado != null && item.disponible != null && (
               <>
                 {/* docs/tasks/76_disponibilidad_stock_detalle_item.md — solo vienen en el detalle, nunca en
-                    el listado, y ausentes del todo en Servicios. */}
+                    el listado, y ausentes del todo en Servicios. Con recorte llegan `null` (no
+                    `undefined`): por eso se compara con `!= null`. */}
                 <div className="ff-section-divider" style={{ marginTop: 16 }}>Disponibilidad</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
 
@@ -1525,7 +1602,7 @@ export default function ItemDetail() {
               </span>
               <span style={{ fontSize: 14, color: 'var(--text-secondary)', minWidth: 150, textAlign: 'right' }}>{item.enPedido} unidades</span>
             </div>
-            {item.entregado !== undefined && (
+            {item.entregado != null && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
                   Entregado histórico <span style={{ color: 'var(--text-tertiary)' }}>(ya vendido y despachado — informativo)</span>
@@ -1680,16 +1757,32 @@ export default function ItemDetail() {
         <UpdatePricesModal
           item={item}
           actualizarCostoEnCompraDefault={actualizarCostoEnCompraDefault}
+          visibilidad={datos}
           onClose={() => setShowPricesModal(false)}
           onSuccess={(result) => {
-            queryClient.setQueryData(['item', id], (old: Item | undefined) =>
+            // §8.6: la respuesta del PUT no se recorta — el parche optimista solo puede incluir
+            // campos visibles, nivel por nivel (el invalidate de abajo trae la ficha recortada).
+            queryClient.setQueryData(['item', id], (old: { item: Item; meta: { datosRestringidos?: string[] } } | undefined) =>
               old
                 ? {
                     ...old,
-                    valuationRate: result.purchasePrice,
-                    standardRate: result.standardRate,
-                    priceMode: result.priceMode,
-                    prices: result.prices,
+                    item: {
+                      ...old.item,
+                      ...(!restr.has('costo')
+                        ? { valuationRate: result.purchasePrice, priceMode: result.priceMode }
+                        : {}),
+                      ...(!restr.has('precioA') || !restr.has('precioB') || !restr.has('precioC')
+                        ? {
+                            standardRate: result.standardRate,
+                            prices: {
+                              ...old.item.prices,
+                              ...(!restr.has('precioA') ? { A: result.prices?.A } : {}),
+                              ...(!restr.has('precioB') ? { B: result.prices?.B } : {}),
+                              ...(!restr.has('precioC') ? { C: result.prices?.C } : {}),
+                            },
+                          }
+                        : {}),
+                    },
                   }
                 : old,
             )

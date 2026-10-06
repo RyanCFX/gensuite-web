@@ -278,6 +278,9 @@ export const ERRORES_ACCESO_403 = new Set([
   'RECURSO_NO_PERMITIDO',
   'WIDGET_NO_PERMITIDO',
   'WIDGET_NO_CONTRATADO',
+  // Datos del artículo (docs/tasks/PROMPT_DATOS_ARTICULO_FRONTEND.md §7): filtro u orden
+  // sobre un dato restringido.
+  'DATO_NO_PERMITIDO',
 ])
 
 /** ¿Es un 403 de acceso que amerita refrescar /me/acceso + /me/permissions? */

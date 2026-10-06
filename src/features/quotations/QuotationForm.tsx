@@ -31,6 +31,7 @@ import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { isPinPrecioError } from '@/lib/pinOverride'
 import { isPrecioCatalogoError, precioBloqueadoParaLinea } from '@/lib/precioCatalogo'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
+import { focusLineQty, lineQtyId } from '@/lib/focusLineQty'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { lookupItems, getItemLookup } from '@/shared/api/catalog'
 import { client } from '@/shared/api/client'
@@ -441,6 +442,7 @@ useEffect(() => {
       const existingIndex = items.findIndex((row) => row.itemCode === item.id)
       if (existingIndex !== -1) {
         flashRow(existingIndex)
+        focusLineQty(existingIndex)
         return
       }
       const targetIndex = items.length
@@ -448,6 +450,7 @@ useEffect(() => {
       setTimeout(() => {
         selectCatalogItem(targetIndex, item, { autoAddRow: false })
         addRow()
+        focusLineQty(targetIndex)
       }, 0)
     },
   })
@@ -732,13 +735,13 @@ function buildDto(): CreateQuotationDto {
           salesTaxPct: s.item.salesTaxPct ?? 0,
           salesTaxTemplate: s.item.salesTaxTemplate ?? '',
           uom: s.item.stockUom ?? 'Unidad',
-          maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
+          maxDiscountPct: s.item.allowsDiscount ? (s.item.maxDiscountPct ?? undefined) : undefined,
           autoDiscountPct: s.item.autoDiscount?.discountType === 'Discount Percentage' ? s.item.autoDiscount.discountPercentage : undefined,
           manualDiscountPct: 0,
-          allowsDiscount: s.item.allowsDiscount,
+          allowsDiscount: s.item.allowsDiscount ?? undefined,
           _prices: s.item.prices,
           warehouse: defaultWarehouse(),
-          _stockByWarehouse: s.item.stockByWarehouse,
+          _stockByWarehouse: s.item.stockByWarehouse ?? undefined,
           itemDimensionesDeclaradas: s.item.usaDimensiones ? s.item.dimensiones : undefined,
           dimensiones: undefined,
         }
@@ -774,19 +777,19 @@ function buildDto(): CreateQuotationDto {
           precioManual: undefined,
           conversionFactor: 1,
           amount: calcAmount(row.qty, rate, (autoDiscountPct ?? 0) + defaultManualPct, 0),
-          maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+          maxDiscountPct: catalogItem.allowsDiscount ? (catalogItem.maxDiscountPct ?? undefined) : undefined,
           autoDiscountPct,
           discountPct: (autoDiscountPct ?? 0) + defaultManualPct,
           discountMode: 'pct' as const,
           discountAmount: 0,
           manualDiscountPct: defaultManualPct,
-          allowsDiscount: catalogItem.allowsDiscount,
+          allowsDiscount: catalogItem.allowsDiscount ?? undefined,
           uom: catalogItem.stockUom ?? row.uom,
           _prices: catalogItem.prices,
           salesTaxPct: catalogItem.salesTaxPct ?? 0,
           salesTaxTemplate: catalogItem.salesTaxTemplate ?? '',
           warehouse: defaultWarehouse(),
-          _stockByWarehouse: catalogItem.stockByWarehouse,
+          _stockByWarehouse: catalogItem.stockByWarehouse ?? undefined,
           stockError: undefined,
           // Un artículo nuevo en la fila implica una combinación nueva — nunca arrastramos la
           // combinación del artículo anterior (§5).
@@ -1278,6 +1281,7 @@ if (esClienteOcasional) {
 
                       <td>
                         <QtyInput
+                          id={lineQtyId(index)}
                           className={`items-input${(submitted && (!item.qty || item.qty <= 0)) || item.stockError ? ' items-input-error' : ''}`}
                           value={item.qty}
                           uom={item.uom}

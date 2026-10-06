@@ -33,6 +33,7 @@ import type { VariantSelection } from '@/components/shared/VariantsModal'
 import type { OrdenCompraImportLine } from '@/components/shared/SeleccionarOrdenCompraModal'
 import { listOrdenesCompra, getOrdenCompra } from '@/shared/api/ordenes-compra'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
+import { focusLineQty, lineQtyId } from '@/lib/focusLineQty'
 import { lookupItems, getItemLookup } from '@/shared/api/catalog'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
@@ -310,6 +311,7 @@ function SerialBatchRow({
         </td>
         <td>
           <QtyInput
+            id={lineQtyId(idx)}
             className="items-input"
             style={{ textAlign: 'right' }}
             value={item.qty}
@@ -682,6 +684,7 @@ export default function CompraForm() {
       setTimeout(() => {
         selectCatalogItem(targetIndex, item, { autoAddRow: false })
         setItems((prev) => [...prev, emptyItem(defaultWh)])
+        focusLineQty(targetIndex)
       }, 0)
     },
   })

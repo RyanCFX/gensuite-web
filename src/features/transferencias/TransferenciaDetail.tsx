@@ -5,19 +5,26 @@ import { getTransferencia, confirmarTransferencia, cancelarTransferencia } from 
 import { getUsuarioAlmacenesPermitidos } from '@/shared/api/usuarios'
 import { getCachedUser } from '@/shared/api/storage'
 import { formatDate } from '@/lib/formatters'
-import { ArrowLeft, Check, X, Loader2 } from 'lucide-react'
+import { usePuede } from '@/shared/permissions/can'
+import { useFeature } from '@/shared/features/can'
+import { Modal, ConfirmModal } from '@/shared/ui/Modal'
+import { useDimensionesInventario, useValoresDimension } from '@/shared/hooks/useDimensionesInventario'
+import { ArrowLeft, Check, X, Loader2, BookOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
-
-const ITEMS_COLUMNS = [
-  { key: 'articulo', width: 240 },
-  { key: 'cantidad', width: 120 },
-]
 
 const MODAL_COLUMNS = [
   { key: 'articulo', width: 200 },
   { key: 'cantidad', width: 110 },
 ]
+
+/** Valor legible de una celda de dimensión — se resuelve contra el catálogo de valores del eje. */
+function DimensionValorCell({ codigo, id }: { codigo: string; id: string | undefined }) {
+  const { etiquetaDe, isLoading } = useValoresDimension(codigo)
+  if (!id) return <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+  if (isLoading) return <span className="skeleton-box" style={{ width: 60, height: 14, display: 'inline-block' }} />
+  return <>{etiquetaDe(id)}</>
+}
 
 const STATUS_BADGE: Record<string, string> = {
   draft: 'badge-neutral',
@@ -40,14 +47,27 @@ export default function TransferenciaDetail() {
 
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
-  const { widths: itemsColWidths, startResize: startItemsResize } = useResizableColumns(ITEMS_COLUMNS)
   const { widths: modalColWidths, startResize: startModalResize } = useResizableColumns(MODAL_COLUMNS)
+
+  const tieneContabilidad = useFeature('contabilidad')
+  const puedeVerLibro = usePuede('contabilidad.libros.ver')
 
   const { data: t, isLoading } = useQuery({
     queryKey: ['transferencia', id],
     queryFn: () => getTransferencia(id!),
     enabled: !!id,
   })
+
+  // Una columna por cada eje de dimensión que tenga al menos una línea (como facturas/nueva).
+  const dimensionCodes = Array.from(new Set((t?.items ?? []).flatMap((i) => Object.keys(i.dimensiones ?? {}))))
+  const { etiquetaDe: dimensionEtiquetaDe } = useDimensionesInventario({ enabled: dimensionCodes.length > 0 })
+  const ITEMS_COLUMNS = [
+    { key: 'codigo', width: 120 },
+    { key: 'articulo', width: 240 },
+    ...dimensionCodes.map((code) => ({ key: `dim:${code}`, width: 140 })),
+    { key: 'cantidad', width: 120 },
+  ]
+  const { widths: itemsColWidths, startResize: startItemsResize } = useResizableColumns(ITEMS_COLUMNS)
 
   const { data: myWarehouses } = useQuery({
     queryKey: ['usuarioAlmacenesPermitidos', currentUserEmail],
@@ -93,6 +113,8 @@ export default function TransferenciaDetail() {
     )
   }
 
+  const createdDate = t.createdAt.split('T')[0]
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -100,54 +122,79 @@ export default function TransferenciaDetail() {
           <a className="page-back-link" onClick={() => navigate('/transferencias')}><ArrowLeft size={14} /> Transferencias</a>
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="page-title-dot" />
-            Transferencia: {t.fromWarehouse} → {t.toWarehouse}
+            Transferencia {t.id}
             <span className={`badge ${STATUS_BADGE[t.status] ?? 'badge-neutral'}`}>{STATUS_LABEL[t.status] ?? t.status}</span>
           </h1>
+          <p className="page-sub">{t.fromWarehouse} → {t.toWarehouse}</p>
         </div>
       </div>
 
-      {t.status === 'in_transit' && (
-        <div className="doc-actions-bar" style={{ background: 'transparent', border: 'none', padding: 0, marginBottom: 16 }}>
+      <div className="doc-actions-bar" style={{ background: 'transparent', border: 'none', padding: 0, marginBottom: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {t.status === 'in_transit' && (
+          <>
+            <button
+              className="btn btn-navy btn-size-md"
+              title={canConfirm ? undefined : 'No tienes acceso a la sucursal destino'}
+              disabled={!canConfirm}
+              onClick={() => setConfirmOpen(true)}
+            >
+              <Check size={14} /> Confirmar Recepción
+            </button>
+            <button className="btn btn-danger btn-size-md" onClick={() => setCancelOpen(true)}>
+              <X size={14} /> Cancelar
+            </button>
+          </>
+        )}
+        {tieneContabilidad && puedeVerLibro && (t.status === 'in_transit' || t.status === 'completed') && (
           <button
-            className="btn btn-navy btn-size-md"
-            title={canConfirm ? undefined : 'No tienes acceso a la sucursal destino'}
-            disabled={!canConfirm}
-            onClick={() => setConfirmOpen(true)}
+            className="btn btn-secondary btn-size-md"
+            onClick={() => {
+              navigate(
+                `/contabilidad/libro-diario?voucherNo=${encodeURIComponent(t.id)}` +
+                `&voucherType=Stock+Entry&fromDate=${createdDate}&toDate=${createdDate}`,
+              )
+            }}
           >
-            <Check size={14} /> Confirmar Recepción
+            <BookOpen size={14} /> Ver asientos
           </button>
-          <button className="btn btn-danger btn-size-md" onClick={() => setCancelOpen(true)}>
-            <X size={14} /> Cancelar
-          </button>
-        </div>
-      )}
+        )}
+      </div>
 
-      <div className="card">
-        <div className="card-header navy-card-header"><h2 className="card-title">Información General</h2></div>
-        <div className="card-body">
-          <div className="form-row form-row-3">
-            <div>
-              <div className="ff-label" style={{ marginBottom: 4 }}>Almacén Origen</div>
-              <div style={{ fontWeight: 500 }}>{t.fromWarehouse}</div>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-header navy-card-header">
+          <h2 className="card-title">Información de la Transferencia</h2>
+        </div>
+        <div className="card-body" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="fields-grid">
+            <div className="detail-field">
+              <span className="detail-label">Almacén Origen</span>
+              <span className="detail-value">{t.fromWarehouse}</span>
             </div>
-            <div>
-              <div className="ff-label" style={{ marginBottom: 4 }}>Almacén Destino</div>
-              <div style={{ fontWeight: 500 }}>{t.toWarehouse}</div>
+            <div className="detail-field">
+              <span className="detail-label">Almacén Destino</span>
+              <span className="detail-value">{t.toWarehouse}</span>
             </div>
-            <div>
-              <div className="ff-label" style={{ marginBottom: 4 }}>Fecha de Creación</div>
-              <div>{formatDate(t.createdAt)}</div>
+            <div className="detail-field">
+              <span className="detail-label">Fecha de Creación</span>
+              <span className="detail-value">{formatDate(t.createdAt)}</span>
             </div>
+            {t.confirmationId && (
+              <div className="detail-field">
+                <span className="detail-label">Recepción (Stock Entry)</span>
+                <span className="detail-value" style={{ fontFamily: 'var(--font-body)' }}>{t.confirmationId}</span>
+              </div>
+            )}
           </div>
-          {t.confirmationId && (
-            <div className="inline-alert" style={{ marginTop: 16 }}>
-              Recepción confirmada — Stock Entry: <span style={{ fontFamily: 'var(--font-body)' }}>{t.confirmationId}</span>
+          {t.notes && (
+            <div className="detail-field" style={{ paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+              <span className="detail-label">Notas</span>
+              <span className="detail-value" style={{ whiteSpace: 'pre-line' }}>{t.notes}</span>
             </div>
           )}
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 20 }}>
+      <div className="card">
         <div className="items-table-wrap">
           <table className="items-table navy-table items-table-resizable">
             <colgroup>
@@ -156,9 +203,19 @@ export default function TransferenciaDetail() {
             <thead>
               <tr>
                 <th>
+                  Código
+                  <span className="col-resize-handle" onMouseDown={startItemsResize('codigo')} />
+                </th>
+                <th>
                   Artículo
                   <span className="col-resize-handle" onMouseDown={startItemsResize('articulo')} />
                 </th>
+                {dimensionCodes.map((code) => (
+                  <th key={code}>
+                    {dimensionEtiquetaDe(code)}
+                    <span className="col-resize-handle" onMouseDown={startItemsResize(`dim:${code}`)} />
+                  </th>
+                ))}
                 <th style={{ textAlign: 'right' }}>
                   Cantidad
                   <span className="col-resize-handle" onMouseDown={startItemsResize('cantidad')} />
@@ -168,7 +225,11 @@ export default function TransferenciaDetail() {
             <tbody>
               {t.items.map((i, idx) => (
                 <tr key={idx}>
+                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{i.itemCode || '—'}</td>
                   <td>{i.itemName ?? i.itemCode}</td>
+                  {dimensionCodes.map((code) => (
+                    <td key={code}><DimensionValorCell codigo={code} id={i.dimensiones?.[code]} /></td>
+                  ))}
                   <td style={{ textAlign: 'right' }}>{i.qty}</td>
                 </tr>
               ))}
@@ -177,85 +238,61 @@ export default function TransferenciaDetail() {
         </div>
       </div>
 
-      {t.notes && (
-        <div className="card" style={{ marginTop: 20 }}>
-          <div className="card-header navy-card-header"><h2 className="card-title">Notas</h2></div>
-          <div className="card-body">
-            <p style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{t.notes}</p>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Confirmar recepción"
+        size="sm"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setConfirmOpen(false)}>Cancelar</button>
+            <button className="btn btn-navy" onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending}>
+              {confirmMutation.isPending ? <Loader2 size={14} className="spinner" /> : null}
+              Confirmar Recepción
+            </button>
+          </>
+        }
+      >
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          Vas a recibir en <strong>{t.toWarehouse}</strong> los siguientes artículos, provenientes de <strong>{t.fromWarehouse}</strong>:
+        </p>
+        <table className="data-table navy-table items-table-resizable" style={{ marginTop: 12 }}>
+          <colgroup>
+            {MODAL_COLUMNS.map((c) => <col key={c.key} style={{ width: modalColWidths[c.key] }} />)}
+          </colgroup>
+          <thead>
+            <tr>
+              <th>
+                Artículo
+                <span className="col-resize-handle" onMouseDown={startModalResize('articulo')} />
+              </th>
+              <th style={{ textAlign: 'right' }}>
+                Cantidad
+                <span className="col-resize-handle" onMouseDown={startModalResize('cantidad')} />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.items.map((i, idx) => (
+              <tr key={idx}>
+                <td>{i.itemName ?? i.itemCode}</td>
+                <td style={{ textAlign: 'right' }}>{i.qty}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Modal>
 
-      {confirmOpen && (
-        <div className="modal-overlay" onClick={() => setConfirmOpen(false)}>
-          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h2 className="modal-title">Confirmar recepción</h2>
-              <button className="modal-close" onClick={() => setConfirmOpen(false)}><X size={16} /></button>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                Vas a recibir en <strong>{t.toWarehouse}</strong> los siguientes artículos, provenientes de <strong>{t.fromWarehouse}</strong>:
-              </p>
-              <table className="data-table navy-table items-table-resizable" style={{ marginTop: 12 }}>
-                <colgroup>
-                  {MODAL_COLUMNS.map((c) => <col key={c.key} style={{ width: modalColWidths[c.key] }} />)}
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th>
-                      Artículo
-                      <span className="col-resize-handle" onMouseDown={startModalResize('articulo')} />
-                    </th>
-                    <th style={{ textAlign: 'right' }}>
-                      Cantidad
-                      <span className="col-resize-handle" onMouseDown={startModalResize('cantidad')} />
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {t.items.map((i, idx) => (
-                    <tr key={idx}>
-                      <td>{i.itemName ?? i.itemCode}</td>
-                      <td style={{ textAlign: 'right' }}>{i.qty}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setConfirmOpen(false)}>Cancelar</button>
-              <button className="btn btn-navy" onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending}>
-                {confirmMutation.isPending ? <Loader2 size={14} className="spinner" /> : null}
-                Confirmar Recepción
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {cancelOpen && (
-        <div className="modal-overlay" onClick={() => setCancelOpen(false)}>
-          <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <h2 className="modal-title">¿Cancelar transferencia?</h2>
-              <button className="modal-close" onClick={() => setCancelOpen(false)}><X size={16} /></button>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                Se cancelará la transferencia de <strong>{t.fromWarehouse}</strong> a <strong>{t.toWarehouse}</strong> y el stock regresará al origen.
-              </p>
-            </div>
-            <div className="modal-foot">
-              <button className="btn btn-secondary" onClick={() => setCancelOpen(false)}>Volver</button>
-              <button className="btn btn-danger" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>
-                {cancelMutation.isPending ? <Loader2 size={14} className="spinner" /> : null}
-                Cancelar Transferencia
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        open={cancelOpen}
+        onClose={() => setCancelOpen(false)}
+        onConfirm={() => cancelMutation.mutate()}
+        title="¿Cancelar transferencia?"
+        description={`Se cancelará la transferencia de ${t.fromWarehouse} a ${t.toWarehouse} y el stock regresará al origen.`}
+        confirmLabel="Cancelar Transferencia"
+        variant="danger"
+        loading={cancelMutation.isPending}
+      />
     </div>
   )
 }

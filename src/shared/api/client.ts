@@ -321,6 +321,17 @@ client.interceptors.response.use(
     // `silent403`: la request lo pide (ej. filtros de tablas, que se ocultan solos).
     const silent403 = (error.config as { silent403?: boolean } | undefined)?.silent403
 
+    // Datos del artículo (docs/tasks/PROMPT_DATOS_ARTICULO_FRONTEND.md §7.3): el acceso pudo
+    // haber cambiado — refresco silencioso para que la UI se corrija sola. No se reintenta acá:
+    // `details.parametros` trae etiquetas legibles (no nombres de query param), así que es cada
+    // pantalla la que quita sus filtros/órdenes restringidos y reintenta una sola vez.
+    if (!isAuthEndpoint && errorCode === 'DATO_NO_PERMITIDO') {
+      refreshAccesoDebounced()
+      const datoMsg = data?.error?.message
+      if (datoMsg && !silent403 && shouldToastPermiso(datoMsg)) toast.error(datoMsg)
+      return Promise.reject(data.error)
+    }
+
     if (!isAuthEndpoint && (errorCode === 'PERMISO_INSUFICIENTE' || errorCode === 'FORBIDDEN')) {
       // Toast throttleado: un mismo mensaje puede llegar en ráfaga (react-query reintenta,
       // varias queries fallan a la vez) — no spamear al usuario con el mismo aviso.
@@ -523,6 +534,11 @@ export const ERROR_CODES = {
   // Permisos v2 (docs/tasks/PROMPT_PERMISOS_V2_Y_DASHBOARD_MODULAR_FRONTEND.md §9) —
   // 403 de acceso (manejados centralmente arriba) y validaciones de la admin de acceso.
   FILTRO_NO_PERMITIDO: 'FILTRO_NO_PERMITIDO',
+  // Datos del artículo (docs/tasks/PROMPT_DATOS_ARTICULO_FRONTEND.md §7): filtro u orden sobre
+  // un dato restringido. Se refresca el acceso en segundo plano; cada pantalla quita sus
+  // controles/parámetros restringidos y reintenta una sola vez (el interceptor no puede
+  // quitarlos solo: `details.parametros` trae etiquetas legibles, no nombres de query param).
+  DATO_NO_PERMITIDO: 'DATO_NO_PERMITIDO',
   RECURSO_NO_PERMITIDO: 'RECURSO_NO_PERMITIDO',
   WIDGET_NO_PERMITIDO: 'WIDGET_NO_PERMITIDO',
   WIDGET_NO_CONTRATADO: 'WIDGET_NO_CONTRATADO',

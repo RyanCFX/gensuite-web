@@ -174,6 +174,7 @@ export default function CompraDetail() {
   // compra internamente — no hace falta el relacionId. Pero "enlazar y enviar" (compra ya
   // sometida, Fase 11) sí lo necesita en el body — de ahí el lookup de
   // `useRelacionComercialPorContraparte` (ver ese archivo para el porqué).
+  const puedeVerLibro = usePuede('contabilidad.libros.ver')
   const puedeEnviarAProveedor = usePuede('relaciones.compra.enviar-a-proveedor')
   const puedeEnlazarYEnviar = usePuede('relaciones.compra.enlazar-y-enviar')
   const puedeIgualarBorrador = usePuede('relaciones.compra.igualar')
@@ -342,6 +343,7 @@ export default function CompraDetail() {
                 <button className="btn btn-secondary btn-size-sm" onClick={() => navigate(`/devoluciones-compras/nueva?originalInvoice=${encodeURIComponent(id!)}`)}>
                   <Undo2 size={14} />Devolución
                 </button>
+                {puedeVerLibro && (
                 <button
                   className="btn btn-secondary btn-size-sm"
                   onClick={() => {
@@ -354,6 +356,7 @@ export default function CompraDetail() {
                 >
                   <BookOpen size={14} />Ver asientos
                 </button>
+                )}
                 {puedeEnlazarYEnviar && !loadingEstadoSocio && !estadoSocio?.transaccionUid && relacionSocio && (
                   <button className="btn btn-secondary btn-size-sm" onClick={() => setShowEnlazarYEnviarModal(true)}>
                     <Link2 size={14} />Enviar al proveedor

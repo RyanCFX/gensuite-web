@@ -29,6 +29,7 @@ import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
+import { focusLineQty, lineQtyId } from '@/lib/focusLineQty'
 import { lookupItems, getItemLookup } from '@/shared/api/catalog'
 import { client, isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
@@ -297,6 +298,7 @@ const [customerId, setCustomerId] = useState('')
       const existingIndex = items.findIndex((row) => row.itemCode === item.id)
       if (existingIndex !== -1) {
         flashRow(existingIndex)
+        focusLineQty(existingIndex)
         return
       }
       const targetIndex = items.length
@@ -304,6 +306,7 @@ const [customerId, setCustomerId] = useState('')
       setTimeout(() => {
         selectCatalogItem(targetIndex, item, { autoAddRow: false })
         addRow()
+        focusLineQty(targetIndex)
       }, 0)
     },
   })
@@ -693,11 +696,11 @@ useEffect(() => {
           discountAmount: 0,
            uom: catalogItem.stockUom ?? row.uom,
            conversionFactor: 1,
-           maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+           maxDiscountPct: catalogItem.allowsDiscount ? (catalogItem.maxDiscountPct ?? undefined) : undefined,
           salesTaxPct: catalogItem.salesTaxPct ?? 0,
           _prices: catalogItem.prices,
           warehouse: defaultWarehouse(),
-          _stockByWarehouse: catalogItem.stockByWarehouse,
+          _stockByWarehouse: catalogItem.stockByWarehouse ?? undefined,
           // Un artículo nuevo en la fila implica una combinación nueva — nunca arrastramos la
           // combinación del artículo anterior (docs/tasks/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md §5).
           itemDimensionesDeclaradas: catalogItem.usaDimensiones ? catalogItem.dimensiones : undefined,
@@ -782,11 +785,11 @@ useEffect(() => {
           discountAmount: 0,
           uom: s.item.stockUom ?? 'Unidad',
           conversionFactor: 1,
-          maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
+          maxDiscountPct: s.item.allowsDiscount ? (s.item.maxDiscountPct ?? undefined) : undefined,
           salesTaxPct: s.item.salesTaxPct ?? 0,
           _prices: s.item.prices,
           warehouse: defaultWarehouse(),
-          _stockByWarehouse: s.item.stockByWarehouse,
+          _stockByWarehouse: s.item.stockByWarehouse ?? undefined,
           // Variantes y dimensiones son mutuamente excluyentes por artículo (§0.4) — se respeta el
           // flag igual que en las demás vías de selección, por si alguna vez dejara de serlo.
           itemDimensionesDeclaradas: s.item.usaDimensiones ? s.item.dimensiones : undefined,
@@ -1284,7 +1287,7 @@ try {
                           const info = item.itemCode && item.warehouse ? resolveDisponible(stockMap.get(item.itemCode), item.warehouse) : undefined
                           return (
                             <>
-                              <QtyInput className={`items-input${(submitted && (!item.qty || item.qty <= 0)) || stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
+                              <QtyInput id={lineQtyId(index)} className={`items-input${(submitted && (!item.qty || item.qty <= 0)) || stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
                               {stockError ? (
                                 <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'normal', overflowWrap: 'break-word' }}>
                                   {stockError}

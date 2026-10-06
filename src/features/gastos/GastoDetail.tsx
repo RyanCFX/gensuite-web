@@ -12,6 +12,7 @@ import { SaldoFavorCxpSection } from '@/features/devoluciones-compras/SaldoFavor
 import { AsientosPreviewModal } from '@/components/shared/AsientosPreviewModal'
 import { PagoContadoModal } from '@/components/shared/PagoContadoModal'
 import { ECF_SUBMIT_UNAVAILABLE_MSG } from '@/shared/api/ecf'
+import { usePuede } from '@/shared/permissions/can'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import type { ImpuestoDistribucionDto, EcfSubmitResult, ApiError, PagoContadoDto } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
@@ -34,6 +35,7 @@ type ConfirmAction = 'submit' | 'cancel' | 'amend' | null
 
 export default function GastoDetail() {
   const { id } = useParams<{ id: string }>()
+  const puedeVerLibro = usePuede('contabilidad.libros.ver')
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const isSystemManager = useIsSystemManager()
@@ -189,6 +191,7 @@ export default function GastoDetail() {
             )}
             {gasto.status === 'submitted' && (
               <>
+                {puedeVerLibro && (
                 <button
                   className="btn btn-secondary btn-size-sm"
                   onClick={() => {
@@ -201,6 +204,7 @@ export default function GastoDetail() {
                 >
                   <BookOpen size={14} />Ver asientos
                 </button>
+                )}
                 <button className="btn btn-danger btn-size-sm" onClick={() => setConfirmAction('cancel')}>
                   <X size={14} />Anular
                 </button>

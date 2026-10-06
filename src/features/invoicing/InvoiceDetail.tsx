@@ -185,6 +185,7 @@ export default function InvoiceDetail() {
   const queryClient = useQueryClient();
   const isSystemManager = useIsSystemManager();
   const tieneContabilidad = useFeature('contabilidad');
+  const puedeVerLibro = usePuede("contabilidad.libros.ver");
   const tieneRelacionesComerciales = useFeature('relacionesComerciales');
 
   // Bloque opcional (u obligatorio si el cliente no tiene crédito) de "¿Cómo se cobra?"
@@ -1805,7 +1806,7 @@ export default function InvoiceDetail() {
             >
               <RotateCcw size={14} /> Devolver producto(s)
             </button>
-            {tieneContabilidad && (
+            {tieneContabilidad && puedeVerLibro && (
               <button
                 className="btn btn-secondary btn-size-md"
                 onClick={() => {

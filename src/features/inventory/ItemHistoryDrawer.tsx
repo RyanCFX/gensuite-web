@@ -17,6 +17,8 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { FilterField } from '@/shared/ui/FilterField'
 import { STOCK_VOUCHER_TYPES } from '@/lib/constants'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { restringidosDe } from '@/shared/permissions/datosArticulo'
+import { DatoRestringido } from '@/shared/ui/DatoRestringido'
 
 const PAGE_SIZE = 15
 
@@ -71,6 +73,8 @@ export function ItemHistoryDrawer({ itemCode, itemName, initialWarehouse, onClos
   })
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
+  // Fuente B (§4.5): cantidades sin `stock`, valoración sin `costo`. `warehouse` no se recorta.
+  const restr = restringidosDe(data ?? {})
 
   return (
     <Drawer
@@ -182,15 +186,23 @@ export function ItemHistoryDrawer({ itemCode, itemName, initialWarehouse, onClos
                             textAlign: 'right',
                             fontFamily: 'var(--font-body)',
                             fontWeight: 600,
-                            color: entry.movementQty >= 0 ? 'oklch(62.7% 0.194 149.214)' : 'oklch(51.4% 0.222 16.935)',
+                            color: (entry.movementQty ?? 0) >= 0 ? 'oklch(62.7% 0.194 149.214)' : 'oklch(51.4% 0.222 16.935)',
                           }}
                           >
-                            {formatNumber(entry.movementQty)}
+                            {entry.movementQty == null
+                              ? <DatoRestringido bloqueante={restr.has('stock')}>—</DatoRestringido>
+                              : formatNumber(entry.movementQty)}
                           </td>
                           <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>
-                            {formatNumber(entry.stockAfter)}
+                            {entry.stockAfter == null
+                              ? <DatoRestringido bloqueante={restr.has('stock')}>—</DatoRestringido>
+                              : formatNumber(entry.stockAfter)}
                           </td>
-                          <td style={{ textAlign: 'right' }}>{formatDOP(entry.valuationRate)}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            {entry.valuationRate == null
+                              ? <DatoRestringido bloqueante={restr.has('costo')}>—</DatoRestringido>
+                              : formatDOP(entry.valuationRate)}
+                          </td>
                           <td className="td-muted">{entry.voucherType}</td>
                           <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{entry.voucherNo}</td>
                           <td>

@@ -10,7 +10,7 @@ import {
 // Editor de árbol Módulo → Pantalla → Componente (perfiles y excepciones de usuario).
 // docs/tasks/PROMPT_PERMISOS_V2_Y_DASHBOARD_MODULAR_FRONTEND.md §7.3.
 
-export type FiltroTipo = 'todos' | 'vista' | 'accion' | 'filtro' | 'exportar' | 'widget'
+export type FiltroTipo = 'todos' | 'vista' | 'accion' | 'filtro' | 'exportar' | 'widget' | 'dato'
 
 const TIPO_LABEL: Record<string, string> = {
   vista: 'Vista',
@@ -18,6 +18,10 @@ const TIPO_LABEL: Record<string, string> = {
   filtro: 'Filtro',
   exportar: 'Exportar',
   widget: 'Dashboard',
+  // Datos del artículo (docs/tasks/PROMPT_DATOS_ARTICULO_FRONTEND.md §9): qué información del
+  // artículo ve la persona dentro de Productos e Inventario. Un tipo desconocido cae al genérico
+  // (`?? c.tipo`), nunca rompe el árbol.
+  dato: 'Dato',
 }
 
 function vacio(): EstadoPantalla {
@@ -104,6 +108,7 @@ export function ArbolPermisos({ catalogo, estados, onChange, readOnly = false }:
             <option value="filtro">Filtros</option>
             <option value="exportar">Exportar</option>
             <option value="widget">Dashboard</option>
+            <option value="dato">Datos</option>
           </select>
         </div>
       </div>
@@ -154,8 +159,7 @@ export function ArbolPermisos({ catalogo, estados, onChange, readOnly = false }:
                 return (
                   <div key={p.key} style={{ borderTop: '1px solid var(--border-default)', paddingTop: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, minWidth: 140 }}>{p.nombre}</span>
-                      {!readOnly && (
+                      <span style={{ fontSize: 13, fontWeight: 600, minWidth: 140 }}>{p.nombre}</span>                      {!readOnly && (
                         <div role="radiogroup" aria-label={p.nombre} style={{ display: 'flex', gap: 12, fontSize: 13 }}>
                           <label className="ff-check-wrap">
                             <input type="radio" className="ff-check" checked={nada} onChange={() => marcarPantalla(p, 'nada')} />
@@ -177,7 +181,12 @@ export function ArbolPermisos({ catalogo, estados, onChange, readOnly = false }:
                       )}
                       <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{marcados} de {total}</span>
                     </div>
-                    {comps.length > 0 && (
+                    {p.key === 'catalogo.datos-articulo' && (
+                      <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '6px 0 0' }}>
+                        Estos permisos limitan qué información del artículo ve la persona dentro de
+                        Productos e Inventario. Código, descripción, categoría y marca siempre se ven.
+                      </p>
+                    )}                    {comps.length > 0 && (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 4, marginTop: 6 }}>
                         {comps.map((c) => {
                           const marcado = e.marcados.has(c.key)

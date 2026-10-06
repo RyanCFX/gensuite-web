@@ -31,6 +31,17 @@ import type {
 
 // ---- Items ----
 
+/** Meta mínima de recorte (docs/tasks/PROMPT_DATOS_ARTICULO_FRONTEND.md §3.2): solo trae
+ *  `datosRestringidos` cuando algo se recortó; ausente = sin recorte. */
+export interface MetaRecorte {
+  datosRestringidos?: string[];
+}
+
+export interface ItemConMeta {
+  item: Item;
+  meta: MetaRecorte;
+}
+
 export interface ListItemsParams extends PaginationParams {
   category?: string
   brand?: string
@@ -67,9 +78,9 @@ export async function listItems(params?: ListItemsParams) {
   return unwrapPaginated(res)
 }
 
-export async function getItem(id: string) {
-  const res = await client.get<{ success: true; data: Item }>(ENDPOINTS.catalog.items.byId(id))
-  return unwrap(res)
+export async function getItem(id: string): Promise<ItemConMeta> {
+  const res = await client.get<{ success: true; data: Item; meta?: MetaRecorte }>(ENDPOINTS.catalog.items.byId(id))
+  return { item: res.data.data, meta: res.data.meta ?? {} }
 }
 
 /** Búsqueda de artículos para formularios (agregar a una línea). Sin costos ni márgenes
@@ -144,9 +155,9 @@ export async function listServicios(params?: ListItemsParams) {
   return unwrapPaginated(res)
 }
 
-export async function getServicio(id: string) {
-  const res = await client.get<{ success: true; data: Item }>(ENDPOINTS.catalog.servicios.byId(id))
-  return unwrap(res)
+export async function getServicio(id: string): Promise<ItemConMeta> {
+  const res = await client.get<{ success: true; data: Item; meta?: MetaRecorte }>(ENDPOINTS.catalog.servicios.byId(id))
+  return { item: res.data.data, meta: res.data.meta ?? {} }
 }
 
 export async function createServicio(data: CreateItemDto) {
@@ -298,9 +309,9 @@ export async function updateAttribute(id: string, data: UpdateAttributeDto) {
 
 // ─── Variants ─────────────────────────────────────────────────────────────────
 
-export async function listItemVariants(itemId: string) {
-  const res = await client.get<{ success: true; data: Item[] }>(`/catalog/items/${encodeURIComponent(itemId)}/variants`)
-  return unwrap(res)
+export async function listItemVariants(itemId: string): Promise<{ items: Item[]; meta: MetaRecorte }> {
+  const res = await client.get<{ success: true; data: Item[]; meta?: MetaRecorte }>(`/catalog/items/${encodeURIComponent(itemId)}/variants`)
+  return { items: res.data.data, meta: res.data.meta ?? {} }
 }
 
 export async function generateVariants(itemId: string): Promise<GenerateVariantsResult> {

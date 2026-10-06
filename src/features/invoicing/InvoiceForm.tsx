@@ -44,6 +44,7 @@ import { PinModal } from '@/components/shared/PinModal'
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
+import { focusLineQty, lineQtyId } from '@/lib/focusLineQty'
 import { getUsuario, getUsuarioSucursales } from '@/shared/api/usuarios'
 import { useSucursalAlmacenes } from '@/shared/hooks/useSucursalAlmacenes'
 import { getCachedUser } from '@/shared/api/storage'
@@ -441,6 +442,7 @@ export default function InvoiceForm() {
       if (existingIndex !== -1) {
         updateItem(existingIndex, { qty: items[existingIndex].qty + 1 })
         flashRow(existingIndex)
+        focusLineQty(existingIndex)
         return
       }
       const targetIndex = items.length
@@ -448,6 +450,7 @@ export default function InvoiceForm() {
       setTimeout(() => {
         selectCatalogItem(targetIndex, item, { autoAddRow: false })
         addRow()
+        focusLineQty(targetIndex)
       }, 0)
     },
   })
@@ -928,13 +931,13 @@ export default function InvoiceForm() {
             baseRate: it.rate,
             uom: it.uom || cat?.stockUom || 'Unidad',
             conversionFactor: 1,
-            maxDiscountPct: cat?.allowsDiscount ? cat?.maxDiscountPct : undefined,
+            maxDiscountPct: cat?.allowsDiscount ? (cat?.maxDiscountPct ?? undefined) : undefined,
             autoDiscountPct: undefined,
             manualDiscountPct: discountMode === 'pct' ? discountPct : 0,
-            allowsDiscount: cat?.allowsDiscount,
+            allowsDiscount: cat?.allowsDiscount ?? undefined,
             warehouse: it.warehouse ?? '',
             _prices: cat?.prices,
-            _stockByWarehouse: cat?.stockByWarehouse,
+            _stockByWarehouse: cat?.stockByWarehouse ?? undefined,
             ubicacion: it.ubicacion || undefined,
             _usaDimensiones: cat?.usaDimensiones,
             _itemDimensiones: cat?.dimensiones,
@@ -1050,18 +1053,18 @@ export default function InvoiceForm() {
            amount: calcAmount(row.qty, rate, (autoDiscountPct ?? 0) + defaultManualPct, 0),
           uom: catalogItem.stockUom ?? row.uom,
           conversionFactor: 1,
-          maxDiscountPct: catalogItem.allowsDiscount ? catalogItem.maxDiscountPct : undefined,
+          maxDiscountPct: catalogItem.allowsDiscount ? (catalogItem.maxDiscountPct ?? undefined) : undefined,
           autoDiscountPct,
           discountPct: (autoDiscountPct ?? 0) + defaultManualPct,
           discountMode: 'pct',
           discountAmount: 0,
           manualDiscountPct: defaultManualPct,
-          allowsDiscount: catalogItem.allowsDiscount,
+          allowsDiscount: catalogItem.allowsDiscount ?? undefined,
           _prices: catalogItem.prices,
           salesTaxPct: catalogItem.salesTaxPct ?? 0,
           salesTaxTemplate: catalogItem.salesTaxTemplate ?? '',
           warehouse: defaultWarehouse(),
-          _stockByWarehouse: catalogItem.stockByWarehouse,
+          _stockByWarehouse: catalogItem.stockByWarehouse ?? undefined,
           _comboComponents: undefined,
           componentTracking: undefined,
           ubicacion: undefined,
@@ -1189,13 +1192,13 @@ export default function InvoiceForm() {
           salesTaxTemplate: s.item.salesTaxTemplate ?? '',
           uom: s.item.stockUom ?? 'Unidad',
           conversionFactor: 1,
-          maxDiscountPct: s.item.allowsDiscount ? s.item.maxDiscountPct : undefined,
+          maxDiscountPct: s.item.allowsDiscount ? (s.item.maxDiscountPct ?? undefined) : undefined,
           autoDiscountPct: s.item.autoDiscount?.discountType === 'Discount Percentage' ? s.item.autoDiscount.discountPercentage : undefined,
           manualDiscountPct: 0,
-          allowsDiscount: s.item.allowsDiscount,
+          allowsDiscount: s.item.allowsDiscount ?? undefined,
           _prices: s.item.prices,
           warehouse: defaultWarehouse(),
-          _stockByWarehouse: s.item.stockByWarehouse,
+          _stockByWarehouse: s.item.stockByWarehouse ?? undefined,
         }
       }),
     ])
@@ -1953,7 +1956,7 @@ persistInvoice(buildInvoiceDto())
                           const info = item.itemCode && item.warehouse ? resolveDisponible(stockMap.get(item.itemCode), item.warehouse) : undefined
                           return (
                             <>
-                              <QtyInput className={`items-input${stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
+                              <QtyInput id={lineQtyId(index)} className={`items-input${stockError ? ' items-input-error' : ''}`} value={item.qty} uom={item.uom} onChange={(v) => updateItem(index, { qty: v })} style={{ textAlign: 'right' }} />
                               {stockError ? (
                                 <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
                                   {stockError}

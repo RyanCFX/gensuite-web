@@ -23,6 +23,7 @@ import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/
 import { VariantsModal } from '@/components/shared/VariantsModal'
 import type { VariantSelection } from '@/components/shared/VariantsModal'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
+import { focusLineQty, lineQtyId } from '@/lib/focusLineQty'
 import { lookupItems, getItemLookup } from '@/shared/api/catalog'
 import { SeleccionarOrdenCompraModal } from '@/components/shared/SeleccionarOrdenCompraModal'
 import type { OrdenCompraImportLine } from '@/components/shared/SeleccionarOrdenCompraModal'
@@ -249,6 +250,7 @@ function SerialBatchRow({
         </td>
         <td>
           <QtyInput
+            id={lineQtyId(idx)}
             className="items-input"
             style={{ textAlign: 'right' }}
             value={item.qty}
@@ -525,7 +527,8 @@ export default function RecepcionForm() {
       const item = res.items?.[0]
       if (!item) { toast.error(`Código de barras no encontrado: ${code}`); return }
       setItems((prev) => [...prev, emptyItem(defaultWh)])
-      setTimeout(() => selectCatalogItem(items.length, item), 0)
+      const targetIndex = items.length
+      setTimeout(() => { selectCatalogItem(targetIndex, item); focusLineQty(targetIndex) }, 0)
     },
   })
 

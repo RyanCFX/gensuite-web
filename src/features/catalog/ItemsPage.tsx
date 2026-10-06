@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { listItems, toggleItem, listServicios, toggleServicio } from '@/shared/api/catalog'
 import { listUOMs } from '@/shared/api/config'
 import type { Item } from '@/shared/api/types'
+import type { DatoArticulo } from '@/shared/permissions/datosArticulo'
+import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatDOP } from '@/lib/formatters'
 import { Plus, Eye, ToggleLeft, ToggleRight, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
@@ -23,10 +25,16 @@ import { usePuede } from '@/shared/permissions/can'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 import { SearchInput } from '@/shared/ui/SearchInput'
+import { useDatosArticulo, veAlgunPrecio, restringidosDe } from '@/shared/permissions/datosArticulo'
+import { DatoRestringido } from '@/shared/ui/DatoRestringido'
 
 const PAGE_SIZE = 20
 
-function StockBadge({ item }: { item: Item }) {
+// Política de columnas restringidas (§5.2 del doc de datos del artículo, única en toda la app):
+// la columna se OCULTA cuando el dato no es visible (Fuente A, store); si el store está
+// desactualizado y la respuesta igual recorta, la celda muestra "—" (Fuente B, meta).
+function StockBadge({ item, restringido }: { item: Item; restringido?: boolean }) {
+  if (restringido) return <DatoRestringido bloqueante />
   const stock = item.currentStock ?? 0
   let status: 'in-stock' | 'low-stock' | 'out-stock'
   if (stock <= 0) status = 'out-stock'
@@ -107,11 +115,42 @@ export default function ItemsPage() {
   const debouncedSearch = search
   const offset = (page - 1) * PAGE_SIZE
 
-  const { data, isLoading, isError } = useQuery({
+  // ─── Datos del artículo (§3) ──────────────────────────────────────────
+  // Fuente A (store) decide estructura y controles; Fuente B (meta de la respuesta) decide
+  // cómo se pinta cada celda. Columnas restringidas: se OCULTAN (política única de la app).
+  const datos = useDatosArticulo()
+  const hayPrecio = veAlgunPrecio(datos)
+  const colPrecio = hayPrecio
+  const colStock = isProduct && datos.stock
+  const colDescuento = datos.descuento
+  const colCount = (isProduct ? 10 : 8) - (colPrecio ? 0 : 1) - (colStock ? 0 : 1) - (colDescuento ? 0 : 1)
+
+  // Orden efectivo: nunca se envía un orden apoyado en un dato restringido (§7.1).
+  const campoOrden = orderBy.startsWith('-') ? orderBy.slice(1) : orderBy
+  const ordenRestringido =
+    (campoOrden === 'standardRate' || campoOrden === 'rate') ? !hayPrecio
+    : campoOrden === 'currentStock' ? !datos.stock
+    : false
+  const orderByEfectivo = ordenRestringido ? undefined : (orderBy || undefined)
+
+  // Si cambian los permisos con la pantalla abierta, se descartan los filtros que ya no
+  // corresponden (no hay estado guardado en URL/localStorage en esta pantalla).
+  const visibilidadKey = JSON.stringify(datos)
+  useEffect(() => {
+    if (!veAlgunPrecio(datos)) { setPricesMin(''); setPricesMax('') }
+    if (!datos.costo) setPriceModeFilter('all')
+    if (!datos.descuento) { setMaxDiscountPctMin(''); setMaxDiscountPctMax('') }
+    setPage(1)
+    // Solo ante cambio de visibilidad, no en cada tecleo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibilidadKey])
+
+  const [reintentoDato, setReintentoDato] = useState(false)
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: [
       'items',
       {
-        search: debouncedSearch, fixedType, templateFilter, categoryFilter, brandFilter, statusFilter, offset, orderBy,
+        search: debouncedSearch, fixedType, templateFilter, categoryFilter, brandFilter, statusFilter, offset, orderBy: orderByEfectivo,
         stockUomFilter, hasWarrantyFilter, warrantyPeriodMin, warrantyPeriodMax,
         pricesMin, pricesMax, priceModeFilter, maxDiscountPctMin, maxDiscountPctMax, trackingTypeFilter,
         principioActivoFilter, esMedicamentoFilter,
@@ -120,6 +159,7 @@ export default function ItemsPage() {
     queryFn: () => {
       // Productos → GET /catalog/items (solo productos: type=service da 403/vacío).
       // Servicios → GET /catalog/servicios (el backend fuerza type=service).
+      // Los filtros apoyados en datos restringidos no se envían (§7.1); el resto igual que antes.
       const baseParams = {
         search: debouncedSearch || undefined,
         category: categoryFilter || undefined,
@@ -128,16 +168,16 @@ export default function ItemsPage() {
         isTemplate: templateFilter === 'template' ? true : templateFilter === 'standalone' ? false : undefined,
         limit: PAGE_SIZE,
         offset,
-        orderBy: orderBy || undefined,
+        orderBy: orderByEfectivo,
         stockUom: isProduct ? (stockUomFilter || undefined) : undefined,
         hasWarranty: hasWarrantyFilter === 'all' ? undefined : hasWarrantyFilter === 'true',
         warrantyPeriodMin: warrantyPeriodMin ? Number(warrantyPeriodMin) : undefined,
         warrantyPeriodMax: warrantyPeriodMax ? Number(warrantyPeriodMax) : undefined,
-        pricesMin: pricesMin ? Number(pricesMin) : undefined,
-        pricesMax: pricesMax ? Number(pricesMax) : undefined,
-        priceMode: priceModeFilter === 'all' ? undefined : priceModeFilter,
-        maxDiscountPctMin: maxDiscountPctMin ? Number(maxDiscountPctMin) : undefined,
-        maxDiscountPctMax: maxDiscountPctMax ? Number(maxDiscountPctMax) : undefined,
+        pricesMin: hayPrecio && pricesMin ? Number(pricesMin) : undefined,
+        pricesMax: hayPrecio && pricesMax ? Number(pricesMax) : undefined,
+        priceMode: datos.costo && priceModeFilter !== 'all' ? priceModeFilter : undefined,
+        maxDiscountPctMin: datos.descuento && maxDiscountPctMin ? Number(maxDiscountPctMin) : undefined,
+        maxDiscountPctMax: datos.descuento && maxDiscountPctMax ? Number(maxDiscountPctMax) : undefined,
         trackingType: isProduct ? (trackingTypeFilter === 'all' ? undefined : trackingTypeFilter) : undefined,
         principioActivo: esFarmacia ? (principioActivoFilter || undefined) : undefined,
         esMedicamento: esFarmacia && esMedicamentoFilter ? true : undefined,
@@ -145,6 +185,43 @@ export default function ItemsPage() {
       return isProduct ? listItems({ ...baseParams, type: 'product' }) : listServicios(baseParams)
     },
   })
+
+  // Defensa §7.3: si igual llega 403 DATO_NO_PERMITIDO (permiso cambiado con la pantalla
+  // abierta), se quitan los filtros apoyados en datos y se reintenta una sola vez — el cambio
+  // de estado re-dispara la query. El interceptor ya mostró el mensaje y refrescó /me/acceso.
+  useEffect(() => {
+    if (error && isApiErrorCode(error, ERROR_CODES.DATO_NO_PERMITIDO) && !reintentoDato) {
+      setReintentoDato(true)
+      setPricesMin('')
+      setPricesMax('')
+      setPriceModeFilter('all')
+      setMaxDiscountPctMin('')
+      setMaxDiscountPctMax('')
+      setPage(1)
+    }
+  }, [error, reintentoDato])
+
+  // Fuente B: datos recortados en ESTA respuesta (para pintar cada celda).
+  const restr = restringidosDe(data ?? {})
+  // Nivel principal de precio: defaultPriceTier solo si ese nivel es visible; si no, el primer
+  // nivel visible; null = ninguno visible.
+  const nivelPrincipal: 'A' | 'B' | 'C' | null = (() => {
+    const niveles: ('A' | 'B' | 'C')[] = ['A', 'B', 'C']
+    const visible = (t: 'A' | 'B' | 'C') => !restr.has(`precio${t}` as DatoArticulo)
+    const def = data?.meta.defaultPriceTier
+    if (def && visible(def)) return def
+    return niveles.find(visible) ?? null
+  })()
+
+  /** Celda de precio principal: nivel visible o `—` (nunca 0 por permiso). */
+  function celdaPrecio(item: Item) {
+    if (item.hasVariants || !nivelPrincipal) return <span className="td-muted">—</span>
+    const valor = item.prices?.[nivelPrincipal] ?? null
+    if (valor == null) {
+      return <DatoRestringido bloqueante={restr.has(`precio${nivelPrincipal}` as DatoArticulo)}>—</DatoRestringido>
+    }
+    return formatDOP(valor)
+  }
 
   const { data: principiosActivosData } = useQuery({
     queryKey: ['principios-activos-filtro', {}],
@@ -188,11 +265,12 @@ export default function ItemsPage() {
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
 
   const activeMoreFiltersCount = [
-    stockUomFilter, warrantyPeriodMin, warrantyPeriodMax, pricesMin, pricesMax,
-    maxDiscountPctMin, maxDiscountPctMax,
+    ...(hayPrecio ? [pricesMin, pricesMax] : []),
+    ...(datos.descuento ? [maxDiscountPctMin, maxDiscountPctMax] : []),
+    stockUomFilter, warrantyPeriodMin, warrantyPeriodMax,
   ].filter((v) => v !== '').length
     + (hasWarrantyFilter !== 'all' ? 1 : 0)
-    + (priceModeFilter !== 'all' ? 1 : 0)
+    + (datos.costo && priceModeFilter !== 'all' ? 1 : 0)
     + (trackingTypeFilter !== 'all' ? 1 : 0)
     + (esFarmacia && principioActivoFilter ? 1 : 0)
     + (esFarmacia && esMedicamentoFilter ? 1 : 0)
@@ -203,10 +281,10 @@ export default function ItemsPage() {
     ...(isProduct ? [{ key: 'rol', width: 100 }] : []),
     { key: 'categoria', width: 160 },
     { key: 'marca', width: 140 },
-    { key: 'precio', width: 110 },
-    ...(isProduct ? [{ key: 'stock', width: 90 }] : []),
+    ...(colPrecio ? [{ key: 'precio', width: 110 }] : []),
+    ...(colStock ? [{ key: 'stock', width: 90 }] : []),
     { key: 'estado', width: 100 },
-    { key: 'descuento', width: 110 },
+    ...(colDescuento ? [{ key: 'descuento', width: 110 }] : []),
     { key: 'actions', width: 48 },
   ]
   const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
@@ -333,15 +411,17 @@ export default function ItemsPage() {
                 Marca
                 <span className="col-resize-handle" onMouseDown={startResize('marca')} />
               </th>
-              <SortableTh
-                label="Precio"
-                sortKey="standardRate"
-                orderBy={orderBy}
-                onSort={(k) => { sort(k); setPage(1) }}
-                align="right"
-                resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('precio')} />}
-              />
-              {isProduct && (
+              {colPrecio && (
+                <SortableTh
+                  label="Precio"
+                  sortKey="standardRate"
+                  orderBy={orderBy}
+                  onSort={(k) => { sort(k); setPage(1) }}
+                  align="right"
+                  resizeHandle={<span className="col-resize-handle" onMouseDown={startResize('precio')} />}
+                />
+              )}
+              {colStock && (
                 <SortableTh
                   label="Stock"
                   sortKey="currentStock"
@@ -354,10 +434,12 @@ export default function ItemsPage() {
                   Estado
                   <span className="col-resize-handle" onMouseDown={startResize('estado')} />
                 </th>
+              {colDescuento && (
                 <th>
                   Descuento
                   <span className="col-resize-handle" onMouseDown={startResize('descuento')} />
                 </th>
+              )}
                 <th />
             </tr>
           </thead>
@@ -365,7 +447,7 @@ export default function ItemsPage() {
             {isLoading
               ? Array.from({ length: 6 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: isProduct ? 9 : 7 }).map((__, j) => (
+                    {Array.from({ length: colCount }).map((__, j) => (
                       <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                     ))}
                   </tr>
@@ -373,7 +455,7 @@ export default function ItemsPage() {
               : isError
                 ? (
                     <tr>
-                      <td colSpan={isProduct ? 9 : 7} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
+                      <td colSpan={colCount} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--error-text)' }}>
                         Error al cargar {isProduct ? 'los productos' : 'los servicios'}
                       </td>
                     </tr>
@@ -381,7 +463,7 @@ export default function ItemsPage() {
                 : data?.items.length === 0
                   ? (
                       <tr>
-                        <td colSpan={isProduct ? 9 : 7}>
+                        <td colSpan={colCount}>
                           <div className="empty-state">
                             <p className="empty-title">{isProduct ? 'Sin productos' : 'Sin servicios'}</p>
                             <p className="empty-sub">No se encontraron {isProduct ? 'productos' : 'servicios'}.</p>
@@ -404,18 +486,26 @@ export default function ItemsPage() {
                             : item.categoryName ?? item.category ?? '—'}
                         </td>
                         <td className="td-muted">{item.brandName ?? '—'}</td>
+          {colPrecio && (
           <td style={{ textAlign: 'right' }}>
-            {item.hasVariants
-              ? <span className="td-muted">—</span>
-              : formatDOP(item.standardRate)}
+            {celdaPrecio(item)}
           </td>
-          {isProduct && <td><StockBadge item={item} /></td>}
+          )}
+          {colStock && <td><StockBadge item={item} restringido={restr.has('stock')} /></td>}
+          {colDescuento && (
           <td>
-            <AutoDiscountBadge item={item} />
-            {item.allowsDiscount === false
-              ? <span className="badge badge-neutral" style={{ marginLeft: 4 }}>Sin dto.</span>
-              : null}
+            {restr.has('descuento') ? (
+              <DatoRestringido bloqueante>—</DatoRestringido>
+            ) : (
+              <>
+                <AutoDiscountBadge item={item} />
+                {item.allowsDiscount === false
+                  ? <span className="badge badge-neutral" style={{ marginLeft: 4 }}>Sin dto.</span>
+                  : null}
+              </>
+            )}
           </td>
+          )}
                         <td>
                           {item.disabled
                             ? <span className="badge badge-neutral">Inactivo</span>
@@ -531,6 +621,7 @@ export default function ItemsPage() {
           </div>
         </div>
 
+        {hayPrecio && (
         <div className="ff-wrap">
           <label className="ff-label">Precio</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -551,7 +642,9 @@ export default function ItemsPage() {
             />
           </div>
         </div>
+        )}
 
+        {datos.costo && (
         <div className="ff-wrap">
           <label className="ff-label">Modo de precio</label>
           <Select
@@ -563,7 +656,9 @@ export default function ItemsPage() {
             <SelectItem value="cost_plus">Costo + Margen</SelectItem>
           </Select>
         </div>
+        )}
 
+        {datos.descuento && (
         <div className="ff-wrap">
           <label className="ff-label">Descuento máximo (%)</label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -584,6 +679,7 @@ export default function ItemsPage() {
             />
           </div>
         </div>
+        )}
 
         {isProduct && (
           <div className="ff-wrap">

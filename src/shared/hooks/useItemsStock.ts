@@ -37,7 +37,9 @@ export interface DisponibleInfo {
  *  stock ahí). */
 export function resolveDisponible(stock: ItemStock | undefined, warehouse: string): DisponibleInfo | undefined {
   if (!stock || !warehouse) return undefined
-  const w = stock.warehouses.find((x) => x.warehouse === warehouse)
+  // `warehouses` puede venir `null` sin el dato `existenciasAlmacen` (§4.2) — el lookup de
+  // formularios siempre lo trae, así que acá solo es defensa tipada, sin cambio de conducta.
+  const w = stock.warehouses?.find((x) => x.warehouse === warehouse)
   if (!w) return { disponible: 0, reservedStock: 0, actualQty: 0 }
-  return { disponible: w.disponible, reservedStock: w.reservedStock, actualQty: w.qty }
+  return { disponible: w.disponible ?? 0, reservedStock: w.reservedStock ?? 0, actualQty: w.qty ?? 0 }
 }

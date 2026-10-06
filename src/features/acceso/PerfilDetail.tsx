@@ -184,6 +184,52 @@ export function PerfilDetail({ perfilId, onBack }: { perfilId: string; onBack: (
 
       <ArbolPermisos catalogo={catalogo} estados={edicion} onChange={setEstados} readOnly={soloLectura} />
 
+      {(() => {
+        // §9.3: un perfil con `inventario` o `catalogo.items` pero sin ningún
+        // `catalogo.datos-articulo.*` deja precios/costos/existencias en `null` para esa gente.
+        const compConAcceso = (prefijo: string) =>
+          Object.values(edicion).some((e) => [...e.marcados].some((k) => k === prefijo || k.startsWith(`${prefijo}.`)))
+        const pantallaConAcceso = (key: string) => {
+          const e = edicion[key]
+          return !!e && e.marcados.size > 0
+        }
+        const tieneInventarioOItems =
+          ['inventario', 'catalogo.items'].some((p) => pantallaConAcceso(p) || compConAcceso(p))
+        const tieneDatosArticulo =
+          pantallaConAcceso('catalogo.datos-articulo') || compConAcceso('catalogo.datos-articulo')
+        if (!tieneInventarioOItems || tieneDatosArticulo) return null
+        return (
+          <div className="inline-alert inline-alert-warn" style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span>
+              Este perfil no incluye 'Datos del artículo': quienes lo usen verán precios, costos y
+              existencias como no disponibles. Agregá el acceso a 'Datos del artículo' para que vean
+              esa información.
+            </span>
+            {!soloLectura && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-size-sm"
+                onClick={() => {
+                  const pant = catalogo.modulos
+                    .find((m) => m.key === 'catalogo')
+                    ?.pantallas.find((p) => p.key === 'catalogo.datos-articulo')
+                  if (!pant) return
+                  setEstados({
+                    ...edicion,
+                    'catalogo.datos-articulo': {
+                      marcados: new Set(pant.componentes.map((c) => c.key)),
+                      incluirFuturos: true,
+                    },
+                  })
+                }}
+              >
+                Agregar todos
+              </button>
+            )}
+          </div>
+        )
+      })()}
+
       <div className="card" style={{ marginTop: 16 }}>
         <div className="card-header">
           <h3 className="card-title">Usuarios con este perfil ({perfil.usuarios.length})</h3>

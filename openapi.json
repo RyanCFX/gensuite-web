@@ -50094,6 +50094,34 @@
             "type": "boolean",
             "description": "Lista de Productos — Ver"
           },
+          "catalogo.datos-articulo.ver-precio-a": {
+            "type": "boolean",
+            "description": "Datos del Artículo — Ver precio de venta — nivel A (máximo)"
+          },
+          "catalogo.datos-articulo.ver-precio-b": {
+            "type": "boolean",
+            "description": "Datos del Artículo — Ver precio de venta — nivel B (promedio)"
+          },
+          "catalogo.datos-articulo.ver-precio-c": {
+            "type": "boolean",
+            "description": "Datos del Artículo — Ver precio de venta — nivel C (mínimo)"
+          },
+          "catalogo.datos-articulo.ver-stock": {
+            "type": "boolean",
+            "description": "Datos del Artículo — Ver stock (existencias totales)"
+          },
+          "catalogo.datos-articulo.ver-descuento": {
+            "type": "boolean",
+            "description": "Datos del Artículo — Ver descuentos"
+          },
+          "catalogo.datos-articulo.ver-costo": {
+            "type": "boolean",
+            "description": "Datos del Artículo — Ver costo y márgenes"
+          },
+          "catalogo.datos-articulo.ver-existencias-almacen": {
+            "type": "boolean",
+            "description": "Datos del Artículo — Ver existencias por almacén"
+          },
           "catalogo.items.eliminar": {
             "type": "boolean",
             "description": "Detalle de Artículo — Eliminar"
@@ -52076,6 +52104,13 @@
           "catalogo.dimensiones.crear",
           "catalogo.dimensiones.editar",
           "catalogo.items.listar",
+          "catalogo.datos-articulo.ver-precio-a",
+          "catalogo.datos-articulo.ver-precio-b",
+          "catalogo.datos-articulo.ver-precio-c",
+          "catalogo.datos-articulo.ver-stock",
+          "catalogo.datos-articulo.ver-descuento",
+          "catalogo.datos-articulo.ver-costo",
+          "catalogo.datos-articulo.ver-existencias-almacen",
           "catalogo.items.eliminar",
           "catalogo.items.consultar-stock",
           "catalogo.items.crear",
@@ -52831,7 +52866,8 @@
               "accion",
               "filtro",
               "exportar",
-              "widget"
+              "widget",
+              "dato"
             ]
           },
           "nombre": {
@@ -53464,7 +53500,8 @@
               "accion",
               "filtro",
               "exportar",
-              "widget"
+              "widget",
+              "dato"
             ]
           },
           "estado": {

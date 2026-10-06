@@ -20,6 +20,7 @@ import { AttributeSelect } from '@/components/shared/AttributeSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { ArrowLeft, Plus, Minus, Trash2, ImagePlus, Loader2, Save } from 'lucide-react'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
+import { useDatosArticulo, restringidosDe } from '@/shared/permissions/datosArticulo'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { useDimensionesInventario, useValoresDimension } from '@/shared/hooks/useDimensionesInventario'
 
@@ -198,11 +199,24 @@ export default function ItemForm() {
   const itemCodeMode = empresa?.itemCodeMode ?? 'manual'
   const isAutoCode = itemCodeMode === 'auto' || itemCodeMode === 'prefix_auto'
 
-  const { data: existingItem, isLoading: itemLoading } = useQuery({
+  const { data: detalleExistente, isLoading: itemLoading } = useQuery({
     queryKey: ['item', id],
     queryFn: () => (fixedType === 'product' ? getItem(id!) : getServicio(id!)),
     enabled: isEdit,
   })
+  const existingItem = detalleExistente?.item
+  // §8: lo restringido (Fuente A del store o Fuente B de ESTA respuesta) se oculta y nunca se
+  // envía — ni null, ni 0, ni "". En creación no hay detalle: rige solo la Fuente A.
+  const restrForm = restringidosDe(detalleExistente ?? {})
+  const datosForm = useDatosArticulo()
+  const oculto = {
+    costo: !datosForm.costo || restrForm.has('costo'),
+    precioA: !datosForm.precioA || restrForm.has('precioA'),
+    precioB: !datosForm.precioB || restrForm.has('precioB'),
+    precioC: !datosForm.precioC || restrForm.has('precioC'),
+    descuento: !datosForm.descuento || restrForm.has('descuento'),
+  }
+  const ocultaAlgo = oculto.costo || oculto.precioA || oculto.precioB || oculto.precioC || oculto.descuento
 
   // Para mostrar el default actual del tenant junto al selector de override — docs/tasks/
   // 77_actualizar_costo_en_compra_configurable.md §2.
@@ -357,15 +371,15 @@ export default function ItemForm() {
       subcategory: existingItem.subcategory ?? '',
       brand: existingItem.brand ?? '',
       itemCode: existingItem.id,
-      priceA: existingItem.prices?.A,
+      priceA: existingItem.prices?.A ?? undefined,
       priceB: existingItem.prices?.B ?? existingItem.standardRate ?? 0,
-      priceC: existingItem.prices?.C,
+      priceC: existingItem.prices?.C ?? undefined,
       priceMode: existingItem.priceMode ?? 'manual',
       actualizarCostoEnCompraOverride: existingItem.actualizarCostoEnCompraOverride ?? '',
-      marginA: existingItem.marginA,
-      marginB: existingItem.marginB,
-      marginC: existingItem.marginC,
-      valuationRate: existingItem.valuationRate,
+      marginA: existingItem.marginA ?? undefined,
+      marginB: existingItem.marginB ?? undefined,
+      marginC: existingItem.marginC ?? undefined,
+      valuationRate: existingItem.valuationRate ?? undefined,
       description: existingItem.internalDescription ?? '',
       shortName: existingItem.shortName ?? '',
       notes: existingItem.notes ?? '',
@@ -463,12 +477,14 @@ export default function ItemForm() {
   const onSubmit = (data: FormValues) => {
     // Servicios: sin costo de valoración — el modo siempre es manual y no aplica
     // "Actualizar costo al comprar" (ambos campos ocultos en la UI para servicios).
-    const submitPriceMode = isProduct ? data.priceMode : 'manual'
+    const submitPriceMode = oculto.costo ? undefined : (isProduct ? data.priceMode : 'manual')
     if (subcategoryOptions.length > 0 && !data.subcategory) {
       toast.error('Selecciona una subcategoría')
       return
     }
-    if (submitPriceMode === 'cost_plus' && !data.valuationRate) {
+    // Con el dato `costo` restringido el modo es forzosamente manual-invisible: no se exige
+    // costo ni se envía modo/márgenes/override (van omitidos abajo, §8.2).
+    if (!oculto.costo && submitPriceMode === 'cost_plus' && !data.valuationRate) {
       toast.error('Debes ingresar el Costo de Valoración para usar el modo "Sobre costo"')
       return
     }
@@ -531,6 +547,17 @@ export default function ItemForm() {
       isSalesItem: data.isSalesItem,
       isPurchaseItem: data.isPurchaseItem,
     }
+
+    // §8.2 — no enviar lo que no se ve: se omite la clave por completo (nunca null, 0, ""
+    // ni el valor tal como llegó). Sin esto, el formulario completo sobrescribiría el costo /
+    // precios / descuentos reales con lo que el backend mandó en `null` por el recorte.
+    for (const k of [
+      ...(oculto.costo ? ['valuationRate', 'priceMode', 'actualizarCostoEnCompraOverride', 'marginA', 'marginB', 'marginC'] : []),
+      ...(oculto.precioA ? ['priceA'] : []),
+      ...(oculto.precioB ? ['priceB'] : []),
+      ...(oculto.precioC ? ['priceC'] : []),
+      ...(oculto.descuento ? ['allowsDiscount', 'maxDiscountPct'] : []),
+    ]) delete (payload as Record<string, unknown>)[k]
 
     // §4.1/§4.6 — `usaDimensiones` NUNCA se manda (el servidor la ignora/rechaza, es de solo
     // lectura). Si el bloque no aplica o el artículo no declaró ninguna dimensión, se omiten
@@ -754,6 +781,13 @@ export default function ItemForm() {
       {isTemplate && (
         <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
           Este artículo es un template con variantes — las variantes no se pueden editar aquí. Usa la ficha del artículo para gestionarlas.
+        </div>
+      )}
+
+      {ocultaAlgo && (
+        <div className="inline-alert inline-alert-info" style={{ marginBottom: 16 }}>
+          Algunos campos (costo, precios o descuentos) están ocultos por tus permisos de datos y no
+          se enviarán al guardar.
         </div>
       )}
 
@@ -1252,6 +1286,7 @@ export default function ItemForm() {
             <div className="card-header navy-card-header"><h2 className="card-title">Compra</h2></div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div className="form-row">
+                {!oculto.costo && (
                 <div className="ff-wrap">
                   <label className="ff-label" htmlFor="valuationRate">
                     Costo de Valoración
@@ -1268,6 +1303,7 @@ export default function ItemForm() {
                     {...register('valuationRate', { valueAsNumber: true })}
                   />
                 </div>
+                )}
                 <div className="ff-wrap">
                   <label className="ff-label" htmlFor="purchaseTaxTemplate">
                     Impuesto de Compra {!noPurchaseTax && <span className="ff-required">*</span>}
@@ -1312,8 +1348,9 @@ export default function ItemForm() {
             <div className="card-header navy-card-header"><h2 className="card-title">Venta</h2></div>
             <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-              {/* Servicios: "Modo de precio" oculto — siempre "manual". */}
-              {isProduct && (
+              {/* Servicios: "Modo de precio" oculto — siempre "manual". Con el dato `costo`
+                  restringido también se oculta (revelaría cómo se calcula el precio, §4.1). */}
+              {isProduct && !oculto.costo && (
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="priceMode">Modo de precio</label>
                 <Controller
@@ -1339,8 +1376,9 @@ export default function ItemForm() {
               </div>
               )}
 
-              {/* Servicios: "Actualizar costo al comprar" oculto — no aplica sin costo. */}
-              {isProduct && (
+              {/* Servicios: "Actualizar costo al comprar" oculto — no aplica sin costo. Igual con
+                  el dato `costo` restringido (§8.1). */}
+              {isProduct && !oculto.costo && (
               <div className="ff-wrap">
                 <label className="ff-label" htmlFor="actualizarCostoEnCompraOverride">
                   Actualizar costo al comprar
@@ -1372,20 +1410,24 @@ export default function ItemForm() {
                 <div className="form-row" style={{ alignItems: 'start' }}>
                   <div className="ff-wrap">
                     {effectivePriceMode === 'cost_plus' ? (
-                      <>
-                        <label className="ff-label">Margen A (%)</label>
-                        <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 40" {...register('marginA', { valueAsNumber: true })} />
-                        {priceLabel(calcTotalFromMargin(watchedMarginA))}
-                      </>
+                      !oculto.costo && (
+                        <>
+                          <label className="ff-label">Margen A (%)</label>
+                          <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 40" {...register('marginA', { valueAsNumber: true })} />
+                          {priceLabel(calcTotalFromMargin(watchedMarginA))}
+                        </>
+                      )
                     ) : (
-                      <>
-                        <label className="ff-label" style={{ color: 'var(--text-secondary)' }}>
-                          Precio A — Máximo
-                          <FieldTooltip>Clientes VIP / venta especial</FieldTooltip>
-                        </label>
-                        <input type="number" step="0.01" min="0" className="ff-input" placeholder="0.00" {...register('priceA', { valueAsNumber: true })} />
-                        {priceLabel(watchedPriceA)}
-                      </>
+                      !oculto.precioA && (
+                        <>
+                          <label className="ff-label" style={{ color: 'var(--text-secondary)' }}>
+                            Precio A — Máximo
+                            <FieldTooltip>Clientes VIP / venta especial</FieldTooltip>
+                          </label>
+                          <input type="number" step="0.01" min="0" className="ff-input" placeholder="0.00" {...register('priceA', { valueAsNumber: true })} />
+                          {priceLabel(watchedPriceA)}
+                        </>
+                      )
                     )}
                   </div>
                   <div className="ff-wrap">
@@ -1430,19 +1472,24 @@ export default function ItemForm() {
 
                 {effectivePriceMode === 'cost_plus' ? (
                   <>
+                    {!oculto.costo && (
                     <div className="ff-wrap">
                       <label className="ff-label">Margen B (%) <span className="ff-required">*</span></label>
                       <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 25" {...register('marginB', { valueAsNumber: true })} />
                       {priceLabel(calcTotalFromMargin(watchedMarginB))}
                     </div>
+                    )}
+                    {!oculto.costo && (
                     <div className="ff-wrap">
                       <label className="ff-label">Margen C (%)</label>
                       <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 10" {...register('marginC', { valueAsNumber: true })} />
                       {priceLabel(calcTotalFromMargin(watchedMarginC))}
                     </div>
+                    )}
                   </>
                 ) : (
                   <>
+                    {!oculto.precioB && (
                     <div className="ff-wrap">
                       <label className="ff-label">
                         Precio B — Promedio <span className="ff-required">*</span>
@@ -1457,6 +1504,8 @@ export default function ItemForm() {
                       {errors.priceB && <span className="ff-error">{errors.priceB.message}</span>}
                       {priceLabel(watchedPriceB)}
                     </div>
+                    )}
+                    {!oculto.precioC && (
                     <div className="ff-wrap">
                       <label className="ff-label" style={{ color: 'var(--text-secondary)' }}>
                         Precio C — Mínimo
@@ -1465,10 +1514,12 @@ export default function ItemForm() {
                       <input type="number" step="0.01" min="0" className="ff-input" placeholder="0.00" {...register('priceC', { valueAsNumber: true })} />
                       {priceLabel(watchedPriceC)}
                     </div>
+                    )}
                   </>
                 )}
               </div>
 
+              {!oculto.descuento && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <span className="ff-section-divider">Descuento</span>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 40, flexWrap: 'wrap' }}>
@@ -1503,6 +1554,7 @@ export default function ItemForm() {
                   )}
                 </div>
               </div>
+              )}
             </div>
           </div>
 

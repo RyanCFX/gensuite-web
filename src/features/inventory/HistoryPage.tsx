@@ -14,6 +14,8 @@ import { ItemHistoryDrawer } from './ItemHistoryDrawer'
 import { STOCK_VOUCHER_TYPES } from '@/lib/constants'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { restringidosDe } from '@/shared/permissions/datosArticulo'
+import { DatoRestringido } from '@/shared/ui/DatoRestringido'
 
 const PAGE_SIZE = 30
 
@@ -60,6 +62,9 @@ export default function HistoryPage() {
   })
 
   const totalPages = data ? Math.ceil(data.meta.total / PAGE_SIZE) : 1
+  // Fuente B: las cantidades se anulan sin dato `stock` (§4.5). `warehouse` no se recorta en el
+  // historial, así que no hay filtros que ocultar.
+  const restr = restringidosDe(data ?? {})
 
   return (
     <div className="page-container">
@@ -196,13 +201,17 @@ export default function HistoryPage() {
                             textAlign: 'right',
                             fontFamily: 'var(--font-body)',
                             fontWeight: 600,
-                            color: entry.movementQty >= 0 ? 'oklch(62.7% 0.194 149.214)' : 'oklch(51.4% 0.222 16.935)',
+                            color: (entry.movementQty ?? 0) >= 0 ? 'oklch(62.7% 0.194 149.214)' : 'oklch(51.4% 0.222 16.935)',
                           }}
                           >
-                            {formatNumber(entry.movementQty)}
+                            {entry.movementQty == null
+                              ? <DatoRestringido bloqueante={restr.has('stock')}>—</DatoRestringido>
+                              : formatNumber(entry.movementQty)}
                           </td>
                           <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>
-                            {formatNumber(entry.stockAfter)}
+                            {entry.stockAfter == null
+                              ? <DatoRestringido bloqueante={restr.has('stock')}>—</DatoRestringido>
+                              : formatNumber(entry.stockAfter)}
                           </td>
                           <td className="td-muted">{entry.voucherType}</td>
                           <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{entry.voucherNo}</td>

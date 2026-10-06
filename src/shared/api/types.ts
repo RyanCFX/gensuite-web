@@ -50,6 +50,10 @@ export interface PaginationMeta {
   offset: number;
   hasMore: boolean;
   defaultPriceTier?: "A" | "B" | "C";
+  /** Datos del artículo recortados en ESTA respuesta (docs/tasks/
+   *  PROMPT_DATOS_ARTICULO_FRONTEND.md §3.2). Ausente = sin recorte. Los valores son los de
+   *  `DatoArticulo`; cualquier otro string se ignora al leer (ver `restringidosDe`). */
+  datosRestringidos?: string[];
 }
 
 export interface ApiErrorResponse {
@@ -1411,9 +1415,11 @@ export type UpdateBundleDto = Partial<CreateBundleDto>;
 
 // Item Prices
 export interface ItemPrices {
-  A?: number;
-  B?: number;
-  C?: number;
+  /** Cada nivel puede venir `null` si el usuario no ve ese dato (docs/tasks/
+   *  PROMPT_DATOS_ARTICULO_FRONTEND.md §4.1) — tratar cada nivel por separado. */
+  A?: number | null;
+  B?: number | null;
+  C?: number | null;
 }
 
 export interface Item {
@@ -1427,10 +1433,14 @@ export interface Item {
   brand?: string;
   brandName?: string;
   type: "product" | "service" | "combo";
-  standardRate: number;
+  /** `null` si el usuario no ve ningún nivel de precio (docs/tasks/
+   *  PROMPT_DATOS_ARTICULO_FRONTEND.md §4.1). */
+  standardRate: number | null;
   prices?: ItemPrices;
-  valuationRate?: number;
-  currentStock?: number;
+  /** `null` si el usuario no ve el dato `costo`. */
+  valuationRate?: number | null;
+  /** `null` si el usuario no ve el dato `stock`. */
+  currentStock?: number | null;
   /**
    * Stock por almacén: `{ "<nombre del almacén>": <cantidad> }`, solo almacenes con existencia ≠ 0.
    * La suma de los valores es igual a `currentStock`.
@@ -1439,10 +1449,14 @@ export interface Item {
    * - En el listado (GET /catalog/items) solo se puebla al filtrar por `branch`.
    * Solo cantidades (sin valuación); para valor de inventario por almacén usar GET /catalog/items/:id/stock.
    */
-  stockByWarehouse?: Record<string, number>;
+  stockByWarehouse?: Record<string, number> | null;
   /** Solo vienen en el detalle (GET /catalog/items/:id) — NUNCA en el listado (GET /catalog/items),
    *  a propósito, para no disparar consultas extra por fila en una lista paginada. `undefined` en
    *  un Servicio (no aplica). Ver docs/tasks/76_disponibilidad_stock_detalle_item.md.
+   *
+   *  Cada uno puede venir `null` (en vez de número) si el usuario no ve el dato `stock`
+   *  (docs/tasks/PROMPT_DATOS_ARTICULO_FRONTEND.md §4.1) — `null` + dato listado en
+   *  `meta.datosRestringidos` = "sin acceso", no cero.
    *
    *  No son intercambiables:
    *  - `enPedido`: comprometido en Pedidos de venta SIN facturar todavía — solo informativo, NO
@@ -1454,14 +1468,14 @@ export interface Item {
    *    Entry, que puede estar subcontado si el despacho aún no se creó). Son dos preguntas
    *    distintas, no un bug si difieren para el mismo artículo.
    *  - `disponible` = `currentStock - reservado` (nunca resta `enPedido`). */
-  enPedido?: number;
-  reservado?: number;
-  disponible?: number;
+  enPedido?: number | null;
+  reservado?: number | null;
+  disponible?: number | null;
   /** Unidades de este artículo ya vendidas Y despachadas físicamente (Delivery Notes sometidos) —
    *  puramente histórico/informativo, no afecta `disponible`. Mismas reglas que enPedido/reservado/
    *  disponible: solo en el detalle, nunca en el listado, `undefined` en un Servicio. Ver
    *  docs/tasks/79_confirmacion_despacho_pedido.md §8. */
-  entregado?: number;
+  entregado?: number | null;
   internalDescription?: string;
   shortName?: string;
   notes?: string;
@@ -1485,18 +1499,19 @@ export interface Item {
   hasVariants?: boolean;
   variantOf?: string;
   attributes?: TemplateAttribute[];
-  priceMode?: "manual" | "cost_plus";
+  /** `null` si el usuario no ve el dato `costo` (revela cómo se calcula el precio). */
+  priceMode?: "manual" | "cost_plus" | null;
   /** Override por artículo de `FacturacionConfig.actualizarCostoEnCompra` — docs/tasks/
    *  77_actualizar_costo_en_compra_configurable.md §2. `'si'`/`'no'` siempre gana sobre el default
    *  del tenant; ausente = usa el default. Nunca viene como `''` en las respuestas — solo en los
    *  DTOs de request se manda `''` para borrar el override. Independiente de `priceMode`: no
-   *  afecta el recálculo del precio de venta en modo `cost_plus`. */
-  actualizarCostoEnCompraOverride?: "si" | "no";
-  marginA?: number;
-  marginB?: number;
-  marginC?: number;
-  allowsDiscount?: boolean;
-  maxDiscountPct?: number;
+   *  afecta el recálculo del precio de venta en modo `cost_plus`. `null` si no ve `costo`. */
+  actualizarCostoEnCompraOverride?: "si" | "no" | null;
+  marginA?: number | null;
+  marginB?: number | null;
+  marginC?: number | null;
+  allowsDiscount?: boolean | null;
+  maxDiscountPct?: number | null;
   trackingType?: "none" | "batch" | "serial";
   /** Nativos de ERPNext (no custom fields), solo tienen efecto si trackingType === "batch" —
    *  ver docs/FARMACIA_ARS_FRONTEND.md §6.1. Rechazado con 400 si se envían con otro trackingType. */
@@ -1510,9 +1525,11 @@ export interface Item {
   purchaseTaxPct?: number;
   salesTaxTemplate?: string;
   salesTaxPct?: number;
-  purchasePriceDate?: string;
+  /** `null` si el usuario no ve el dato `costo`. */
+  purchasePriceDate?: string | null;
   salesPriceDate?: string;
-  autoDiscount?: AutoDiscount;
+  /** `null` si el usuario no ve el dato `descuento` (regla de precios automática). */
+  autoDiscount?: AutoDiscount | null;
   /** Componentes del combo (cuando type === 'combo') */
   components?: { itemCode: string; qty: number }[];
   // ─── Composición de medicamentos (vertical Farmacia) ──────────────────────
@@ -2557,26 +2574,29 @@ export type UpdateBrandDto = Partial<CreateBrandDto>;
 
 export interface ItemStockWarehouse {
   warehouse: string;
-  qty: number;
+  /** `null` sin dato `stock`; con `costo` recortado, `valuationRate`/`stockValue` en `null`. */
+  qty: number | null;
   /** No vienen en el lookup de formularios (sin costos ni valuación). */
-  valuationRate?: number;
-  stockValue?: number;
+  valuationRate?: number | null;
+  stockValue?: number | null;
   /** Comprometido con otro cliente/proceso en este almacén (Stock Reservation Entry — típicamente
    *  un Apartado). Ver docs/tasks/73_alertas_stock_disponible_reservado.md. */
-  reservedStock: number;
+  reservedStock: number | null;
   /** = qty - reservedStock. Lo realmente disponible para prometer a un cliente nuevo — usar
    *  siempre este campo (nunca `qty` a secas) para validar/mostrar disponibilidad al vender. */
-  disponible: number;
+  disponible: number | null;
 }
 
 export interface ItemStock {
   itemCode: string;
-  totalQty: number;
+  /** `null` sin dato `stock` (igual los totales de abajo). */
+  totalQty: number | null;
   /** Suma de `reservedStock` de todos los almacenes. */
-  totalReservedStock: number;
+  totalReservedStock: number | null;
   /** Suma de `disponible` de todos los almacenes (= totalQty - totalReservedStock). */
-  totalDisponible: number;
-  warehouses: ItemStockWarehouse[];
+  totalDisponible: number | null;
+  /** `null` sin dato `existenciasAlmacen` (no hay desglose). */
+  warehouses: ItemStockWarehouse[] | null;
 }
 
 export interface InventoryItem {
@@ -2584,31 +2604,37 @@ export interface InventoryItem {
   itemName: string;
   category?: string;
   brand?: string;
-  warehouse: string;
-  actualQty: number;
-  valuationRate: number; // costo unitario
-  standardRate: number; // precio de venta unitario
-  investmentValue: number; // qty × costo
-  saleValue: number; // qty × precio venta
-  potentialProfit: number;
+  /** `null` en la forma colapsada (una fila por artículo, sin dato `existenciasAlmacen`). */
+  warehouse: string | null;
+  /** Cantidades: `null` sin dato `stock`. */
+  actualQty: number | null;
+  /** Costo unitario: `null` sin dato `costo`. */
+  valuationRate: number | null; // costo unitario
+  /** Precio de venta unitario: `null` si no ve ningún nivel de precio. */
+  standardRate: number | null; // precio de venta unitario
+  /** Montos (inversión/venta/ganancia): `null` sin `stock` (revelan cantidad), y cada uno exige
+   *  además su dato propio (`costo` para inversión/ganancia, algún precio para venta/ganancia). */
+  investmentValue: number | null; // qty × costo
+  saleValue: number | null; // qty × precio venta
+  potentialProfit: number | null;
   /** Nombres de las ubicaciones (Zona/Rack) asignadas a este artículo en este almacén */
   ubicaciones?: string[];
   // ─── Campos del Bin — docs/tasks/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md §7 ───
   // Existen siempre (no gateados por despachoHabilitado); el listado ya no oculta actualQty=0.
-  /** Comprometido en pedidos de venta sometidos aún sin entregar. */
-  reservedQty?: number;
+  /** Comprometido en pedidos de venta sometidos aún sin entregar. `null` sin dato `stock`. */
+  reservedQty?: number | null;
   /** Subconjunto de reservedQty con reserva nativa de ERPNext (Stock Reservation Entry) sobre
    *  stock físico concreto — es el que se usa para calcular disponibleParaVender. */
-  reservedStock?: number;
+  reservedStock?: number | null;
   /** Ya pedido a proveedores (orden de compra sometida, aún sin recibir). */
-  orderedQty?: number;
+  orderedQty?: number | null;
   /** En solicitudes de material/compra pendientes (previo a orden de compra). */
-  indentedQty?: number;
+  indentedQty?: number | null;
   /** Proyección nativa de ERPNext: actualQty + orderedQty + indentedQty - reservedQty. */
-  projectedQty?: number;
+  projectedQty?: number | null;
   /** El campo más útil para la UI: actualQty - (reservedStock ?? 0) — lo que realmente se le
    *  puede prometer a un cliente nuevo ahora mismo. Preferirlo sobre actualQty a secas. */
-  disponibleParaVender?: number;
+  disponibleParaVender?: number | null;
 }
 
 // ─── Zonas y Ubicaciones (organización física dentro del almacén) ─────────────
@@ -2758,11 +2784,14 @@ export interface MovimientoUbicacion {
 }
 
 export interface InventorySummary {
-  totalInvestment: number;
-  totalSaleValue: number;
-  totalPotentialProfit: number;
+  /** `null` sin `stock` (los montos revelan cantidad); inversión/ganancia exigen además `costo`,
+   *  venta/ganancia algún precio. `totalItems` nunca se anula. */
+  totalInvestment: number | null;
+  totalSaleValue: number | null;
+  totalPotentialProfit: number | null;
   totalItems: number;
-  totalUnits: number;
+  /** `null` sin dato `stock`. */
+  totalUnits: number | null;
 }
 
 export interface InventoryListResult {
@@ -2910,12 +2939,15 @@ export type UpdateAlmacenDto = Partial<Omit<CreateAlmacenDto, 'warehouseType'>> 
 export interface InventoryHistory {
   itemCode: string;
   itemName: string;
+  /** `warehouse` NO se recorta en el historial (el historial es su propio permiso). */
   warehouse: string;
   voucherType: string;
   voucherNo: string;
-  movementQty: number;
-  stockAfter: number;
-  valuationRate: number;
+  /** `null` sin dato `stock`. */
+  movementQty: number | null;
+  stockAfter: number | null;
+  /** `null` sin dato `costo`. */
+  valuationRate: number | null;
   postingDate: string;
   /** Hora del movimiento (Stock Ledger Entry.posting_time) — no siempre viene poblada según el
    *  documento de origen, tratar como opcional. */
@@ -3974,7 +4006,7 @@ export interface Grant {
   expiraEn?: string;
 }
 
-export type AccesoComponenteTipo = 'vista' | 'accion' | 'filtro' | 'exportar' | 'widget';
+export type AccesoComponenteTipo = 'vista' | 'accion' | 'filtro' | 'exportar' | 'widget' | 'dato';
 export type AccesoPantallaTipo = 'operativa' | 'reporte' | 'config' | 'dashboard';
 
 export interface AccesoCatalogoComponente {
