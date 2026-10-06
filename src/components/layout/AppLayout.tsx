@@ -55,10 +55,12 @@ import {
   Handshake,
   ArrowLeftRight,
   Repeat,
+  Hash,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth.store";
 import { usePermissionsStore } from "@/stores/permissions.store";
 import { useFeaturesStore } from "@/stores/features.store";
+import { mostrarItemNumeracion } from "@/features/numeracion/numeracionReferencia";
 import { useIsSystemManager } from "@/shared/hooks/useIsSystemManager";
 import { resolverRuta } from "@/shared/permissions/rutas";
 import { resolverFeature, REPORTE_KEY_POR_TIPO } from "@/shared/features/catalog";
@@ -607,6 +609,11 @@ const NAV_CONFIG: NavEntry = {
       icon: <Shield size={14} />,
       path: "/config/ncf",
     },
+    {
+      label: "Numeración de documentos",
+      icon: <Hash size={14} />,
+      path: "/config/numeracion",
+    },
     // Ítem "aplanado" (ver nota arriba, junto a Facturación Electrónica) — las otras 3 pantallas
     // se muestran como tabs (RouteTabs) dentro de /config/tasas-impuesto y hermanas.
     {
@@ -709,6 +716,7 @@ const CONFIG_ITEM_GROUP: Record<string, string> = {
   "/config/ecf": "Facturación",
   "/config/plantillas-facturas": "Facturación",
   "/config/ncf": "Facturación",
+  "/config/numeracion": "Facturación",
   "/config/tasas-impuesto": "Facturación",
   "/config/listas-precio": "Facturación",
   "/config/grupos-clientes": "Facturación",
@@ -1626,7 +1634,7 @@ function AppLayoutInner() {
 
   // Sin Impuesto de Documento, las plantillas de Ventas/Compras/Artículo dejan de tener sentido
   // en el menú — colapsa el grupo "Impuestos" a un único ítem plano que va directo al catálogo.
-  const configNav: NavEntry = usaImpuestoDocumento
+  const configNavImpuestos: NavEntry = usaImpuestoDocumento
     ? configNavAdminFiltered
     : {
         ...(configNavAdminFiltered as NavGroup),
@@ -1636,6 +1644,13 @@ function AppLayoutInner() {
             : item,
         ),
       };
+  // Numeración de documentos (§7.1 del prompt del módulo): el ítem se muestra solo si existe al
+  // menos un tipo accesible (algún `features.numeracion*` en true Y alguna acción
+  // `config.numeracion.*` en true). El contenido real igual lo decide el índice.
+  const NUMERACION_MENU_PATHS = new Set(["/config/numeracion"]);
+  const configNav: NavEntry = mostrarItemNumeracion({ acciones, features, featuresReady })
+    ? configNavImpuestos
+    : (stripPathsFromEntry(configNavImpuestos, NUMERACION_MENU_PATHS) as NavGroup);
   const financeNavPos: NavEntry[] = usaModuloPos
     ? NAV_FINANZAS
     : NAV_FINANZAS.filter(

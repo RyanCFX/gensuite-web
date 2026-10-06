@@ -21,7 +21,7 @@
 > el nombre exacto de un campo, **gana el `openapi.json`** — pero no debería pasar: todo lo escrito
 > acá se extrajo directamente del código fuente ya mergeado, no de un diseño preliminar.
 >
-> Documento relacionado que asumimos ya tenés implementado, sin cambios en este documento:
+> Documento relacionado que asumimos ya tienes implementado, sin cambios en este documento:
 > `PROMPT_PERMISOS_FRONTEND.md` (contrato de permisos, `GET /me/permissions` → `data.acciones`).
 > Este cambio **no agrega ninguna acción de permiso nueva** — reutiliza exactamente las que ya
 > gatean la pantalla de Configuración de Facturación y los flujos de cobro (ver §5).
@@ -94,7 +94,7 @@ ya viaja en la misma respuesta que usás para leer/mostrar el resto de esta pant
 
 ## 2. Pantalla de Configuración — sección "Módulo POS (turnos de caja)"
 
-Ya tenés (asumimos) el selector "Método de Pago de Caja" dentro de esta sección, que llama a
+Ya tienes (asumimos) el selector "Método de Pago de Caja" dentro de esta sección, que llama a
 `PUT /config/facturacion` con `{ "modoPagoCaja": "Efectivo" }`. Agregá, **en el mismo bloque, justo
 al lado o debajo del selector de DOP**, hasta dos selectores más, cada uno gateado según §1:
 
@@ -111,7 +111,7 @@ para USD, o viceversa, sin ninguna restricción cruzada.
 
 ### 2.2 De dónde sacar las opciones del selector
 
-Igual que el selector de DOP que ya tenés: `GET /config/metodos-pago` (endpoint ya existente, sin
+Igual que el selector de DOP que ya tienes: `GET /config/metodos-pago` (endpoint ya existente, sin
 cambios) devuelve la lista de métodos de pago (`Mode of Payment`) disponibles para poblar el
 dropdown. **No hay un endpoint separado ni filtrado por moneda** — la lista de opciones es la misma
 para los 3 selectores; es responsabilidad de quien configura elegir un método de pago que de verdad
@@ -274,7 +274,7 @@ es en DOP, usado para cobrar una factura en USD). Si un admin configura, por eje
 `modoPagoCajaUsd` apuntando por error a un método de pago que en realidad opera en DOP, el error
 aparece **al cobrar** (no al guardar la configuración, ver §2.3), con el mismo mensaje que ya
 manejás hoy para esa validación (algo del estilo *"El método de pago 'X' opera en DOP, pero la
-factura es en USD"*). No hace falta agregar manejo nuevo para esto — el cliente HTTP que ya tenés
+factura es en USD"*). No hace falta agregar manejo nuevo para esto — el cliente HTTP que ya tienes
 para ese error existente lo sigue cubriendo.
 
 ---

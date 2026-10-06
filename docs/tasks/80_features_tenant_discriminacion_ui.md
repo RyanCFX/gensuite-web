@@ -103,7 +103,7 @@ X-Tenant: <slug>
 ```
 
 Pedilo **una sola vez al iniciar sesión** (o al cambiar de tenant, si tu app permite eso sin
-recargar), guardalo en el mismo store donde ya tenés `permissions`/`vertical`. No lo vuelvas a
+recargar), guardalo en el mismo store donde ya tienes `permissions`/`vertical`. No lo vuelvas a
 pedir por cada pantalla.
 
 **Garantías del backend que podés asumir sin validar vos:**
@@ -320,7 +320,7 @@ revisá estos casos puntuales:
   `cuentasPorCobrar`; la config de Tesorería con `tesoreria`. Si tu pantalla de Configuración es un
   menú de secciones, ocultá la sección entera cuando el feature correspondiente esté apagado — no
   dejes un formulario de configuración de algo que el tenant ni siquiera puede usar.
-- **Dashboard**: si tenés widgets/tarjetas de resumen por módulo (ej. "Compras del mes", "Stock
+- **Dashboard**: si tienes widgets/tarjetas de resumen por módulo (ej. "Compras del mes", "Stock
   bajo", "Cuentas por cobrar vencidas"), cada tarjeta se oculta según su feature — el Dashboard en
   sí es núcleo, el contenido no.
 

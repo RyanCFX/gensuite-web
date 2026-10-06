@@ -19,7 +19,7 @@
 > — pero no debería pasar: todo lo escrito acá se extrajo directamente del código fuente ya
 > mergeado, no de un diseño preliminar.
 >
-> Documento relacionado que asumimos ya tenés implementado, sin cambios en este documento:
+> Documento relacionado que asumimos ya tienes implementado, sin cambios en este documento:
 > `PROMPT_PERMISOS_FRONTEND.md` (contrato de permisos, `GET /me/permissions` → `data.acciones`).
 > Ninguno de los 4 cambios de este documento agrega una acción de permiso nueva — todos reutilizan
 > exactamente las que ya gatean la pantalla de Configuración de Facturación y la de Facturación
@@ -169,7 +169,7 @@ Al abrir el formulario de Nueva Factura para un **cliente ocasional**:
    seleccionado en el formulario (igual que hoy), sea el default o uno distinto.
 4. Si `ncfTipoVentaDefault` es `null` (tenant que nunca lo configuró), el comportamiento es
    **exactamente el de hoy**: el selector arranca sin preselección, o con el primer valor del
-   catálogo si así lo tenés implementado actualmente — no cambia nada.
+   catálogo si así lo tienes implementado actualmente — no cambia nada.
 
 **No apliques esta preselección para un cliente registrado (`Customer` con ficha propia)** si ese
 cliente ya tiene su propio `ncfTypeDefault` configurado en su ficha (`Customer.custom_ncf_type_default`,
@@ -283,7 +283,7 @@ GET /api/v1/config/catalogos-fiscales?type=compra
 
 - **Sin el parámetro** (como lo usás hoy): la respuesta trae **ambos** bloques, `ncfTypes` +
   `ncfTypesFisicos` (venta) y `ncfTypesCompra` (compra) — **exactamente igual que antes de este
-  cambio, byte a byte.** No tenés que cambiar nada en las pantallas que ya lo consumen así.
+  cambio, byte a byte.** No tienes que cambiar nada en las pantallas que ya lo consumen así.
 - **`?type=venta`**: la respuesta **omite** `ncfTypesCompra` — solo trae `ncfTypes`/`ncfTypesFisicos`.
 - **`?type=compra`**: la respuesta **omite** `ncfTypes`/`ncfTypesFisicos` — solo trae `ncfTypesCompra`.
 - En los tres casos, `tipoBienes606`, `formaPago606` y `facturacionElectronicaHabilitada` **siempre**
@@ -343,7 +343,7 @@ Hoy, cuando se crea/somete una factura y el total (`grandTotal`) no termina en `
 **crear** el documento — esto ya lo ves reflejado en los campos `grandTotal`/`roundedTotal`/
 `roundingAdjustment` que ya devuelve `GET`/`POST /invoices`. Este comportamiento se activa o
 desactiva con el toggle `redondeoTotalDeshabilitado` en `Facturacion Config`, que probablemente ya
-tenés como un switch en la pantalla de Configuración de Facturación.
+tienes como un switch en la pantalla de Configuración de Facturación.
 
 ### 4.2 El comportamiento nuevo
 

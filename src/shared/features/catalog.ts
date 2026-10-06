@@ -36,6 +36,31 @@ export const FEATURE_KEYS: readonly FeatureKey[] = [
   'notasCredito',
   'notasDebito',
   'pedidos',
+  // Numeración de documentos — docs/tasks/PROMPT_NUMERACION_DOCUMENTOS_FRONTEND.md §3.1.
+  // 22 features `numeracion*` independientes. Verificado contra el índice
+  // `GET /config/numeracion` (el backend los devuelve en `feature` por tipo).
+  'numeracionCliente',
+  'numeracionCotizacion',
+  'numeracionPedido',
+  'numeracionDespacho',
+  'numeracionFacturaVenta',
+  'numeracionNotaCreditoVenta',
+  'numeracionProveedor',
+  'numeracionSolicitudCompra',
+  'numeracionSolicitudCotizacion',
+  'numeracionCotizacionProveedor',
+  'numeracionOrdenCompra',
+  'numeracionRecepcionCompra',
+  'numeracionFacturaCompra',
+  'numeracionMovimientoInventario',
+  'numeracionAjusteInventario',
+  'numeracionLote',
+  'numeracionPago',
+  'numeracionAsientoDiario',
+  'numeracionSolicitudPago',
+  'numeracionEmpleado',
+  'numeracionReclamoGastos',
+  'numeracionActivo',
 ] as const
 
 /** Las 15 claves de reporte de §4.2. */
@@ -195,6 +220,13 @@ export const RUTAS_FEATURES: readonly RutaFeature[] = [
   { pattern: '/config/tesoreria', feature: 'tesoreria' },
   { pattern: '/config/bancos', feature: 'tesoreria' },
   { pattern: '/config/cuentas-bancarias', feature: 'tesoreria' },
+
+  // Numeración de documentos — docs/tasks/PROMPT_NUMERACION_DOCUMENTOS_FRONTEND.md §7.1.
+  // 22 features `numeracion*` independientes: el índice ya hace la intersección feature ∩
+  // permiso por tipo, así que estas rutas pasan esta capa (núcleo) y cada página aplica su
+  // propio gating con el índice + los estados de §7.3/§9.
+  { pattern: '/config/numeracion/*', feature: null },
+  { pattern: '/config/numeracion', feature: null },
 
   // Reportes — se gatean por `reportesHabilitados` (ver REPORTE_KEY_POR_TIPO abajo), no por un
   // feature de módulo. Acá siempre pasan esta capa; el filtro real vive en ReportesPage +

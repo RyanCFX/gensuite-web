@@ -285,6 +285,14 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/config/roles', accion: null, soloSystemManager: true },
   { pattern: '/config/auditoria-pin', accion: null, soloSystemManager: true },
   { pattern: '/config/farmacia', accion: null, soloFarmacia: true, soloSystemManager: true },
+  // Numeración de documentos — docs/tasks/PROMPT_NUMERACION_DOCUMENTOS_FRONTEND.md §7.1.
+  // El gating real es POR TIPO (22 acciones `config.numeracion.<ruta>` dinámicas que no están en
+  // el catálogo estático `AccionId`, más 22 features `numeracion*`): el índice
+  // `GET /config/numeracion` ya hace la intersección feature ∩ permiso y cada detalle maneja
+  // sus 403/409 con estados propios (§7.3/§9). El guard de router se deja pasar (fail-open) y
+  // la visibilidad del ítem de menú la decide `tieneAlgunTipoNumeracion` en AppLayout (§7.1).
+  { pattern: '/config/numeracion/*', accion: null },
+  { pattern: '/config/numeracion', accion: null },
   // /config/:seccion — catch-all de secciones misceláneas; la propia ConfigPage valida
   { pattern: '/config/*', accion: null },
   { pattern: '/config', accion: null },

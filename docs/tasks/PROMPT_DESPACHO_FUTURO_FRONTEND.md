@@ -18,7 +18,7 @@
 > exacto de un campo, **gana el `openapi.json`** — pero no debería pasar: todo lo escrito acá se
 > extrajo directamente del código fuente ya mergeado, no de un diseño preliminar.
 >
-> Documento relacionado que asumimos ya tenés implementado, sin cambios en este documento:
+> Documento relacionado que asumimos ya tienes implementado, sin cambios en este documento:
 > `PROMPT_PERMISOS_FRONTEND.md` (contrato de permisos, `GET /me/permissions` → `data.acciones`).
 > Este cambio agrega **una sola acción nueva**: `config.despacho.configurar` (ver §6).
 
@@ -83,7 +83,7 @@ no es una pantalla nueva de configuración, es una sección más dentro de la qu
 
 ## 2. Pantalla de Configuración — sección "Despacho"
 
-Ya tenés (asumimos) los dos botones existentes "Habilitar despacho" / "Deshabilitar despacho"
+Ya tienes (asumimos) los dos botones existentes "Habilitar despacho" / "Deshabilitar despacho"
 (`POST /config/despacho/habilitar` y `POST /config/despacho/deshabilitar`, sin cambios). Agregá,
 **dentro de esa misma sección, visible solo si `despachoHabilitado: true`**, tres controles nuevos
 que se guardan con un endpoint dedicado:
@@ -223,7 +223,7 @@ usuario tenga que elegir cuál unidad puntual se vende.
   el usuario puede facturar un artículo con tracking sin haber llamado
   `POST /invoices/:id/asignar-serial-lote`, y el submit igual funciona (a menos que no haya
   suficiente disponible, en cuyo caso cae en el mismo error de §4.1 — "Stock insuficiente").
-- Con este switch **apagado** (default): **nada cambia** respecto a lo que ya tenés — seguí
+- Con este switch **apagado** (default): **nada cambia** respecto a lo que ya tienes — seguí
   exigiendo que el usuario asigne serial/lote a mano antes de someter, exactamente como hoy.
 - Si querés seguir ofreciendo la asignación manual aunque el switch esté activo (por si el usuario
   quiere elegir una unidad específica en vez de dejar que el sistema elija), no hay ningún
@@ -239,7 +239,7 @@ usuario tenga que elegir cuál unidad puntual se vende.
 
 ## 5. Bloqueo de venta a otros clientes (`despachoFuturoBloqueaVenta`)
 
-Esto afecta al módulo `/despachos` que ya tenés — específicamente a los dos endpoints que crean un
+Esto afecta al módulo `/despachos` que ya tienes — específicamente a los dos endpoints que crean un
 despacho **pendiente** a partir de un pedido o una factura ya facturados a futuro:
 
 - `POST /despachos/desde-pedido/:soId`

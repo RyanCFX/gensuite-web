@@ -32443,7 +32443,7 @@
     },
     "/api/v1/me/features": {
       "get": {
-        "description": "docs/plans/PLAN_FEATURES_TENANT.md §10. El frontend arma el menú intersectando esto con GET /me/permissions: un ítem aparece solo si el feature está encendido (acá) Y el usuario tiene permiso sobre al menos una acción de ese módulo (endpoint existente, sin cambios). `usuariosActuales`/`sucursalesActuales` se calculan con el mismo método que usa el límite al crear, para poder mostrar \"X de Y\" sin un segundo roundtrip.\n\n`features` siempre trae las 20 claves de `public.features` con `type='modulo'` (nunca falta una) — el shape exacto es `MeFeaturesResponseDto`, ver el schema de esta respuesta.",
+        "description": "docs/plans/PLAN_FEATURES_TENANT.md §10. El frontend arma el menú intersectando esto con GET /me/permissions: un ítem aparece solo si el feature está encendido (acá) Y el usuario tiene permiso sobre al menos una acción de ese módulo (endpoint existente, sin cambios). `usuariosActuales`/`sucursalesActuales` se calculan con el mismo método que usa el límite al crear, para poder mostrar \"X de Y\" sin un segundo roundtrip.\n\n`features` siempre trae las 42 claves de `public.features` con `type='modulo'` (nunca falta una) — el shape exacto es `MeFeaturesResponseDto`, ver el schema de esta respuesta.",
         "operationId": "MeController_getFeatures",
         "parameters": [
           {
@@ -32900,6 +32900,3871 @@
         "summary": "Desvincula una cuenta externa",
         "tags": [
           "Mis permisos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion": {
+      "get": {
+        "description": "Intersección de features del tenant (`numeracion*` en GET /me/features) y permisos del usuario (`config.numeracion.*`). Cada tipo expone su propia ruta `GET/PUT /config/numeracion/\u003Cruta\u003E`.",
+        "operationId": "NumeracionIndiceController_indice",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionIndiceEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tipos de documento cuya numeración puede configurar el usuario",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/cliente": {
+      "get": {
+        "operationId": "Numeracion_cliente_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Clientes (Customer)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_cliente_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Clientes",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/cliente/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_cliente_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Clientes",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/cliente/preview": {
+      "post": {
+        "operationId": "Numeracion_cliente_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/cotizacion": {
+      "get": {
+        "operationId": "Numeracion_cotizacion_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Cotizaciones (Quotation)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_cotizacion_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Cotizaciones",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/cotizacion/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_cotizacion_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Cotizaciones",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/cotizacion/preview": {
+      "post": {
+        "operationId": "Numeracion_cotizacion_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/pedido": {
+      "get": {
+        "operationId": "Numeracion_pedido_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Pedidos (Sales Order)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_pedido_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Pedidos",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/pedido/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_pedido_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Pedidos",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/pedido/preview": {
+      "post": {
+        "operationId": "Numeracion_pedido_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/despacho": {
+      "get": {
+        "operationId": "Numeracion_despacho_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Despachos (Delivery Note)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_despacho_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Despachos",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/despacho/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_despacho_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Despachos",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/despacho/preview": {
+      "post": {
+        "operationId": "Numeracion_despacho_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/factura-venta": {
+      "get": {
+        "operationId": "Numeracion_facturaVenta_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Facturas de venta (Sales Invoice)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_facturaVenta_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Facturas de venta",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/factura-venta/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_facturaVenta_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Facturas de venta",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/factura-venta/preview": {
+      "post": {
+        "operationId": "Numeracion_facturaVenta_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/nota-credito-venta": {
+      "get": {
+        "operationId": "Numeracion_notaCreditoVenta_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Notas de crédito de venta (devoluciones) (Sales Invoice)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_notaCreditoVenta_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Notas de crédito de venta (devoluciones)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/nota-credito-venta/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_notaCreditoVenta_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Notas de crédito de venta (devoluciones)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/nota-credito-venta/preview": {
+      "post": {
+        "operationId": "Numeracion_notaCreditoVenta_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/proveedor": {
+      "get": {
+        "operationId": "Numeracion_proveedor_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Proveedores (Supplier)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_proveedor_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Proveedores",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/proveedor/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_proveedor_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Proveedores",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/proveedor/preview": {
+      "post": {
+        "operationId": "Numeracion_proveedor_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/solicitud-compra": {
+      "get": {
+        "operationId": "Numeracion_solicitudCompra_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Solicitudes de compra (Material Request)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_solicitudCompra_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Solicitudes de compra",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/solicitud-compra/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_solicitudCompra_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Solicitudes de compra",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/solicitud-compra/preview": {
+      "post": {
+        "operationId": "Numeracion_solicitudCompra_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/solicitud-cotizacion": {
+      "get": {
+        "operationId": "Numeracion_solicitudCotizacion_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Solicitudes de cotización (RFQ) (Request for Quotation)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_solicitudCotizacion_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Solicitudes de cotización (RFQ)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/solicitud-cotizacion/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_solicitudCotizacion_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Solicitudes de cotización (RFQ)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/solicitud-cotizacion/preview": {
+      "post": {
+        "operationId": "Numeracion_solicitudCotizacion_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/cotizacion-proveedor": {
+      "get": {
+        "operationId": "Numeracion_cotizacionProveedor_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Cotizaciones de proveedor (Supplier Quotation)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_cotizacionProveedor_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Cotizaciones de proveedor",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/cotizacion-proveedor/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_cotizacionProveedor_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Cotizaciones de proveedor",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/cotizacion-proveedor/preview": {
+      "post": {
+        "operationId": "Numeracion_cotizacionProveedor_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/orden-compra": {
+      "get": {
+        "operationId": "Numeracion_ordenCompra_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Órdenes de compra (Purchase Order)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_ordenCompra_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Órdenes de compra",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/orden-compra/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_ordenCompra_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Órdenes de compra",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/orden-compra/preview": {
+      "post": {
+        "operationId": "Numeracion_ordenCompra_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/recepcion-compra": {
+      "get": {
+        "operationId": "Numeracion_recepcionCompra_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Recepciones de compra (Purchase Receipt)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_recepcionCompra_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Recepciones de compra",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/recepcion-compra/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_recepcionCompra_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Recepciones de compra",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/recepcion-compra/preview": {
+      "post": {
+        "operationId": "Numeracion_recepcionCompra_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/factura-compra": {
+      "get": {
+        "operationId": "Numeracion_facturaCompra_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Facturas de compra y gastos (Purchase Invoice)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_facturaCompra_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Facturas de compra y gastos",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/factura-compra/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_facturaCompra_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Facturas de compra y gastos",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/factura-compra/preview": {
+      "post": {
+        "operationId": "Numeracion_facturaCompra_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/movimiento-inventario": {
+      "get": {
+        "operationId": "Numeracion_movimientoInventario_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Movimientos de inventario (Stock Entry)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_movimientoInventario_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Movimientos de inventario",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/movimiento-inventario/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_movimientoInventario_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Movimientos de inventario",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/movimiento-inventario/preview": {
+      "post": {
+        "operationId": "Numeracion_movimientoInventario_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/ajuste-inventario": {
+      "get": {
+        "operationId": "Numeracion_ajusteInventario_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Ajustes de inventario (Stock Reconciliation)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_ajusteInventario_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Ajustes de inventario",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/ajuste-inventario/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_ajusteInventario_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Ajustes de inventario",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/ajuste-inventario/preview": {
+      "post": {
+        "operationId": "Numeracion_ajusteInventario_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/lote": {
+      "get": {
+        "operationId": "Numeracion_lote_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Lotes (Batch)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_lote_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Lotes",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/lote/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_lote_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Lotes",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/lote/preview": {
+      "post": {
+        "operationId": "Numeracion_lote_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/pago": {
+      "get": {
+        "operationId": "Numeracion_pago_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Pagos y cobros (Payment Entry)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_pago_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Pagos y cobros",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/pago/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_pago_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Pagos y cobros",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/pago/preview": {
+      "post": {
+        "operationId": "Numeracion_pago_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/asiento-diario": {
+      "get": {
+        "operationId": "Numeracion_asientoDiario_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Asientos de diario (Journal Entry)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_asientoDiario_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Asientos de diario",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/asiento-diario/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_asientoDiario_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Asientos de diario",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/asiento-diario/preview": {
+      "post": {
+        "operationId": "Numeracion_asientoDiario_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/solicitud-pago": {
+      "get": {
+        "operationId": "Numeracion_solicitudPago_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Solicitudes de pago (Payment Request)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_solicitudPago_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Solicitudes de pago",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/solicitud-pago/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_solicitudPago_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Solicitudes de pago",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/solicitud-pago/preview": {
+      "post": {
+        "operationId": "Numeracion_solicitudPago_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/empleado": {
+      "get": {
+        "operationId": "Numeracion_empleado_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Empleados (Employee)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_empleado_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Empleados",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/empleado/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_empleado_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Empleados",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/empleado/preview": {
+      "post": {
+        "operationId": "Numeracion_empleado_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/reclamo-gastos": {
+      "get": {
+        "operationId": "Numeracion_reclamoGastos_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Reclamos de gastos (Expense Claim)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_reclamoGastos_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Reclamos de gastos",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/reclamo-gastos/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_reclamoGastos_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Reclamos de gastos",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/reclamo-gastos/preview": {
+      "post": {
+        "operationId": "Numeracion_reclamoGastos_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/activo": {
+      "get": {
+        "operationId": "Numeracion_activo_Controller_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Numeración de Activos fijos (Asset)",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza la lista de series (la primera es la predeterminada). Solo afecta a documentos nuevos; los ya emitidos conservan su nombre.",
+        "operationId": "Numeracion_activo_Controller_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configura la numeración de Activos fijos",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/activo/contador": {
+      "put": {
+        "description": "Cuidado: bajar un contador puede generar nombres duplicados (ERPNext rechazará el duplicado).",
+        "operationId": "Numeracion_activo_Controller_contador",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContadorNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NumeracionEstadoEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fija el último número emitido de una serie de Activos fijos",
+        "tags": [
+          "Numeración de documentos"
+        ]
+      }
+    },
+    "/api/v1/config/numeracion/activo/preview": {
+      "post": {
+        "operationId": "Numeracion_activo_Controller_preview",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewNumeracionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewEnvelopeDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vista previa de los próximos números de una plantilla",
+        "tags": [
+          "Numeración de documentos"
         ]
       }
     },
@@ -52097,6 +55962,94 @@
           "relaciones.compra.enlazar-y-enviar": {
             "type": "boolean",
             "description": "Detalle de compra (sometida) — Enviar al proveedor"
+          },
+          "config.numeracion.cliente": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Clientes"
+          },
+          "config.numeracion.cotizacion": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Cotizaciones"
+          },
+          "config.numeracion.pedido": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Pedidos"
+          },
+          "config.numeracion.despacho": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Despachos"
+          },
+          "config.numeracion.factura-venta": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Facturas de venta"
+          },
+          "config.numeracion.nota-credito-venta": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Notas de crédito de venta (devoluciones)"
+          },
+          "config.numeracion.proveedor": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Proveedores"
+          },
+          "config.numeracion.solicitud-compra": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Solicitudes de compra"
+          },
+          "config.numeracion.solicitud-cotizacion": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Solicitudes de cotización (RFQ)"
+          },
+          "config.numeracion.cotizacion-proveedor": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Cotizaciones de proveedor"
+          },
+          "config.numeracion.orden-compra": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Órdenes de compra"
+          },
+          "config.numeracion.recepcion-compra": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Recepciones de compra"
+          },
+          "config.numeracion.factura-compra": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Facturas de compra y gastos"
+          },
+          "config.numeracion.movimiento-inventario": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Movimientos de inventario"
+          },
+          "config.numeracion.ajuste-inventario": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Ajustes de inventario"
+          },
+          "config.numeracion.lote": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Lotes"
+          },
+          "config.numeracion.pago": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Pagos y cobros"
+          },
+          "config.numeracion.asiento-diario": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Asientos de diario"
+          },
+          "config.numeracion.solicitud-pago": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Solicitudes de pago"
+          },
+          "config.numeracion.empleado": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Empleados"
+          },
+          "config.numeracion.reclamo-gastos": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Reclamos de gastos"
+          },
+          "config.numeracion.activo": {
+            "type": "boolean",
+            "description": "Numeración de documentos — Activos fijos"
           }
         },
         "required": [
@@ -52604,7 +56557,29 @@
           "relaciones.transaccion.enlazar-compra",
           "relaciones.transaccion.enlazar-venta",
           "relaciones.transaccion.buscar-candidatos",
-          "relaciones.compra.enlazar-y-enviar"
+          "relaciones.compra.enlazar-y-enviar",
+          "config.numeracion.cliente",
+          "config.numeracion.cotizacion",
+          "config.numeracion.pedido",
+          "config.numeracion.despacho",
+          "config.numeracion.factura-venta",
+          "config.numeracion.nota-credito-venta",
+          "config.numeracion.proveedor",
+          "config.numeracion.solicitud-compra",
+          "config.numeracion.solicitud-cotizacion",
+          "config.numeracion.cotizacion-proveedor",
+          "config.numeracion.orden-compra",
+          "config.numeracion.recepcion-compra",
+          "config.numeracion.factura-compra",
+          "config.numeracion.movimiento-inventario",
+          "config.numeracion.ajuste-inventario",
+          "config.numeracion.lote",
+          "config.numeracion.pago",
+          "config.numeracion.asiento-diario",
+          "config.numeracion.solicitud-pago",
+          "config.numeracion.empleado",
+          "config.numeracion.reclamo-gastos",
+          "config.numeracion.activo"
         ]
       },
       "MePermissionsDataDto": {
@@ -52850,6 +56825,429 @@
         },
         "required": [
           "code"
+        ]
+      },
+      "NumeracionTipoDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "facturaVenta"
+          },
+          "doctype": {
+            "type": "string",
+            "example": "Sales Invoice"
+          },
+          "area": {
+            "type": "string",
+            "example": "Ventas"
+          },
+          "soportaSucursal": {
+            "type": "boolean",
+            "description": "El documento lleva sucursal: admite `reglasSucursal`."
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Facturas de venta"
+          },
+          "ejemplo": {
+            "type": "string",
+            "example": "FAC-2026-00001"
+          },
+          "modo": {
+            "type": "string",
+            "enum": [
+              "series",
+              "regla-devolucion",
+              "lote"
+            ]
+          },
+          "ruta": {
+            "type": "string",
+            "example": "/api/v1/config/numeracion/factura-venta"
+          },
+          "feature": {
+            "type": "string",
+            "example": "numeracionFacturaVenta",
+            "description": "Clave en GET /me/features."
+          },
+          "accion": {
+            "type": "string",
+            "example": "config.numeracion.factura-venta",
+            "description": "Clave en GET /me/permissions."
+          }
+        },
+        "required": [
+          "slug",
+          "doctype",
+          "area",
+          "soportaSucursal",
+          "nombre",
+          "ejemplo",
+          "modo",
+          "ruta",
+          "feature",
+          "accion"
+        ]
+      },
+      "NumeracionIndiceEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "description": "Solo los tipos que el tenant tiene activos Y que el usuario puede gestionar.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NumeracionTipoDto"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "SerieNumeracionDto": {
+        "type": "object",
+        "properties": {
+          "plantilla": {
+            "type": "string",
+            "example": "FAC-.YYYY.-",
+            "description": "Plantilla tal como la guarda ERPNext."
+          },
+          "esPredeterminada": {
+            "type": "boolean",
+            "description": "La primera de la lista: la que ERPNext usa cuando el BFF crea un documento."
+          },
+          "proximo": {
+            "type": "string",
+            "nullable": true,
+            "example": "FAC-2026-00001",
+            "description": "Próximo número que se asignaría."
+          },
+          "prefijo": {
+            "type": "string",
+            "nullable": true,
+            "example": "FAC-2026-",
+            "description": "Prefijo evaluado."
+          },
+          "contador": {
+            "type": "number",
+            "nullable": true,
+            "description": "Último número emitido (0 si no se ha usado)."
+          }
+        },
+        "required": [
+          "plantilla",
+          "esPredeterminada",
+          "proximo",
+          "prefijo",
+          "contador"
+        ]
+      },
+      "ReglaSucursalDto": {
+        "type": "object",
+        "properties": {
+          "sucursal": {
+            "type": "string",
+            "example": "Santo Domingo",
+            "description": "Nombre del Branch en ERPNext."
+          },
+          "plantilla": {
+            "type": "string",
+            "example": "FAC-SD-.YYYY.-.#####"
+          },
+          "prefijo": {
+            "type": "string",
+            "nullable": true,
+            "example": "FAC-SD-2026-"
+          },
+          "contador": {
+            "type": "number",
+            "nullable": true,
+            "description": "Último número emitido con esta regla (contador propio de la sucursal)."
+          },
+          "proximo": {
+            "type": "string",
+            "nullable": true,
+            "example": "FAC-SD-2026-00001"
+          }
+        },
+        "required": [
+          "sucursal",
+          "plantilla",
+          "prefijo",
+          "contador",
+          "proximo"
+        ]
+      },
+      "LoteNumeracionDto": {
+        "type": "object",
+        "properties": {
+          "usarSerie": {
+            "type": "boolean"
+          },
+          "prefijo": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "usarSerie",
+          "prefijo"
+        ]
+      },
+      "NumeracionEstadoDto": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "facturaVenta"
+          },
+          "doctype": {
+            "type": "string",
+            "example": "Sales Invoice"
+          },
+          "area": {
+            "type": "string",
+            "example": "Ventas"
+          },
+          "soportaSucursal": {
+            "type": "boolean",
+            "description": "El documento lleva sucursal: admite `reglasSucursal`."
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Facturas de venta"
+          },
+          "ejemplo": {
+            "type": "string",
+            "example": "FAC-2026-00001"
+          },
+          "modo": {
+            "type": "string",
+            "enum": [
+              "series",
+              "regla-devolucion",
+              "lote"
+            ]
+          },
+          "ruta": {
+            "type": "string",
+            "example": "/api/v1/config/numeracion/factura-venta"
+          },
+          "feature": {
+            "type": "string",
+            "example": "numeracionFacturaVenta",
+            "description": "Clave en GET /me/features."
+          },
+          "accion": {
+            "type": "string",
+            "example": "config.numeracion.factura-venta",
+            "description": "Clave en GET /me/permissions."
+          },
+          "series": {
+            "description": "Vacío en modo \"lote\".",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SerieNumeracionDto"
+            }
+          },
+          "reservadas": {
+            "description": "Series que otros procesos usan y el BFF conserva siempre (no editables).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reglasSucursal": {
+            "description": "Reglas de numeración por sucursal activas. Prevalecen sobre `series`. Vacío si el tipo no soporta sucursal o no hay ninguna.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReglaSucursalDto"
+            }
+          },
+          "nombradoPor": {
+            "type": "string",
+            "enum": [
+              "Customer Name",
+              "Supplier Name",
+              "Naming Series",
+              "Auto Name"
+            ],
+            "description": "Solo clientes/proveedores: la serie solo aplica si vale \"Naming Series\"."
+          },
+          "lote": {
+            "description": "Solo en modo \"lote\".",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LoteNumeracionDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "slug",
+          "doctype",
+          "area",
+          "soportaSucursal",
+          "nombre",
+          "ejemplo",
+          "modo",
+          "ruta",
+          "feature",
+          "accion",
+          "series",
+          "reservadas",
+          "reglasSucursal"
+        ]
+      },
+      "NumeracionEstadoEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/NumeracionEstadoDto"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReglaSucursalInputDto": {
+        "type": "object",
+        "properties": {
+          "sucursal": {
+            "type": "string",
+            "example": "Santo Domingo"
+          },
+          "plantilla": {
+            "type": "string",
+            "example": "FAC-SD-.YYYY.-.#####",
+            "description": "Debe terminar en `.` + `#`s."
+          }
+        },
+        "required": [
+          "sucursal",
+          "plantilla"
+        ]
+      },
+      "LoteNumeracionInputDto": {
+        "type": "object",
+        "properties": {
+          "usarSerie": {
+            "type": "boolean"
+          },
+          "prefijo": {
+            "type": "string",
+            "example": "LOT-"
+          }
+        },
+        "required": [
+          "usarSerie"
+        ]
+      },
+      "UpdateNumeracionDto": {
+        "type": "object",
+        "properties": {
+          "reglasSucursal": {
+            "description": "Lista COMPLETA de reglas por sucursal (una por sucursal). Las sucursales que no estén en la lista se desactivan (su contador se conserva por si se vuelven a agregar). Solo tipos con `soportaSucursal`.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReglaSucursalInputDto"
+            }
+          },
+          "series": {
+            "example": [
+              "FAC-.YYYY.-",
+              "FAC-B01-.#####"
+            ],
+            "description": "Lista COMPLETA y ordenada de plantillas (la primera es la predeterminada). Reemplaza la actual; las reservadas se conservan solas. En el modo \"regla-devolucion\" admite una sola plantilla (ej. \"NC-FAC-.YYYY.-.#####\") o vacío para desactivar la regla.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nombradoPor": {
+            "type": "string",
+            "enum": [
+              "Customer Name",
+              "Supplier Name",
+              "Naming Series",
+              "Auto Name"
+            ],
+            "description": "Solo clientes/proveedores."
+          },
+          "lote": {
+            "description": "Solo en modo \"lote\".",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LoteNumeracionInputDto"
+              }
+            ]
+          }
+        }
+      },
+      "ContadorNumeracionDto": {
+        "type": "object",
+        "properties": {
+          "sucursal": {
+            "type": "string",
+            "description": "Si viene, el contador es el de la regla de ESA sucursal (en vez de una serie)."
+          },
+          "plantilla": {
+            "type": "string",
+            "example": "FAC-.YYYY.-",
+            "description": "Plantilla de la lista actual (obligatoria si no viene `sucursal`)."
+          },
+          "valor": {
+            "type": "number",
+            "example": 150,
+            "description": "Último número emitido: el siguiente documento será valor + 1."
+          }
+        },
+        "required": [
+          "valor"
+        ]
+      },
+      "PreviewNumeracionDto": {
+        "type": "object",
+        "properties": {
+          "plantilla": {
+            "type": "string",
+            "example": "FAC-.YYYY.-"
+          }
+        },
+        "required": [
+          "plantilla"
+        ]
+      },
+      "PreviewEnvelopeDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "example": [
+              "FAC-2026-00001",
+              "FAC-2026-00002",
+              "FAC-2026-00003"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "success",
+          "data"
         ]
       },
       "CatalogoComponenteDto": {

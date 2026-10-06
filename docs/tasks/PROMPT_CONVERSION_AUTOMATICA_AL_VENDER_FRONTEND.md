@@ -3,7 +3,7 @@
 > **Para quien recibe este documento.** Esto describe un cambio nuevo que **requiere como
 > prerrequisito** que ya tengas implementado `docs/frontend/PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md`
 > (conversión MANUAL genérico→dimensionado) y, antes que ese, `docs/frontend/PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md`
-> (Dimensiones de Inventario en general). Este documento asume que ya conocés y tenés construido:
+> (Dimensiones de Inventario en general). Este documento asume que ya conocés y tienes construido:
 > el concepto de "ítem genérico" y "ítem dimensionado", el campo `itemGenericoOrigen` en el ítem
 > dimensionado, la pantalla de Catálogo → Artículos con sus selectores de dimensión, y la pantalla
 > manual "Conversión a Ítem Dimensionado" (`POST /inventory/conversion-dimension`). **No repito acá
@@ -36,7 +36,7 @@
 > `PUT /invoices/:id` (tag **Facturación**), que ya conocés. Si este documento y el `openapi.json`
 > llegaran a diferir en el nombre exacto de un campo, **gana el `openapi.json`**.
 >
-> Documento relacionado que asumimos ya tenés implementado, sin cambios en este documento:
+> Documento relacionado que asumimos ya tienes implementado, sin cambios en este documento:
 > `docs/frontend/PROMPT_PERMISOS_FRONTEND.md` (contrato de permisos, `GET /me/permissions` →
 > `data.acciones`).
 
@@ -160,7 +160,7 @@ isSalesItem === true  O  tiene conversionAutomatica configurada
 ```
 
 Esto es 100% transparente para vos — no hace falta ningún query param nuevo ni ninguna lógica de
-cliente para esto, el servidor ya filtra así. Lo único que tenés que hacer es **no asumir** que
+cliente para esto, el servidor ya filtra así. Lo único que tienes que hacer es **no asumir** que
 todo ítem que aparece en ese listado tiene `isSalesItem: true` — ahora puede aparecer un ítem con
 `isSalesItem: false` que trae el bloque `conversionAutomatica`. Tu UI debe tratar ese caso
 especial (ver §4) en vez de, por ejemplo, ocultarlo por tener `isSalesItem: false` si vos mismo
@@ -270,8 +270,8 @@ que ya uses hoy para facturar con descuento de inventario real.
 | 2 | 400 | `PUT /catalog/items` | `El destino de conversión automática no puede ser el mismo artículo.` | Se intentó apuntar un ítem a sí mismo | No debería poder pasar si el selector excluye el propio ítem de sus opciones |
 | 3 | 400 | `PUT /catalog/items` | `Un ítem no puede tener configurado «Ítem genérico de origen» y «Destino de conversión automática» a la vez...` | Se intentaron configurar ambos campos en el mismo ítem | Mostrar solo uno de los dos campos por formulario según el rol del ítem (§2.1) |
 | 4 | 400 | `POST`/`PUT /invoices` | `El ítem "X" tiene configurada conversión automática a "Y" — debe indicar "dimensiones".` | Se mandó una línea con un ítem genérico-con-conversión-automática SIN `dimensiones`, en una factura con `update_stock=1` | No debería poder pasar si el formulario obliga a elegir la combinación (§4.1, punto 3) |
-| 5 | 400 | `POST`/`PUT /invoices` | `No se pudo resolver almacén para convertir "X".` | No se pudo determinar un almacén de venta válido para la línea (mismo tipo de error que ya conocés de cualquier línea sin almacén resoluble) | Mismo manejo que ya tenés para errores de almacén en facturación |
-| 6 | 400 | `POST`/`PUT /invoices` | `SALE_WAREHOUSE_MISMATCH` (código), mensaje sobre "esta sucursal solo puede vender desde..." | La sucursal tiene un almacén de venta forzado distinto al de la conversión | Mismo manejo que ya tenés para este error existente en facturación — no es nuevo, solo ahora también puede dispararse desde una línea con conversión automática |
+| 5 | 400 | `POST`/`PUT /invoices` | `No se pudo resolver almacén para convertir "X".` | No se pudo determinar un almacén de venta válido para la línea (mismo tipo de error que ya conocés de cualquier línea sin almacén resoluble) | Mismo manejo que ya tienes para errores de almacén en facturación |
+| 6 | 400 | `POST`/`PUT /invoices` | `SALE_WAREHOUSE_MISMATCH` (código), mensaje sobre "esta sucursal solo puede vender desde..." | La sucursal tiene un almacén de venta forzado distinto al de la conversión | Mismo manejo que ya tienes para este error existente en facturación — no es nuevo, solo ahora también puede dispararse desde una línea con conversión automática |
 
 Los demás errores de combinación de dimensión (falta un valor, combinación inválida, etc.) son los
 MISMOS que ya conocés y manejás de cualquier línea de un ítem dimensionado — no hay mensajes nuevos

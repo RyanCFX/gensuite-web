@@ -1,7 +1,7 @@
 # Prompt para el agente de frontend: Permisos v2 (pantallas, componentes, filtros) y dashboard modular
 
 > **Para quien recibe este documento:** sos el agente que implementa el frontend de GenSuite
-> (React). No tenés memoria de ninguna conversación previa. Todo lo que necesitás está en este
+> (React). No tienes memoria de ninguna conversación previa. Todo lo que necesitás está en este
 > documento y en el `openapi.json` del repo del frontend, que ya trae la documentación
 > actualizada de TODOS los endpoints que se mencionan acá (tag **"Permisos v2 (acceso)"** y
 > tag **Dashboard**). Si algo de este documento contradice el `openapi.json`, gana el

@@ -31,7 +31,7 @@
 | Devoluciones | Sin soporte | Formulario de devoluciones normal + NC a la ARS automática |
 | Impresión | Endpoints propios de despacho/lote | `GET /invoices/:id/pdf` + plantillas JSON con bindings `seguro.*` |
 
-Todo lo que sigue asume que ya tenés el módulo Aseguradoras (`/aseguradoras`) y el contrato de
+Todo lo que sigue asume que ya tienes el módulo Aseguradoras (`/aseguradoras`) y el contrato de
 permisos (`acciones`, `vertical`) funcionando.
 
 ---
@@ -49,7 +49,7 @@ iniciar sesión, junto con `data.acciones`.
 - Las columnas "Cubre ARS" / "A cobrar" en la cola de Caja.
 - Los campos `motivoAnulacionArs` / `motivoAnulacionDetalle` en el formulario de devolución y el
   botón "Emitir NC a la aseguradora".
-- Menú **Farmacia ARS** → *Lotes de Facturación* y *Reportes*. (Aseguradoras ya lo tenés.)
+- Menú **Farmacia ARS** → *Lotes de Facturación* y *Reportes*. (Aseguradoras ya lo tienes.)
 - Configuración → sección **Farmacia ARS** (botón Habilitar/Reparar).
 - En el editor de plantillas, los bindings `seguro.*` (el catálogo ya no los devuelve en un
   tenant general, pero si cacheás el catálogo, invalidalo por tenant).

@@ -49,6 +49,15 @@ const FEATURE_KEYS = [
   'proveedores', 'caja', 'contabilidad', 'cuentasPorCobrar', 'cuentasPorPagar', 'tesoreria',
   'inventario', 'productos', 'servicios', 'relacionesComerciales', 'cotizaciones', 'despacho',
   'devoluciones', 'notasCredito', 'notasDebito', 'pedidos',
+  // Numeración de documentos — docs/tasks/PROMPT_NUMERACION_DOCUMENTOS_FRONTEND.md §4.6.
+  // Tratar como `false` si faltan (tenants o backends más viejos).
+  'numeracionCliente', 'numeracionCotizacion', 'numeracionPedido', 'numeracionDespacho',
+  'numeracionFacturaVenta', 'numeracionNotaCreditoVenta', 'numeracionProveedor',
+  'numeracionSolicitudCompra', 'numeracionSolicitudCotizacion', 'numeracionCotizacionProveedor',
+  'numeracionOrdenCompra', 'numeracionRecepcionCompra', 'numeracionFacturaCompra',
+  'numeracionMovimientoInventario', 'numeracionAjusteInventario', 'numeracionLote',
+  'numeracionPago', 'numeracionAsientoDiario', 'numeracionSolicitudPago', 'numeracionEmpleado',
+  'numeracionReclamoGastos', 'numeracionActivo',
 ] as const
 
 export function normalizeMeFeatures(raw: unknown): MeFeatures {

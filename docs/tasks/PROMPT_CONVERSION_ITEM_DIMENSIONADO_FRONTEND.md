@@ -35,7 +35,7 @@
 > diferir en el nombre exacto de un campo, **gana el `openapi.json`** — pero no debería pasar: todo
 > lo escrito acá se extrajo directamente del código fuente ya mergeado.
 >
-> Documento relacionado que asumimos ya tenés implementado, sin cambios en este documento:
+> Documento relacionado que asumimos ya tienes implementado, sin cambios en este documento:
 > `docs/frontend/PROMPT_PERMISOS_FRONTEND.md` (contrato de permisos, `GET /me/permissions` →
 > `data.acciones`, manejo de `403`).
 
@@ -48,7 +48,7 @@
 | 3 campos nuevos en `Item` | `itemGenericoOrigen`, `isSalesItem`, `isPurchaseItem` | `POST/PUT/GET /catalog/items` (endpoint ya existente) |
 | 1 endpoint nuevo | Convertir N unidades de un ítem genérico en N unidades de un ítem dimensionado, asignando la combinación | `POST /inventory/conversion-dimension` |
 | 1 permiso nuevo | Gatea el endpoint de conversión | `inventario.convertir-dimension` |
-| Pantallas a tocar | Catálogo → Artículos (3 campos nuevos en el formulario) + 1 pantalla/acción nueva ("Conversión a Ítem Dimensionado", mismo lugar donde ya tenés Ajuste/Reclasificación de Combinación) | — |
+| Pantallas a tocar | Catálogo → Artículos (3 campos nuevos en el formulario) + 1 pantalla/acción nueva ("Conversión a Ítem Dimensionado", mismo lugar donde ya tienes Ajuste/Reclasificación de Combinación) | — |
 
 **Lo que NO cambia:**
 - Nada de lo que ya implementaste de `PROMPT_INVENTORY_DIMENSIONS_FRONTEND.md` cambia de

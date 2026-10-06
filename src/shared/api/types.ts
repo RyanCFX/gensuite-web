@@ -7214,7 +7214,17 @@ export type TenantFeatureKey =
   | 'gastos' | 'proveedores' | 'caja' | 'contabilidad' | 'cuentasPorCobrar'
   | 'cuentasPorPagar' | 'tesoreria' | 'inventario' | 'productos' | 'servicios'
   | 'relacionesComerciales' | 'cotizaciones' | 'despacho' | 'devoluciones'
-  | 'notasCredito' | 'notasDebito' | 'pedidos';
+  | 'notasCredito' | 'notasDebito' | 'pedidos'
+  // Numeración de documentos — docs/tasks/PROMPT_NUMERACION_DOCUMENTOS_FRONTEND.md §4.6.
+  // 22 claves `numeracion*` dentro de `features` de GET /me/features (ausente ⇒ `false`).
+  | 'numeracionCliente' | 'numeracionCotizacion' | 'numeracionPedido'
+  | 'numeracionDespacho' | 'numeracionFacturaVenta' | 'numeracionNotaCreditoVenta'
+  | 'numeracionProveedor' | 'numeracionSolicitudCompra' | 'numeracionSolicitudCotizacion'
+  | 'numeracionCotizacionProveedor' | 'numeracionOrdenCompra' | 'numeracionRecepcionCompra'
+  | 'numeracionFacturaCompra' | 'numeracionMovimientoInventario' | 'numeracionAjusteInventario'
+  | 'numeracionLote' | 'numeracionPago' | 'numeracionAsientoDiario'
+  | 'numeracionSolicitudPago' | 'numeracionEmpleado' | 'numeracionReclamoGastos'
+  | 'numeracionActivo';
 
 export type TenantReporteKey =
   | 'ventas_por_periodo' | 'top_productos' | 'top_clientes' | 'ventas_por_vendedor'
@@ -8732,3 +8742,92 @@ export type ClienteDetalle = Partial<Customer> & { id: string; customerName: str
 
 /** Detalle comercial/fiscal del proveedor para formularios (GET /opciones/proveedores/:id/detalle). */
 export type ProveedorDetalle = Partial<Supplier> & { id: string; supplierName: string };
+
+// ─── Numeración de documentos — docs/tasks/PROMPT_NUMERACION_DOCUMENTOS_FRONTEND.md §12 ──
+// Verificado contra openapi.json (tag "Numeración de documentos"): `NumeracionTipoDto`,
+// `SerieNumeracionDto`, `NumeracionEstadoDto`, `UpdateNumeracionDto`, `ContadorNumeracionDto`,
+// `PreviewNumeracionDto`. Gana openapi.json ante cualquier discrepancia de nombres/tipos.
+
+export type NumeracionModo = 'series' | 'regla-devolucion' | 'lote';
+
+export interface NumeracionTipo {
+  slug: string;
+  doctype: string;
+  area: string;
+  nombre: string;
+  ejemplo: string;
+  modo: NumeracionModo;
+  /** El documento lleva sucursal: admite `reglasSucursal` (solo 14 tipos, ver §2 de la actualización). */
+  soportaSucursal: boolean;
+  /** ⚠️ Path absoluto que YA incluye /api/v1 (ej. "/api/v1/config/numeracion/factura-venta") — ver §4.1. */
+  ruta: string;
+  /** Clave en GET /me/features (ej. 'numeracionFacturaVenta'). */
+  feature: string;
+  /** Clave en GET /me/permissions (ej. 'config.numeracion.factura-venta'). */
+  accion: string;
+}
+
+export interface SerieNumeracion {
+  plantilla: string;
+  esPredeterminada: boolean;
+  /** Próximo número que saldría (null si la plantilla usa campos del documento). */
+  proximo: string | null;
+  /** Prefijo ya evaluado con la fecha actual (null si usa campos del documento). */
+  prefijo: string | null;
+  /** ÚLTIMO número emitido con ese prefijo (0 si nunca se usó; null si no evaluable). */
+  contador: number | null;
+}
+
+export type NombradoPor =
+  | 'Customer Name'
+  | 'Supplier Name'
+  | 'Naming Series'
+  | 'Auto Name';
+
+export interface NumeracionEstado extends NumeracionTipo {
+  series: SerieNumeracion[];
+  /** Series del sistema: solo informativas, nunca se editan ni se reenvían en el PUT. */
+  reservadas: string[];
+  /** Reglas ACTIVAS por sucursal (prevalecen sobre `series`). `[]` si no hay o no aplica. */
+  reglasSucursal: ReglaSucursal[];
+  /** Solo en cliente y proveedor. */
+  nombradoPor?: NombradoPor;
+  /** Solo en modo "lote". */
+  lote?: { usarSerie: boolean; prefijo: string | null };
+}
+
+export interface UpdateNumeracion {
+  /** Lista COMPLETA y ORDENADA (reemplaza la actual). Sin reservadas. */
+  series?: string[];
+  /** Lista COMPLETA de reglas por sucursal (reemplaza la actual). Quitar una sucursal la
+   *  desactiva (conserva su contador). Se puede enviar junto con `series` en el mismo PUT. */
+  reglasSucursal?: { sucursal: string; plantilla: string }[];
+  nombradoPor?: NombradoPor | string;
+  lote?: { usarSerie: boolean; prefijo?: string };
+}
+
+export interface ContadorNumeracion {
+  /** Contador de una SERIE (obligatoria si no viene `sucursal`). */
+  plantilla?: string;
+  /** Contador de la REGLA de esa sucursal (requiere regla activa y tipo con sucursal). */
+  sucursal?: string;
+  /** Último número emitido (entero ≥ 0). El próximo será valor + 1. */
+  valor: number;
+}
+
+// ─── Numeración por sucursal — actualización del prompt de Numeración (§1-§3) ──
+// Verificado contra openapi.json: `soportaSucursal` (requerido en NumeracionTipoDto y
+// NumeracionEstadoDto), `reglasSucursal` (requerido en NumeracionEstadoDto),
+// `ReglaSucursalDto` / `ReglaSucursalInputDto`, `UpdateNumeracionDto.reglasSucursal` y
+// `ContadorNumeracionDto` con `sucursal` opcional. Gana openapi.json ante discrepancias.
+
+/** Regla activa de numeración propia de una sucursal (prevalece sobre `series`). */
+export interface ReglaSucursal {
+  /** Nombre del Branch en ERPNext (ej. "Santo Domingo"). */
+  sucursal: string;
+  plantilla: string;
+  prefijo: string | null;
+  /** Último número emitido con esta regla (contador propio de la sucursal). */
+  contador: number | null;
+  proximo: string | null;
+}

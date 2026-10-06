@@ -33,7 +33,7 @@
 
 ## 0. Qué es esto, en una frase, y por qué NO es lo mismo que ya viste en otras pantallas
 
-Una pantalla — dentro de Inventario, junto a Conteos y Transferencias (si ya las tenés) — para
+Una pantalla — dentro de Inventario, junto a Conteos y Transferencias (si ya las tienes) — para
 que un usuario **agregue existencias a un almacén sin que haya una compra a proveedor de por
 medio**: hallazgos de auditoría, donaciones, ajustes puntuales, mercancía que apareció y hay que
 sumar al sistema. Es un `Stock Entry` de ERPNext con `stock_entry_type: "Material Receipt"`.
@@ -52,7 +52,7 @@ pregunta que te van a hacer en QA la primera vez que algo salga mal:
 | Para qué se usa | Hallazgos, donaciones, ajustes puntuales o recurrentes | Migración masiva de saldos de un sistema anterior (una sola vez, al principio) | Ajuste tras un conteo físico periódico | Reposicionar stock existente entre almacenes/sucursales |
 | Menú sugerido | Inventario → Carga Inicial | Migración de Saldos → Inventario | Inventario → Conteos | Inventario → Transferencias |
 
-**La pregunta que tenés que hacerte antes de cada línea del formulario: "¿esta cantidad se suma
+**La pregunta que tienes que hacerte antes de cada línea del formulario: "¿esta cantidad se suma
 o reemplaza?".** Acá siempre se suma. Si en algún momento el usuario quiere decir "el almacén
 tiene EXACTAMENTE 120 unidades" (sin importar cuánto había antes), esa es la pantalla de Conteo o
 la de Apertura de Inventario — **no esta**.
@@ -236,7 +236,7 @@ servidor rechaza el documento completo.
 
 **Cómo manejarlo en la UI:**
 
-- Si tu formulario permite elegir el almacén línea por línea, y ya tenés cacheado a qué sucursal
+- Si tu formulario permite elegir el almacén línea por línea, y ya tienes cacheado a qué sucursal
   pertenece cada almacén (por ejemplo, del catálogo de almacenes que ya consumís en otras
   pantallas), podés detectar esto ANTES de someter y marcar las filas en conflicto.
 - Si preferís una solución más simple para la primera entrega: dejá que el servidor lo rechace y
@@ -270,7 +270,7 @@ con un mensaje que apunta directo a cómo arreglarlo:
 **Qué hacer en la UI cuando aparece este error:**
 
 - Mostrá el mensaje tal cual — ya está redactado para el usuario final.
-- Si tenés acceso de administrador a la pantalla de Configuración → Cuentas de la Empresa,
+- Si tienes acceso de administrador a la pantalla de Configuración → Cuentas de la Empresa,
   ofrecé un enlace directo ahí (`/config/cuentas-empresa` o como se llame tu ruta interna) en vez
   de solo mostrar el texto — es un problema de configuración de una sola vez por tenant, y cuanto
   más fácil sea resolverlo desde acá, menos tickets de soporte vas a generar.
@@ -381,7 +381,7 @@ Sin body. Confirmación previa obligatoria en la UI:
 ```
 
 Mostrá ese `message` tal cual. Después de anular, refrescá el listado/detalle — el `status` pasa
-a `"cancelled"`. Si tenés una pantalla de Inventario general (existencias actuales) abierta en
+a `"cancelled"`. Si tienes una pantalla de Inventario general (existencias actuales) abierta en
 otra pestaña, considerá invalidar su caché/refrescarla, ya que las cantidades reales cambiaron.
 
 **Advertencia práctica, igual que en Apertura de Inventario:** si entre que se cargó el documento

@@ -28,6 +28,31 @@ export type FeatureKey =
   | 'notasCredito'
   | 'notasDebito'
   | 'pedidos'
+  // Numeración de documentos — docs/tasks/PROMPT_NUMERACION_DOCUMENTOS_FRONTEND.md §3.1/§4.6.
+  // 22 features independientes (`numeracion*`), apagados por defecto, que GenSuite Control
+  // enciende tenant por tenant. Ausente en el backend viejo ⇒ `false` (ver normalizeMeFeatures).
+  | 'numeracionCliente'
+  | 'numeracionCotizacion'
+  | 'numeracionPedido'
+  | 'numeracionDespacho'
+  | 'numeracionFacturaVenta'
+  | 'numeracionNotaCreditoVenta'
+  | 'numeracionProveedor'
+  | 'numeracionSolicitudCompra'
+  | 'numeracionSolicitudCotizacion'
+  | 'numeracionCotizacionProveedor'
+  | 'numeracionOrdenCompra'
+  | 'numeracionRecepcionCompra'
+  | 'numeracionFacturaCompra'
+  | 'numeracionMovimientoInventario'
+  | 'numeracionAjusteInventario'
+  | 'numeracionLote'
+  | 'numeracionPago'
+  | 'numeracionAsientoDiario'
+  | 'numeracionSolicitudPago'
+  | 'numeracionEmpleado'
+  | 'numeracionReclamoGastos'
+  | 'numeracionActivo'
 
 /** Claves de reporte de `reportesHabilitados` (§4.2) — presencia en el array = encendido. */
 export type ReporteKey =

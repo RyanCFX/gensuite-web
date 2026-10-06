@@ -116,6 +116,8 @@ const UsuariosPage    = lazy(() => import('@/features/usuarios/UsuariosPage'))
 const ReportesPage    = lazy(() => import('@/features/reportes/ReportesPage'))
 const EmpresaConfig   = lazy(() => import('@/features/config/EmpresaConfig'))
 const NcfPage         = lazy(() => import('@/features/config/NcfPage'))
+const NumeracionPage  = lazy(() => import('@/features/numeracion/NumeracionPage'))
+const NumeracionDetailPage = lazy(() => import('@/features/numeracion/NumeracionDetailPage'))
 const MonedasPage     = lazy(() => import('@/features/config/MonedasPage'))
 const EcfAdminPage    = lazy(() => import('@/features/config/EcfAdminPage'))
 const EcfCertificacionPage = lazy(() => import('@/features/config/EcfCertificacionPage'))
@@ -469,6 +471,10 @@ export default function App() {
             <Route path="/config/empresa" element={<Suspense fallback={<PageLoader />}><EmpresaConfig /></Suspense>} />
             {/* /config/ncf and /config/sucursales must be before /config/:seccion to avoid being caught as seccion */}
             <Route path="/config/ncf" element={<Suspense fallback={<PageLoader />}><NcfPage /></Suspense>} />
+            {/* Numeración de documentos — docs/tasks/PROMPT_NUMERACION_DOCUMENTOS_FRONTEND.md §7.1.
+                Van antes que /config/:seccion para no ser capturadas como sección. */}
+            <Route path="/config/numeracion" element={<Suspense fallback={<PageLoader />}><NumeracionPage /></Suspense>} />
+            <Route path="/config/numeracion/:ruta" element={<Suspense fallback={<PageLoader />}><NumeracionDetailPage /></Suspense>} />
             <Route path="/config/monedas" element={<Suspense fallback={<PageLoader />}><MonedasPage /></Suspense>} />
             <Route path="/config/ecf/admin" element={<Suspense fallback={<PageLoader />}><EcfAdminPage /></Suspense>} />
             <Route path="/config/ecf/certificacion" element={<Suspense fallback={<PageLoader />}><EcfCertificacionPage /></Suspense>} />

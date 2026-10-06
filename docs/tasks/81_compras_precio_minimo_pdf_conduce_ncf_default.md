@@ -105,7 +105,7 @@ dispare también para este caso.
 
 **Punto crítico si tu frontend detecta el motivo del bloqueo inspeccionando el TEXTO del mensaje**
 (por ejemplo, buscando la substring "costo de compra" para decidir si mostrar el diálogo de PIN):
-tenés que **agregar también la detección de "precio mínimo"** en ese mismo lugar, o generalizar la
+tienes que **agregar también la detección de "precio mínimo"** en ese mismo lugar, o generalizar la
 detección a "cualquier 400 de `/invoices` o `/quotations` que mencione autorización con PIN" —
 si solo buscás la palabra "costo", el bloqueo por precio mínimo no va a disparar el diálogo y el
 usuario va a ver un error crudo sin poder autorizar desde la UI.
@@ -279,7 +279,7 @@ importar lo que diga este default.
 
 Tipo: string, uno de los códigos NCF físicos: `B01`, `B02`, `B03`, `B04`, `B11`, `B12`, `B13`,
 `B14`, `B15`, `B16`, `B17` (mismo catálogo que ya usás en el selector de `ncfType`/`tipoComprobante`
-de facturas/compras — probablemente ya tenés las etiquetas en español de cada código en algún lado
+de facturas/compras — probablemente ya tienes las etiquetas en español de cada código en algún lado
 de tu app, ej. B01 = "Crédito Fiscal", B02 = "Consumo", B11 = "Compras", etc.; reusalas acá).
 
 | Endpoint | Uso |
