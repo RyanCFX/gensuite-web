@@ -559,7 +559,7 @@ export default function CostosImportacionPage() {
                 <button type="button" className="btn btn-secondary" disabled={createMutation.isPending} onClick={requestClose}>
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
+                <button type="submit" className="btn btn-navy" disabled={createMutation.isPending}>
                   {createMutation.isPending ? 'Creando…' : 'Crear'}
                 </button>
               </div>

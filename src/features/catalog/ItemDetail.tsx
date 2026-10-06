@@ -28,6 +28,12 @@ import { EquivalentesPanel } from './EquivalentesPanel'
 
 // ─── Update Prices Modal ──────────────────────────────────────────────────────
 
+// Monto de impuesto dado base y % — redondeo igual al del precio con impuesto mostrado.
+function impuestoDe(base: number, pct: number): number {
+  const taxed = Math.round(base * (1 + pct / 100) * 100) / 100
+  return Math.round((taxed - base) * 100) / 100
+}
+
 function costPlusPreview(purchasePrice: string, margin: string): number | undefined {
   const cost = parseFloat(purchasePrice)
   const marginPct = parseFloat(margin)
@@ -990,13 +996,13 @@ function StockPorDimensionPanel({ itemCode }: { itemCode: string }) {
           ) : (
             <>
               <div className="stats-row" style={{ marginBottom: 16 }}>
-                <div className="stat-card">
+                <div className="stat-card kpi">
                   <div className="stat-card-top"><span className="stat-label">Total</span></div>
-                  <div className="stat-value" style={{ fontSize: 28 }}>{response.total}</div>
+                  <div className="stat-value">{response.total}</div>
                 </div>
-                <div className="stat-card">
+                <div className="stat-card kpi">
                   <div className="stat-card-top"><span className="stat-label">Sin especificar</span></div>
-                  <div className="stat-value" style={{ fontSize: 28, color: response.sinEspecificar !== 0 ? 'var(--color-error)' : undefined }}>
+                  <div className="stat-value" style={{ color: response.sinEspecificar !== 0 ? 'var(--color-error)' : undefined }}>
                     {response.sinEspecificar}
                   </div>
                   {/* §8.3 — para un artículo dimensionado desde el día uno esto debería ser
@@ -1083,7 +1089,7 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
     <div className="card" style={{ marginBottom: 16 }}>
       <div className="card-header navy-card-header">
         <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <MapPin size={15} style={{ color: 'var(--text-secondary)' }} /> Ubicaciones
+          Ubicaciones
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {(warehouses?.length ?? 0) > 1 && (
@@ -1315,18 +1321,16 @@ export default function ItemDetail() {
           <p className="page-sub" style={{ fontFamily: 'var(--font-body)' }}>{item.id}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {puedeEditar && (
-            <button className="btn btn-secondary" onClick={() => navigate(`${basePath}/${item.id}/editar`)}>
-              <Pencil size={15} /> Editar
-            </button>
-          )}
-          {puedePrecios && !item.hasVariants && (
-            <button className="btn btn-secondary" onClick={() => setShowPricesModal(true)}>
+          <button className="btn btn-secondary" style={{ border: '1.457px solid var(--Gris-Forms, #CCDBE2)', color: '#0E3D51' }} onClick={() => navigate(`${basePath}/${item.id}/editar`)}>
+            <Pencil size={15} /> Editar
+          </button>
+          {!item.hasVariants && (
+            <button className="btn btn-secondary" style={{ border: '1.457px solid var(--Gris-Forms, #CCDBE2)', color: '#0E3D51' }} onClick={() => setShowPricesModal(true)}>
               <DollarSign size={15} /> Actualizar Precios
             </button>
           )}
           {item.type === 'product' && !item.hasVariants && (
-            <button className="btn btn-secondary" onClick={() => setShowPrintLabels(true)}>
+            <button className="btn btn-secondary" style={{ border: '1.457px solid var(--Gris-Forms, #CCDBE2)', color: '#0E3D51' }} onClick={() => setShowPrintLabels(true)}>
               <Printer size={15} /> Imprimir etiqueta
             </button>
           )}
@@ -1359,22 +1363,22 @@ export default function ItemDetail() {
 
       {item.type === 'product' && !item.hasVariants && (
         <div className="stats-row" style={{ marginBottom: 16 }}>
-          <div className="stat-card">
+          <div className="stat-card kpi">
             <div className="stat-card-top">
               <span className="stat-label">Stock Actual</span>
             </div>
-            <div className="stat-value" style={{ color: stockColor, fontSize: 40 }}>{stock}</div>
+            <div className="stat-value" style={{ color: stockColor }}>{stock}</div>
             <div className="stat-footer">
               <span style={{ color: stockColor, fontWeight: 500, fontSize: 13 }}>{stockLabel}</span>
             </div>
           </div>
 
            {!!item.standardRate && (
-            <div className="stat-card">
+            <div className="stat-card kpi">
               <div className="stat-card-top">
                 <span className="stat-label">Precio de Venta</span>
               </div>
-              <div className="stat-value" style={{ fontSize: 28 }}>{formatDOP(item.standardRate)}</div>
+              <div className="stat-value">{formatDOP(item.standardRate)}</div>
               {item.autoDiscount && (
                 <div className="stat-footer">
                   <span className="badge badge-discount" style={{ fontSize: 11 }}>
@@ -1398,11 +1402,11 @@ export default function ItemDetail() {
 
       {item.type === 'service' && !item.hasVariants && !!item.standardRate && (
         <div className="stats-row" style={{ marginBottom: 16 }}>
-          <div className="stat-card">
+          <div className="stat-card kpi">
             <div className="stat-card-top">
               <span className="stat-label">Precio de Venta</span>
             </div>
-            <div className="stat-value" style={{ fontSize: 28 }}>{formatDOP(item.standardRate)}</div>
+            <div className="stat-value">{formatDOP(item.standardRate)}</div>
             {item.salesPriceDate && (
               <div className="stat-footer">
                 <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>
@@ -1410,36 +1414,6 @@ export default function ItemDetail() {
                 </span>
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {!item.hasVariants && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header navy-card-header"><h2 className="card-title">Compra</h2></div>
-          <div className="card-body">
-            <div className="fields-grid fields-grid-3">
-              {item.valuationRate != null && (
-                <div className="detail-field">
-                  <span className="detail-label">Costo de Valoración</span>
-                  <span className="detail-value">{formatDOP(item.valuationRate)}</span>
-                  {item.purchasePriceDate && (
-                    <span style={{ display: 'block', fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                      actualizado: {new Date(item.purchasePriceDate).toLocaleDateString('es-DO')}
-                    </span>
-                  )}
-                </div>
-              )}
-              <div className="detail-field">
-                <span className="detail-label">Impuesto de Compra</span>
-                <span className="detail-value">
-                  {item.purchaseTaxTemplate ?? '—'}
-                  {item.purchaseTaxPct != null && item.purchaseTaxPct > 0 && (
-                    <span style={{ color: 'var(--color-brand)', fontWeight: 600 }}> ({item.purchaseTaxPct}%)</span>
-                  )}
-                </span>
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -1478,126 +1452,144 @@ export default function ItemDetail() {
                 {item.priceMode === 'cost_plus' ? (
                   <>
                     {item.marginA != null && item.valuationRate != null && item.valuationRate > 0 && (
-                      <div className="stat-card">
+                      <div className="stat-card kpi">
                         <div className="stat-card-top">
-                          <span className="stat-label">Margen A</span>
+                          <span className="stat-label">Margen A - ({item.marginA}%)</span>
                         </div>
-                        <div className="stat-value" style={{ fontSize: 22 }}>
-                          {formatDOP(Math.round(item.valuationRate / (1 - item.marginA / 100) * 100) / 100)}
-                          <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>sin impuesto</span>
-                        </div>
-                        {item.salesTaxPct != null && item.salesTaxPct > 0 && (
-                          <div className="stat-value" style={{ fontSize: 22, color: 'var(--color-brand)' }}>
-                            {formatDOP(Math.round(item.valuationRate / (1 - item.marginA / 100) * (1 + item.salesTaxPct / 100) * 100) / 100)}
-                            <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>con impuesto</span>
+                        {(item.salesTaxPct != null && item.salesTaxPct > 0) ? (
+                          <>
+                            <div className="stat-value" style={{ fontSize: 22 }}>
+                              {formatDOP(Math.round(item.valuationRate / (1 - item.marginA / 100) * (1 + item.salesTaxPct / 100) * 100) / 100)}
+                            </div>
+                            <div style={{ borderTop: '1px solid var(--border-default)', margin: '8px 0' }} />
+                            <div className="stat-value" style={{ fontSize: 16, fontWeight: 400 }}>
+                              {formatDOP(Math.round(item.valuationRate / (1 - item.marginA / 100) * 100) / 100)} + {formatDOP(impuestoDe(Math.round(item.valuationRate / (1 - item.marginA / 100) * 100) / 100, item.salesTaxPct))}
+                              <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: '#1f8591', lineHeight: 1.3, marginTop: 2 }}>sin impuesto + impuesto</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="stat-value" style={{ fontSize: 22 }}>
+                            {formatDOP(Math.round(item.valuationRate / (1 - item.marginA / 100) * 100) / 100)}
                           </div>
                         )}
-                        <div className="stat-footer">
-                          <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>({item.marginA}%)</span>
-                        </div>
                       </div>
                     )}
                     {item.marginB != null && item.valuationRate != null && item.valuationRate > 0 && (
-                      <div className="stat-card">
+                      <div className="stat-card kpi">
                         <div className="stat-card-top">
-                          <span className="stat-label">Margen B</span>
+                          <span className="stat-label">Margen B - ({item.marginB}%)</span>
                         </div>
-                        <div className="stat-value" style={{ fontSize: 22 }}>
-                          {formatDOP(Math.round(item.valuationRate / (1 - item.marginB / 100) * 100) / 100)}
-                          <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>sin impuesto</span>
-                        </div>
-                        {item.salesTaxPct != null && item.salesTaxPct > 0 && (
-                          <div className="stat-value" style={{ fontSize: 22, color: 'var(--color-brand)' }}>
-                            {formatDOP(Math.round(item.valuationRate / (1 - item.marginB / 100) * (1 + item.salesTaxPct / 100) * 100) / 100)}
-                            <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>con impuesto</span>
+                        {(item.salesTaxPct != null && item.salesTaxPct > 0) ? (
+                          <>
+                            <div className="stat-value" style={{ fontSize: 22 }}>
+                              {formatDOP(Math.round(item.valuationRate / (1 - item.marginB / 100) * (1 + item.salesTaxPct / 100) * 100) / 100)}
+                            </div>
+                            <div style={{ borderTop: '1px solid var(--border-default)', margin: '8px 0' }} />
+                            <div className="stat-value" style={{ fontSize: 16, fontWeight: 400 }}>
+                              {formatDOP(Math.round(item.valuationRate / (1 - item.marginB / 100) * 100) / 100)} + {formatDOP(impuestoDe(Math.round(item.valuationRate / (1 - item.marginB / 100) * 100) / 100, item.salesTaxPct))}
+                              <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: '#1f8591', lineHeight: 1.3, marginTop: 2 }}>sin impuesto + impuesto</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="stat-value" style={{ fontSize: 22 }}>
+                            {formatDOP(Math.round(item.valuationRate / (1 - item.marginB / 100) * 100) / 100)}
                           </div>
                         )}
-                        <div className="stat-footer">
-                          <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>({item.marginB}%)</span>
-                        </div>
                       </div>
                     )}
                     {item.marginC != null && item.valuationRate != null && item.valuationRate > 0 && (
-                      <div className="stat-card">
+                      <div className="stat-card kpi">
                         <div className="stat-card-top">
-                          <span className="stat-label">Margen C</span>
+                          <span className="stat-label">Margen C - ({item.marginC}%)</span>
                         </div>
-                        <div className="stat-value" style={{ fontSize: 22 }}>
-                          {formatDOP(Math.round(item.valuationRate / (1 - item.marginC / 100) * 100) / 100)}
-                          <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>sin impuesto</span>
-                        </div>
-                        {item.salesTaxPct != null && item.salesTaxPct > 0 && (
-                          <div className="stat-value" style={{ fontSize: 22, color: 'var(--color-brand)' }}>
-                            {formatDOP(Math.round(item.valuationRate / (1 - item.marginC / 100) * (1 + item.salesTaxPct / 100) * 100) / 100)}
-                            <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>con impuesto</span>
+                        {(item.salesTaxPct != null && item.salesTaxPct > 0) ? (
+                          <>
+                            <div className="stat-value" style={{ fontSize: 22 }}>
+                              {formatDOP(Math.round(item.valuationRate / (1 - item.marginC / 100) * (1 + item.salesTaxPct / 100) * 100) / 100)}
+                            </div>
+                            <div style={{ borderTop: '1px solid var(--border-default)', margin: '8px 0' }} />
+                            <div className="stat-value" style={{ fontSize: 16, fontWeight: 400 }}>
+                              {formatDOP(Math.round(item.valuationRate / (1 - item.marginC / 100) * 100) / 100)} + {formatDOP(impuestoDe(Math.round(item.valuationRate / (1 - item.marginC / 100) * 100) / 100, item.salesTaxPct))}
+                              <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: '#1f8591', lineHeight: 1.3, marginTop: 2 }}>sin impuesto + impuesto</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="stat-value" style={{ fontSize: 22 }}>
+                            {formatDOP(Math.round(item.valuationRate / (1 - item.marginC / 100) * 100) / 100)}
                           </div>
                         )}
-                        <div className="stat-footer">
-                          <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>({item.marginC}%)</span>
-                        </div>
                       </div>
                     )}
                   </>
                 ) : (
                   <>
                     {item.prices?.A != null && (
-                      <div className="stat-card">
+                      <div className="stat-card kpi">
                         <div className="stat-card-top">
-                          <span className="stat-label">Precio A</span>
+                          <span className="stat-label">Precio A - Máximo</span>
                         </div>
-                        <div className="stat-value" style={{ fontSize: 22, color: 'var(--text-secondary)' }}>
-                          {formatDOP(item.prices?.A)}
-                          <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>sin impuesto</span>
-                        </div>
-                        {item.salesTaxPct != null && item.salesTaxPct > 0 && (
-                          <div className="stat-value" style={{ fontSize: 22, color: 'var(--color-brand)' }}>
-                            {formatDOP(Math.round(item.prices?.A * (1 + item.salesTaxPct / 100) * 100) / 100)}
-                            <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>con impuesto</span>
+                        {(item.salesTaxPct != null && item.salesTaxPct > 0) ? (
+                          <>
+                            <div className="stat-value" style={{ fontSize: 22 }}>
+                              {formatDOP(Math.round(item.prices?.A * (1 + item.salesTaxPct / 100) * 100) / 100)}
+                            </div>
+                            <div style={{ borderTop: '1px solid var(--border-default)', margin: '8px 0' }} />
+                            <div className="stat-value" style={{ fontSize: 16, fontWeight: 400 }}>
+                              {formatDOP(item.prices?.A)} + {formatDOP(impuestoDe(item.prices?.A ?? 0, item.salesTaxPct))}
+                              <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: '#1f8591', lineHeight: 1.3, marginTop: 2 }}>sin impuesto + impuesto</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="stat-value" style={{ fontSize: 22 }}>
+                            {formatDOP(item.prices?.A)}
                           </div>
                         )}
-                        <div className="stat-footer">
-                          <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>Máximo</span>
-                        </div>
                       </div>
                     )}
                     {item.prices?.B != null && (
-                      <div className="stat-card">
+                      <div className="stat-card kpi">
                         <div className="stat-card-top">
-                          <span className="stat-label">Precio B</span>
+                          <span className="stat-label">Precio B - Promedio</span>
                         </div>
-                        <div className="stat-value" style={{ fontSize: 22 }}>
-                          {formatDOP(item.prices?.B)}
-                          <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>sin impuesto</span>
-                        </div>
-                        {item.salesTaxPct != null && item.salesTaxPct > 0 && (
-                          <div className="stat-value" style={{ fontSize: 22, color: 'var(--color-brand)' }}>
-                            {formatDOP(Math.round(item.prices?.B * (1 + item.salesTaxPct / 100) * 100) / 100)}
-                            <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>con impuesto</span>
+                        {(item.salesTaxPct != null && item.salesTaxPct > 0) ? (
+                          <>
+                            <div className="stat-value" style={{ fontSize: 22 }}>
+                              {formatDOP(Math.round(item.prices?.B * (1 + item.salesTaxPct / 100) * 100) / 100)}
+                            </div>
+                            <div style={{ borderTop: '1px solid var(--border-default)', margin: '8px 0' }} />
+                            <div className="stat-value" style={{ fontSize: 16, fontWeight: 400 }}>
+                              {formatDOP(item.prices?.B)} + {formatDOP(impuestoDe(item.prices?.B ?? 0, item.salesTaxPct))}
+                              <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: '#1f8591', lineHeight: 1.3, marginTop: 2 }}>sin impuesto + impuesto</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="stat-value" style={{ fontSize: 22 }}>
+                            {formatDOP(item.prices?.B)}
                           </div>
                         )}
-                        <div className="stat-footer">
-                          <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>Promedio</span>
-                        </div>
                       </div>
                     )}
                     {item.prices?.C != null && (
-                      <div className="stat-card">
+                      <div className="stat-card kpi">
                         <div className="stat-card-top">
-                          <span className="stat-label">Precio C</span>
+                          <span className="stat-label">Precio C - Mínimo</span>
                         </div>
-                        <div className="stat-value" style={{ fontSize: 22, color: 'var(--text-secondary)' }}>
-                          {formatDOP(item.prices?.C)}
-                          <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>sin impuesto</span>
-                        </div>
-                        {item.salesTaxPct != null && item.salesTaxPct > 0 && (
-                          <div className="stat-value" style={{ fontSize: 22, color: 'var(--color-brand)' }}>
-                            {formatDOP(Math.round(item.prices?.C * (1 + item.salesTaxPct / 100) * 100) / 100)}
-                            <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: 'var(--text-tertiary)', lineHeight: 1.3 }}>con impuesto</span>
+                        {(item.salesTaxPct != null && item.salesTaxPct > 0) ? (
+                          <>
+                            <div className="stat-value" style={{ fontSize: 22 }}>
+                              {formatDOP(Math.round(item.prices?.C * (1 + item.salesTaxPct / 100) * 100) / 100)}
+                            </div>
+                            <div style={{ borderTop: '1px solid var(--border-default)', margin: '8px 0' }} />
+                            <div className="stat-value" style={{ fontSize: 16, fontWeight: 400 }}>
+                              {formatDOP(item.prices?.C)} + {formatDOP(impuestoDe(item.prices?.C ?? 0, item.salesTaxPct))}
+                              <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: '#1f8591', lineHeight: 1.3, marginTop: 2 }}>sin impuesto + impuesto</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="stat-value" style={{ fontSize: 22 }}>
+                            {formatDOP(item.prices?.C)}
                           </div>
                         )}
-                        <div className="stat-footer">
-                          <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>Mínimo</span>
-                        </div>
                       </div>
                     )}
                   </>
@@ -1608,32 +1600,8 @@ export default function ItemDetail() {
         </div>
       )}
 
-      {item.type === 'product' && !item.hasVariants && item.usaDimensiones === true && (
-        <StockPorDimensionPanel itemCode={item.id} />
-      )}
 
-      {/* Compra sin dimensión (docs/tasks/PROMPT_CONVERSION_DIMENSION_FRONTEND.md §4) — flag del
-          propio artículo, sin vínculos con otros ítems. Solo informativo. */}
-      {item.type === 'product' && !item.hasVariants && item.usaDimensiones === true && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header navy-card-header">
-            <h2 className="card-title">Dimensiones de inventario</h2>
-          </div>
-          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
-              <span style={{ color: 'var(--text-tertiary)' }}>Permite comprar/recibir sin dimensión:</span>
-              <strong style={{ color: 'var(--text-secondary)' }}>{item.permiteCompraSinDimension ? 'sí' : 'no'}</strong>
-              {item.permiteCompraSinDimension && (
-                <span style={{ color: 'var(--text-tertiary)' }}>
-                  — se puede comprar sin combinación; al venderla, la combinación sigue siendo obligatoria.
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {item.type === 'product' && !item.hasVariants && (
+{item.type === 'product' && !item.hasVariants && (
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="card-header navy-card-header">
             <h2 className="card-title">Existencias por almacén</h2>
@@ -1645,6 +1613,7 @@ export default function ItemDetail() {
                 return <p style={{ color: 'var(--text-tertiary)', fontSize: 13, margin: 0 }}>Sin existencias</p>
               }
               return (
+                <div className="items-table-wrap">
                 <table className="data-table navy-table items-table-resizable" style={{ width: '100%' }}>
                   <colgroup>
                     {STOCK_WAREHOUSE_COLUMNS.map((c) => <col key={c.key} style={{ width: stockWhColWidths[c.key] }} />)}
@@ -1670,40 +1639,35 @@ export default function ItemDetail() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )
             })()}
-          </div>
-        </div>
-      )}
+            {item.enPedido !== undefined && item.reservado !== undefined && item.disponible !== undefined && (
+              <>
+                {/* docs/tasks/76_disponibilidad_stock_detalle_item.md — solo vienen en el detalle, nunca en
+                    el listado, y ausentes del todo en Servicios. */}
+                <div className="ff-section-divider" style={{ marginTop: 16 }}>Disponibilidad</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
 
-      {/* docs/tasks/76_disponibilidad_stock_detalle_item.md — solo vienen en el detalle, nunca en
-          el listado, y ausentes del todo en Servicios: si falta cualquiera de los 3, se oculta la
-          sección entera en vez de mostrar "undefined"/"0" engañoso. */}
-      {item.enPedido !== undefined && item.reservado !== undefined && item.disponible !== undefined && (
-        <div className="card" style={{ marginBottom: 16 }}>
-          <div className="card-header navy-card-header">
-            <h2 className="card-title">Disponibilidad</h2>
-          </div>
-          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
                 En pedido <span style={{ color: 'var(--text-tertiary)' }}>(sin cobrar — informativo, no resta de lo disponible)</span>
               </span>
-              <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{item.enPedido} unidades</span>
+              <span style={{ fontSize: 14, color: 'var(--text-secondary)', minWidth: 150, textAlign: 'right' }}>{item.enPedido} unidades</span>
             </div>
             {item.entregado !== undefined && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
                   Entregado histórico <span style={{ color: 'var(--text-tertiary)' }}>(ya vendido y despachado — informativo)</span>
                 </span>
-                <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{item.entregado} unidades</span>
+                <span style={{ fontSize: 14, color: 'var(--text-secondary)', minWidth: 150, textAlign: 'right' }}>{item.entregado} unidades</span>
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, fontWeight: 500 }}>
                 Reservado <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>(ya cobrado — pendiente de entrega física)</span>
               </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, minWidth: 150 }}>
                 <span style={{ fontSize: 14, fontWeight: 500 }}>{item.reservado} unidades</span>
                 {item.reservado > 0 && (
                   <button
@@ -1718,17 +1682,51 @@ export default function ItemDetail() {
             </div>
             <div style={{ borderTop: '1px solid var(--border-default)', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 14, fontWeight: 600 }}>Disponible para vender</span>
-              <span className="stat-value" style={{ fontSize: 28, color: 'var(--color-success)' }}>{item.disponible}</span>
+              <span className="stat-value" style={{ fontSize: 28, color: 'var(--color-success)', minWidth: 150, textAlign: 'right' }}>{item.disponible}</span>
+            </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+
+{item.type === 'product' && !item.hasVariants && !item.variantOf && (
+        <UbicacionesPanel itemCode={item.id} />
+      )}
+{!item.hasVariants && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header navy-card-header"><h2 className="card-title">Compra</h2></div>
+          <div className="card-body">
+            <div className="fields-grid fields-grid-3">
+              {item.valuationRate != null && (
+                <div className="detail-field">
+                  <span className="detail-label">Costo de Valoración</span>
+                  <span className="detail-value">{formatDOP(item.valuationRate)}</span>
+                  {item.purchasePriceDate && (
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                      actualizado: {new Date(item.purchasePriceDate).toLocaleDateString('es-DO')}
+                    </span>
+                  )}
+                </div>
+              )}
+              <div className="detail-field">
+                <span className="detail-label">Impuesto de Compra</span>
+                <span className="detail-value">
+                  {item.purchaseTaxTemplate ?? '—'}
+                  {item.purchaseTaxPct != null && item.purchaseTaxPct > 0 && (
+                    <span style={{ color: 'var(--color-brand)', fontWeight: 600 }}> ({item.purchaseTaxPct}%)</span>
+                  )}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {item.type === 'product' && !item.hasVariants && !item.variantOf && (
-        <UbicacionesPanel itemCode={item.id} />
-      )}
 
-      <div className="card">
+<div className="card">
         <div className="card-header navy-card-header">
           <h2 className="card-title">Detalles</h2>
         </div>
@@ -1790,6 +1788,9 @@ export default function ItemDetail() {
               </div>
             </div>
           )}
+          {esFarmacia && item.type === 'product' && !item.hasVariants && (
+            <ComposicionPanel itemId={item.id} />
+          )}
         </div>
       </div>
 
@@ -1803,12 +1804,7 @@ export default function ItemDetail() {
       {/* Composición y Equivalentes (vertical Farmacia) — docs/tasks/
           PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §3/§6/§8. Ausente por completo (nunca solo
           deshabilitado) para un tenant que no sea Farmacia. */}
-      {esFarmacia && item.type === 'product' && !item.hasVariants && (
-        <>
-          <ComposicionPanel itemId={item.id} />
-          {item.esMedicamento && <EquivalentesPanel itemId={item.id} basePath={basePath} />}
-        </>
-      )}
+      {esFarmacia && item.type === 'product' && !item.hasVariants && item.esMedicamento && <EquivalentesPanel itemId={item.id} basePath={basePath} />}
 
       {showPricesModal && (
         <UpdatePricesModal

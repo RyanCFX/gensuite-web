@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { ChevronDown, ChevronRight, FlaskConical, Plus, Trash2 } from 'lucide-react'
+import { FlaskConical, Plus, Minus, Trash2 } from 'lucide-react'
 import { getComposicion, updateComposicion } from '@/shared/api/catalog'
 import { listPrincipiosActivos } from '@/shared/api/principios-activos'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -154,20 +154,25 @@ export function ComposicionPanel({ itemId }: { itemId: string }) {
   if (!puedeVer) return null
 
   return (
-    <div className="card" style={{ marginBottom: 16 }}>
-      <div
-        className="card-header"
-        style={{ cursor: 'pointer' }}
+    <div style={{ marginTop: 16 }}>
+      <button
+        type="button"
+        className="pill-plus-trigger ff-section-divider"
+        style={{ width: '100%' }}
+        aria-expanded={abierto}
+        aria-label={abierto ? 'Ocultar composición' : 'Mostrar composición'}
         onClick={() => setAbierto((v) => !v)}
       >
-        <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {abierto ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          <FlaskConical size={16} /> Composición
-        </h2>
-      </div>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <FlaskConical size={14} /> Composición
+        </span>
+        <span key={abierto ? 'open' : 'closed'} className="pill-plus-trigger-icon">
+          {abierto ? <Minus size={14} /> : <Plus size={14} />}
+        </span>
+      </button>
 
       {abierto && (
-        <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ padding: '0 18px', display: 'flex', flexDirection: 'column', gap: 16, marginTop: 12 }}>
           {isLoading ? (
             <span className="skeleton-box" style={{ height: 80, width: '100%', display: 'block' }} />
           ) : (
@@ -175,6 +180,7 @@ export function ComposicionPanel({ itemId }: { itemId: string }) {
               <label className="ff-check-wrap">
                 <input
                   type="checkbox"
+                  className="ff-check"
                   checked={esMedicamento}
                   disabled={!puedeEditar}
                   onChange={(e) => { setEsMedicamento(e.target.checked); marcarDirty() }}
@@ -249,7 +255,7 @@ export function ComposicionPanel({ itemId }: { itemId: string }) {
                 <div>
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="btn btn-navy"
                     disabled={!dirty || !puedeGuardar || saveMutation.isPending}
                     onClick={() => saveMutation.mutate()}
                   >

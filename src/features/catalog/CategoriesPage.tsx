@@ -667,6 +667,7 @@ export default function CategoriesPage() {
                       <label key={role.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
                         <input
                           type="checkbox"
+                          className="ff-check"
                           checked={rolesPermitidosVenta.includes(role.value)}
                           onChange={(e) =>
                             setRolesPermitidosVenta((prev) =>
@@ -682,7 +683,7 @@ export default function CategoriesPage() {
               </div>
               <div className="modal-foot">
                 <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>
-                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                <button type="submit" className="btn btn-navy" disabled={isSubmitting}>
                   {isSubmitting ? 'Guardando…' : editTarget ? 'Guardar' : 'Crear'}
                 </button>
               </div>

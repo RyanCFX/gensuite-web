@@ -25,7 +25,7 @@ export function EquivalentesPanel({ itemId, basePath }: { itemId: string; basePa
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
-      <div className="card-header">
+      <div className="card-header navy-card-header">
         <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Sparkles size={16} /> Equivalentes sugeridos
         </h2>

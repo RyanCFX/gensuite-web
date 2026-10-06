@@ -51,6 +51,15 @@ const WIDGETS: Record<string, ComponentType<WidgetProps>> = {
   'dashboard.actividad.pendientes': PendientesWidget,
 }
 
+/** Widgets que el catálogo puede mandar pero no se muestran en el dashboard. */
+const WIDGETS_OCULTOS = new Set([
+  'dashboard.compras.total',
+  'dashboard.gastos.mes',
+  'dashboard.cobros.mes',
+  'dashboard.ventas.top-clientes',
+  'dashboard.inventario.bajo-minimo',
+])
+
 /** Widgets chicos que se agrupan en la fila de KPIs de su sección. */
 const WIDGETS_KPI = new Set([
   'dashboard.ventas.total',
@@ -187,7 +196,7 @@ function reportesConocidos(catalogo: DashboardTipoReporte[]) {
       if (!WIDGETS[r.key]) console.debug(`[dashboard] reporte sin visual: ${r.key} — se ignora`)
     }
   }
-  return todos.filter((r) => WIDGETS[r.key])
+  return todos.filter((r) => WIDGETS[r.key] && !WIDGETS_OCULTOS.has(r.key))
 }
 
 export default function DashboardPage() {

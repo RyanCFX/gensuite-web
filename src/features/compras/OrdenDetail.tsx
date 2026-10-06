@@ -497,7 +497,7 @@ export default function OrdenDetail() {
             </div>
             <div className="modal-foot">
               <button className="btn btn-secondary" disabled={isPending} onClick={() => setConfirmAction(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={handleConfirm} disabled={isPending}>
+              <button className="btn btn-navy" onClick={handleConfirm} disabled={isPending}>
                 {isPending ? 'Procesando…' : confirmMessages[confirmAction].actionLabel}
               </button>
             </div>
@@ -630,7 +630,7 @@ export default function OrdenDetail() {
                 <button type="button" className="btn btn-secondary" disabled={facturarMutation.isPending} onClick={() => setShowFacturar(false)}>
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={facturarMutation.isPending}>
+                <button type="submit" className="btn btn-navy" disabled={facturarMutation.isPending}>
                   {facturarMutation.isPending ? 'Generando…' : 'Generar Factura'}
                 </button>
               </div>
@@ -839,6 +839,7 @@ function RecibirModal({ items, loading, onClose, onConfirm }: RecibirModalProps)
                       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
                         <input
                           type="checkbox"
+                          className="ff-check"
                           checked={line.corrigiendoDimensiones}
                           onChange={(e) => updateLine(idx, { corrigiendoDimensiones: e.target.checked })}
                         />
@@ -864,7 +865,7 @@ function RecibirModal({ items, loading, onClose, onConfirm }: RecibirModalProps)
         </div>
         <div className="modal-foot">
           <button className="btn btn-secondary" onClick={onClose} disabled={loading}>Cancelar</button>
-          <button className="btn btn-primary" onClick={handleConfirm} disabled={loading}>
+          <button className="btn btn-navy" onClick={handleConfirm} disabled={loading}>
             {loading ? 'Generando…' : 'Generar Recepción'}
           </button>
         </div>

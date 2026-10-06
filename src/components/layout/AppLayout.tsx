@@ -1120,13 +1120,13 @@ function TabCloseButton({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        width: 16,
-        height: 16,
+        width: 18,
+        height: 18,
         borderRadius: 4,
         border: "none",
         background: "transparent",
         cursor: "pointer",
-        color: active ? "#ffffff" : "var(--text-tertiary)",
+        color: active ? "#ffffff" : "var(--text-secondary)",
         padding: 0,
         flexShrink: 0,
         opacity: active ? 0.85 : 0.7,
@@ -1152,7 +1152,7 @@ function TabCloseButton({
       aria-label={label}
       title=""
     >
-      <X size={11} />
+      <X size={13} />
       {tooltipPos &&
         createPortal(
           <span
@@ -1542,18 +1542,18 @@ function TabBar() {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        width: 20,
-                        height: 20,
+                        width: 22,
+                        height: 22,
                         border: "none",
                         borderRadius: 4,
                         background: "transparent",
-                        color: "var(--text-tertiary)",
+                        color: "var(--text-secondary)",
                         cursor: "pointer",
                         padding: 0,
                         flexShrink: 0,
                       }}
                     >
-                      <X size={12} />
+                      <X size={14} />
                     </button>
                   </div>
                 );
