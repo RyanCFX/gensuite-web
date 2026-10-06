@@ -7214,7 +7214,7 @@ export type TenantFeatureKey =
   | 'gastos' | 'proveedores' | 'caja' | 'contabilidad' | 'cuentasPorCobrar'
   | 'cuentasPorPagar' | 'tesoreria' | 'inventario' | 'productos' | 'servicios'
   | 'relacionesComerciales' | 'cotizaciones' | 'despacho' | 'devoluciones'
-  | 'notasCredito' | 'notasDebito' | 'pedidos';
+  | 'notasCredito' | 'notasDebito' | 'pedidos' | 'auditoriaTransacciones';
 
 export type TenantReporteKey =
   | 'ventas_por_periodo' | 'top_productos' | 'top_clientes' | 'ventas_por_vendedor'

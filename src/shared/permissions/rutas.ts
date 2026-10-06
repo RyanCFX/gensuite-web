@@ -174,6 +174,12 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/tesoreria/cheques/*', accion: 'tesoreria.cheques.listar' },
   { pattern: '/tesoreria/cheques', accion: 'tesoreria.cheques.listar' },
 
+  // Auditoría de Transacciones — docs/tasks/PROMPT_AUDITORIA_TRANSACCIONES_FRONTEND.md §1.
+  // Pantalla `administracion.auditoria` (acción `administracion.auditoria.listar`, ya en el
+  // catálogo generado y en MePermissionsAccionesDto del openapi.json).
+  { pattern: '/auditoria/*', accion: 'administracion.auditoria.listar' },
+  { pattern: '/auditoria', accion: 'administracion.auditoria.listar' },
+
   // Usuarios
   { pattern: '/usuarios', accion: 'usuarios.listar' },
 

@@ -185,6 +185,9 @@ const RelacionDetail = lazy(() => import('@/features/relaciones-comerciales/Rela
 const TransaccionesPage = lazy(() => import('@/features/relaciones-comerciales/TransaccionesPage'))
 const TransaccionDetail = lazy(() => import('@/features/relaciones-comerciales/TransaccionDetail'))
 
+// Auditoría de Transacciones — docs/tasks/PROMPT_AUDITORIA_TRANSACCIONES_FRONTEND.md (solo lectura)
+const AuditoriaPage = lazy(() => import('@/features/auditoria/AuditoriaPage'))
+
 function PageLoader() {
   return (
     <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -377,6 +380,9 @@ export default function App() {
             <Route path="/relaciones-comerciales/transacciones" element={<Suspense fallback={<PageLoader />}><TransaccionesPage /></Suspense>} />
             <Route path="/relaciones-comerciales/transacciones/:uid" element={<Suspense fallback={<PageLoader />}><TransaccionDetail /></Suspense>} />
             <Route path="/relaciones-comerciales/:id" element={<Suspense fallback={<PageLoader />}><RelacionDetail /></Suspense>} />
+
+            {/* Auditoría de Transacciones (solo lectura) — docs/tasks/PROMPT_AUDITORIA_TRANSACCIONES_FRONTEND.md */}
+            <Route path="/auditoria" element={<Suspense fallback={<PageLoader />}><AuditoriaPage /></Suspense>} />
 
             {/* Caja / Cobros */}
             <Route path="/caja/pendientes" element={<Suspense fallback={<PageLoader />}><CajaPage /></Suspense>} />

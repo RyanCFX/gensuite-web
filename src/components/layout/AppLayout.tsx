@@ -463,6 +463,14 @@ const NAV_CONTABILIDAD: NavItem[] = [
   },
 ];
 
+const NAV_ADMINISTRACION: NavEntry[] = [
+  {
+    label: "Auditoría de Transacciones",
+    icon: <ScrollText size={16} aria-hidden="true" />,
+    path: "/auditoria",
+  },
+];
+
 const NAV_REPORTES: NavEntry = {
   label: "Reportes",
   icon: <BarChart3 size={16} aria-hidden="true" />,
@@ -1667,6 +1675,7 @@ function AppLayoutInner() {
   const farmaciaNav = filtrarNavPorPermisos(NAV_FARMACIA, permCtx);
   const financeNav = filtrarNavList(financeNavPos, permCtx);
   const contabilidadNav = filtrarNavList(NAV_CONTABILIDAD, permCtx);
+  const administracionNav = filtrarNavList(NAV_ADMINISTRACION, permCtx);
   const reportesNavDespachoFiltered: NavEntry = despachoHabilitado
     ? NAV_REPORTES
     : (stripPathsFromEntry(NAV_REPORTES, DESPACHO_ONLY_NAV_KEYS) as NavGroup);
@@ -1850,6 +1859,14 @@ function AppLayoutInner() {
           {!collapsed && <div className="sb-label">Contabilidad</div>}
           {contabilidadNav.map((entry) => renderEntry(entry, handleNav, collapsed))}
           {reportesNav && renderEntry(reportesNav, handleNav, collapsed)}
+        </div>
+      )}
+
+      {/* Administración */}
+      {administracionNav.length > 0 && (
+        <div className="sb-section">
+          {!collapsed && <div className="sb-label">Administración</div>}
+          {administracionNav.map((entry) => renderEntry(entry, handleNav, collapsed))}
         </div>
       )}
 

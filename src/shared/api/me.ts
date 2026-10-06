@@ -48,7 +48,7 @@ const FEATURE_KEYS = [
   'compras', 'comprasOrdenes', 'comprasSolicitudes', 'devolucionesCompras', 'gastos',
   'proveedores', 'caja', 'contabilidad', 'cuentasPorCobrar', 'cuentasPorPagar', 'tesoreria',
   'inventario', 'productos', 'servicios', 'relacionesComerciales', 'cotizaciones', 'despacho',
-  'devoluciones', 'notasCredito', 'notasDebito', 'pedidos',
+  'devoluciones', 'notasCredito', 'notasDebito', 'pedidos', 'auditoriaTransacciones',
 ] as const
 
 export function normalizeMeFeatures(raw: unknown): MeFeatures {
@@ -58,6 +58,8 @@ export function normalizeMeFeatures(raw: unknown): MeFeatures {
   for (const key of FEATURE_KEYS) {
     // El backend garantiza booleano siempre — cualquier otra cosa se trata como apagado
     // (fail-closed en esta capa; ProtectedRoute hace fail-open mientras carga).
+    // Clave canónica `auditoriaTransacciones` (camelCase, migración 0035; la 0034 en snake_case
+    // quedó renombrada) — sin fallback: el spec es la única forma válida.
     features[key] = rawFeatures[key] === true
   }
   const reportes = Array.isArray(d.reportesHabilitados)

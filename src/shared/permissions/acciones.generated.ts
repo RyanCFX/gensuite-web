@@ -1,8 +1,12 @@
 // GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
 // Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (467 acciones) + 6 de `catalogo.servicios.*`
 // (openapi.json: Lista de Servicios — ver/nuevo/activar/editar/precios/eliminar). Regenerar: node scripts/gen-acciones.mjs
+// NOTA manual (openapi.json verificado 2026-10-06): el spec ya expone
+// `administracion.auditoria.listar` (MePermissionsAccesoDto, 554 acciones) aunque el doc §16
+// aún no lo lista — se agrega a mano hasta regenerar desde el spec.
 
 export type AccionId =
+  | 'administracion.auditoria.listar'
   | 'apertura.compras.anular'
   | 'apertura.compras.crear'
   | 'apertura.compras.listar'
@@ -478,6 +482,7 @@ export type AccionId =
   | 'ventas.nota-debito.imprimir'
 
 export const ACCIONES_CATALOGO: readonly AccionId[] = [
+  'administracion.auditoria.listar',
   'apertura.compras.anular',
   'apertura.compras.crear',
   'apertura.compras.listar',

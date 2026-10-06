@@ -28,6 +28,7 @@ export type FeatureKey =
   | 'notasCredito'
   | 'notasDebito'
   | 'pedidos'
+  | 'auditoriaTransacciones'
 
 /** Claves de reporte de `reportesHabilitados` (§4.2) — presencia en el array = encendido. */
 export type ReporteKey =

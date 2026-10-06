@@ -809,4 +809,12 @@ export const ENDPOINTS = {
       enviar: (invoiceId: string) => `/relaciones/ventas/${encodeURIComponent(invoiceId)}/enviar`,
     },
   },
+  // Auditoría de Transacciones — docs/tasks/PROMPT_AUDITORIA_TRANSACCIONES_FRONTEND.md §3-§4.
+  // Solo lectura. El backend aún no lo expone en openapi.json — paths literales según el doc.
+  auditoria: {
+    transacciones: {
+      list: '/auditoria/transacciones',
+      byId: (id: string) => `/auditoria/transacciones/${encodeURIComponent(id)}`,
+    },
+  },
 } as const

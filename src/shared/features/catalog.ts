@@ -36,6 +36,7 @@ export const FEATURE_KEYS: readonly FeatureKey[] = [
   'notasCredito',
   'notasDebito',
   'pedidos',
+  'auditoriaTransacciones',
 ] as const
 
 /** Las 15 claves de reporte de §4.2. */
@@ -201,6 +202,11 @@ export const RUTAS_FEATURES: readonly RutaFeature[] = [
   // RequireAccion (caso /reportes/:tipo).
   { pattern: '/reportes/*', feature: null },
   { pattern: '/reportes', feature: null },
+
+  // Auditoría de Transacciones — docs/tasks/PROMPT_AUDITORIA_TRANSACCIONES_FRONTEND.md §1.
+  // Feature `auditoria_transacciones` (type modulo). Ruta propia /auditoria, fuera de /config.
+  { pattern: '/auditoria/*', feature: 'auditoriaTransacciones' },
+  { pattern: '/auditoria', feature: 'auditoriaTransacciones' },
 
   // Núcleo (§4.3): dashboard, clientes, usuarios, resto de configuración, e-CF, farmacia ARS
   // (vertical, no feature), apertura (migración de saldos), mi cuenta.

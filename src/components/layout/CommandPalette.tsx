@@ -191,6 +191,8 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'cfg-roles',    label: 'Roles',                group: 'Configuración', path: '/config/roles',                icon: <ShieldCheck size={15} />, keywords: 'roles permisos' },
   { id: 'cfg-auditoria-pin', label: 'Auditoría de PIN', group: 'Configuración', path: '/config/auditoria-pin',       icon: <ScrollText size={15} />, keywords: 'audit auditoria pin log' },
   { id: 'cfg-perfil',   label: 'Mi Perfil',            group: 'Configuración', path: '/config/perfil',               icon: <UserCog size={15} />, keywords: 'perfil usuario profile settings' },
+  // Auditoría de Transacciones — docs/tasks/PROMPT_AUDITORIA_TRANSACCIONES_FRONTEND.md (solo lectura, grupo Administración)
+  { id: 'auditoria',   label: 'Auditoría de Transacciones', group: 'Administración', path: '/auditoria',             icon: <ScrollText size={15} />, keywords: 'audit auditoria transacciones historial quien hizo documento' },
 ]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -4749,6 +4749,24 @@
                 "invoice"
               ]
             }
+          },
+          {
+            "name": "salesPerson",
+            "required": false,
+            "in": "query",
+            "description": "Solo facturas de este vendedor (requiere Vendedores)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sinVendedor",
+            "required": false,
+            "in": "query",
+            "description": "true = solo facturas sin vendedor (requiere Vendedores)",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -4801,6 +4819,24 @@
                 "party",
                 "invoice"
               ]
+            }
+          },
+          {
+            "name": "salesPerson",
+            "required": false,
+            "in": "query",
+            "description": "Solo facturas de este vendedor (requiere Vendedores)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sinVendedor",
+            "required": false,
+            "in": "query",
+            "description": "true = solo facturas sin vendedor (requiere Vendedores)",
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -5110,12 +5146,13 @@
             "name": "partyType",
             "required": false,
             "in": "query",
-            "description": "Tipo de la parte filtrada en \"party\" — obligatorio si se manda \"party\" (el reporte nativo lo exige). Valor interno de ERPNext, no la etiqueta traducida.",
+            "description": "Tipo de la parte filtrada en \"party\" — obligatorio si se manda \"party\" (el reporte nativo lo exige). Valor interno de ERPNext, no la etiqueta traducida. \"Employee\" (cuentas por cobrar a empleados) requiere el feature cxcEmpleados.",
             "schema": {
               "type": "string",
               "enum": [
                 "Customer",
-                "Supplier"
+                "Supplier",
+                "Employee"
               ]
             }
           },
@@ -5254,12 +5291,13 @@
             "name": "partyType",
             "required": false,
             "in": "query",
-            "description": "Tipo de la parte filtrada en \"party\" — obligatorio si se manda \"party\" (el reporte nativo lo exige). Valor interno de ERPNext, no la etiqueta traducida.",
+            "description": "Tipo de la parte filtrada en \"party\" — obligatorio si se manda \"party\" (el reporte nativo lo exige). Valor interno de ERPNext, no la etiqueta traducida. \"Employee\" (cuentas por cobrar a empleados) requiere el feature cxcEmpleados.",
             "schema": {
               "type": "string",
               "enum": [
                 "Customer",
-                "Supplier"
+                "Supplier",
+                "Employee"
               ]
             }
           },
@@ -5492,6 +5530,24 @@
                 "party",
                 "invoice"
               ]
+            }
+          },
+          {
+            "name": "salesPerson",
+            "required": false,
+            "in": "query",
+            "description": "Solo facturas de este vendedor (requiere Vendedores)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sinVendedor",
+            "required": false,
+            "in": "query",
+            "description": "true = solo facturas sin vendedor (requiere Vendedores)",
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -7370,6 +7426,33 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "salesPerson",
+            "required": false,
+            "in": "query",
+            "description": "Clientes en la cartera de este vendedor (requiere Vendedores)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sinVendedor",
+            "required": false,
+            "in": "query",
+            "description": "true = solo clientes sin vendedor asignado (requiere Vendedores)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "esEmpleado",
+            "required": false,
+            "in": "query",
+            "description": "true = solo clientes espejo de un empleado (requiere CxC de empleados)",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -7537,6 +7620,46 @@
           }
         ],
         "summary": "Delete/disable customer",
+        "tags": [
+          "Customers"
+        ]
+      }
+    },
+    "/api/v1/customers/asignar-vendedor": {
+      "post": {
+        "description": "Resultado por cliente. Requiere el módulo Vendedores (403 FEATURE_NO_CONTRATADO).",
+        "operationId": "CustomersController_asignarVendedor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsignarVendedorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Asignar un vendedor a varios clientes (máx. 100)",
         "tags": [
           "Customers"
         ]
@@ -7859,6 +7982,24 @@
             "required": false,
             "in": "query",
             "description": "Si es true, excluye las facturas que ya tienen al menos una nota de crédito sometida (total o parcial) en su contra.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "salesPerson",
+            "required": false,
+            "in": "query",
+            "description": "Documentos de este vendedor (requiere Vendedores)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sinVendedor",
+            "required": false,
+            "in": "query",
+            "description": "true = solo documentos sin vendedor (requiere Vendedores)",
             "schema": {
               "type": "boolean"
             }
@@ -13903,7 +14044,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CobrarFacturaDto"
+                "$ref": "#/components/schemas/CompletarCobroDto"
               }
             }
           }
@@ -13918,7 +14059,7 @@
             "bearer": []
           }
         ],
-        "summary": "Completa el cobro de una factura enviada a Caja: somete la factura de verdad, respeta el tipo de comprobante de la factura (fijado al crearla) y asigna el NCF en este momento (nunca antes). Mismo body que /cobrar.",
+        "summary": "Completa el cobro de una factura enviada a Caja: somete la factura de verdad, respeta el tipo de comprobante de la factura (fijado al crearla) y asigna el NCF en este momento (nunca antes). Mismo body que /cobrar, más `salesTeam`/`sinVendedor` opcionales.",
         "tags": [
           "Caja"
         ]
@@ -23941,6 +24082,152 @@
         ]
       }
     },
+    "/api/v1/auditoria/transacciones": {
+      "get": {
+        "operationId": "AuditoriaController_listar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "Fecha/hora ISO desde (inclusive).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "Fecha/hora ISO hasta (inclusive).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "usuario",
+            "required": false,
+            "in": "query",
+            "description": "Email exacto del usuario que hizo la transacción. Protegido por el componente de permiso administracion.auditoria.filtro.usuario (dato sensible).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accion",
+            "required": false,
+            "in": "query",
+            "description": "Key de ACTION_CATALOG, ej. \"gastos.someter\".",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "doctype",
+            "required": false,
+            "in": "query",
+            "description": "Doctype de ERPNext, ej. \"Sales Invoice\".",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listado paginado de transacciones de negocio del tenant",
+        "tags": [
+          "Auditoría"
+        ]
+      }
+    },
+    "/api/v1/auditoria/transacciones/{id}": {
+      "get": {
+        "operationId": "AuditoriaController_detalle",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una entrada de auditoría, con drill-down best-effort a Version de ERPNext",
+        "tags": [
+          "Auditoría"
+        ]
+      }
+    },
     "/api/v1/usuarios/lookup": {
       "get": {
         "description": "Debe ir declarado ANTES de GET /:email para que \"lookup\" no se interprete como un email. Nunca revela en qué otros tenants está el usuario — solo nombre/apellido/teléfono y si ya es miembro de ESTE tenant.",
@@ -28014,6 +28301,24 @@
             "schema": {
               "example": "Ventas - JBC",
               "type": "string"
+            }
+          },
+          {
+            "name": "salesPerson",
+            "required": false,
+            "in": "query",
+            "description": "Documentos de este vendedor (requiere Vendedores)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sinVendedor",
+            "required": false,
+            "in": "query",
+            "description": "true = solo documentos sin vendedor (requiere Vendedores)",
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -32905,7 +33210,7 @@
     },
     "/api/v1/me/bootstrap": {
       "get": {
-        "description": "`data`: `permisos` (= GET /me/permissions data), `acceso` (= GET /me/acceso data), `features` (= GET /me/features data), `facturacion` (= GET /config/facturacion data con `config.facturacion.ver`; el subconjunto no sensible con el recurso `lookup.config-facturacion`; si no, null), `ecf` (idem con `config.ecf.ver` / `lookup.config-ecf`), `usuario` { email, maxDiscountPct, branches, defaultBranch, allBranches, almacenesPermitidos }, `referenceVersion` (= X-Reference-Version) y `errores` { [bloque]: { code, message, statusCode } }. Con ETag: responde 304 si no cambió. No incluye el turno de caja (GET /pos/turnos/actual).",
+        "description": "`data`: `permisos` (= GET /me/permissions data), `acceso` (= GET /me/acceso data), `features` (= GET /me/features data), `facturacion` (= GET /config/facturacion data con `config.facturacion.ver`; el subconjunto no sensible con el recurso `lookup.config-facturacion`; si no, null), `ecf` (idem con `config.ecf.ver` / `lookup.config-ecf`), `usuario` { email, maxDiscountPct, branches, defaultBranch, allBranches, almacenesPermitidos, soloCarteraPropia }, `usuario.salesPersonId` (vendedor del usuario, feature vendedores), `rrhh` { hrmsInstalado, empleado: { id, nombre, designation, department, branch, status, reportsTo, esVendedor, salesPersonId } | null, ventaCreditoEmpleados: { habilitada } | null, nomina: null } — null si `rrhh` está apagado o el modo v2 no es activo (entonces errores.rrhh.code = ACCESO_V2_REQUERIDO), `referenceVersion` (= X-Reference-Version) y `errores` { [bloque]: { code, message, statusCode } }. Con ETag: responde 304 si no cambió. No incluye el turno de caja (GET /pos/turnos/actual).",
         "operationId": "MeBootstrapController_get",
         "parameters": [
           {
@@ -33397,6 +33702,44 @@
           }
         ],
         "summary": "Semáforo de crédito de un cliente (reemplaza GET /cobros/semaforo/:customerId)",
+        "tags": [
+          "Opciones para formularios (lookup)"
+        ]
+      }
+    },
+    "/api/v1/opciones/clientes/{id}/credito-empleado": {
+      "get": {
+        "description": "Recurso `lookup.credito-empleado`. `{ esEmpleado:false }` si el cliente no es un empleado; si lo es: `{ esEmpleado, employeeId, nombre, estado, ventaCreditoHabilitada, puedeComprarACredito, limite, saldo, disponible }`.",
+        "operationId": "OpcionesFormularioController_creditoEmpleado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "RECURSO_NO_PERMITIDO — details: { recurso: \"lookup.\u003Crecurso\u003E\" }"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crédito en tienda del empleado detrás de un cliente espejo (docs/plans/hr, Fase 05)",
         "tags": [
           "Opciones para formularios (lookup)"
         ]
@@ -39936,6 +40279,3237 @@
           "Facturas de Apertura (Migración de Saldos)"
         ]
       }
+    },
+    "/api/v1/rrhh/configuracion/general": {
+      "get": {
+        "operationId": "ConfiguracionRrhhController_getGeneral",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configuración general de RRHH (divisor, jornada, salario mínimo, registro patronal)",
+        "tags": [
+          "RRHH - Configuración"
+        ]
+      },
+      "put": {
+        "operationId": "ConfiguracionRrhhController_updateGeneral",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConfiguracionGeneralDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar la configuración general de RRHH (parcial)",
+        "tags": [
+          "RRHH - Configuración"
+        ]
+      }
+    },
+    "/api/v1/rrhh/configuracion/estado": {
+      "get": {
+        "description": "`{ listo, items: [{ codigo, ok, feature, mensaje, accion? }] }` — solo ítems de features contratados.",
+        "operationId": "ConfiguracionRrhhController_getEstado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Checklist de puesta en marcha de RRHH",
+        "tags": [
+          "RRHH - Configuración"
+        ]
+      }
+    },
+    "/api/v1/rrhh/configuracion/cxc": {
+      "get": {
+        "operationId": "ConfiguracionRrhhController_getCxc",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configuración de cuentas por cobrar a empleados (Fase 05)",
+        "tags": [
+          "RRHH - Configuración"
+        ]
+      },
+      "put": {
+        "operationId": "ConfiguracionRrhhController_updateCxc",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConfiguracionCxcDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar la configuración de CxC de empleados (parcial)",
+        "tags": [
+          "RRHH - Configuración"
+        ]
+      }
+    },
+    "/api/v1/rrhh/configuracion/cxc/diagnostico": {
+      "get": {
+        "operationId": "ConfiguracionRrhhController_diagnostico",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Diagnóstico de la cuenta 112-02 (movimientos sin empleado)",
+        "tags": [
+          "RRHH - Configuración"
+        ]
+      }
+    },
+    "/api/v1/rrhh/configuracion/cxc/preparar-cuenta": {
+      "post": {
+        "description": "409 CUENTA_CON_MOVIMIENTOS_SIN_PARTY si tiene movimientos sin empleado (reclasificar antes con el contador).",
+        "operationId": "ConfiguracionRrhhController_preparar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Convertir la cuenta CxC de empleados en «Receivable» y enlazarla",
+        "tags": [
+          "RRHH - Configuración"
+        ]
+      }
+    },
+    "/api/v1/rrhh/estructura/cargos": {
+      "get": {
+        "operationId": "EstructuraController_listCargos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda por nombre",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar cargos (Designation)",
+        "tags": [
+          "RRHH - Estructura"
+        ]
+      },
+      "post": {
+        "operationId": "EstructuraController_createCargo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CargoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear cargo",
+        "tags": [
+          "RRHH - Estructura"
+        ]
+      }
+    },
+    "/api/v1/rrhh/estructura/cargos/{id}": {
+      "put": {
+        "operationId": "EstructuraController_updateCargo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CargoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renombrar / editar cargo",
+        "tags": [
+          "RRHH - Estructura"
+        ]
+      },
+      "delete": {
+        "description": "409 LINKED_DOC_BLOCKS si hay empleados con ese cargo.",
+        "operationId": "EstructuraController_deleteCargo",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Eliminar cargo",
+        "tags": [
+          "RRHH - Estructura"
+        ]
+      }
+    },
+    "/api/v1/rrhh/estructura/administradoras": {
+      "get": {
+        "operationId": "EstructuraController_listAdmin",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda por nombre",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AFP",
+                "ARS"
+              ]
+            }
+          },
+          {
+            "name": "includeDisabled",
+            "required": false,
+            "in": "query",
+            "description": "Incluir inactivas",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar AFP o ARS (?tipo=AFP|ARS)",
+        "tags": [
+          "RRHH - Estructura"
+        ]
+      },
+      "post": {
+        "operationId": "EstructuraController_createAdmin",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAdministradoraDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Agregar una AFP o ARS",
+        "tags": [
+          "RRHH - Estructura"
+        ]
+      }
+    },
+    "/api/v1/rrhh/estructura/administradoras/{tipo}/{id}": {
+      "put": {
+        "operationId": "EstructuraController_updateAdmin",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAdministradoraDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar código TSS / activar o desactivar una AFP o ARS",
+        "tags": [
+          "RRHH - Estructura"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados": {
+      "get": {
+        "operationId": "EmpleadosController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Nombre, código del empleado o cédula (la cédula solo con datos confidenciales)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Estado del empleado",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Active",
+                "Inactive",
+                "Suspended",
+                "Left"
+              ]
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Departamento (opciones: /opciones/departamentos)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Sucursal (opciones: /opciones/sucursales)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "designation",
+            "required": false,
+            "in": "query",
+            "description": "Cargo (opciones: /opciones/cargos)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contractType",
+            "required": false,
+            "in": "query",
+            "description": "Tipo de contrato",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Indefinido",
+                "Por tiempo determinado",
+                "Para obra o servicio determinado"
+              ]
+            }
+          },
+          {
+            "name": "reportsTo",
+            "required": false,
+            "in": "query",
+            "description": "Jefe inmediato (id de empleado)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "description": "Ej. \"employee_name asc\", \"date_of_joining desc\"",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar empleados (paginado, filtros por estado/departamento/sucursal/cargo/contrato)",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      },
+      "post": {
+        "description": "400 CEDULA_INVALIDA · 409 CEDULA_DUPLICADA. El bloque `confidencial` exige rrhh.empleados.editar-confidencial.",
+        "operationId": "EmpleadosController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmpleadoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar empleado",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados/usuarios-disponibles": {
+      "get": {
+        "operationId": "EmpleadosController_usuariosDisponibles",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Nombre o correo",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Usuarios del tenant (aceptados o invitados) sin empleado activo vinculado",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados/importacion/plantilla": {
+      "get": {
+        "operationId": "EmpleadosController_plantilla",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plantilla .xlsx para importar empleados",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados/importacion/validar": {
+      "post": {
+        "description": "multipart con el archivo en \"file\". Devuelve `{ token, total, filasValidas, errores: [{fila, columna, codigo, mensaje}] }`.",
+        "operationId": "EmpleadosController_validar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Paso 1: validar un .xlsx de empleados (no crea nada)",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados/importacion/confirmar": {
+      "post": {
+        "description": "Hasta 50 filas responde `201 { estado: \"terminado\", creados: [{fila, id}], errores }`. Con más responde `202 { estado: \"en_proceso\", jobId, total, filasValidas, errores }` (los errores de validación) y el alta sigue en segundo plano: consulte `GET /rrhh/empleados/importacion/:jobId` hasta `terminado` o `fallido`.",
+        "operationId": "EmpleadosController_confirmar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmarImportacionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Paso 2: crear los empleados válidos del archivo validado",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados/importacion/{jobId}": {
+      "get": {
+        "description": "`{ jobId, estado: \"en_proceso\"|\"terminado\"|\"fallido\", total, filasValidas, procesadas, creados, errores, mensaje? }`. Solo la consulta quien la inició (o un administrador de RRHH). 404 `IMPORTACION_NO_ENCONTRADA` si venció (24 h).",
+        "operationId": "EmpleadosController_estadoImportacion",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "jobId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Avance de una importación en segundo plano",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados/exportar": {
+      "get": {
+        "operationId": "EmpleadosController_exportar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Nombre, código del empleado o cédula (la cédula solo con datos confidenciales)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Estado del empleado",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Active",
+                "Inactive",
+                "Suspended",
+                "Left"
+              ]
+            }
+          },
+          {
+            "name": "department",
+            "required": false,
+            "in": "query",
+            "description": "Departamento (opciones: /opciones/departamentos)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Sucursal (opciones: /opciones/sucursales)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "designation",
+            "required": false,
+            "in": "query",
+            "description": "Cargo (opciones: /opciones/cargos)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contractType",
+            "required": false,
+            "in": "query",
+            "description": "Tipo de contrato",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Indefinido",
+                "Por tiempo determinado",
+                "Para obra o servicio determinado"
+              ]
+            }
+          },
+          {
+            "name": "reportsTo",
+            "required": false,
+            "in": "query",
+            "description": "Jefe inmediato (id de empleado)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "description": "Ej. \"employee_name asc\", \"date_of_joining desc\"",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Exportar empleados a Excel (mismos filtros del listado; confidenciales solo con permiso)",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados/{id}": {
+      "get": {
+        "description": "`?incluir=resumen,confidencial,acceso,cxc`. Un bloque sin permiso o de un feature apagado viene `null` y aparece en `bloquesOmitidos: [{bloque, motivo}]`.",
+        "operationId": "EmpleadosController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incluir",
+            "required": false,
+            "in": "query",
+            "description": "Bloques extra separados por coma: resumen, confidencial, acceso, cxc. Un bloque sin permiso viene null.",
+            "schema": {
+              "example": "resumen,confidencial,acceso",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ficha del empleado en una llamada",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      },
+      "put": {
+        "operationId": "EmpleadosController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEmpleadoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar datos no confidenciales (parcial)",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados/{id}/confidencial": {
+      "put": {
+        "operationId": "EmpleadosController_updateConfidencial",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmpleadoConfidencialDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar datos confidenciales (cédula, NSS, AFP/ARS, banco, salario)",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados/{id}/estado": {
+      "post": {
+        "description": "Left exige relievingDate y motivo. Con usuario de acceso activo y estado distinto de Active, exige `acceso` (revocar | suspender | mantener) — 409 ACCESO_DECISION_REQUERIDA si falta.",
+        "operationId": "EmpleadosController_cambiarEstado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiarEstadoEmpleadoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambiar estado (Active / Inactive / Suspended / Left)",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados/{id}/historial-salarial": {
+      "get": {
+        "operationId": "EmpleadosController_historial",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Historial salarial (sin módulo de nómina)",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      },
+      "post": {
+        "operationId": "EmpleadosController_agregarHistorial",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HistorialSalarialDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar un cambio salarial (actualiza el salario vigente)",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados/{id}/usuario": {
+      "post": {
+        "description": "Asíncrono si el User aún no existe en el site (`estado: pendiente`). 409 USUARIO_NO_VINCULABLE · USUARIO_YA_VINCULADO.",
+        "operationId": "EmpleadosController_vincular",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VincularUsuarioDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vincular un usuario del tenant al empleado",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      },
+      "delete": {
+        "operationId": "EmpleadosController_desvincular",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Desvincular el usuario (no toca su membresía ni sus permisos)",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados/{id}/crear-acceso": {
+      "post": {
+        "description": "Nombre y teléfono salen de la ficha. En modo v2 activo exige `perfilesAcceso`.",
+        "operationId": "EmpleadosController_crearAcceso",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrearAccesoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Invitar al empleado como usuario y vincularlo",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/empleados/{id}/credito": {
+      "put": {
+        "description": "Al habilitarlo crea o adopta su cliente espejo: `{ clienteEspejo: { customer, adoptado, creado }, cxc }`.",
+        "operationId": "EmpleadosController_credito",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreditoEmpleadoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crédito en tienda del empleado (Fase 05)",
+        "tags": [
+          "RRHH - Empleados"
+        ]
+      }
+    },
+    "/api/v1/reportes/rrhh/plantilla": {
+      "get": {
+        "operationId": "ReportesRrhhController_plantilla",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plantilla de personal: activos por departamento, sucursal y cargo",
+        "tags": [
+          "Reportes - RRHH"
+        ]
+      }
+    },
+    "/api/v1/reportes/rrhh/plantilla/excel": {
+      "get": {
+        "operationId": "ReportesRrhhController_plantillaExcel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Plantilla de personal en Excel",
+        "tags": [
+          "Reportes - RRHH"
+        ]
+      }
+    },
+    "/api/v1/reportes/rrhh/movimientos": {
+      "get": {
+        "operationId": "ReportesRrhhController_movimientos",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "Default: primer día del mes en curso",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Altas y bajas de personal en un período",
+        "tags": [
+          "Reportes - RRHH"
+        ]
+      }
+    },
+    "/api/v1/reportes/rrhh/movimientos/excel": {
+      "get": {
+        "operationId": "ReportesRrhhController_movimientosExcel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "Default: primer día del mes en curso",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Altas y bajas en Excel",
+        "tags": [
+          "Reportes - RRHH"
+        ]
+      }
+    },
+    "/api/v1/rrhh/cxc-empleados": {
+      "get": {
+        "operationId": "CxcEmpleadosController_listar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "employee",
+            "required": false,
+            "in": "query",
+            "description": "Empleado (opciones: /opciones/empleados)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "description": "Tipo de deuda",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Préstamo",
+                "Avance de salario",
+                "Faltante de caja",
+                "Daño o pérdida",
+                "Otro",
+                "Compra a crédito"
+              ]
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "description": "Estado de la deuda",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "borrador",
+                "pendiente",
+                "saldado",
+                "anulado"
+              ]
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deudas de empleados (préstamos, avances, faltantes, compras a crédito…)",
+        "tags": [
+          "RRHH - Cuentas por cobrar a empleados"
+        ]
+      },
+      "post": {
+        "description": "Queda en borrador salvo `someter: true` (exige rrhh.cxc-empleados.someter).",
+        "operationId": "CxcEmpleadosController_crear",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDeudaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar una deuda (préstamo/avance con desembolso; faltante/daño/otro con contrapartida)",
+        "tags": [
+          "RRHH - Cuentas por cobrar a empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/cxc-empleados/cobros": {
+      "get": {
+        "operationId": "CxcEmpleadosController_listarCobros",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "employee",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fromDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toDate",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cobros a empleados",
+        "tags": [
+          "RRHH - Cuentas por cobrar a empleados"
+        ]
+      },
+      "post": {
+        "description": "Sin `aplicaciones` se aplica FIFO por antigüedad. 400 MONTO_EXCEDE_SALDO / APLICACIONES_NO_CUADRAN.",
+        "operationId": "CxcEmpleadosController_cobrar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCobroEmpleadoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar un cobro (efectivo/banco)",
+        "tags": [
+          "RRHH - Cuentas por cobrar a empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/cxc-empleados/cobros/{id}": {
+      "get": {
+        "operationId": "CxcEmpleadosController_verCobro",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un cobro con sus aplicaciones",
+        "tags": [
+          "RRHH - Cuentas por cobrar a empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/cxc-empleados/cobros/{id}/cancel": {
+      "post": {
+        "operationId": "CxcEmpleadosController_cancelarCobro",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Anular un cobro (borrador: se elimina)",
+        "tags": [
+          "RRHH - Cuentas por cobrar a empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/cxc-empleados/empleados/{employeeId}/pendientes": {
+      "get": {
+        "operationId": "CxcEmpleadosController_pendientes",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employeeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deudas con saldo de un empleado (para aplicar un cobro)",
+        "tags": [
+          "RRHH - Cuentas por cobrar a empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/cxc-empleados/empleados/{employeeId}/estado-cuenta": {
+      "get": {
+        "operationId": "CxcEmpleadosController_estadoCuenta",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employeeId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "Default: 1 de enero del año de «hasta»",
+            "schema": {
+              "example": "2026-01-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "Default: hoy",
+            "schema": {
+              "example": "2026-12-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Estado de cuenta del empleado (saldo inicial, movimientos con saldo corrido, saldo final)",
+        "tags": [
+          "RRHH - Cuentas por cobrar a empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/cxc-empleados/{id}": {
+      "get": {
+        "operationId": "CxcEmpleadosController_ver",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de una deuda: líneas, aplicaciones y saldo",
+        "tags": [
+          "RRHH - Cuentas por cobrar a empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/cxc-empleados/{id}/submit": {
+      "post": {
+        "operationId": "CxcEmpleadosController_someter",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Someter una deuda",
+        "tags": [
+          "RRHH - Cuentas por cobrar a empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/cxc-empleados/{id}/cancel": {
+      "post": {
+        "description": "409 DEUDA_CON_COBROS si tiene aplicaciones; 409 DEUDA_DE_FACTURA si nace de una factura (anular la factura).",
+        "operationId": "CxcEmpleadosController_cancelar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Anular una deuda",
+        "tags": [
+          "RRHH - Cuentas por cobrar a empleados"
+        ]
+      }
+    },
+    "/api/v1/rrhh/cxc-empleados/{id}/condonar": {
+      "post": {
+        "operationId": "CxcEmpleadosController_condonar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CondonarDeudaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Condonar parte o toda una deuda (PIN de administrador, acción condonar_cxc_empleado)",
+        "tags": [
+          "RRHH - Cuentas por cobrar a empleados"
+        ]
+      }
+    },
+    "/api/v1/reportes/rrhh/cxc-antiguedad": {
+      "get": {
+        "operationId": "CxcEmpleadosReportesController_antiguedad",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaCorte",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de corte (default hoy)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agruparPor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "empleado",
+              "type": "string",
+              "enum": [
+                "empleado",
+                "departamento",
+                "sucursal"
+              ]
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "json",
+              "type": "string",
+              "enum": [
+                "json",
+                "excel"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Antigüedad de saldos de empleados (0-30, 31-60, 61-90, +90) agrupable",
+        "tags": [
+          "Reportes - RRHH"
+        ]
+      }
+    },
+    "/api/v1/reportes/rrhh/cxc-antiguedad/excel": {
+      "get": {
+        "operationId": "CxcEmpleadosReportesController_antiguedadExcel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaCorte",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de corte (default hoy)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "agruparPor",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "empleado",
+              "type": "string",
+              "enum": [
+                "empleado",
+                "departamento",
+                "sucursal"
+              ]
+            }
+          },
+          {
+            "name": "format",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "json",
+              "type": "string",
+              "enum": [
+                "json",
+                "excel"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Antigüedad de CxC de empleados en Excel",
+        "tags": [
+          "Reportes - RRHH"
+        ]
+      }
+    },
+    "/api/v1/pos/turnos/{openingEntryId}/imputar-faltante": {
+      "post": {
+        "description": "409 TURNO_NO_CERRADO; 417 si el monto supera el faltante o ya fue imputado.",
+        "operationId": "PosFaltanteController_imputar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "openingEntryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImputarFaltanteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Imputar el faltante de un turno cerrado a un empleado (D CxC empleado / C caja)",
+        "tags": [
+          "POS"
+        ]
+      }
+    },
+    "/api/v1/vendedores": {
+      "get": {
+        "operationId": "VendedoresController_listar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Nombre del vendedor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "enabled",
+            "required": false,
+            "in": "query",
+            "description": "Solo habilitados (true) o deshabilitados (false)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "isGroup",
+            "required": false,
+            "in": "query",
+            "description": "Solo grupos (true) u hojas (false)",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "parent",
+            "required": false,
+            "in": "query",
+            "description": "Grupo padre",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "employee",
+            "required": false,
+            "in": "query",
+            "description": "Empleado vinculado",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Vendedores (paginado)",
+        "tags": [
+          "Vendedores"
+        ]
+      },
+      "post": {
+        "description": "409 EMPLEADO_YA_ES_VENDEDOR / FEATURE_NO_CONTRATADO.",
+        "operationId": "VendedoresController_crear",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendedorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear vendedor o grupo",
+        "tags": [
+          "Vendedores"
+        ]
+      }
+    },
+    "/api/v1/vendedores/arbol": {
+      "get": {
+        "operationId": "VendedoresController_arbol",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Árbol de vendedores (grupos → vendedores)",
+        "tags": [
+          "Vendedores"
+        ]
+      }
+    },
+    "/api/v1/vendedores/mi-cartera": {
+      "get": {
+        "description": "409 SIN_VENDEDOR_VINCULADO.",
+        "operationId": "VendedoresController_miCartera",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Clientes del vendedor vinculado al usuario",
+        "tags": [
+          "Vendedores"
+        ]
+      }
+    },
+    "/api/v1/vendedores/comisiones": {
+      "get": {
+        "operationId": "VendedoresController_comisiones",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "base",
+            "required": false,
+            "in": "query",
+            "description": "Default: Configuración › Facturación",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "facturado",
+                "cobrado"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Comisiones de todos los vendedores en un rango",
+        "tags": [
+          "Vendedores"
+        ]
+      }
+    },
+    "/api/v1/vendedores/{id}": {
+      "get": {
+        "operationId": "VendedoresController_ver",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ficha del vendedor (cartera y comisiones del mes)",
+        "tags": [
+          "Vendedores"
+        ]
+      },
+      "put": {
+        "operationId": "VendedoresController_editar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendedorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar vendedor (cambiar el nombre renombra el registro)",
+        "tags": [
+          "Vendedores"
+        ]
+      }
+    },
+    "/api/v1/vendedores/{id}/estado": {
+      "post": {
+        "operationId": "VendedoresController_estado",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EstadoVendedorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Habilitar / deshabilitar",
+        "tags": [
+          "Vendedores"
+        ]
+      }
+    },
+    "/api/v1/vendedores/{id}/clientes": {
+      "get": {
+        "operationId": "VendedoresController_cartera",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Clientes asignados al vendedor",
+        "tags": [
+          "Vendedores"
+        ]
+      }
+    },
+    "/api/v1/vendedores/{id}/comisiones": {
+      "get": {
+        "operationId": "VendedoresController_comisionesVendedor",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "base",
+            "required": false,
+            "in": "query",
+            "description": "Default: Configuración › Facturación",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "facturado",
+                "cobrado"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Comisiones del vendedor en un rango, con detalle por factura",
+        "tags": [
+          "Vendedores"
+        ]
+      }
+    },
+    "/api/v1/reportes/ventas/vendedor": {
+      "get": {
+        "operationId": "ReportesVendedoresController_ventas",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "base",
+            "required": false,
+            "in": "query",
+            "description": "Default: Configuración › Facturación",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "facturado",
+                "cobrado"
+              ]
+            }
+          },
+          {
+            "name": "salesPerson",
+            "required": false,
+            "in": "query",
+            "description": "Un vendedor puntual",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ventas por vendedor (facturado; notas de crédito restan)",
+        "tags": [
+          "Reportes - Vendedores"
+        ]
+      }
+    },
+    "/api/v1/reportes/ventas/vendedor/excel": {
+      "get": {
+        "operationId": "ReportesVendedoresController_ventasExcel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "base",
+            "required": false,
+            "in": "query",
+            "description": "Default: Configuración › Facturación",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "facturado",
+                "cobrado"
+              ]
+            }
+          },
+          {
+            "name": "salesPerson",
+            "required": false,
+            "in": "query",
+            "description": "Un vendedor puntual",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ventas por vendedor en Excel",
+        "tags": [
+          "Reportes - Vendedores"
+        ]
+      }
+    },
+    "/api/v1/reportes/ventas/comisiones": {
+      "get": {
+        "operationId": "ReportesVendedoresController_comisiones",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "base",
+            "required": false,
+            "in": "query",
+            "description": "Default: Configuración › Facturación",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "facturado",
+                "cobrado"
+              ]
+            }
+          },
+          {
+            "name": "salesPerson",
+            "required": false,
+            "in": "query",
+            "description": "Un vendedor puntual",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Comisiones por vendedor (base: Configuración › Facturación o `?base=`)",
+        "tags": [
+          "Reportes - Vendedores"
+        ]
+      }
+    },
+    "/api/v1/reportes/ventas/comisiones/excel": {
+      "get": {
+        "operationId": "ReportesVendedoresController_comisionesExcel",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "base",
+            "required": false,
+            "in": "query",
+            "description": "Default: Configuración › Facturación",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "facturado",
+                "cobrado"
+              ]
+            }
+          },
+          {
+            "name": "salesPerson",
+            "required": false,
+            "in": "query",
+            "description": "Un vendedor puntual",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Comisiones por vendedor en Excel",
+        "tags": [
+          "Reportes - Vendedores"
+        ]
+      }
     }
   },
   "info": {
@@ -40573,6 +44147,35 @@
           }
         }
       },
+      "AsignarVendedorDto": {
+        "type": "object",
+        "properties": {
+          "customerIds": {
+            "description": "Clientes (máx. 100)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "salesPersonId": {
+            "type": "string",
+            "example": "Juan Pérez"
+          },
+          "modo": {
+            "type": "string",
+            "enum": [
+              "reemplazar",
+              "agregar"
+            ],
+            "description": "`reemplazar`: el vendedor queda solo al 100 %. `agregar`: se suma a la cartera existente repartiendo el 100 % en partes iguales."
+          }
+        },
+        "required": [
+          "customerIds",
+          "salesPersonId",
+          "modo"
+        ]
+      },
       "TelefonoClienteDto": {
         "type": "object",
         "properties": {
@@ -40588,6 +44191,30 @@
         },
         "required": [
           "telefono"
+        ]
+      },
+      "SalesTeamItemDto": {
+        "type": "object",
+        "properties": {
+          "salesPersonId": {
+            "type": "string",
+            "example": "Juan Pérez",
+            "description": "ID del vendedor (GET /vendedores)"
+          },
+          "allocatedPercentage": {
+            "type": "number",
+            "example": 100,
+            "description": "Porcentaje asignado. La suma de las filas debe ser 100."
+          },
+          "commissionRate": {
+            "type": "number",
+            "example": 5,
+            "description": "Comisión (%). Default: la del vendedor."
+          }
+        },
+        "required": [
+          "salesPersonId",
+          "allocatedPercentage"
         ]
       },
       "CreateCustomerDto": {
@@ -40724,6 +44351,13 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "salesTeam": {
+            "description": "Cartera: vendedor(es) del cliente (suma 100 %). Se copia sola a cotizaciones, pedidos y facturas según Configuración › Facturación › vendedor por defecto. `[]` quita la cartera. Requiere el módulo Vendedores (403 FEATURE_NO_CONTRATADO).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTeamItemDto"
             }
           }
         },
@@ -40866,6 +44500,13 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "salesTeam": {
+            "description": "Cartera: vendedor(es) del cliente (suma 100 %). Se copia sola a cotizaciones, pedidos y facturas según Configuración › Facturación › vendedor por defecto. `[]` quita la cartera. Requiere el módulo Vendedores (403 FEATURE_NO_CONTRATADO).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTeamItemDto"
             }
           }
         }
@@ -41226,6 +44867,17 @@
                 "$ref": "#/components/schemas/PinOverrideDto"
               }
             ]
+          },
+          "salesTeam": {
+            "description": "Vendedor(es) del documento (suma 100 %). Sin enviarlo, ERPNext aplica el vendedor por defecto (Configuración › Facturación › vendedorPorDefecto). Requiere el módulo Vendedores.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTeamItemDto"
+            }
+          },
+          "sinVendedor": {
+            "type": "boolean",
+            "description": "true = el documento queda SIN vendedor aunque el cliente tenga cartera. Requiere el módulo Vendedores."
           }
         },
         "required": [
@@ -41347,6 +44999,17 @@
                 "$ref": "#/components/schemas/PinOverrideDto"
               }
             ]
+          },
+          "salesTeam": {
+            "description": "Vendedor(es) del documento (suma 100 %). Sin enviarlo, ERPNext aplica el vendedor por defecto (Configuración › Facturación › vendedorPorDefecto). Requiere el módulo Vendedores.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTeamItemDto"
+            }
+          },
+          "sinVendedor": {
+            "type": "boolean",
+            "description": "true = el documento queda SIN vendedor aunque el cliente tenga cartera. Requiere el módulo Vendedores."
           }
         },
         "required": [
@@ -41841,6 +45504,36 @@
             "type": "boolean",
             "default": true,
             "description": "Igual que `permitirModificarPrecioServicios`, pero para PRODUCTOS — interruptor separado, aplica en cotización, pedido y factura."
+          },
+          "vendedorPorDefecto": {
+            "type": "string",
+            "enum": [
+              "ninguno",
+              "cliente",
+              "usuario",
+              "cliente_o_usuario"
+            ],
+            "default": "cliente_o_usuario",
+            "description": "Cómo se llena el vendedor de cotizaciones, pedidos y facturas cuando el documento no lo trae (lo resuelve ERPNext al validar, en todos los canales): `cliente` = la cartera del cliente; `usuario` = el vendedor del usuario que vende; `cliente_o_usuario` = cliente y si no tiene, usuario; `ninguno` = sin vendedor. Un `salesTeam` explícito siempre gana."
+          },
+          "vendedorObligatorio": {
+            "type": "boolean",
+            "default": false,
+            "description": "No se puede someter factura ni pedido sin vendedor (también desde el Desk)."
+          },
+          "clientesSinCarteraVisibles": {
+            "type": "boolean",
+            "default": true,
+            "description": "Con «solo ve su cartera», los clientes sin vendedor (de mostrador) los ve cualquier vendedor."
+          },
+          "comisionBase": {
+            "type": "string",
+            "enum": [
+              "facturado",
+              "cobrado"
+            ],
+            "default": "facturado",
+            "description": "Base de las comisiones."
           }
         }
       },
@@ -43489,6 +47182,63 @@
             ],
             "example": "B02",
             "description": "Sobrescribe el tipo de comprobante de la factura al cobrar. Opcional: si no se envía se usa el que la factura trae al crearse. Solo tipos de venta: B01/B02/B14/B15 o su equivalente electrónico E31/E32/E44/E45 (se guarda como B0x). Con B01/E31 sobre un comprador ocasional se exige `rnc`."
+          }
+        },
+        "required": [
+          "payments"
+        ]
+      },
+      "CompletarCobroDto": {
+        "type": "object",
+        "properties": {
+          "payments": {
+            "description": "Líneas de pago (uno o más métodos: efectivo, tarjetas, cheques). La suma no puede exceder el saldo pendiente de la factura — puede ser menor (cobro parcial). Puede venir vacío SOLO en POST /caja/facturas/:id/completar-cobro cuando la cobertura ARS ya cubre el 100% del total (nada que cobrarle al paciente) — en cualquier otro caso, con saldo pendiente real, el servicio rechaza un array vacío.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentLineDto"
+            }
+          },
+          "vuelto": {
+            "description": "Desglose de denominaciones del vuelto entregado en efectivo. Puramente informativo — requiere `tenderedCash`, no afecta los montos aplicados a la factura. Solo admitido si el tenant está en flujo de cobro \"caja\" (ver Facturacion Config).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VueltoLineDto"
+            }
+          },
+          "tenderedCash": {
+            "type": "number",
+            "description": "Efectivo entregado por el cliente, usado para validar el desglose de `vuelto`."
+          },
+          "rnc": {
+            "type": "string",
+            "example": "132456785",
+            "description": "RNC del comprador. Obligatorio en POST /caja/facturas/:id/completar-cobro cuando la factura es de un comprador sin registrar como cliente (cliente ocasional) y la condición fiscal resuelta es Crédito Fiscal (B01) — la DGII exige el RNC del comprador en ese caso. Sin efecto para clientes registrados (se usa el RNC ya guardado en el Customer)."
+          },
+          "ncfType": {
+            "type": "string",
+            "enum": [
+              "B01",
+              "B02",
+              "B14",
+              "B15",
+              "E31",
+              "E32",
+              "E44",
+              "E45"
+            ],
+            "example": "B02",
+            "description": "Sobrescribe el tipo de comprobante de la factura al cobrar. Opcional: si no se envía se usa el que la factura trae al crearse. Solo tipos de venta: B01/B02/B14/B15 o su equivalente electrónico E31/E32/E44/E45 (se guarda como B0x). Con B01/E31 sobre un comprador ocasional se exige `rnc`."
+          },
+          "salesTeam": {
+            "description": "Vendedores de la venta (GET /vendedores). Sin enviarlo, la factura conserva el que ya trae (o el vendedor por defecto que pone ERPNext). Requiere el feature `vendedores`.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTeamItemDto"
+            }
+          },
+          "sinVendedor": {
+            "type": "boolean",
+            "description": "true = venta sin vendedor (anula el vendedor por defecto)."
           }
         },
         "required": [
@@ -47605,6 +51355,10 @@
             "type": "string",
             "example": "EMP-00231",
             "description": "Código de identificación impreso/codificado en un carnet, QR o código de barras — permite buscar rápido a este usuario por escaneo (ver GET /usuarios/buscar-codigo/:codigo) en vez de escribir su email. No es secreto, único por tenant."
+          },
+          "soloCarteraPropia": {
+            "type": "boolean",
+            "description": "Data-scope de vendedores (docs/plans/hr, Fase 04 §3.3): true = el usuario solo ve los clientes y documentos de venta de SU cartera (lo aplica ERPNext). Requiere el módulo Vendedores."
           }
         }
       },
@@ -48886,6 +52640,17 @@
                 "$ref": "#/components/schemas/PinOverrideDto"
               }
             ]
+          },
+          "salesTeam": {
+            "description": "Vendedor(es) del documento (suma 100 %). Sin enviarlo, ERPNext aplica el vendedor por defecto (Configuración › Facturación › vendedorPorDefecto). Requiere el módulo Vendedores.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesTeamItemDto"
+            }
+          },
+          "sinVendedor": {
+            "type": "boolean",
+            "description": "true = el documento queda SIN vendedor aunque el cliente tenga cartera. Requiere el módulo Vendedores."
           }
         },
         "required": [
@@ -50093,34 +53858,6 @@
           "catalogo.items.listar": {
             "type": "boolean",
             "description": "Lista de Productos — Ver"
-          },
-          "catalogo.datos-articulo.ver-precio-a": {
-            "type": "boolean",
-            "description": "Datos del Artículo — Ver precio de venta — nivel A (máximo)"
-          },
-          "catalogo.datos-articulo.ver-precio-b": {
-            "type": "boolean",
-            "description": "Datos del Artículo — Ver precio de venta — nivel B (promedio)"
-          },
-          "catalogo.datos-articulo.ver-precio-c": {
-            "type": "boolean",
-            "description": "Datos del Artículo — Ver precio de venta — nivel C (mínimo)"
-          },
-          "catalogo.datos-articulo.ver-stock": {
-            "type": "boolean",
-            "description": "Datos del Artículo — Ver stock (existencias totales)"
-          },
-          "catalogo.datos-articulo.ver-descuento": {
-            "type": "boolean",
-            "description": "Datos del Artículo — Ver descuentos"
-          },
-          "catalogo.datos-articulo.ver-costo": {
-            "type": "boolean",
-            "description": "Datos del Artículo — Ver costo y márgenes"
-          },
-          "catalogo.datos-articulo.ver-existencias-almacen": {
-            "type": "boolean",
-            "description": "Datos del Artículo — Ver existencias por almacén"
           },
           "catalogo.items.eliminar": {
             "type": "boolean",
@@ -51794,6 +55531,30 @@
             "type": "boolean",
             "description": "Dashboard — Acciones pendientes"
           },
+          "dashboard.rrhh.plantilla": {
+            "type": "boolean",
+            "description": "Dashboard — Plantilla de personal"
+          },
+          "dashboard.rrhh.movimientos": {
+            "type": "boolean",
+            "description": "Dashboard — Altas y bajas"
+          },
+          "dashboard.rrhh.cumpleanos": {
+            "type": "boolean",
+            "description": "Dashboard — Próximos cumpleaños"
+          },
+          "dashboard.rrhh.contratos-por-vencer": {
+            "type": "boolean",
+            "description": "Dashboard — Contratos por vencer"
+          },
+          "dashboard.rrhh.cxc-empleados": {
+            "type": "boolean",
+            "description": "Dashboard — Cuentas por cobrar a empleados"
+          },
+          "dashboard.ventas.top-vendedores": {
+            "type": "boolean",
+            "description": "Dashboard — Top vendedores"
+          },
           "config.acceso.gestionar": {
             "type": "boolean",
             "description": "Permisos — Gestionar perfiles de acceso y permisos de usuarios"
@@ -52097,6 +55858,206 @@
           "relaciones.compra.enlazar-y-enviar": {
             "type": "boolean",
             "description": "Detalle de compra (sometida) — Enviar al proveedor"
+          },
+          "rrhh.configuracion.ver": {
+            "type": "boolean",
+            "description": "Configuración de RRHH — Ver"
+          },
+          "rrhh.configuracion.editar": {
+            "type": "boolean",
+            "description": "Configuración de RRHH — Editar parámetros"
+          },
+          "rrhh.cargos.listar": {
+            "type": "boolean",
+            "description": "Cargos — Ver"
+          },
+          "rrhh.cargos.crear": {
+            "type": "boolean",
+            "description": "Cargos — Nuevo"
+          },
+          "rrhh.cargos.editar": {
+            "type": "boolean",
+            "description": "Cargos — Editar"
+          },
+          "rrhh.cargos.eliminar": {
+            "type": "boolean",
+            "description": "Cargos — Eliminar"
+          },
+          "rrhh.administradoras.listar": {
+            "type": "boolean",
+            "description": "AFP y ARS — Ver"
+          },
+          "rrhh.administradoras.editar": {
+            "type": "boolean",
+            "description": "AFP y ARS — Nueva / Editar / Activar"
+          },
+          "rrhh.empleados.listar": {
+            "type": "boolean",
+            "description": "Empleados — Ver listado"
+          },
+          "rrhh.empleados.ver": {
+            "type": "boolean",
+            "description": "Empleados — Ver ficha"
+          },
+          "rrhh.empleados.crear": {
+            "type": "boolean",
+            "description": "Empleados — Nuevo"
+          },
+          "rrhh.empleados.editar": {
+            "type": "boolean",
+            "description": "Empleados — Editar"
+          },
+          "rrhh.empleados.cambiar-estado": {
+            "type": "boolean",
+            "description": "Empleados — Cambiar estado"
+          },
+          "rrhh.empleados.ver-confidencial": {
+            "type": "boolean",
+            "description": "Empleados — Ver datos confidenciales (cédula, NSS, AFP/ARS, banco, salario)"
+          },
+          "rrhh.empleados.editar-confidencial": {
+            "type": "boolean",
+            "description": "Empleados — Editar datos confidenciales"
+          },
+          "rrhh.empleados.historial-salarial": {
+            "type": "boolean",
+            "description": "Empleados — Registrar cambio salarial"
+          },
+          "rrhh.empleados.importar": {
+            "type": "boolean",
+            "description": "Empleados — Importar desde Excel"
+          },
+          "rrhh.empleados.exportar": {
+            "type": "boolean",
+            "description": "Empleados — Exportar a Excel"
+          },
+          "rrhh.empleados.vincular-usuario": {
+            "type": "boolean",
+            "description": "Empleados — Vincular / desvincular usuario"
+          },
+          "rrhh.empleados.crear-acceso": {
+            "type": "boolean",
+            "description": "Empleados — Crear acceso al sistema"
+          },
+          "rrhh.cxc-empleados.listar": {
+            "type": "boolean",
+            "description": "Cuentas por cobrar a empleados — Ver listado"
+          },
+          "rrhh.cxc-empleados.ver": {
+            "type": "boolean",
+            "description": "Cuentas por cobrar a empleados — Ver detalle"
+          },
+          "rrhh.cxc-empleados.crear": {
+            "type": "boolean",
+            "description": "Cuentas por cobrar a empleados — Registrar deuda"
+          },
+          "rrhh.cxc-empleados.someter": {
+            "type": "boolean",
+            "description": "Cuentas por cobrar a empleados — Someter"
+          },
+          "rrhh.cxc-empleados.cancelar": {
+            "type": "boolean",
+            "description": "Cuentas por cobrar a empleados — Anular"
+          },
+          "rrhh.cxc-empleados.condonar": {
+            "type": "boolean",
+            "description": "Cuentas por cobrar a empleados — Condonar"
+          },
+          "rrhh.cxc-empleados.cobrar": {
+            "type": "boolean",
+            "description": "Cuentas por cobrar a empleados — Registrar cobro"
+          },
+          "rrhh.cxc-empleados.estado-cuenta": {
+            "type": "boolean",
+            "description": "Cuentas por cobrar a empleados — Estado de cuenta"
+          },
+          "rrhh.cxc-empleados.configurar-credito": {
+            "type": "boolean",
+            "description": "Cuentas por cobrar a empleados — Configurar crédito en tienda del empleado"
+          },
+          "reportes.rrhh.plantilla.ver": {
+            "type": "boolean",
+            "description": "Reporte: plantilla de personal — Ver"
+          },
+          "reportes.rrhh.plantilla.exportar": {
+            "type": "boolean",
+            "description": "Reporte: plantilla de personal — Exportar"
+          },
+          "reportes.rrhh.movimientos.ver": {
+            "type": "boolean",
+            "description": "Reporte: altas y bajas — Ver"
+          },
+          "reportes.rrhh.movimientos.exportar": {
+            "type": "boolean",
+            "description": "Reporte: altas y bajas — Exportar"
+          },
+          "reportes.rrhh.cxc-antiguedad.ver": {
+            "type": "boolean",
+            "description": "Reporte: antigüedad CxC empleados — Ver"
+          },
+          "reportes.rrhh.cxc-antiguedad.exportar": {
+            "type": "boolean",
+            "description": "Reporte: antigüedad CxC empleados — Exportar"
+          },
+          "pos.turno.imputar-faltante": {
+            "type": "boolean",
+            "description": "Turnos de caja — Imputar faltante a un empleado"
+          },
+          "vendedores.listar": {
+            "type": "boolean",
+            "description": "Vendedores — Ver listado"
+          },
+          "vendedores.ver": {
+            "type": "boolean",
+            "description": "Vendedores — Ver ficha"
+          },
+          "vendedores.crear": {
+            "type": "boolean",
+            "description": "Vendedores — Nuevo"
+          },
+          "vendedores.editar": {
+            "type": "boolean",
+            "description": "Vendedores — Editar"
+          },
+          "vendedores.cambiar-estado": {
+            "type": "boolean",
+            "description": "Vendedores — Habilitar / deshabilitar"
+          },
+          "vendedores.cartera.ver": {
+            "type": "boolean",
+            "description": "Cartera de vendedores — Ver clientes del vendedor"
+          },
+          "vendedores.comisiones.ver": {
+            "type": "boolean",
+            "description": "Comisiones de vendedores — Ver comisiones"
+          },
+          "vendedores.mi-cartera.ver": {
+            "type": "boolean",
+            "description": "Mi cartera — Ver mis clientes"
+          },
+          "clientes.asignar-vendedor": {
+            "type": "boolean",
+            "description": "Clientes — Asignar vendedor (masivo)"
+          },
+          "reportes.ventas.vendedor.ver": {
+            "type": "boolean",
+            "description": "Reporte: ventas por vendedor — Ver"
+          },
+          "reportes.ventas.vendedor.exportar": {
+            "type": "boolean",
+            "description": "Reporte: ventas por vendedor — Exportar"
+          },
+          "reportes.ventas.comisiones.ver": {
+            "type": "boolean",
+            "description": "Reporte: comisiones por vendedor — Ver"
+          },
+          "reportes.ventas.comisiones.exportar": {
+            "type": "boolean",
+            "description": "Reporte: comisiones por vendedor — Exportar"
+          },
+          "administracion.auditoria.listar": {
+            "type": "boolean",
+            "description": "Auditoría de Transacciones — Ver"
           }
         },
         "required": [
@@ -52104,13 +56065,6 @@
           "catalogo.dimensiones.crear",
           "catalogo.dimensiones.editar",
           "catalogo.items.listar",
-          "catalogo.datos-articulo.ver-precio-a",
-          "catalogo.datos-articulo.ver-precio-b",
-          "catalogo.datos-articulo.ver-precio-c",
-          "catalogo.datos-articulo.ver-stock",
-          "catalogo.datos-articulo.ver-descuento",
-          "catalogo.datos-articulo.ver-costo",
-          "catalogo.datos-articulo.ver-existencias-almacen",
           "catalogo.items.eliminar",
           "catalogo.items.consultar-stock",
           "catalogo.items.crear",
@@ -52529,6 +56483,12 @@
           "dashboard.inventario.bajo-minimo",
           "dashboard.actividad.reciente",
           "dashboard.actividad.pendientes",
+          "dashboard.rrhh.plantilla",
+          "dashboard.rrhh.movimientos",
+          "dashboard.rrhh.cumpleanos",
+          "dashboard.rrhh.contratos-por-vencer",
+          "dashboard.rrhh.cxc-empleados",
+          "dashboard.ventas.top-vendedores",
           "config.acceso.gestionar",
           "impresoras.listar",
           "impresoras.administrar",
@@ -52604,7 +56564,57 @@
           "relaciones.transaccion.enlazar-compra",
           "relaciones.transaccion.enlazar-venta",
           "relaciones.transaccion.buscar-candidatos",
-          "relaciones.compra.enlazar-y-enviar"
+          "relaciones.compra.enlazar-y-enviar",
+          "rrhh.configuracion.ver",
+          "rrhh.configuracion.editar",
+          "rrhh.cargos.listar",
+          "rrhh.cargos.crear",
+          "rrhh.cargos.editar",
+          "rrhh.cargos.eliminar",
+          "rrhh.administradoras.listar",
+          "rrhh.administradoras.editar",
+          "rrhh.empleados.listar",
+          "rrhh.empleados.ver",
+          "rrhh.empleados.crear",
+          "rrhh.empleados.editar",
+          "rrhh.empleados.cambiar-estado",
+          "rrhh.empleados.ver-confidencial",
+          "rrhh.empleados.editar-confidencial",
+          "rrhh.empleados.historial-salarial",
+          "rrhh.empleados.importar",
+          "rrhh.empleados.exportar",
+          "rrhh.empleados.vincular-usuario",
+          "rrhh.empleados.crear-acceso",
+          "rrhh.cxc-empleados.listar",
+          "rrhh.cxc-empleados.ver",
+          "rrhh.cxc-empleados.crear",
+          "rrhh.cxc-empleados.someter",
+          "rrhh.cxc-empleados.cancelar",
+          "rrhh.cxc-empleados.condonar",
+          "rrhh.cxc-empleados.cobrar",
+          "rrhh.cxc-empleados.estado-cuenta",
+          "rrhh.cxc-empleados.configurar-credito",
+          "reportes.rrhh.plantilla.ver",
+          "reportes.rrhh.plantilla.exportar",
+          "reportes.rrhh.movimientos.ver",
+          "reportes.rrhh.movimientos.exportar",
+          "reportes.rrhh.cxc-antiguedad.ver",
+          "reportes.rrhh.cxc-antiguedad.exportar",
+          "pos.turno.imputar-faltante",
+          "vendedores.listar",
+          "vendedores.ver",
+          "vendedores.crear",
+          "vendedores.editar",
+          "vendedores.cambiar-estado",
+          "vendedores.cartera.ver",
+          "vendedores.comisiones.ver",
+          "vendedores.mi-cartera.ver",
+          "clientes.asignar-vendedor",
+          "reportes.ventas.vendedor.ver",
+          "reportes.ventas.vendedor.exportar",
+          "reportes.ventas.comisiones.ver",
+          "reportes.ventas.comisiones.exportar",
+          "administracion.auditoria.listar"
         ]
       },
       "MePermissionsDataDto": {
@@ -52866,8 +56876,7 @@
               "accion",
               "filtro",
               "exportar",
-              "widget",
-              "dato"
+              "widget"
             ]
           },
           "nombre": {
@@ -53500,8 +57509,7 @@
               "accion",
               "filtro",
               "exportar",
-              "widget",
-              "dato"
+              "widget"
             ]
           },
           "estado": {
@@ -54295,7 +58303,8 @@
             "type": "string",
             "enum": [
               "Customer",
-              "Supplier"
+              "Supplier",
+              "Employee"
             ]
           },
           "id": {
@@ -54508,7 +58517,8 @@
             "type": "string",
             "enum": [
               "Customer",
-              "Supplier"
+              "Supplier",
+              "Employee"
             ]
           },
           "id": {
@@ -55771,6 +59781,784 @@
         "required": [
           "fechaApertura",
           "items"
+        ]
+      },
+      "SalarioMinimoDto": {
+        "type": "object",
+        "properties": {
+          "desde": {
+            "type": "string",
+            "example": "2026-04-01"
+          },
+          "sector": {
+            "type": "string",
+            "example": "Empresas grandes",
+            "description": "Vacío = general"
+          },
+          "monto": {
+            "type": "number",
+            "example": 25000
+          }
+        }
+      },
+      "UpdateConfiguracionGeneralDto": {
+        "type": "object",
+        "properties": {
+          "divisorSalarioDiario": {
+            "type": "number",
+            "example": 23.83,
+            "description": "Salario diario = mensual ÷ divisor"
+          },
+          "horasJornadaDiaria": {
+            "type": "number",
+            "example": 8
+          },
+          "horasSemanales": {
+            "type": "number",
+            "example": 44
+          },
+          "edadMinimaLaboral": {
+            "type": "number",
+            "example": 16,
+            "description": "Solo advierte al registrar un empleado menor"
+          },
+          "grupoClientesEmpleados": {
+            "type": "string",
+            "example": "Empleados",
+            "description": "Grupo de los clientes espejo (opciones: /opciones/grupos-clientes)"
+          },
+          "salariosMinimosLegales": {
+            "description": "Reemplaza la tabla completa",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalarioMinimoDto"
+            }
+          },
+          "registroPatronalTss": {
+            "type": "string",
+            "example": "130959994",
+            "description": "Registro patronal ante la TSS (por defecto el RNC)"
+          }
+        }
+      },
+      "UpdateConfiguracionCxcDto": {
+        "type": "object",
+        "properties": {
+          "ventaCreditoEmpleadosHabilitada": {
+            "type": "boolean",
+            "description": "Permitir ventas a crédito a empleados (cliente espejo → traspaso)"
+          },
+          "limiteCreditoEmpleadoDefault": {
+            "type": "number",
+            "example": 10000,
+            "description": "Límite por defecto cuando el empleado no tiene uno propio"
+          },
+          "cuentaCondonacion": {
+            "type": "string",
+            "description": "Cuenta de gasto para condonaciones (opciones: /opciones/cuentas)"
+          },
+          "cuentaFaltantesCaja": {
+            "type": "string",
+            "description": "Cuenta para faltantes de caja no imputados a un empleado"
+          }
+        }
+      },
+      "CargoDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "Cajera"
+          },
+          "descripcion": {
+            "type": "string",
+            "example": "Atiende la caja del punto de venta"
+          }
+        },
+        "required": [
+          "nombre"
+        ]
+      },
+      "CreateAdministradoraDto": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "AFP",
+              "ARS"
+            ]
+          },
+          "nombre": {
+            "type": "string",
+            "example": "AFP Popular"
+          },
+          "codigoTss": {
+            "type": "string",
+            "description": "Código TSS (de la plantilla oficial de autodeterminación)"
+          },
+          "tipoArs": {
+            "type": "string",
+            "enum": [
+              "Pública",
+              "Privada",
+              "Autogestión"
+            ],
+            "description": "Solo ARS"
+          }
+        },
+        "required": [
+          "tipo",
+          "nombre"
+        ]
+      },
+      "UpdateAdministradoraDto": {
+        "type": "object",
+        "properties": {
+          "codigoTss": {
+            "type": "string"
+          },
+          "activa": {
+            "type": "boolean"
+          },
+          "tipoArs": {
+            "type": "string",
+            "enum": [
+              "Pública",
+              "Privada",
+              "Autogestión"
+            ]
+          }
+        }
+      },
+      "ConfirmarImportacionDto": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Token devuelto por /importacion/validar (válido 30 minutos)"
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "EmpleadoConfidencialDto": {
+        "type": "object",
+        "properties": {
+          "documentType": {
+            "type": "string",
+            "enum": [
+              "Cédula",
+              "Pasaporte",
+              "Otro"
+            ],
+            "default": "Cédula"
+          },
+          "documentNumber": {
+            "type": "string",
+            "example": "40200000004",
+            "description": "Sin guiones (se aceptan y se quitan). Cédula: 11 dígitos con dígito verificador."
+          },
+          "nss": {
+            "type": "string",
+            "description": "NSS. Si es cédula y se omite, se usa la cédula."
+          },
+          "afp": {
+            "type": "string",
+            "description": "AFP (opciones: /opciones/afp)"
+          },
+          "afpAffiliateNumber": {
+            "type": "string"
+          },
+          "ars": {
+            "type": "string",
+            "description": "ARS (opciones: /opciones/ars)"
+          },
+          "additionalSfsDependents": {
+            "type": "number",
+            "default": 0
+          },
+          "appliesTss": {
+            "type": "boolean",
+            "default": true
+          },
+          "isrExempt": {
+            "type": "boolean",
+            "default": false
+          },
+          "tssStartDate": {
+            "type": "string"
+          },
+          "monthlySalary": {
+            "type": "number",
+            "example": 35000,
+            "description": "Salario mensual (sin nómina). Cada cambio queda en el historial salarial."
+          },
+          "bankName": {
+            "type": "string",
+            "description": "Banco (opciones: /opciones/bancos)"
+          },
+          "bankAccount": {
+            "type": "string"
+          },
+          "bankAccountType": {
+            "type": "string",
+            "enum": [
+              "Ahorro",
+              "Corriente"
+            ]
+          }
+        }
+      },
+      "CreateEmpleadoDto": {
+        "type": "object",
+        "properties": {
+          "middleName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Pérez Gómez"
+          },
+          "seniorityStartDate": {
+            "type": "string",
+            "description": "Solo si hubo sustitución de empleador; default = fecha de ingreso"
+          },
+          "designation": {
+            "type": "string"
+          },
+          "department": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "reportsTo": {
+            "type": "string",
+            "description": "Jefe inmediato (id de empleado)"
+          },
+          "contractType": {
+            "type": "string",
+            "enum": [
+              "Indefinido",
+              "Por tiempo determinado",
+              "Para obra o servicio determinado"
+            ]
+          },
+          "contractEndDate": {
+            "type": "string",
+            "description": "Obligatoria si el contrato no es indefinido"
+          },
+          "workday": {
+            "type": "string",
+            "enum": [
+              "Completa",
+              "Media jornada",
+              "Por horas"
+            ]
+          },
+          "nationality": {
+            "type": "string",
+            "description": "País (opciones: /opciones/paises)",
+            "example": "Dominican Republic"
+          },
+          "cellNumber": {
+            "type": "string"
+          },
+          "personalEmail": {
+            "type": "string"
+          },
+          "companyEmail": {
+            "type": "string"
+          },
+          "confidencial": {
+            "description": "Solo en el alta y con rrhh.empleados.editar-confidencial; en la edición usar PUT /:id/confidencial.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmpleadoConfidencialDto"
+              }
+            ]
+          },
+          "firstName": {
+            "type": "string",
+            "example": "María"
+          },
+          "gender": {
+            "type": "string",
+            "description": "Género (opciones reales del site; ej. Femenino/Masculino)"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "example": "1990-04-02"
+          },
+          "dateOfJoining": {
+            "type": "string",
+            "example": "2024-01-15"
+          }
+        },
+        "required": [
+          "firstName",
+          "gender",
+          "dateOfBirth",
+          "dateOfJoining"
+        ]
+      },
+      "UpdateEmpleadoDto": {
+        "type": "object",
+        "properties": {
+          "middleName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Pérez Gómez"
+          },
+          "seniorityStartDate": {
+            "type": "string",
+            "description": "Solo si hubo sustitución de empleador; default = fecha de ingreso"
+          },
+          "designation": {
+            "type": "string"
+          },
+          "department": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "reportsTo": {
+            "type": "string",
+            "description": "Jefe inmediato (id de empleado)"
+          },
+          "contractType": {
+            "type": "string",
+            "enum": [
+              "Indefinido",
+              "Por tiempo determinado",
+              "Para obra o servicio determinado"
+            ]
+          },
+          "contractEndDate": {
+            "type": "string",
+            "description": "Obligatoria si el contrato no es indefinido"
+          },
+          "workday": {
+            "type": "string",
+            "enum": [
+              "Completa",
+              "Media jornada",
+              "Por horas"
+            ]
+          },
+          "nationality": {
+            "type": "string",
+            "description": "País (opciones: /opciones/paises)",
+            "example": "Dominican Republic"
+          },
+          "cellNumber": {
+            "type": "string"
+          },
+          "personalEmail": {
+            "type": "string"
+          },
+          "companyEmail": {
+            "type": "string"
+          },
+          "confidencial": {
+            "description": "Solo en el alta y con rrhh.empleados.editar-confidencial; en la edición usar PUT /:id/confidencial.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmpleadoConfidencialDto"
+              }
+            ]
+          },
+          "firstName": {
+            "type": "string",
+            "example": "María"
+          },
+          "gender": {
+            "type": "string",
+            "description": "Género (opciones reales del site; ej. Femenino/Masculino)"
+          },
+          "dateOfBirth": {
+            "type": "string",
+            "example": "1990-04-02"
+          },
+          "dateOfJoining": {
+            "type": "string",
+            "example": "2024-01-15"
+          }
+        }
+      },
+      "CambiarEstadoEmpleadoDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "Active",
+              "Inactive",
+              "Suspended",
+              "Left"
+            ]
+          },
+          "relievingDate": {
+            "type": "string",
+            "description": "Obligatoria para Left"
+          },
+          "motivo": {
+            "type": "string",
+            "description": "Motivo (obligatorio para Left)"
+          },
+          "acceso": {
+            "type": "string",
+            "enum": [
+              "revocar",
+              "suspender",
+              "mantener"
+            ],
+            "description": "Obligatorio si el empleado tiene un usuario con acceso activo y el estado deja de ser Active: revocar/suspender el acceso, o mantenerlo como usuario externo (se desvincula el usuario del empleado)."
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "HistorialSalarialDto": {
+        "type": "object",
+        "properties": {
+          "fechaEfectiva": {
+            "type": "string",
+            "example": "2026-10-01"
+          },
+          "salarioMensual": {
+            "type": "number",
+            "example": 38000
+          },
+          "motivo": {
+            "type": "string",
+            "enum": [
+              "Ingreso",
+              "Aumento",
+              "Ajuste",
+              "Corrección"
+            ],
+            "default": "Aumento"
+          },
+          "nota": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fechaEfectiva",
+          "salarioMensual"
+        ]
+      },
+      "VincularUsuarioDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "maria@empresa.com"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "CrearAccesoDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "maria@empresa.com"
+          },
+          "perfilesAcceso": {
+            "description": "Permisos v2 activo: ids de perfiles de acceso (obligatorio en modo activo)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "CreditoEmpleadoDto": {
+        "type": "object",
+        "properties": {
+          "puedeComprarACredito": {
+            "type": "boolean",
+            "description": "Habilita comprar a crédito en la tienda (crea o adopta su cliente espejo)"
+          },
+          "limite": {
+            "type": "number",
+            "description": "Límite propio; 0 = el de la configuración"
+          },
+          "descontarEnNomina": {
+            "type": "boolean",
+            "description": "Sus compras a crédito se marcan para descontar en nómina"
+          },
+          "cuotaMaxima": {
+            "type": "number",
+            "description": "Tope de descuento por período (además del límite legal)"
+          }
+        },
+        "required": [
+          "puedeComprarACredito"
+        ]
+      },
+      "AplicacionCobroDto": {
+        "type": "object",
+        "properties": {
+          "documentoId": {
+            "type": "string",
+            "description": "Id de la deuda (Journal Entry)"
+          },
+          "monto": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "documentoId",
+          "monto"
+        ]
+      },
+      "CreateCobroEmpleadoDto": {
+        "type": "object",
+        "properties": {
+          "employeeId": {
+            "type": "string"
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-10-05"
+          },
+          "metodoPago": {
+            "type": "string",
+            "example": "Efectivo RD"
+          },
+          "cuentaBancaria": {
+            "type": "string"
+          },
+          "referencia": {
+            "type": "string",
+            "description": "Nº de transferencia/cheque si entra por banco"
+          },
+          "monto": {
+            "type": "number",
+            "example": 400
+          },
+          "aplicaciones": {
+            "description": "Sin aplicaciones: FIFO por antigüedad",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AplicacionCobroDto"
+            }
+          },
+          "notas": {
+            "type": "string"
+          },
+          "sucursal": {
+            "type": "string"
+          },
+          "someter": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "required": [
+          "employeeId",
+          "fecha",
+          "metodoPago",
+          "monto"
+        ]
+      },
+      "DesembolsoDto": {
+        "type": "object",
+        "properties": {
+          "metodoPago": {
+            "type": "string",
+            "description": "Método de pago del desembolso (opciones: /opciones/metodos-pago)",
+            "example": "Efectivo RD"
+          },
+          "cuentaBancaria": {
+            "type": "string",
+            "description": "Cuenta bancaria (opciones: /opciones/cuentas-bancarias) si el método la exige"
+          },
+          "referencia": {
+            "type": "string",
+            "description": "Nº de cheque o de transferencia (obligatorio si sale de banco)"
+          }
+        },
+        "required": [
+          "metodoPago"
+        ]
+      },
+      "CreateDeudaDto": {
+        "type": "object",
+        "properties": {
+          "employeeId": {
+            "type": "string",
+            "example": "HR-EMP-00001"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "Préstamo",
+              "Avance de salario",
+              "Faltante de caja",
+              "Daño o pérdida",
+              "Otro"
+            ]
+          },
+          "fecha": {
+            "type": "string",
+            "example": "2026-10-05"
+          },
+          "monto": {
+            "type": "number",
+            "example": 20000
+          },
+          "desembolso": {
+            "description": "Préstamo / avance: de dónde sale el dinero",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DesembolsoDto"
+              }
+            ]
+          },
+          "cuentaContrapartida": {
+            "type": "string",
+            "description": "Faltante / daño / otro sin desembolso: cuenta contrapartida (opciones: /opciones/cuentas)"
+          },
+          "cuotas": {
+            "type": "number",
+            "example": 4
+          },
+          "montoCuota": {
+            "type": "number",
+            "example": 5000
+          },
+          "descontarEnNomina": {
+            "type": "boolean",
+            "description": "Marcar para descontar en nómina (Fase 10)"
+          },
+          "notas": {
+            "type": "string"
+          },
+          "sucursal": {
+            "type": "string",
+            "description": "Sucursal (dimensión contable)"
+          },
+          "centroCosto": {
+            "type": "string",
+            "description": "Centro de costo"
+          },
+          "someter": {
+            "type": "boolean",
+            "description": "Someter de una vez (exige rrhh.cxc-empleados.someter)"
+          }
+        },
+        "required": [
+          "employeeId",
+          "tipo",
+          "fecha",
+          "monto"
+        ]
+      },
+      "CondonarDeudaDto": {
+        "type": "object",
+        "properties": {
+          "monto": {
+            "type": "number",
+            "example": 500
+          },
+          "motivo": {
+            "type": "string"
+          },
+          "pinOverride": {
+            "description": "PIN de un usuario autorizado (acción condonar_cxc_empleado)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PinOverrideDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "monto",
+          "motivo",
+          "pinOverride"
+        ]
+      },
+      "ImputarFaltanteDto": {
+        "type": "object",
+        "properties": {
+          "employeeId": {
+            "type": "string",
+            "description": "Empleado al que se imputa el faltante"
+          },
+          "monto": {
+            "type": "number",
+            "description": "Monto (≤ faltante del cierre)"
+          },
+          "notas": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "employeeId",
+          "monto"
+        ]
+      },
+      "VendedorDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Juan Pérez",
+            "description": "Obligatorio salvo que venga `employeeId` (default: nombre del empleado)"
+          },
+          "parent": {
+            "type": "string",
+            "description": "Grupo padre (default: la raíz del árbol)"
+          },
+          "isGroup": {
+            "type": "boolean",
+            "default": false,
+            "description": "Grupo (ej. \"Ruta Norte\") en vez de vendedor"
+          },
+          "employeeId": {
+            "type": "string",
+            "description": "Empleado (requiere el módulo de RRHH). Un empleado solo puede ser un vendedor."
+          },
+          "usuario": {
+            "type": "string",
+            "description": "Usuario del sistema, para vendedores externos sin ficha de empleado"
+          },
+          "commissionRate": {
+            "type": "number",
+            "example": 5,
+            "description": "Comisión por defecto (%)"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "EstadoVendedorDto": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
         ]
       }
     }
