@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
 import { createTransferencia } from '@/shared/api/transferencias'
+import { getItemLookup } from '@/shared/api/catalog'
 import { listUbicaciones } from '@/shared/api/ubicaciones'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -15,9 +16,10 @@ import { ArrowLeft, Save, Plus, Trash2, Loader2 } from 'lucide-react'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
-import { CombinacionDimensionSelector, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
+import { DimensionAxisCell, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { useDimensionesInventario } from '@/shared/hooks/useDimensionesInventario'
 
 interface LineItem {
   itemCode: string
@@ -46,10 +48,15 @@ export default function TransferenciaForm() {
   const [toUbicacion, setToUbicacion] = useState('')
   const [toUbicacionLabel, setToUbicacionLabel] = useState('')
   const [items, setItems] = useState<LineItem[]>([{ itemCode: '', qty: 1 }])
+  // Código: ancho según el código más largo presente (igual que facturas/nueva).
+  const codigoAutoWidth = Math.min(160, Math.max(60, Math.max(0, ...items.map((i) => i.itemCode?.length ?? 0)) * 7.5 + 28))
+  // Dimensión: una columna por cada eje que declare AL MENOS un artículo, a la derecha de "Artículo".
+  const dimensionCodes = Array.from(new Set(items.flatMap((i) => i.itemDimensiones?.map((d) => d.dimension) ?? [])))
+  const { etiquetaDe: dimensionEtiquetaDe } = useDimensionesInventario({ enabled: items.some((i) => i.usaDimensiones) })
   const ITEMS_COLUMNS = [
     { key: 'articulo', width: 240 },
+    ...dimensionCodes.map((code) => ({ key: `dim:${code}`, width: 140 })),
     { key: 'cantidad', width: 120 },
-    { key: 'combination', width: 160 },
     { key: 'actions', width: 40 },
   ]
   const { widths: colWidths, startResize } = useResizableColumns(ITEMS_COLUMNS)
@@ -142,6 +149,27 @@ export default function TransferenciaForm() {
 
   function updateItem(index: number, patch: Partial<LineItem>) {
     setItems((prev) => prev.map((it, i) => i === index ? { ...it, ...patch } : it))
+  }
+  function selectCatalogItem(index: number, catalogItem: Item) {
+    updateItem(index, {
+      itemCode: catalogItem.id,
+      itemLabel: catalogItem.itemName,
+      usaDimensiones: !!catalogItem.usaDimensiones,
+      itemDimensiones: catalogItem.dimensiones ?? [],
+      dimensiones: {},
+    })
+    // El picker puede no traer `dimensiones` — solo el detalle las garantiza (§4.3).
+    if (!catalogItem.dimensiones || catalogItem.dimensiones.length === 0) {
+      getItemLookup(catalogItem.id).then((detail) => {
+        if (detail?.usaDimensiones && detail.dimensiones?.length) {
+          setItems((prev) => prev.map((row, i) =>
+            i === index && row.itemCode === catalogItem.id && !(row.itemDimensiones?.length)
+              ? { ...row, usaDimensiones: true, itemDimensiones: detail.dimensiones }
+              : row,
+          ))
+        }
+      }).catch(() => {})
+    }
   }
   function addRow() { setItems((prev) => [...prev, { itemCode: '', qty: 1 }]) }
   function removeRow(index: number) { setItems((prev) => prev.filter((_, i) => i !== index)) }
@@ -245,21 +273,25 @@ export default function TransferenciaForm() {
           <div className="items-table-wrap">
             <table className="items-table navy-table items-table-resizable">
               <colgroup>
+                <col style={{ width: codigoAutoWidth }} />
                 {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
               </colgroup>
               <thead>
                 <tr>
+                  <th>Código</th>
                   <th>
                     Artículo
                     <span className="col-resize-handle" onMouseDown={startResize('articulo')} />
                   </th>
+                  {dimensionCodes.map((code) => (
+                    <th key={code}>
+                      {dimensionEtiquetaDe(code)}
+                      <span className="col-resize-handle" onMouseDown={startResize(`dim:${code}`)} />
+                    </th>
+                  ))}
                   <th style={{ textAlign: 'right' }}>
                     Cantidad
                     <span className="col-resize-handle" onMouseDown={startResize('cantidad')} />
-                  </th>
-          <th style={{ textAlign: 'right' }}>
-                    Dimensión
-                    <span className="col-resize-handle" onMouseDown={startResize('combination')} />
                   </th>
                   <th />
                 </tr>
@@ -268,20 +300,31 @@ export default function TransferenciaForm() {
                 {items.map((item, index) => (
                   <tr key={index}>
                     <td>
+                      <span className="td-muted" style={{ fontSize: 12 }}>{item.itemCode || '—'}</span>
+                    </td>
+                    <td>
                       <ItemSelect
                         value={item.itemCode}
                         selectedLabel={item.itemLabel}
                         typeFilter="product"
-                        onSelect={(catalogItem: Item) => updateItem(index, {
-                          itemCode: catalogItem.id,
-                          itemLabel: catalogItem.itemName,
-                          usaDimensiones: !!catalogItem.usaDimensiones,
-                          itemDimensiones: catalogItem.dimensiones ?? [],
-                          dimensiones: {},
-                        })}
+                        onSelect={(catalogItem: Item) => selectCatalogItem(index, catalogItem)}
                         onClear={() => updateItem(index, { itemCode: '', itemLabel: undefined, usaDimensiones: false, itemDimensiones: [], dimensiones: {} })}
                       />
                     </td>
+                    {dimensionCodes.map((code) => (
+                      <td key={code}>
+                        {item.itemCode && item.usaDimensiones && item.itemDimensiones?.some((d) => d.dimension === code) ? (
+                          <DimensionAxisCell
+                            itemDimensiones={item.itemDimensiones}
+                            codigo={code}
+                            value={item.dimensiones ?? {}}
+                            onChange={(next) => updateItem(index, { dimensiones: next })}
+                          />
+                        ) : (
+                          <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
+                        )}
+                      </td>
+                    ))}
                     <td>
                       <input
                         className={`items-input${submitted && (!item.qty || item.qty <= 0) ? ' items-input-error' : ''}`}
@@ -292,16 +335,6 @@ export default function TransferenciaForm() {
                         onChange={(e) => updateItem(index, { qty: parseFloat(e.target.value) || 0 })}
                         style={{ textAlign: 'right' }}
                       />
-                    </td>
-                    <td>
-                      {item.usaDimensiones && item.itemDimensiones && item.itemDimensiones.length > 0 && (
-                        <CombinacionDimensionSelector
-                          itemDimensiones={item.itemDimensiones}
-                          value={item.dimensiones ?? {}}
-                          onChange={(v) => updateItem(index, { dimensiones: v })}
-                          compact
-                        />
-                      )}
                     </td>
                     <td>
                       <button type="button" className="btn btn-ghost btn-size-icon-sm" onClick={() => removeRow(index)} disabled={items.length === 1}>
