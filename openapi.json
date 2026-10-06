@@ -19323,6 +19323,560 @@
         ]
       }
     },
+    "/api/v1/catalog/servicios": {
+      "get": {
+        "operationId": "ServiciosController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "Filter by category (Item Group name)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "brand",
+            "required": false,
+            "in": "query",
+            "description": "Filter by brand name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "product",
+                "service"
+              ]
+            }
+          },
+          {
+            "name": "disabled",
+            "required": false,
+            "in": "query",
+            "description": "Show disabled items too",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "isTemplate",
+            "required": false,
+            "in": "query",
+            "description": "true = solo artículos template (has_variants=1). false = excluye templates.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "variantOf",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar variantes de un template específico por su código",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeVariants",
+            "required": false,
+            "in": "query",
+            "description": "true = incluir variantes en la lista. Default: false (excluye variantes individuales)",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "validateStock",
+            "required": false,
+            "in": "query",
+            "description": "true = solo devolver artículos con stock disponible (\u003E 0) en algún almacén. Solo aplica a productos.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Filtrar artículos por sucursal — solo muestra artículos con stock en almacenes de esa sucursal, y desglosa stock por almacén en stockByWarehouse.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stockUom",
+            "required": false,
+            "in": "query",
+            "description": "UOM de stock (stock_uom)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasWarranty",
+            "required": false,
+            "in": "query",
+            "description": "true = solo artículos con garantía (warranty_period \u003E 0). false = sin garantía.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "warrantyPeriodMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "warrantyPeriodMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "pricesMin",
+            "required": false,
+            "in": "query",
+            "description": "Precio mínimo — coincide si CUALQUIERA de las listas de precio (A/B/C) del artículo cae en el rango.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "pricesMax",
+            "required": false,
+            "in": "query",
+            "description": "Precio máximo — coincide si CUALQUIERA de las listas de precio (A/B/C) del artículo cae en el rango.",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "priceMode",
+            "required": false,
+            "in": "query",
+            "description": "custom_price_mode: \"manual\" o \"cost_plus\"",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "maxDiscountPctMin",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "maxDiscountPctMax",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "trackingType",
+            "required": false,
+            "in": "query",
+            "description": "custom_tracking_type — no aplica el fallback legacy que sí usa el mapeo de respuesta.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "none",
+                "serial",
+                "batch"
+              ]
+            }
+          },
+          {
+            "name": "barcode",
+            "required": false,
+            "in": "query",
+            "description": "Código de barra exacto (match = sobre Item Barcode.barcode). Más rápido que `search` para lectura por scanner.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "principioActivo",
+            "required": false,
+            "in": "query",
+            "description": "name (id) de un Active Ingredient — filtra artículos que lo declaran en su composición. Filtra por child table (Item Active Ingredient): el servicio deduplica antes de contar.",
+            "schema": {
+              "example": "Acetaminofén",
+              "type": "string"
+            }
+          },
+          {
+            "name": "esMedicamento",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por Item.custom_is_medicine",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "formaFarmaceutica",
+            "required": false,
+            "in": "query",
+            "description": "name (id) de un Dosage Form — filtra por Item.custom_dosage_form",
+            "schema": {
+              "example": "Tableta",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar servicios (mismos filtros que /catalog/items)",
+        "tags": [
+          "Catalog - Servicios"
+        ]
+      },
+      "post": {
+        "operationId": "ServiciosController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear servicio (`type` se fuerza a \"service\")",
+        "tags": [
+          "Catalog - Servicios"
+        ]
+      }
+    },
+    "/api/v1/catalog/servicios/{id}": {
+      "get": {
+        "operationId": "ServiciosController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un servicio",
+        "tags": [
+          "Catalog - Servicios"
+        ]
+      },
+      "put": {
+        "operationId": "ServiciosController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar servicio",
+        "tags": [
+          "Catalog - Servicios"
+        ]
+      },
+      "delete": {
+        "operationId": "ServiciosController_remove",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Desactivar servicio (disabled=1)",
+        "tags": [
+          "Catalog - Servicios"
+        ]
+      }
+    },
+    "/api/v1/catalog/servicios/{id}/precios": {
+      "put": {
+        "operationId": "ServiciosController_updatePrices",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateItemPricesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar solo los precios del servicio",
+        "tags": [
+          "Catalog - Servicios"
+        ]
+      }
+    },
+    "/api/v1/catalog/servicios/{id}/imagen": {
+      "post": {
+        "operationId": "ServiciosController_uploadImagen",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Subir/reemplazar la imagen del servicio",
+        "tags": [
+          "Catalog - Servicios"
+        ]
+      }
+    },
+    "/api/v1/catalog/servicios/{id}/toggle": {
+      "post": {
+        "operationId": "ServiciosController_toggle",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Activar/desactivar servicio",
+        "tags": [
+          "Catalog - Servicios"
+        ]
+      }
+    },
     "/api/v1/catalog/items/lookup": {
       "get": {
         "description": "No requiere la pantalla Artículos: se permite si algún formulario del usuario depende del recurso `lookup.articulos` (ej. Crear factura). Usar `search` para la búsqueda remota.",
@@ -42920,6 +43474,21 @@
             "type": "string",
             "example": "132456785",
             "description": "RNC del comprador. Obligatorio en POST /caja/facturas/:id/completar-cobro cuando la factura es de un comprador sin registrar como cliente (cliente ocasional) y la condición fiscal resuelta es Crédito Fiscal (B01) — la DGII exige el RNC del comprador en ese caso. Sin efecto para clientes registrados (se usa el RNC ya guardado en el Customer)."
+          },
+          "ncfType": {
+            "type": "string",
+            "enum": [
+              "B01",
+              "B02",
+              "B14",
+              "B15",
+              "E31",
+              "E32",
+              "E44",
+              "E45"
+            ],
+            "example": "B02",
+            "description": "Sobrescribe el tipo de comprobante de la factura al cobrar. Opcional: si no se envía se usa el que la factura trae al crearse. Solo tipos de venta: B01/B02/B14/B15 o su equivalente electrónico E31/E32/E44/E45 (se guarda como B0x). Con B01/E31 sobre un comprador ocasional se exige `rnc`."
           }
         },
         "required": [
@@ -49523,7 +50092,7 @@
           },
           "catalogo.items.listar": {
             "type": "boolean",
-            "description": "Lista de Productos/Servicios — Ver"
+            "description": "Lista de Productos — Ver"
           },
           "catalogo.items.eliminar": {
             "type": "boolean",
@@ -49535,11 +50104,11 @@
           },
           "catalogo.items.crear": {
             "type": "boolean",
-            "description": "Lista de Productos/Servicios — Nuevo"
+            "description": "Lista de Productos — Nuevo"
           },
           "catalogo.items.activar": {
             "type": "boolean",
-            "description": "Lista de Productos/Servicios — Activar/Desactivar"
+            "description": "Lista de Productos — Activar/Desactivar"
           },
           "catalogo.items.editar": {
             "type": "boolean",
@@ -49560,6 +50129,30 @@
           "catalogo.items.asignar-ubicacion": {
             "type": "boolean",
             "description": "Detalle de Artículo — Asignar/Mover/Quitar ubicación"
+          },
+          "catalogo.servicios.listar": {
+            "type": "boolean",
+            "description": "Lista de Servicios — Ver"
+          },
+          "catalogo.servicios.crear": {
+            "type": "boolean",
+            "description": "Lista de Servicios — Nuevo"
+          },
+          "catalogo.servicios.activar": {
+            "type": "boolean",
+            "description": "Lista de Servicios — Activar/Desactivar"
+          },
+          "catalogo.servicios.editar": {
+            "type": "boolean",
+            "description": "Detalle de Servicio — Editar"
+          },
+          "catalogo.servicios.actualizar-precios": {
+            "type": "boolean",
+            "description": "Detalle de Servicio — Actualizar Precios"
+          },
+          "catalogo.servicios.eliminar": {
+            "type": "boolean",
+            "description": "Detalle de Servicio — Eliminar"
           },
           "catalogo.categorias.listar": {
             "type": "boolean",
@@ -51492,6 +52085,12 @@
           "catalogo.items.imprimir-etiqueta",
           "catalogo.items.generar-variantes",
           "catalogo.items.asignar-ubicacion",
+          "catalogo.servicios.listar",
+          "catalogo.servicios.crear",
+          "catalogo.servicios.activar",
+          "catalogo.servicios.editar",
+          "catalogo.servicios.actualizar-precios",
+          "catalogo.servicios.eliminar",
           "catalogo.categorias.listar",
           "catalogo.categorias.crear",
           "catalogo.categorias.editar",

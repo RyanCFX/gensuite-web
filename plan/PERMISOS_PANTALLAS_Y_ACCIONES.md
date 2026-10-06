@@ -104,11 +104,18 @@ no está confirmado, se marca `(custom?)`.
 
 | Pantalla | Acción | Permiso |
 |---|---|---|
-| Lista de Productos/Servicios | Nuevo | `Item.create` |
-| " | Ver | `Item.read` |
-| " | Activar/Desactivar | `Item.write` |
-| Detalle de Artículo | Editar | `Item.write` |
-| " | Actualizar Precios | `Item Price.write` |
+| Lista de Productos | Nuevo | `catalogo.items.crear` |
+| " | Ver | `catalogo.items.listar` |
+| " | Activar/Desactivar | `catalogo.items.activar` |
+| Lista de Servicios | Nuevo | `catalogo.servicios.crear` |
+| " | Ver | `catalogo.servicios.listar` |
+| " | Activar/Desactivar | `catalogo.servicios.activar` |
+| Detalle de Artículo (producto) | Editar | `catalogo.items.editar` |
+| " | Actualizar Precios | `catalogo.items.actualizar-precios` |
+| " | Eliminar | `catalogo.items.eliminar` |
+| Detalle de Servicio | Editar | `catalogo.servicios.editar` |
+| " | Actualizar Precios | `catalogo.servicios.actualizar-precios` |
+| " | Eliminar | `catalogo.servicios.eliminar` |
 | " | Imprimir etiqueta | `Item.print` |
 | " | Agregar/Generar variantes | `Item.create` |
 | " | Asignar/Mover/Quitar ubicación | `Warehouse.write` (o `Bin`/`Stock Entry.create` si mueve stock) |

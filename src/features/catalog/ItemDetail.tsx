@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getItem, toggleItem, listItemVariants, generateVariants, createVariant, getAttribute, updateItemPrices } from '@/shared/api/catalog'
+import { getItem, toggleItem, listItemVariants, generateVariants, createVariant, getAttribute, updateItemPrices, getServicio, toggleServicio, updateServicioPrices } from '@/shared/api/catalog'
 import { getFacturacionConfig } from '@/shared/api/config'
 import { listWarehouses, getStockPorDimension } from '@/shared/api/inventory'
 import { listZonas } from '@/shared/api/zonas'
@@ -22,6 +22,7 @@ import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePermissionsStore } from '@/stores/permissions.store'
+import { usePuede } from '@/shared/permissions/can'
 import { ComposicionPanel } from './ComposicionPanel'
 import { EquivalentesPanel } from './EquivalentesPanel'
 
@@ -66,7 +67,8 @@ function UpdatePricesModal({
   const { requestClose, confirming, confirmDiscard, cancelDiscard } = useConfirmClose(isDirty, onClose)
 
   const mutation = useMutation({
-    mutationFn: (data: UpdateItemPricesDto) => updateItemPrices(item.id, data),
+    mutationFn: (data: UpdateItemPricesDto) =>
+      (item.type === 'product' ? updateItemPrices(item.id, data) : updateServicioPrices(item.id, data)),
     onSuccess: (result) => {
       toast.success('Precios actualizados')
       onSuccess(result)
@@ -1192,14 +1194,36 @@ function UbicacionesPanel({ itemCode }: { itemCode: string }) {
 export default function ItemDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const esFarmacia = usePermissionsStore((s) => s.vertical) === 'farmacia'
 
+  // Productos y Servicios son módulos separados con endpoints separados: la ruta desde la que se
+  // entró decide de qué endpoint se lee (`/catalog/items/:id` solo devuelve productos,
+  // `/catalog/servicios/:id` solo servicios).
+  const rutaEsServicio = location.pathname.startsWith('/catalogo/servicios')
+  // `catalogo.items.*` aplica solo a productos; el detalle de servicios usa
+  // `catalogo.servicios.*` (editar/actualizar-precios/activar).
+  const puedeEditar = usePuede(rutaEsServicio ? 'catalogo.servicios.editar' : 'catalogo.items.editar')
+  const puedePrecios = usePuede(rutaEsServicio ? 'catalogo.servicios.actualizar-precios' : 'catalogo.items.actualizar-precios')
+  const puedeActivar = usePuede(rutaEsServicio ? 'catalogo.servicios.activar' : 'catalogo.items.activar')
+
   const { data: item, isLoading, isError } = useQuery({
     queryKey: ['item', id],
-    queryFn: () => getItem(id!),
+    queryFn: () => (rutaEsServicio ? getServicio(id!) : getItem(id!)),
     enabled: Boolean(id),
   })
+
+  // Defensivo: si se abre la URL de un módulo con el id del otro tipo, se redirige al módulo
+  // correcto en vez de mostrar un 403/vacío del endpoint del otro tipo.
+  useEffect(() => {
+    if (!item) return
+    const esperado = rutaEsServicio ? 'service' : 'product'
+    if (item.type !== esperado) {
+      const baseCorrecto = item.type === 'product' ? '/inventario/productos' : '/catalogo/servicios'
+      navigate(`${baseCorrecto}/${item.id}`, { replace: true })
+    }
+  }, [item, rutaEsServicio, navigate])
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ['facturacion-config'],
@@ -1217,7 +1241,7 @@ export default function ItemDetail() {
   const { widths: stockWhColWidths, startResize: startResizeStockWh } = useResizableColumns(STOCK_WAREHOUSE_COLUMNS)
 
   const toggleMutation = useMutation({
-    mutationFn: () => toggleItem(id!),
+    mutationFn: () => (rutaEsServicio ? toggleServicio(id!) : toggleItem(id!)),
     onSuccess: (updated) => {
       toast.success(updated.disabled ? 'Artículo desactivado' : 'Artículo activado')
       queryClient.invalidateQueries({ queryKey: ['item', id] })
@@ -1291,10 +1315,12 @@ export default function ItemDetail() {
           <p className="page-sub" style={{ fontFamily: 'var(--font-body)' }}>{item.id}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={() => navigate(`${basePath}/${item.id}/editar`)}>
-            <Pencil size={15} /> Editar
-          </button>
-          {!item.hasVariants && (
+          {puedeEditar && (
+            <button className="btn btn-secondary" onClick={() => navigate(`${basePath}/${item.id}/editar`)}>
+              <Pencil size={15} /> Editar
+            </button>
+          )}
+          {puedePrecios && !item.hasVariants && (
             <button className="btn btn-secondary" onClick={() => setShowPricesModal(true)}>
               <DollarSign size={15} /> Actualizar Precios
             </button>
@@ -1304,15 +1330,17 @@ export default function ItemDetail() {
               <Printer size={15} /> Imprimir etiqueta
             </button>
           )}
-          <button
-            className="btn btn-secondary"
-            onClick={() => toggleMutation.mutate()}
-            disabled={toggleMutation.isPending}
-          >
-            {item.disabled
-              ? <><ToggleRight size={15} /> Activar</>
-              : <><ToggleLeft size={15} /> Desactivar</>}
-          </button>
+          {puedeActivar && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => toggleMutation.mutate()}
+              disabled={toggleMutation.isPending}
+            >
+              {item.disabled
+                ? <><ToggleRight size={15} /> Activar</>
+                : <><ToggleLeft size={15} /> Desactivar</>}
+            </button>
+          )}
         </div>
       </div>
 
@@ -1765,8 +1793,8 @@ export default function ItemDetail() {
         </div>
       </div>
 
-      {/* Variants panel — only for templates */}
-      {item.hasVariants && (
+      {/* Variants panel — solo productos tienen variantes (servicios no tiene rutas de variantes) */}
+      {item.type === 'product' && item.hasVariants && (
         <div style={{ marginTop: 20 }}>
           <VariantsPanel itemId={id!} item={item} />
         </div>

@@ -5369,6 +5369,9 @@ export interface CobrarFacturaDto {
     *  ocasional y su ncfType es Crédito Fiscal (B01/E31). Sin efecto para clientes registrados
     *  (se usa el RNC ya guardado en el Customer). */
    rnc?: string
+   /** Sobrescribe el tipo de comprobante de la factura (B01|B02|B14|B15|E31|E32|E44|E45) solo en
+    *  completar-cobro; cualquier otro valor da 400. Se envía únicamente si el cajero lo cambió. */
+   ncfType?: string
  }
 
 /** Resumen del cobro registrado al someter una factura (presente cuando se enviaron payments). */
@@ -7177,7 +7180,7 @@ export interface DocumentPermissions {
 export type TenantFeatureKey =
   | 'compras' | 'comprasOrdenes' | 'comprasSolicitudes' | 'devolucionesCompras'
   | 'gastos' | 'proveedores' | 'caja' | 'contabilidad' | 'cuentasPorCobrar'
-  | 'cuentasPorPagar' | 'tesoreria' | 'inventario' | 'servicios'
+  | 'cuentasPorPagar' | 'tesoreria' | 'inventario' | 'productos' | 'servicios'
   | 'relacionesComerciales' | 'cotizaciones' | 'despacho' | 'devoluciones'
   | 'notasCredito' | 'notasDebito' | 'pedidos';
 
@@ -7199,8 +7202,9 @@ export interface TenantLimites {
 }
 
 export interface MeFeatures {
-  /** Siempre trae las 20 claves de `public.features` (`MeFeaturesResponseDto`/`FeaturesMapDto`
-   *  en openapi.json — 19 implementadas + `servicios` reservada) como booleano. */
+  /** Claves de `public.features` (`MeFeaturesResponseDto`/`FeaturesMapDto` en openapi.json —
+   *  `productos` y `servicios` son features independientes: si falta uno se oculta su
+   *  menú/pantalla y el API responde 403 FEATURE_NO_CONTRATADO) como booleano. */
   features: Record<TenantFeatureKey, boolean>;
   /** Claves de reporte ENCENDIDAS — un reporte ausente está apagado, no hay booleano por reporte. */
   reportesHabilitados: TenantReporteKey[];
@@ -7319,7 +7323,6 @@ export interface FacturaElegibleArs {
   customer: string;
   customerName: string;
   postingDate: string;
-  ncf?: string;
   grandTotal: number;
   outstandingAmount: number;
   numeroAutorizacion: string;
@@ -7343,7 +7346,6 @@ export interface VincularFacturasDto {
 /** Fila congelada al facturar el lote — el anexo oficial de la consolidada. */
 export interface LoteFacturaSnapshot {
   factura: string;
-  ncf?: string;
   paciente?: string;
   numeroAutorizacion?: string;
   carnetAfiliado?: string;

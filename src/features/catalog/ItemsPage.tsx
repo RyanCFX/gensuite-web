@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { listItems, toggleItem } from '@/shared/api/catalog'
+import { listItems, toggleItem, listServicios, toggleServicio } from '@/shared/api/catalog'
 import { listUOMs } from '@/shared/api/config'
 import type { Item } from '@/shared/api/types'
 import { formatDOP } from '@/lib/formatters'
@@ -19,6 +19,7 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { listPrincipiosActivos } from '@/shared/api/principios-activos'
 import { usePermissionsStore } from '@/stores/permissions.store'
+import { usePuede } from '@/shared/permissions/can'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 import { SearchInput } from '@/shared/ui/SearchInput'
@@ -71,6 +72,10 @@ export default function ItemsPage() {
   const isProduct = fixedType === 'product'
   const basePath = isProduct ? '/inventario/productos' : '/catalogo/servicios'
   const moduleLabel = isProduct ? 'Productos' : 'Servicios'
+  // `catalogo.items.*` aplica solo a productos; la pantalla de servicios usa
+  // `catalogo.servicios.*` (openapi.json: Lista de Servicios).
+  const puedeCrear = usePuede(isProduct ? 'catalogo.items.crear' : 'catalogo.servicios.crear')
+  const puedeActivar = usePuede(isProduct ? 'catalogo.items.activar' : 'catalogo.servicios.activar')
 
   const [search, setSearch] = useState('')
   const [templateFilter, setTemplateFilter] = useState<'all' | 'template' | 'standalone'>('all')
@@ -112,10 +117,11 @@ export default function ItemsPage() {
         principioActivoFilter, esMedicamentoFilter,
       },
     ],
-    queryFn: () =>
-      listItems({
+    queryFn: () => {
+      // Productos → GET /catalog/items (solo productos: type=service da 403/vacío).
+      // Servicios → GET /catalog/servicios (el backend fuerza type=service).
+      const baseParams = {
         search: debouncedSearch || undefined,
-        type: fixedType,
         category: categoryFilter || undefined,
         brand: brandFilter || undefined,
         disabled: statusFilter === 'all' ? undefined : statusFilter === 'disabled' ? 'true' : 'false',
@@ -135,7 +141,9 @@ export default function ItemsPage() {
         trackingType: isProduct ? (trackingTypeFilter === 'all' ? undefined : trackingTypeFilter) : undefined,
         principioActivo: esFarmacia ? (principioActivoFilter || undefined) : undefined,
         esMedicamento: esFarmacia && esMedicamentoFilter ? true : undefined,
-      }),
+      }
+      return isProduct ? listItems({ ...baseParams, type: 'product' }) : listServicios(baseParams)
+    },
   })
 
   const { data: principiosActivosData } = useQuery({
@@ -166,7 +174,7 @@ export default function ItemsPage() {
     .map((u) => ({ value: u.name, label: u.name }))
 
   const toggleMutation = useMutation({
-    mutationFn: (id: string) => toggleItem(id),
+    mutationFn: (id: string) => (isProduct ? toggleItem(id) : toggleServicio(id)),
     onSuccess: (item: Item) => {
       toast.success(item.disabled ? 'Artículo desactivado' : 'Artículo activado')
       queryClient.invalidateQueries({ queryKey: ['items'] })
@@ -227,10 +235,12 @@ export default function ItemsPage() {
         action={
           <>
             <RecargarButton />
-            <button className="btn btn-navy" onClick={() => navigate(`${basePath}/nuevo`)}>
-              <Plus size={16} />
-              Nuevo {isProduct ? 'Producto' : 'Servicio'}
-            </button>
+            {puedeCrear && (
+              <button className="btn btn-navy" onClick={() => navigate(`${basePath}/nuevo`)}>
+                <Plus size={16} />
+                Nuevo {isProduct ? 'Producto' : 'Servicio'}
+              </button>
+            )}
           </>
         }
       />
@@ -421,7 +431,7 @@ export default function ItemsPage() {
                                 <Eye size={14} /> Ver variantes
                               </ActionsMenuItem>
                             )}
-                            <ActionsMenuItem disabled={toggleMutation.isPending} onClick={() => toggleMutation.mutate(item.id)}>
+                            <ActionsMenuItem disabled={!puedeActivar || toggleMutation.isPending} onClick={() => toggleMutation.mutate(item.id)}>
                               {item.disabled
                                 ? <><ToggleRight size={14} /> Activar</>
                                 : <><ToggleLeft size={14} /> Desactivar</>}

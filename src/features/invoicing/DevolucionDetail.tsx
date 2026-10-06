@@ -124,7 +124,7 @@ export default function DevolucionDetail() {
     )
   }
 
-  const ncfLabel = catalogos?.ncfTypes.find((t) => t.value === devolucion.ncfType)?.label
+  const ncfLabel = [...(catalogos?.ncfTypes ?? []), ...(catalogos?.ncfTypesFisicos ?? [])].find((t) => t.value === devolucion.ncfType)?.label
   const usageStatus = devolucion.usageStatus
 
   return (

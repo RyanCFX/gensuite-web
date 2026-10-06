@@ -164,7 +164,10 @@ export default function CreditNotesPage() {
   const ncEsEcf = ecfTipoElectronicoHabilitado(ecfTipos, '34')
 
   const [ncfTypeSearch, setNcfTypeSearch] = useState('')
-  const ncfTypeOptions: SearchSelectOption[] = (catalogos?.ncfTypes ?? [])
+  // `ncfTypes` ya solo trae los 4 tipos de VENTA (B01/B02/B14/B15 o E31/E32/E44/E45): el tipo de una
+  // nota de crédito (B04) vive en el catálogo completo `ncfTypesFisicos`.
+  const ncfTypeOptions: SearchSelectOption[] = (catalogos?.ncfTypesFisicos ?? [])
+    .filter((t) => t.value === 'B04')
     .filter((t) => !ncfTypeSearch || t.label.toLowerCase().includes(ncfTypeSearch.toLowerCase()))
     .map((t) => ({ value: t.value, label: t.label }))
 
@@ -630,7 +633,7 @@ export default function CreditNotesPage() {
             onChange={setNcfType}
             options={ncfTypeOptions}
             onSearch={setNcfTypeSearch}
-            selectedLabel={catalogos?.ncfTypes?.find((t) => t.value === ncfType)?.label ?? ''}
+            selectedLabel={(catalogos?.ncfTypesFisicos ?? []).find((t) => t.value === ncfType)?.label ?? ''}
             placeholder="Todos los tipos NCF"
           />
         </div>

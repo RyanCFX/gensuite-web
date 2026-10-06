@@ -1,5 +1,6 @@
 // GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
-// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (467 acciones). Regenerar: node scripts/gen-acciones.mjs
+// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (467 acciones) + 6 de `catalogo.servicios.*`
+// (openapi.json: Lista de Servicios — ver/nuevo/activar/editar/precios/eliminar). Regenerar: node scripts/gen-acciones.mjs
 
 export type AccionId =
   | 'apertura.compras.anular'
@@ -58,6 +59,12 @@ export type AccionId =
   | 'catalogo.marcas.editar'
   | 'catalogo.marcas.eliminar'
   | 'catalogo.marcas.listar'
+  | 'catalogo.servicios.activar'
+  | 'catalogo.servicios.actualizar-precios'
+  | 'catalogo.servicios.crear'
+  | 'catalogo.servicios.editar'
+  | 'catalogo.servicios.eliminar'
+  | 'catalogo.servicios.listar'
   | 'clientes.crear'
   | 'clientes.editar'
   | 'clientes.eliminar'
@@ -527,6 +534,12 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'catalogo.marcas.editar',
   'catalogo.marcas.eliminar',
   'catalogo.marcas.listar',
+  'catalogo.servicios.activar',
+  'catalogo.servicios.actualizar-precios',
+  'catalogo.servicios.crear',
+  'catalogo.servicios.editar',
+  'catalogo.servicios.eliminar',
+  'catalogo.servicios.listar',
   'clientes.crear',
   'clientes.editar',
   'clientes.eliminar',

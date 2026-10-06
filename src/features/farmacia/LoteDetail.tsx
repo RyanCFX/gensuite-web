@@ -27,7 +27,6 @@ const ESTADO_BADGE: Record<LoteFarmaciaEstado, string> = {
 
 const FACTURAS_SNAPSHOT_COLUMNS = [
   { key: 'factura', width: 110 },
-  { key: 'ncf', width: 110 },
   { key: 'paciente', width: 180 },
   { key: 'autorizacion', width: 140 },
   { key: 'carnet', width: 120 },
@@ -101,8 +100,7 @@ export default function LoteDetail() {
   const FACTURAS_COLUMNS = [
     { key: 'factura', width: 110 },
     { key: 'paciente', width: 180 },
-    { key: 'ncf', width: 110 },
-    { key: 'autorizacion', width: 140 },
+      { key: 'autorizacion', width: 140 },
     { key: 'total', width: 110 },
     { key: 'cobertura', width: 130 },
     { key: 'estadoArs', width: 130 },
@@ -247,10 +245,6 @@ export default function LoteDetail() {
                   <span className="col-resize-handle" onMouseDown={facturasStartResize('paciente')} />
                 </th>
                 <th>
-                  NCF
-                  <span className="col-resize-handle" onMouseDown={facturasStartResize('ncf')} />
-                </th>
-                <th>
                   N.º autorización
                   <span className="col-resize-handle" onMouseDown={facturasStartResize('autorizacion')} />
                 </th>
@@ -272,7 +266,7 @@ export default function LoteDetail() {
             <tbody>
               {facturas.length === 0 ? (
                 <tr>
-                  <td colSpan={mostrarAccionesFactura ? 8 : 7}>
+                  <td colSpan={mostrarAccionesFactura ? 7 : 6}>
                     <div className="empty-state">
                       <div className="empty-title">Sin facturas vinculadas todavía</div>
                       {mostrarAccionesFactura && puedeVerElegibles && (
@@ -288,7 +282,6 @@ export default function LoteDetail() {
                   <tr key={f.id} className="table-row-clickable" onClick={() => navigate(`/facturas/${f.id}`)}>
                     <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{f.id}</td>
                     <td>{f.customerName || f.customer}</td>
-                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{f.ncf ?? '—'}</td>
                     <td>{f.numeroAutorizacion}</td>
                     <td style={{ textAlign: 'right' }}>{formatDOP(f.grandTotal)}</td>
                     <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatDOP(f.montoCoberturaNeta)}</td>
@@ -335,10 +328,6 @@ export default function LoteDetail() {
                     <span className="col-resize-handle" onMouseDown={snapshotStartResize('factura')} />
                   </th>
                   <th>
-                    NCF
-                    <span className="col-resize-handle" onMouseDown={snapshotStartResize('ncf')} />
-                  </th>
-                  <th>
                     Paciente
                     <span className="col-resize-handle" onMouseDown={snapshotStartResize('paciente')} />
                   </th>
@@ -360,7 +349,6 @@ export default function LoteDetail() {
                 {snapshot.map((f) => (
                   <tr key={f.factura}>
                     <td className="td-muted" style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{f.factura}</td>
-                    <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{f.ncf ?? '—'}</td>
                     <td>{f.paciente ?? '—'}</td>
                     <td>{f.numeroAutorizacion ?? '—'}</td>
                     <td>{f.carnetAfiliado ?? '—'}</td>

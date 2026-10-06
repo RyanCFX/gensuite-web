@@ -131,6 +131,61 @@ export async function toggleItem(id: string) {
   return unwrap(res)
 }
 
+// ---- Servicios ----
+// Productos y Servicios son módulos separados con rutas separadas en el backend:
+// `/catalog/items…` solo maneja productos (type=service da 400/403/vacío) y
+// `/catalog/servicios…` solo maneja servicios (el backend fuerza type=service).
+// Mismos DTOs y filtros que items — ver ServiciosController_* en openapi.json.
+
+export async function listServicios(params?: ListItemsParams) {
+  const { type: _omit, ...rest } = params ?? {}
+  void _omit
+  const res = await client.get<PaginatedResponse<Item>>(ENDPOINTS.catalog.servicios.list, { params: rest })
+  return unwrapPaginated(res)
+}
+
+export async function getServicio(id: string) {
+  const res = await client.get<{ success: true; data: Item }>(ENDPOINTS.catalog.servicios.byId(id))
+  return unwrap(res)
+}
+
+export async function createServicio(data: CreateItemDto) {
+  const res = await client.post<{ success: true; data: Item }>(ENDPOINTS.catalog.servicios.list, data)
+  return unwrap(res)
+}
+
+export async function updateServicio(id: string, data: Partial<CreateItemDto>) {
+  const res = await client.put<{ success: true; data: Item }>(ENDPOINTS.catalog.servicios.byId(id), data)
+  return unwrap(res)
+}
+
+/** Atajo para actualizar solo precios de un servicio, sin mandar el payload completo de edición. */
+export async function updateServicioPrices(id: string, data: UpdateItemPricesDto) {
+  const res = await client.put<{ success: true; data: ItemPricesResult }>(ENDPOINTS.catalog.servicios.precios(id), data)
+  return unwrap(res)
+}
+
+/** Sube/reemplaza la foto del servicio (multipart, máx 5MB). */
+export async function uploadServicioImagen(id: string, file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await client.post<{ success: true; data: ItemImagenUploadResult }>(
+    ENDPOINTS.catalog.servicios.imagen(id),
+    formData,
+    { headers: { 'Content-Type': undefined } },
+  )
+  return unwrap(res)
+}
+
+export async function deleteServicio(id: string) {
+  await client.delete(ENDPOINTS.catalog.servicios.byId(id))
+}
+
+export async function toggleServicio(id: string) {
+  const res = await client.post<{ success: true; data: Item }>(ENDPOINTS.catalog.servicios.toggle(id))
+  return unwrap(res)
+}
+
 // ─── Composición de medicamentos (vertical Farmacia) — docs/tasks/
 // PROMPT_COMPOSICION_MEDICAMENTOS_FRONTEND.md §6 ────────────────────────────────
 

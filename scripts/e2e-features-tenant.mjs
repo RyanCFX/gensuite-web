@@ -4,7 +4,7 @@
  *
  * Cubre cada aspecto del módulo y todo lo relacionado: contrato GET /me/features, menú+router
  * (regla feature Y permiso), tabs NC/ND, reportes por `reportesHabilitados`, secciones embebidas,
- * perfiles de rol, límites, errores, núcleo siempre visible y `servicios` inexistente.
+ * perfiles de rol, límites, errores, núcleo siempre visible y productos/servicios independientes.
  *
  * Estrategia: el repo no tiene runner de tests (sin vitest/playwright/cypress) ni backend vivo
  * para un E2E con red. Este script hace (a) pruebas de lógica sobre ESPEJOS de las funciones
@@ -54,9 +54,9 @@ const ESPEJO_PATTERNS = [
   ['/inventario/conteos', 'inventario'],
   ['/inventario/zonas', 'inventario'],
   ['/inventario/carga-inicial', 'inventario'],
-  ['/inventario/productos', null],
+  ['/inventario/productos', 'productos'],
   ['/transferencias', 'inventario'],
-  ['/catalogo/servicios', null],
+  ['/catalogo/servicios', 'servicios'],
   ['/catalogo/cuentas-por-pagar', 'cuentasPorPagar'],
   ['/catalogo/categorias', null],
   ['/compras/recepciones', 'compras'],
@@ -143,8 +143,8 @@ function featureEspejo(pathname) {
     [/^\/despachos(\/|$)/, 'despacho'], [/^\/notas-credito$/, 'notasCredito'],
     [/^\/notas-debito$/, 'notasDebito'], [/^\/devoluciones(\/|$)/, 'devoluciones'],
     [/^\/facturas(\/|$)/, null], [/^\/inventario\/(stock|historial|conteos|zonas)(\/|$)/, 'inventario'],
-    [/^\/inventario\/carga-inicial(\/|$)/, 'inventario'], [/^\/inventario\/productos(\/|$)/, null],
-    [/^\/transferencias(\/|$)/, 'inventario'], [/^\/catalogo\/servicios(\/|$)/, null],
+    [/^\/inventario\/carga-inicial(\/|$)/, 'inventario'], [/^\/inventario\/productos(\/|$)/, 'productos'],
+    [/^\/transferencias(\/|$)/, 'inventario'], [/^\/catalogo\/servicios(\/|$)/, 'servicios'],
     [/^\/catalogo\/cuentas-por-pagar$/, 'cuentasPorPagar'], [/^\/catalogo(\/|$)/, null],
     [/^\/compras\/(recepciones|costos-importacion)(\/|$)/, 'compras'],
     [/^\/compras\/solicitudes(\/|$)/, 'comprasSolicitudes'],
@@ -171,13 +171,14 @@ function featureEspejo(pathname) {
 
 // Fixtures: dos tenants (contrato §3) + un usuario con todos los permisos.
 const TENANT_FULL = {
-  features: Object.fromEntries(['compras', 'comprasOrdenes', 'comprasSolicitudes', 'devolucionesCompras', 'gastos', 'proveedores', 'caja', 'contabilidad', 'cuentasPorCobrar', 'cuentasPorPagar', 'tesoreria', 'inventario', 'relacionesComerciales', 'cotizaciones', 'despacho', 'devoluciones', 'notasCredito', 'notasDebito', 'pedidos'].map((k) => [k, true])),
+  features: Object.fromEntries(['compras', 'comprasOrdenes', 'comprasSolicitudes', 'devolucionesCompras', 'gastos', 'proveedores', 'caja', 'contabilidad', 'cuentasPorCobrar', 'cuentasPorPagar', 'tesoreria', 'inventario', 'productos', 'servicios', 'relacionesComerciales', 'cotizaciones', 'despacho', 'devoluciones', 'notasCredito', 'notasDebito', 'pedidos'].map((k) => [k, true])),
   reportesHabilitados: ['ventas_por_periodo', 'top_productos', 'top_clientes', 'ventas_por_vendedor', 'compras_por_periodo', 'gastos_por_periodo', 'cuentas_por_cobrar', 'cuentas_por_pagar', 'stock_valorizado', 'movimientos_inventario', 'flujo_caja', 'balance_general', 'estado_resultados', 'reporte_606', 'reporte_607'],
   limites: { maxUsuarios: 10, maxSucursales: null, usuariosActuales: 4, sucursalesActuales: 2 },
 }
 const TENANT_MINIMO = {
-  // Farmacia sin contabilidad ni compras: solo núcleo + ventas básicas + CxC.
-  features: { compras: false, comprasOrdenes: false, comprasSolicitudes: false, devolucionesCompras: false, gastos: false, proveedores: false, caja: false, contabilidad: false, cuentasPorCobrar: true, cuentasPorPagar: false, tesoreria: false, inventario: false, relacionesComerciales: false, cotizaciones: false, despacho: false, devoluciones: true, notasCredito: true, notasDebito: false, pedidos: false },
+  // Farmacia sin contabilidad ni compras: solo núcleo + ventas básicas + CxC + Productos
+  // (Servicios apagado a propósito para probar la independencia productos/servicios).
+  features: { compras: false, comprasOrdenes: false, comprasSolicitudes: false, devolucionesCompras: false, gastos: false, proveedores: false, caja: false, contabilidad: false, cuentasPorCobrar: true, cuentasPorPagar: false, tesoreria: false, inventario: false, productos: true, servicios: false, relacionesComerciales: false, cotizaciones: false, despacho: false, devoluciones: true, notasCredito: true, notasDebito: false, pedidos: false },
   reportesHabilitados: ['ventas_por_periodo', 'cuentas_por_cobrar'],
   limites: { maxUsuarios: 3, maxSucursales: 1, usuariosActuales: 3, sucursalesActuales: 1 },
 }
@@ -334,19 +335,30 @@ ok(sucursalesSrc.includes('LIMITE_SUCURSALES_ALCANZADO'), 'SucursalesPage maneja
 ok(usuariosSrc.includes('title={limiteAlcanzado') || usuariosSrc.includes('Se alcanzó el límite del plan'), 'tooltip explica el límite del plan')
 
 // ─── §8. Núcleo siempre accesible (checklist #8) ─────────────────────────────
+// NOTA: `/inventario/productos` y `/catalogo/servicios` ya NO son núcleo — se gatean por los
+// features independientes `productos` y `servicios` (ver §9), así que no van en esta lista.
 section('§8 núcleo siempre visible')
-for (const p of ['/dashboard', '/facturas', '/facturas/nueva', '/clientes', '/clientes/nuevo', '/usuarios', '/config/empresa', '/config/sucursales', '/config/facturacion', '/ecf-emitidos', '/ecf-recibidos', '/inventario/productos', '/catalogo/categorias', '/catalogo/servicios']) {
+for (const p of ['/dashboard', '/facturas', '/facturas/nueva', '/clientes', '/clientes/nuevo', '/usuarios', '/config/empresa', '/config/sucursales', '/config/facturacion', '/ecf-emitidos', '/ecf-recibidos', '/catalogo/categorias']) {
   ok(featureEspejo(p) === null, `núcleo: '${p}' sin gate de feature`)
 }
 for (const p of ['/dashboard', '/facturas', '/clientes', '/usuarios', '/config/empresa']) {
   ok(moduloVisible(featureEspejo(p), { [p]: false }, true) === true, `núcleo '${p}' visible aun con todo apagado`)
 }
 
-// ─── §9. servicios inexistente (checklist #9) ────────────────────────────────
-section('§9 servicios: no existe en la UI')
-ok(!catalogSrc.split('RUTAS_FEATURES')[1].includes(`feature: 'servicios'`), "ninguna ruta usa feature 'servicios'")
-ok(featureEspejo('/catalogo/servicios') === null, '/catalogo/servicios es catálogo núcleo (no la clave reservada)')
-ok(!layoutSrc.includes(`'/catalogo/servicios'`) || layoutSrc.includes('Servicios'), 'menú Servicios (catálogo) intacto — no confundir con el módulo futuro')
+// ─── §9. Productos y Servicios independientes ───────────────────────────────
+// Productos (`productos` → /inventario/productos) y Servicios (`servicios` →
+// /catalogo/servicios) se contratan por separado: si falta uno se oculta su menú/pantalla y el
+// API responde 403 FEATURE_NO_CONTRATADO. Ninguno es núcleo.
+section('§9 productos/servicios: features independientes')
+ok(catalogSrc.split('RUTAS_FEATURES')[1].includes(`feature: 'servicios'`), "alguna ruta usa feature 'servicios'")
+ok(catalogSrc.split('RUTAS_FEATURES')[1].includes(`feature: 'productos'`), "alguna ruta usa feature 'productos'")
+ok(featureEspejo('/catalogo/servicios') === 'servicios', '/catalogo/servicios → feature servicios')
+ok(featureEspejo('/inventario/productos') === 'productos', '/inventario/productos → feature productos')
+ok(featureEspejo('/catalogo/servicios') !== featureEspejo('/inventario/productos'), 'claves distintas (no una sola)')
+// Independencia: el tenant mínimo tiene productos on + servicios off.
+ok(moduloVisible(featureEspejo('/inventario/productos'), TENANT_MINIMO.features, true) === true, 'tenant mínimo: Productos visible')
+ok(moduloVisible(featureEspejo('/catalogo/servicios'), TENANT_MINIMO.features, true) === false, 'tenant mínimo: Servicios oculto')
+ok(!layoutSrc.includes(`'/catalogo/servicios'`) || layoutSrc.includes('Servicios'), 'menú Servicios (catálogo) intacto')
 
 // ─── §10. Errores defensivos (contrato §9) ───────────────────────────────────
 section('§10 contrato de errores §9')
@@ -364,12 +376,12 @@ function menuVisible(pathname, tenant, permiso = true) {
   return moduloVisible(featureEspejo(pathname), tenant.features, permiso)
 }
 // Tenant FULL con todos los permisos: todo visible núcleo + módulos
-const RUTAS_E2E = ['/dashboard', '/facturas', '/cotizaciones', '/pedidos', '/despachos', '/notas-credito', '/notas-debito', '/devoluciones', '/inventario/stock', '/transferencias', '/compras', '/compras/solicitudes', '/compras/ordenes', '/devoluciones-compras', '/gastos', '/proveedores', '/relaciones-comerciales', '/caja/por-cobrar', '/turnos', '/cobros/lista', '/pagos/lista', '/tesoreria/emisiones', '/cuentas', '/asientos', '/contabilidad/libro-mayor', '/clientes', '/usuarios', '/config/empresa']
-ok(RUTAS_E2E.every((p) => menuVisible(p, TENANT_FULL, true)), 'tenant full: las 28 rutas visibles con permiso')
-const esperadoMinimoOculto = ['/cotizaciones', '/pedidos', '/despachos', '/notas-debito', '/inventario/stock', '/transferencias', '/compras', '/compras/solicitudes', '/compras/ordenes', '/devoluciones-compras', '/gastos', '/proveedores', '/relaciones-comerciales', '/caja/por-cobrar', '/turnos', '/pagos/lista', '/tesoreria/emisiones', '/cuentas', '/asientos', '/contabilidad/libro-mayor']
+const RUTAS_E2E = ['/dashboard', '/facturas', '/cotizaciones', '/pedidos', '/despachos', '/notas-credito', '/notas-debito', '/devoluciones', '/inventario/stock', '/inventario/productos', '/catalogo/servicios', '/transferencias', '/compras', '/compras/solicitudes', '/compras/ordenes', '/devoluciones-compras', '/gastos', '/proveedores', '/relaciones-comerciales', '/caja/por-cobrar', '/turnos', '/cobros/lista', '/pagos/lista', '/tesoreria/emisiones', '/cuentas', '/asientos', '/contabilidad/libro-mayor', '/clientes', '/usuarios', '/config/empresa']
+ok(RUTAS_E2E.every((p) => menuVisible(p, TENANT_FULL, true)), 'tenant full: las 30 rutas visibles con permiso')
+const esperadoMinimoOculto = ['/cotizaciones', '/pedidos', '/despachos', '/notas-debito', '/inventario/stock', '/transferencias', '/catalogo/servicios', '/compras', '/compras/solicitudes', '/compras/ordenes', '/devoluciones-compras', '/gastos', '/proveedores', '/relaciones-comerciales', '/caja/por-cobrar', '/turnos', '/pagos/lista', '/tesoreria/emisiones', '/cuentas', '/asientos', '/contabilidad/libro-mayor']
 ok(esperadoMinimoOculto.every((p) => !menuVisible(p, TENANT_MINIMO, true)), `tenant mínimo: ${esperadoMinimoOculto.length} rutas de módulos no contratados ocultas`)
 const esperadoMinimoVisible = ['/dashboard', '/facturas', '/notas-credito', '/devoluciones', '/clientes', '/usuarios', '/config/empresa', '/cobros/lista', '/inventario/productos']
-ok(esperadoMinimoVisible.every((p) => menuVisible(p, TENANT_MINIMO, true)), 'tenant mínimo: núcleo + CxC + NC + Devoluciones visibles')
+ok(esperadoMinimoVisible.every((p) => menuVisible(p, TENANT_MINIMO, true)), 'tenant mínimo: núcleo + CxC + NC + Devoluciones + Productos visibles')
 // Intersección con permisos: tenant full pero usuario sin rol de Compras → oculto igual
 ok(menuVisible('/compras', TENANT_FULL, false) === false, 'intersección: feature on + sin permiso → oculto')
 // URL directa (guard): feature off → ModuloNoContratado aunque haya permiso (cableado en §2)

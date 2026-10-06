@@ -3093,6 +3093,10 @@ const POS_ONLY_REPORT_KEYS = new Set(['caja', 'cuadreTurno', 'corteCajaDia'])
 // todavía no están migrados a `acciones` y solo se gatean por la ruta en rutas.ts) — la entrada
 // del menú se oculta (no solo se deshabilita) si la acción es `false`.
 const REPORT_VER_ACCIONES: Record<string, string> = {
+  balance: 'reportes.contabilidad.balance-general.ver',
+  pl: 'reportes.contabilidad.ingresos-egresos.ver',
+  libroDiario: 'contabilidad.libros.ver',
+  libroMayor: 'contabilidad.libros.ver',
   'farmacia-lotes': 'farmacia.reportes.lotes.listar',
   'farmacia-facturas-ars': 'farmacia.reportes.facturas-ars.listar',
   'facturacion-fiscal': 'reportes.dgii.facturacion-fiscal.ver',

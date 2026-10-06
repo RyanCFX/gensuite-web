@@ -150,6 +150,13 @@ export const ENDPOINTS = {
       composicion: (id: string) => `/catalog/items/${id}/composicion`,
       equivalentes: (id: string) => `/catalog/items/${id}/equivalentes`,
     },
+    servicios: {
+      list: '/catalog/servicios',
+      byId: (id: string) => `/catalog/servicios/${id}`,
+      toggle: (id: string) => `/catalog/servicios/${id}/toggle`,
+      precios: (id: string) => `/catalog/servicios/${id}/precios`,
+      imagen: (id: string) => `/catalog/servicios/${id}/imagen`,
+    },
     bundles: {
       list: '/catalog/bundles',
       byId: (id: string) => `/catalog/bundles/${id}`,

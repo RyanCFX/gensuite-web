@@ -47,7 +47,7 @@ export async function getMePermissionsForDoc(doctype: string, name: string): Pro
 const FEATURE_KEYS = [
   'compras', 'comprasOrdenes', 'comprasSolicitudes', 'devolucionesCompras', 'gastos',
   'proveedores', 'caja', 'contabilidad', 'cuentasPorCobrar', 'cuentasPorPagar', 'tesoreria',
-  'inventario', 'servicios', 'relacionesComerciales', 'cotizaciones', 'despacho',
+  'inventario', 'productos', 'servicios', 'relacionesComerciales', 'cotizaciones', 'despacho',
   'devoluciones', 'notasCredito', 'notasDebito', 'pedidos',
 ] as const
 

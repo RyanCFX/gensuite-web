@@ -15,7 +15,6 @@ const COLUMNS = [
   { key: 'factura', width: 110 },
   { key: 'paciente', width: 180 },
   { key: 'fecha', width: 100 },
-  { key: 'ncf', width: 110 },
   { key: 'autorizacion', width: 140 },
   { key: 'total', width: 110 },
   { key: 'cobertura', width: 130 },
@@ -164,10 +163,6 @@ export function FacturasElegiblesModal({
                     <span className="col-resize-handle" onMouseDown={startResize('fecha')} />
                   </th>
                   <th>
-                    NCF
-                    <span className="col-resize-handle" onMouseDown={startResize('ncf')} />
-                  </th>
-                  <th>
                     N.º autorización
                     <span className="col-resize-handle" onMouseDown={startResize('autorizacion')} />
                   </th>
@@ -192,7 +187,7 @@ export function FacturasElegiblesModal({
                   ))
                 ) : elegibles.length === 0 ? (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={7}>
                       <div className="empty-state">
                         <div className="empty-title">Sin facturas elegibles</div>
                         <p className="empty-sub">
@@ -221,7 +216,6 @@ export function FacturasElegiblesModal({
                       <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{f.id}</td>
                       <td>{f.customerName || f.customer}</td>
                       <td className="td-muted">{formatDate(f.postingDate)}</td>
-                      <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>{f.ncf ?? '—'}</td>
                       <td>{f.numeroAutorizacion}</td>
                       <td style={{ textAlign: 'right' }}>{formatDOP(f.grandTotal)}</td>
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatDOP(f.montoCoberturaNeta)}</td>

@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { useTabs } from '@/contexts/TabsContext'
-import { createItem, updateItem, getItem, listCategories, listBrands, uploadItemImagen } from '@/shared/api/catalog'
+import { createItem, updateItem, getItem, listCategories, listBrands, uploadItemImagen, createServicio, updateServicio, getServicio, uploadServicioImagen } from '@/shared/api/catalog'
 import type { CreateItemDto, ItemDimensionDeclarada, ReglaCombinacion } from '@/shared/api/types'
 import { listWarehouses } from '@/shared/api/inventory'
 import { listUOMs, getEmpresa, listItemTaxTemplates, getFacturacionConfig } from '@/shared/api/config'
@@ -200,7 +200,7 @@ export default function ItemForm() {
 
   const { data: existingItem, isLoading: itemLoading } = useQuery({
     queryKey: ['item', id],
-    queryFn: () => getItem(id!),
+    queryFn: () => (fixedType === 'product' ? getItem(id!) : getServicio(id!)),
     enabled: isEdit,
   })
 
@@ -219,7 +219,7 @@ export default function ItemForm() {
   }, [isEdit, id], true)
 
   const uploadImageMutation = useMutation({
-    mutationFn: (file: File) => uploadItemImagen(id!, file),
+    mutationFn: (file: File) => (isProduct ? uploadItemImagen(id!, file) : uploadServicioImagen(id!, file)),
     onSuccess: (result) => {
       setValue('image', result.image, { shouldDirty: false })
       queryClient.invalidateQueries({ queryKey: ['item', id] })
@@ -242,13 +242,14 @@ export default function ItemForm() {
   }
 
   const createMutation = useMutation({
-    mutationFn: (data: Parameters<typeof createItem>[0]) => createItem(data),
+    mutationFn: (data: Parameters<typeof createItem>[0]) => (isProduct ? createItem(data) : createServicio(data)),
     onSuccess: async (result) => {
       // El item se crea sin foto (no hay id todavía para POST .../imagen) — si el usuario ya
       // había elegido un archivo, se sube justo ahora que ya existe el id.
       if (pendingImageFile) {
         try {
-          await uploadItemImagen(result.id, pendingImageFile)
+          if (isProduct) await uploadItemImagen(result.id, pendingImageFile)
+          else await uploadServicioImagen(result.id, pendingImageFile)
         } catch {
           toast.error(`${moduleLabel} creado, pero no se pudo subir la foto — agrégala editándolo`)
         }
@@ -269,7 +270,7 @@ export default function ItemForm() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<CreateItemDto>) => updateItem(id!, data),
+    mutationFn: (data: Partial<CreateItemDto>) => (isProduct ? updateItem(id!, data) : updateServicio(id!, data)),
     onSuccess: () => {
       toast.success(`${moduleLabel} actualizado`)
       const formTabId = activeId

@@ -11,8 +11,9 @@ import type { FeatureKey, ReporteKey } from './types'
  * usuario (GET /me/permissions). Ver `moduloVisible` abajo.
  */
 
-/** Las 20 claves con `type='modulo'` (19 implementadas + `servicios` reservado con
- * `implementado: false`). Verificado 1:1 contra `FeaturesMapDto` en openapi.json. */
+/** Las 21 claves con `type='modulo'` (20 previas + `productos`, nuevo — `servicios` deja de
+ *  ser reservada y pasa a gatear el catálogo de servicios). Verificado contra `FeaturesMapDto`
+ *  en openapi.json (pendiente de actualización del backend: el schema aún no trae `productos`). */
 export const FEATURE_KEYS: readonly FeatureKey[] = [
   'compras',
   'comprasOrdenes',
@@ -26,6 +27,7 @@ export const FEATURE_KEYS: readonly FeatureKey[] = [
   'cuentasPorPagar',
   'tesoreria',
   'inventario',
+  'productos',
   'servicios',
   'relacionesComerciales',
   'cotizaciones',
@@ -107,21 +109,23 @@ export const RUTAS_FEATURES: readonly RutaFeature[] = [
   { pattern: '/facturas/*', feature: null },
   { pattern: '/facturas', feature: null },
 
-  // Inventario (spec: /inventory, /transferencias). El CATÁLOGO de artículos es núcleo (§4.3)
-  // aunque viva bajo /inventario/productos o /catalogo/* — solo se gatea el inventario operativo.
+  // Inventario (spec: /inventory, /transferencias). El inventario operativo se gatea por
+  // `inventario`; el catálogo se gatea por separado: Productos → `productos`,
+  // Servicios → `servicios` (features independientes — si falta uno se oculta su menú/pantalla
+  // y el API responde 403 FEATURE_NO_CONTRATADO).
   { pattern: '/inventario/stock', feature: 'inventario' },
   { pattern: '/inventario/historial', feature: 'inventario' },
   { pattern: '/inventario/conteos', feature: 'inventario' },
   { pattern: '/inventario/zonas', feature: 'inventario' },
   { pattern: '/inventario/carga-inicial/*', feature: 'inventario' },
   { pattern: '/inventario/carga-inicial', feature: 'inventario' },
-  { pattern: '/inventario/productos/*', feature: null },
-  { pattern: '/inventario/productos', feature: null },
+  { pattern: '/inventario/productos/*', feature: 'productos' },
+  { pattern: '/inventario/productos', feature: 'productos' },
   { pattern: '/transferencias/*', feature: 'inventario' },
   { pattern: '/transferencias', feature: 'inventario' },
-  // /catalogo/servicios es catálogo de servicios (items tipo servicio, parte del catálogo
-  // núcleo) — NO es la clave reservada `servicios` (módulo futuro, implementado: false, sin
-  // ruta). Nunca se gatea por `servicios`.
+  // Catálogo de servicios — feature `servicios`, independiente de `productos`.
+  { pattern: '/catalogo/servicios/*', feature: 'servicios' },
+  { pattern: '/catalogo/servicios', feature: 'servicios' },
   { pattern: '/catalogo/cuentas-por-pagar', feature: 'cuentasPorPagar' },
   { pattern: '/catalogo/*', feature: null },
 

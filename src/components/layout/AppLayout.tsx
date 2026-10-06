@@ -444,6 +444,23 @@ const NAV_CONTABILIDAD: NavItem[] = [
     icon: <Lock size={16} aria-hidden="true" />,
     path: "/contabilidad/cierre-periodo",
   },
+  // Reportes de contabilidad: cada uno se filtra por su propia acción (`reportes.contabilidad.*`), así el
+  // grupo aparece en cuanto el usuario ve al menos uno, aunque no tenga ninguna pantalla contable.
+  {
+    label: "Balance General",
+    icon: <BarChart3 size={16} aria-hidden="true" />,
+    path: "/reportes/balance",
+  },
+  {
+    label: "Estado de Resultados",
+    icon: <BarChart3 size={16} aria-hidden="true" />,
+    path: "/reportes/pl",
+  },
+  {
+    label: "Flujo de Efectivo",
+    icon: <BarChart3 size={16} aria-hidden="true" />,
+    path: "/reportes/flujo-efectivo",
+  },
 ];
 
 const NAV_REPORTES: NavEntry = {
@@ -455,12 +472,7 @@ const NAV_REPORTES: NavEntry = {
     { label: "DGII 607", icon: <FileText size={14} />, path: "/reportes/607" },
     { label: "DGII 608", icon: <FileText size={14} />, path: "/reportes/608" },
     { label: "Facturación Fiscal", icon: <FileText size={14} />, path: "/reportes/facturacion-fiscal" },
-    {
-      label: "Balance General",
-      icon: <BarChart3 size={14} />,
-      path: "/reportes/balance",
-    },
-    { label: "P&L", icon: <BarChart3 size={14} />, path: "/reportes/pl" },
+    // Balance General, Estado de Resultados y Flujo de Efectivo viven en el grupo Contabilidad (NAV_CONTABILIDAD).
     {
       label: "Stock Balance",
       icon: <BarChart3 size={14} />,

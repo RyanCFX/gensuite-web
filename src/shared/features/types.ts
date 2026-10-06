@@ -19,6 +19,7 @@ export type FeatureKey =
   | 'cuentasPorPagar'
   | 'tesoreria'
   | 'inventario'
+  | 'productos'
   | 'servicios'
   | 'relacionesComerciales'
   | 'cotizaciones'

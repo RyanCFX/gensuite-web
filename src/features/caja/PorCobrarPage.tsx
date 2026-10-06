@@ -42,6 +42,8 @@ import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 import { SearchInput } from '@/shared/ui/SearchInput'
 import { listDenominacionesLookup } from '@/shared/api/formularios'
+import { Select, SelectItem } from '@/components/ui/select'
+import { usePuede } from '@/shared/permissions/can'
 
 const PAGE_SIZE = 20
 
@@ -82,11 +84,16 @@ export default function PorCobrarPage() {
   const selectedRoundingAdjustment = selectedInvoice?.roundingAdjustment ?? 0
   const selectedCobertura = selectedInvoice?.aseguradora?.montoCobertura ?? 0
 
-  // El tipo de comprobante lo trae fijado la factura desde su creación — Caja lo respeta y lo
-  // muestra, nunca lo cambia (ya no hay selector Crédito Fiscal/Consumo). El RNC del comprador
-  // ocasional solo se pide y exige cuando el tipo es Crédito Fiscal (B01/E31); si la fila aún
-  // no trae ncfType se mantiene el comportamiento anterior (pedirlo al ocasional).
-  const selectedNcfType = selectedInvoice?.ncfType
+  // El tipo de comprobante viene de la factura y el cajero puede sobrescribirlo al cobrar (selector
+  // con los tipos de venta del catálogo). El RNC del comprador ocasional solo se pide y exige cuando el
+  // tipo elegido es Crédito Fiscal (B01/E31); si la fila aún no trae ncfType se pide al ocasional.
+  // El cajero puede sobrescribir el tipo al cobrar (`ncfType` de completar-cobro); preseleccionado con el
+  // de la factura y solo se envía si lo cambió.
+  const [ncfTypeElegido, setNcfTypeElegido] = useState('')
+  const puedeCobrar = usePuede('caja.cobrar')
+  const ncfTypeFactura = selectedInvoice?.ncfType
+  const selectedNcfType = ncfTypeElegido || ncfTypeFactura
+  const ncfCambiado = !!ncfTypeElegido && ncfTypeElegido !== ncfTypeFactura
   const selectedEsCreditoFiscal = selectedNcfType ? esCreditoFiscal(selectedNcfType) : !!selectedInvoice?.esClienteOcasional
   const exigeRncOcasional = !!selectedInvoice?.esClienteOcasional && selectedEsCreditoFiscal
 
@@ -284,6 +291,7 @@ const [directoMop, setDirectoMop] = useState('')
 function openModal(invoice: PendienteCobroItem) {
      setSelectedInvoice(invoice)
      setClienteOcasionalRnc('')
+     setNcfTypeElegido(invoice.ncfType ?? '')
      const invoiceCurrency = invoice.currency ?? monedaBase
      if (flujoCobro === 'directo') {
        setDirectoMop(resolveDefaultModeOfPago(facturacion, invoiceCurrency))
@@ -330,6 +338,7 @@ function validateAndSubmit() {
        if (!directoMop) { toast.error('Selecciona un método de pago'); return }
        const dto: CobrarFacturaDto = {
          payments: [{ modeOfPayment: directoMop, amount: total }],
+         ...(ncfCambiado ? { ncfType: ncfTypeElegido } : {}),
          ...(exigeRncOcasional ? { rnc: clienteOcasionalRnc || undefined } : {}),
        }
        completarMutation.mutate(dto)
@@ -368,6 +377,7 @@ function validateAndSubmit() {
       const payload = buildSubmitPayload(paymentsValue, total, metodosActivos)
      completarMutation.mutate({
        ...payload,
+       ...(ncfCambiado ? { ncfType: ncfTypeElegido } : {}),
        ...(exigeRncOcasional ? { rnc: clienteOcasionalRnc || undefined } : {}),
      })
    }
@@ -610,18 +620,29 @@ function validateAndSubmit() {
                  </p>
                )}
 
-                {/* El tipo de comprobante viene fijado desde la creación de la factura — Caja lo
-                    respeta y lo muestra, nunca lo cambia. El RNC del comprador ocasional solo se
-                    pide cuando el tipo es Crédito Fiscal (B01/E31). */}
+                {/* Tipo de comprobante: preseleccionado con el de la factura; el cajero puede cambiarlo entre
+                    los tipos de venta del catálogo (los mismos de facturación). El RNC del comprador
+                    ocasional se pide cuando el tipo elegido es Crédito Fiscal (B01/E31). */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>
                     Tipo de comprobante
                   </label>
-                  <p style={{ margin: 0, fontSize: 13 }}>
-                    {[...(catalogos?.ncfTypes ?? []), ...(catalogos?.ncfTypesFisicos ?? [])].find((t) => t.value === selectedNcfType)?.label
-                      ?? selectedNcfType
-                      ?? 'Sin tipo asignado'}
-                  </p>
+                  <Select
+                    value={ncfTypeElegido}
+                    onValueChange={setNcfTypeElegido}
+                    disabled={!puedeCobrar}
+                    clearable={false}
+                    placeholder={ncfTypeFactura ? undefined : 'Sin tipo asignado'}
+                  >
+                    {[
+                      ...(ncfTypeFactura && !(catalogos?.ncfTypes ?? []).some((t) => t.value === ncfTypeFactura)
+                        ? [{ value: ncfTypeFactura, label: `${ncfTypeFactura} (actual)` }]
+                        : []),
+                      ...(catalogos?.ncfTypes ?? []),
+                    ].map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </Select>
                   {exigeRncOcasional && (
                     <div className="ff-wrap" style={{ marginTop: 8 }}>
                       <label className="ff-label ff-required" htmlFor="ocaRnc">RNC del cliente ocasional</label>

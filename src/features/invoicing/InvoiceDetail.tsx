@@ -1387,7 +1387,7 @@ export default function InvoiceDetail() {
     );
   }
 
-  const ncfLabel = catalogos?.ncfTypes.find((t) => t.value === invoice.ncfType)?.label;
+  const ncfLabel = [...(catalogos?.ncfTypes ?? []), ...(catalogos?.ncfTypesFisicos ?? [])].find((t) => t.value === invoice.ncfType)?.label;
   const ps = invoice.paymentStatus;
 
   const outstandingColor =
