@@ -8,6 +8,7 @@ import {
   abrirTurno,
 } from '@/shared/api/pos'
 import type { ApiError } from '@/shared/api/types'
+import { conSilencio403 } from '@/shared/api/client'
 import { formatDateTime } from '@/lib/formatters'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -34,11 +35,15 @@ export function TurnoCajaIndicator() {
 
   const usaModuloPos = facturacionConfig?.usaModuloPos ?? false
 
-  const { data: turno } = useQuery({
+  const { data: turno, error: turnoError } = useQuery({
     queryKey: ['turno-actual'],
-    queryFn: getTurnoActual,
+    // 403 = el usuario no tiene acceso a los turnos de caja: no es un error a mostrar (se
+    // silencia el toast del interceptor vía `silent403`), simplemente no se ofrece abrir turno.
+    queryFn: () => conSilencio403(() => getTurnoActual()),
     enabled: usaModuloPos,
     staleTime: 2 * 60_000,
+    retry: (failureCount, err) =>
+      (err as unknown as { statusCode?: number } | null)?.statusCode === 403 ? false : failureCount < 1,
     meta: { global: true },
   })
 
@@ -75,6 +80,9 @@ export function TurnoCajaIndicator() {
   })
 
   if (!usaModuloPos) return null
+
+  // Sin acceso a turnos (403 en GET /pos/turnos/actual): sin alerta y sin botón "Abrir turno".
+  if ((turnoError as unknown as { statusCode?: number } | null)?.statusCode === 403) return null
 
   function openModal() {
     setOpeningAmount(0)
