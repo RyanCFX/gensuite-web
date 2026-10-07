@@ -541,7 +541,7 @@ de §8.1-§8.3, con el shape de respuesta de §5.2.
 Construí esto **después** de tener el formulario individual funcionando y probado — es la misma
 lógica de negocio, aplicada a varias filas. Si el volumen de facturas a migrar de tu cliente
 piloto es bajo (unas pocas decenas), podés priorizar el formulario individual primero y esta
-pantalla en una segunda entrega; consultalo con el equipo de producto si tenés dudas de
+pantalla en una segunda entrega; consultalo con el equipo de producto si tienes dudas de
 prioridad.
 
 ### 9.1 `POST /apertura/ventas/importar`
@@ -686,7 +686,7 @@ migradas), y un indicador grande y claro para `cuentaApertura.cuadra`:
   silencioso, es la única señal de alarma real de todo el módulo.
 
 Un gráfico simple de barras apiladas (ventas vs. compras) por año, usando `porAnio`, es un buen
-agregado si tenés tiempo, pero no es indispensable para la primera entrega.
+agregado si tienes tiempo, pero no es indispensable para la primera entrega.
 
 ---
 

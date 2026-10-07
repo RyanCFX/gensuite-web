@@ -21,7 +21,7 @@
 > todo lo escrito acá se extrajo directamente del código fuente ya mergeado (controllers,
 > services, DTOs), no de un diseño preliminar.
 >
-> Documento relacionado que asumimos ya tenés implementado, **sin cambios en este documento**:
+> Documento relacionado que asumimos ya tienes implementado, **sin cambios en este documento**:
 > `PROMPT_PERMISOS_FRONTEND.md` (contrato de permisos, `GET /me/permissions` → `data.acciones`,
 > los dos niveles de permiso, etc.). Esta migración agrega **una sola cosa nueva** al catálogo
 > de permisos: nada — las acciones `usuarios.crear`, `usuarios.listar`, `usuarios.editar` ya
@@ -549,7 +549,7 @@ Retomando §3.2(c): cuando `POST /auth/login` responde `mfaRequired: true`, most
   primero si es un código de recuperación válido; si no, lo valida contra el factor
   correspondiente. Tu UI puede tener un solo campo de texto para "código", sin necesidad de un
   campo separado para "código de recuperación" (aunque podés ofrecerlo como un link/toggle
-  "¿No tenés acceso a tu segundo factor? Usar un código de recuperación" que apunte al mismo
+  "¿No tienes acceso a tu segundo factor? Usar un código de recuperación" que apunte al mismo
   campo).
 - La respuesta exitosa es el mismo `AuthResult` completo de §3.2(d) — mismo manejo que un login
   normal desde ahí en adelante.

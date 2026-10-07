@@ -3171,7 +3171,7 @@ export default function ReportesPage() {
       return <ServiceUnavailable message="Este reporte requiere el despacho habilitado (Configuración → Despacho)." />
     }
     if (REPORT_VER_ACCIONES[active] && !puedeVerReporte(active)) {
-      return <ServiceUnavailable message="No tenés permiso para ver este reporte." />
+      return <ServiceUnavailable message="No tienes permiso para ver este reporte." />
     }
     // URL directa a un reporte apagado para el tenant (§9 FEATURE_NO_CONTRATADO) — no debería
     // pasar si el listado de arriba está bien filtrado; mensaje genérico, no técnico.

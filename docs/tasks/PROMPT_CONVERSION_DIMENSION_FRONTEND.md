@@ -36,7 +36,7 @@ Si tu equipo llegó a ver, o a empezar a implementar, un documento previo llamad
 `PROMPT_CONVERSION_ITEM_DIMENSIONADO_FRONTEND.md` o
 `PROMPT_CONVERSION_AUTOMATICA_AL_VENDER_FRONTEND.md`: **ese diseño se descartó por completo antes
 de llegar a producción.** Ninguna parte de ese diseño sobrevive. Resumen de qué cambió y por qué,
-para que entiendas el motivo si tenés código viejo que mirar:
+para que entiendas el motivo si tienes código viejo que mirar:
 
 - **Diseño descartado**: se usaban **dos artículos de catálogo distintos** — un ítem "genérico"
   (sin dimensiones) y un ítem "dimensionado" (con dimensiones), enlazados por un campo
@@ -560,7 +560,7 @@ nombre de menú: **"Conversión de combinación"** o **"Convertir a combinación
 
 Mostrá esta respuesta en el historial/detalle de inventario de la misma forma en que ya mostrás el
 resultado de un Ajuste o una Reclasificación — es un `Stock Entry` sometido más, consultable como
-cualquier otro movimiento desde las pantallas de historial que ya tenés.
+cualquier otro movimiento desde las pantallas de historial que ya tienes.
 
 ### 7.3 Formulario sugerido, paso a paso
 
@@ -617,7 +617,7 @@ detalle del `Stock Entry` devuelto (`data.id`).
 
 - **No agregues un botón de "deshacer conversión".** No existe conversión inversa implementada en
   esta primera fase. Si se convirtió con la combinación equivocada, la corrección correcta es usar
-  la pantalla de **Reclasificación de Combinación** que ya tenés, aplicada sobre la combinación ya
+  la pantalla de **Reclasificación de Combinación** que ya tienes, aplicada sobre la combinación ya
   convertida, para moverla a la combinación correcta.
 - **No permitas repartir una sola conversión en varias combinaciones dentro del mismo
   formulario/submit.** Cada llamada al endpoint asigna una única combinación. Si el usuario

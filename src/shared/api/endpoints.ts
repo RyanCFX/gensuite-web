@@ -444,6 +444,14 @@ export const ENDPOINTS = {
     ecfContingenciaActivar: '/config/ecf/contingencia/activar',
     ecfContingenciaDesactivar: '/config/ecf/contingencia/desactivar',
     ecfContingenciaFlush: '/config/ecf/contingencia/flush',
+    // Numeración de documentos — docs/tasks/PROMPT_NUMERACION_DOCUMENTOS_FRONTEND.md §4.
+    // `<ruta>` = segmento de la tabla §3.1 (ej. 'factura-venta'). El índice devuelve `ruta`
+    // como path absoluto con /api/v1 incluido — se usa solo el último segmento con estos
+    // helpers para no duplicar la base del cliente HTTP.
+    numeracionIndice: '/config/numeracion',
+    numeracionEstado: (ruta: string) => `/config/numeracion/${encodeURIComponent(ruta)}`,
+    numeracionContador: (ruta: string) => `/config/numeracion/${encodeURIComponent(ruta)}/contador`,
+    numeracionPreview: (ruta: string) => `/config/numeracion/${encodeURIComponent(ruta)}/preview`,
   },
   monedas: {
     list: '/monedas',

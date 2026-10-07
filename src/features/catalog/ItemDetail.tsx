@@ -143,7 +143,7 @@ function UpdatePricesModal({
           <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {!puedeVerCosto && !puedeVerPrecio && (
               <div className="inline-alert inline-alert-warn">
-                No tenés acceso a los datos de costo ni precios de este artículo.
+                No tienes acceso a los datos de costo ni precios de este artículo.
               </div>
             )}
             {isCostPlus && (
@@ -234,7 +234,7 @@ function UpdatePricesModal({
               </div>
               ) : (
                 <div className="inline-alert inline-alert-warn">
-                  Este artículo usa modo "Sobre costo" y no tenés acceso a sus datos de costo.
+                  Este artículo usa modo "Sobre costo" y no tienes acceso a sus datos de costo.
                 </div>
               )
             ) : (
@@ -1551,7 +1551,7 @@ export default function ItemDetail() {
           <div className="card-body">
             {restr.has('existenciasAlmacen') ? (
               <p style={{ color: 'var(--text-tertiary)', fontSize: 13, margin: 0 }}>
-                <DatoRestringido bloqueante>—</DatoRestringido> No tenés acceso al desglose por almacén.
+                <DatoRestringido bloqueante>—</DatoRestringido> No tienes acceso al desglose por almacén.
               </p>
             ) : (() => {
               const entries = Object.entries(item.stockByWarehouse ?? {}).sort((a, b) => b[1] - a[1])

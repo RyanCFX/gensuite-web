@@ -16,7 +16,7 @@ export function DatoRestringido({
   return (
     <span
       aria-label="Sin acceso"
-      title="No tenés acceso a este dato"
+      title="No tienes acceso a este dato"
       style={{ color: 'var(--text-tertiary)' }}
     >
       —

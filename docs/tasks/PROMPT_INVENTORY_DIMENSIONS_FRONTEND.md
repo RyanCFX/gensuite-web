@@ -2,7 +2,7 @@
 
 > **Para quien recibe este documento.** Esto describe una funcionalidad transversal — **no una
 > pantalla nueva aislada**, sino un campo y un concepto que atraviesan casi todos los módulos que
-> ya tenés construidos: Catálogo de Artículos, Compras, Recepciones, Órdenes de Compra,
+> ya tienes construidos: Catálogo de Artículos, Compras, Recepciones, Órdenes de Compra,
 > Devoluciones de Compra, Facturación, Pedidos/Apartados, Cotizaciones, Despachos, Notas de
 > Crédito, Transferencias y Ubicaciones. Además agrega dos pantallas nuevas de administración
 > (Catálogo de Dimensiones y Valores) y dos pantallas/acciones nuevas de operación (Ajuste de
@@ -35,7 +35,7 @@
 > `docs/frontend/PROMPT_DESPACHO_RESERVAS_ABASTECIMIENTO_FRONTEND.md` (Apartados/Layaway) y
 > `docs/frontend/PROMPT_CARGA_INICIAL_INVENTARIO_FRONTEND.md` (Ubicaciones/Transferencias), leé la
 > §9 de este documento con atención: cambia sutilmente el comportamiento de Apartados para
-> artículos con dimensiones, sin cambiar el contrato del botón "Apartar" que ya tenés.
+> artículos con dimensiones, sin cambiar el contrato del botón "Apartar" que ya tienes.
 
 ---
 
@@ -49,7 +49,7 @@ signifique crear "Puerta Honda 2000", "Puerta Honda 2001", "Puerta Toyota 2000" 
 distintos en el catálogo. La combinación completa de valores (una por cada dimensión que el
 artículo declara) es lo que identifica una porción distinguible del stock de ese artículo.
 
-Esto es **distinto y no reemplaza** las Variantes de artículo que probablemente ya tenés
+Esto es **distinto y no reemplaza** las Variantes de artículo que probablemente ya tienes
 implementadas (plantilla + atributos → SKUs hijos). La diferencia de negocio: una variante es un
 artículo real con su propio precio/costo (útil cuando la combinación cambia el precio: Talla S vs
 Talla XL). Una dimensión de inventario es un solo artículo, un solo precio, un solo costo — solo
@@ -133,7 +133,7 @@ igual se intenta una acción sin permiso.
 | `inventario.reclasificar` | Botón "Reclasificar combinación" (§8.6) |
 
 **No hay ningún permiso nuevo para los campos `dimensiones`/`lineaOriginal` dentro de Compras,
-Ventas, etc.** — esos siguen gateados por los permisos que ya tenés de esas pantallas
+Ventas, etc.** — esos siguen gateados por los permisos que ya tienes de esas pantallas
 (`compras.crear`, `invoices.crear`, etc.). No hace falta ningún cambio de permisos ahí, solo de
 formulario.
 
@@ -336,7 +336,7 @@ error.
 En la ficha de creación/edición de un artículo (`POST`/`PUT /catalog/items`), agregá un bloque
 nuevo, colapsable, llamado **"Dimensiones de inventario"** — a propósito con ese nombre completo,
 nunca "Dimensiones" a secas: la palabra "dimensión" también nombra a las dimensiones CONTABLES
-(Sucursal, Departamento) que probablemente ya tenés en otras pantallas, y hay que evitar que un
+(Sucursal, Departamento) que probablemente ya tienes en otras pantallas, y hay que evitar que un
 usuario confunda ambos conceptos. Las contables se siguen llamando por su nombre propio en todos
 lados (Sucursal, Departamento) — nunca "Dimensiones" tampoco.
 
@@ -437,7 +437,7 @@ del artículo:
 - `dimensiones[].valoresPermitidos`: siempre vas a recibir un array (posiblemente vacío `[]`, no
   `undefined`), a diferencia del request donde podés omitirlo.
 - `dimensionEtiqueta`, `dimension.etiqueta` — **el response NO incluye la etiqueta legible de cada
-  dimensión, solo el `codigo`.** Tenés que resolverla vos mismo cruzando contra el catálogo de
+  dimensión, solo el `codigo`.** Tienes que resolverla vos mismo cruzando contra el catálogo de
   dimensiones (§3.2) que ya deberías tener cacheado en memoria/store al iniciar la sesión o al
   entrar a esta pantalla. No esperes un campo de etiqueta embebido acá — no existe hoy.
 - `reglasCombinacion[].valores`: usa el mismo `codigo` de dimensión como clave, no una posición
@@ -514,7 +514,7 @@ movimiento en sí — como una orden de compra sin recibir), el servidor lo rech
 
 - Ojo: **"stock actual en cero" no es lo mismo que "sin movimientos".** Un artículo que se vendió
   y volvió a cero SÍ tiene historia y NO se puede reconfigurar — no uses `currentStock === 0` como
-  criterio para habilitar la edición. Si no tenés una forma confiable de saber de antemano si el
+  criterio para habilitar la edición. Si no tienes una forma confiable de saber de antemano si el
   artículo tiene historia, la alternativa más simple es: **dejá que el usuario intente guardar y
   mostrá el mensaje del servidor tal cual** si lo rechaza — es aceptable para una primera entrega,
   el mensaje ya está redactado para el usuario final.
@@ -590,7 +590,7 @@ siguen igual — el detalle de que la respuesta NO ecoa la combinación elegida 
 §10.2, leelo antes de asumir que podés releer la combinación desde `GET /compras/:id`).
 
 ⚠️ **Regla de edición (repetida de §0.4): en `PUT /compras/:id`, si reenviás el array `items[]`
-completo (reemplaza todas las líneas), tenés que volver a mandar `dimensiones` en CADA línea que
+completo (reemplaza todas las líneas), tienes que volver a mandar `dimensiones` en CADA línea que
 la tenga — este endpoint específicamente NO tiene ningún mecanismo de conservación automática. Si
 la omitís en una línea que antes la tenía, esa línea queda sin combinación y el servidor la
 rechaza al guardar** (mensaje de §11, "Fila #N: indique «Marca»…").
@@ -868,7 +868,7 @@ tenant responde 400 (mismo mensaje de §5) — no se ignora en silencio.
   vía no prevista), no un estado normal — considerá resaltarlo visualmente si aparece.
 - `items[].valores[codigo]`: **⚠️ `etiqueta` acá es hoy literalmente igual al `id`** (ej.
   `{ "id": "MARCA-HONDA", "etiqueta": "MARCA-HONDA" }`) — el servidor **todavía no resuelve** la
-  etiqueta legible real ("Honda") en este endpoint. **Tenés que resolverla vos mismo** cruzando
+  etiqueta legible real ("Honda") en este endpoint. **Tienes que resolverla vos mismo** cruzando
   `id` contra tu caché de `GET /catalog/dimensiones-inventario/:codigo/valores` (§3.6) para
   mostrar "Honda" en vez de "MARCA-HONDA" en la grilla. No asumas que `etiqueta` ya viene lista
   para mostrar tal cual — hoy no lo está.
@@ -925,7 +925,7 @@ corresponde) o corregir la cantidad antes de continuar.
 
 ### 8.5 Ajuste de combinación — pantalla/acción nueva
 
-**Reemplaza al Conteo/Ajuste de Inventario que ya tenés, mostrado específicamente para artículos
+**Reemplaza al Conteo/Ajuste de Inventario que ya tienes, mostrado específicamente para artículos
 con dimensiones** — porque el Conteo estándar (Stock Reconciliation) NO funciona para artículos
 dimensionados (el servidor lo rechaza de plano, ver la nota de exclusión en §11). Esta es la
 **única** forma de corregir el saldo de una combinación puntual.
@@ -1071,7 +1071,7 @@ para el usuario, la factura resultante se ve exactamente igual que cualquier otr
 apartados (además de liberar la reserva nativa de las líneas sin dimensión, que ya conocías) — el
 `warnings` array de la respuesta (que ya deberías estar mostrando) puede incluir ahora también un
 mensaje si esa reversión específica falló, con el mismo criterio de "no bloquea la cancelación,
-pero avisa" que ya tenés implementado para el resto de los warnings de esa pantalla.
+pero avisa" que ya tienes implementado para el resto de los warnings de esa pantalla.
 
 **No hay ninguna acción nueva que construir acá** — solo mostrar correctamente estos `warning`(s)
 si tu UI de Apartados no los está already mostrando de forma genérica como texto libre.
@@ -1110,7 +1110,7 @@ backend, no una omisión de este documento. Consecuencias prácticas:
   opciones razonables: (a) no permitir editar líneas con combinación desde una sesión "fría", solo
   agregar líneas nuevas o eliminar líneas completas; (b) advertir al usuario que reingrese la
   combinación de las líneas existentes antes de guardar cualquier cambio. Este documento no te
-  dice cuál elegir — es una decisión de producto — pero **tenés que elegir una**, no vas a poder
+  dice cuál elegir — es una decisión de producto — pero **tienes que elegir una**, no vas a poder
   ignorarlo.
 
 - El único lugar donde SÍ podés consultar información de combinación después del hecho es el

@@ -95,7 +95,7 @@ en Pedidos — el `:id` es el de la **Solicitud** (`GET /despachos/confirmacione
 
 Es una pantalla/pestaña **dentro de Despachos** (no dentro del detalle de Pedido): una cola de
 "Confirmaciones pendientes" que lista `GET /despachos/confirmaciones` (default `status=Pendiente`)
-— el equivalente, del lado de Despacho, a lo que ya tenés para `GET /despachos/pendientes`.
+— el equivalente, del lado de Despacho, a lo que ya tienes para `GET /despachos/pendientes`.
 Opcionalmente, el detalle de un Pedido puede mostrar un indicador de solo-lectura ("Pendiente de
 confirmar despacho", con link a la solicitud) usando `estadoFlujo` (§6) — pero la ACCIÓN de
 confirmar se hace desde Despachos, no desde Pedidos.

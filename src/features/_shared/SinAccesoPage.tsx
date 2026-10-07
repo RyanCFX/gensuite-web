@@ -35,7 +35,7 @@ export default function SinAccesoPage() {
         <Lock size={22} />
       </span>
       <h1 style={{ fontSize: 18, fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
-        No tenés acceso a esta sección
+        No tienes acceso a esta sección
       </h1>
       <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0, maxWidth: 360 }}>
         Tu usuario no tiene permiso para ver esta pantalla. Si creés que es un error, pedile a un

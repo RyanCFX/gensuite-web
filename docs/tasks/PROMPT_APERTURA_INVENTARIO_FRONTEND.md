@@ -118,7 +118,7 @@ Contabilidad de este sistema no incluye ningún rol de stock.
 habilitadas las pestañas "Ventas" y "Compras" de Migración de Saldos, pero **no** la pestaña
 "Inventario" — necesita el perfil **Inventario** o **Administrador** para esa parte específica.
 No trates esto como un bug ni asumas que si el usuario puede migrar facturas también puede migrar
-inventario — son permisos independientes. Si tu UI muestra un mensaje de "no tenés acceso a esta
+inventario — son permisos independientes. Si tu UI muestra un mensaje de "no tienes acceso a esta
 sección", asegurate de que sea específico a Inventario y no genérico a todo el módulo.
 
 **Error 403 si igual se intenta una acción sin permiso:** mismo contrato de siempre —
@@ -280,7 +280,7 @@ Sur), el servidor rechaza el documento completo — no permite mezclarlos.
 - Si tu formulario permite elegir el almacén línea por línea (lo normal en una grilla), y el
   usuario elige almacenes de sucursales distintas, **idealmente detectá esto ANTES de someter**:
   cuando tengas la lista de almacenes y sepas a qué sucursal pertenece cada uno (podés resolverlo
-  contra tu propio catálogo de almacenes si ya lo tenés cacheado, o simplemente dejar que el
+  contra tu propio catálogo de almacenes si ya lo tienes cacheado, o simplemente dejar que el
   servidor lo valide), mostrá una advertencia inline en la grilla señalando qué filas pertenecen a
   una sucursal distinta del resto.
 - Si preferís una solución más simple para la primera entrega: dejá que el servidor lo rechace y
@@ -309,7 +309,7 @@ sin excepciones.
 (`resultados: [{fila, ok, error}]`) sería directamente engañoso** — implicaría que puede haber
 éxito parcial dentro de un mismo envío, y eso no puede pasar a este nivel.
 
-**Lo que sí tenés disponible, y es la forma correcta de manejar volúmenes grandes:**
+**Lo que sí tienes disponible, y es la forma correcta de manejar volúmenes grandes:**
 
 - `items[]` del `POST /apertura/inventario` (§4) ya acepta **muchas líneas en una sola llamada**
   — no hay un límite documentado por el backend, así que un documento con cientos de líneas para
@@ -369,7 +369,7 @@ de "¿Anular esta factura?" que usás en Ventas/Compras — este necesita su pro
 Mostrá ese `message` tal cual como confirmación después de anular — ya viene redactado con la
 advertencia de que el stock se revirtió, no lo resumas a un genérico "Anulado correctamente".
 
-Después de anular, refrescá el listado/detalle — el `estado` pasa a `"cancelled"`. Si tenés una
+Después de anular, refrescá el listado/detalle — el `estado` pasa a `"cancelled"`. Si tienes una
 pantalla de Inventario general (existencias actuales) abierta en otra pestaña del navegador,
 considerá invalidar su caché/refrescarla también, ya que las cantidades reales cambiaron.
 
@@ -415,7 +415,7 @@ que Ventas/Compras, que tampoco traen sus líneas en el listado):
 Tabla sugerida: Fecha (`fechaApertura`) | Sucursal (`branch`, o `—` si `null`) | Departamento
 (`department`, o `—`) | Estado (badge: verde="submitted", gris="cancelled") | Acciones (Ver, Anular
 si `estado === "submitted"`). Si querés mostrar el monto total en el listado sin hacer N llamadas
-extra, tenés dos opciones: (a) llamar al detalle de cada fila visible bajo demanda (ej. al
+extra, tienes dos opciones: (a) llamar al detalle de cada fila visible bajo demanda (ej. al
 expandir), o (b) consultarlo con el equipo de backend si conviene agregarlo al listado — no está
 incluido hoy porque, a diferencia de Sales/Purchase Invoice, `Stock Reconciliation` no tiene un
 total de cabecera nativo (se calcula sumando las líneas), así que agregarlo al listado tiene un
@@ -457,7 +457,7 @@ por un genérico "Ocurrió un error"** — cada uno le dice al usuario exactamen
 ## 10. Extensión de la pantalla de Cuadre — `GET /apertura/resumen`
 
 **Si ya implementaste la pantalla de Cuadre del prompt original (§10 de
-`PROMPT_APERTURA_FRONTEND.md`), tenés que actualizarla — el endpoint ahora devuelve un bloque
+`PROMPT_APERTURA_FRONTEND.md`), tienes que actualizarla — el endpoint ahora devuelve un bloque
 adicional.** No es un endpoint nuevo, es el mismo `GET /apertura/resumen` de siempre, con más
 información.
 
@@ -483,13 +483,13 @@ información.
 }
 ```
 
-Cambios exactos que tenés que hacer en esa pantalla:
+Cambios exactos que tienes que hacer en esa pantalla:
 
 1. **Nuevo bloque `inventario: { cantidad, montoMigrado }`** — agregalo como una tercera tarjeta de
    KPI, junto a las de Ventas y Compras. Notá que, a diferencia de Ventas/Compras, **no trae
    `saldoPendiente`** — no tiene sentido para inventario (no hay un "saldo pendiente de cobrar/
    pagar" de un ajuste de stock, el concepto no aplica).
-2. **`porAnio` ahora trae una tercera propiedad `inventario` por año** — si ya tenés un gráfico de
+2. **`porAnio` ahora trae una tercera propiedad `inventario` por año** — si ya tienes un gráfico de
    barras apiladas (ventas vs. compras) como sugería el prompt original, agregale una tercera
    serie/color para inventario.
 3. **`cuentaApertura.saldo`/`esperado`/`cuadra` ya incluyen el efecto del inventario migrado** —
@@ -497,7 +497,7 @@ Cambios exactos que tenés que hacer en esa pantalla:
    internamente. Seguí mostrando el indicador `cuadra` exactamente igual que antes (§10 del prompt
    original) — verde si `true`, alerta roja/naranja si `false`.
 
-**Una aclaración honesta que te conviene conocer, aunque no cambia nada de lo que tenés que
+**Una aclaración honesta que te conviene conocer, aunque no cambia nada de lo que tienes que
 construir:** el signo con el que el backend resta el monto de inventario del cálculo de `esperado`
 está basado en una hipótesis contable razonable (una apertura de inventario que agrega stock
 acredita la cuenta puente, igual que una venta), pero **todavía no fue verificada contra un

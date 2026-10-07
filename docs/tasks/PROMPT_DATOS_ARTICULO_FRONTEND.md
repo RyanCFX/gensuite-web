@@ -1,7 +1,7 @@
 # Prompt para el agente de frontend: Datos del artículo (qué información ve cada usuario en Productos e Inventario)
 
 > **Para quien recibe este documento:** sos el agente que implementa el frontend de GenSuite
-> (React). No tenés memoria de ninguna conversación previa. Todo lo que necesitás está en este
+> (React). No tienes memoria de ninguna conversación previa. Todo lo que necesitás está en este
 > documento y en el `openapi.json` del repo del frontend, que trae la documentación del API.
 >
 > **Cómo leer el `openapi.json` frente a este documento:**
@@ -427,7 +427,7 @@ Componente sugerido (adaptalo al design system del proyecto):
 ```tsx
 function DatoRestringido({ restringido, children }: { restringido: boolean; children: React.ReactNode }) {
   if (!restringido) return <>{children}</>;
-  return <span aria-label="Sin acceso" title="No tenés acceso a este dato">—</span>;
+  return <span aria-label="Sin acceso" title="No tienes acceso a este dato">—</span>;
 }
 ```
 
@@ -460,7 +460,7 @@ export const restringidosDe = (res: { meta?: { datosRestringidos?: DatoArticulo[
 - Recorré **cada sección** de la ficha y asigná a cada campo su dato (tabla §4.1). Secciones
   típicas: Precios (tres niveles + `standardRate`), Costos y márgenes, Stock y existencias,
   Descuentos. Si una sección entera queda sin datos visibles, ocultá la sección o mostrá un aviso
-  "No tenés acceso a esta información".
+  "No tienes acceso a esta información".
 - `stockByWarehouse` (mapa) y la pestaña/tabla "Existencias por almacén" (`GET /:id/stock`):
   ver §4.2. Con `existenciasAlmacen` restringido (`warehouses: null`) ocultá la tabla; no la
   muestres vacía.

@@ -731,7 +731,7 @@ solicitado M. Verifique si hay reservas de stock (apartados o pedidos pendientes
 sobre este artículo."
 ```
 
-**En la UI**: no hace falta prevalidar esto en el cliente (no tenés forma barata de calcular
+**En la UI**: no hace falta prevalidar esto en el cliente (no tienes forma barata de calcular
 `reserved_stock` sin pegarle a un endpoint) — simplemente mostrar el error del servidor tal cual
 si el submit de la transferencia falla con este mensaje. Si querés dar mejor UX proactiva, podés
 mostrar en el formulario de transferencia el campo `disponibleParaVender` que ya expone
@@ -801,7 +801,7 @@ directamente con el mensaje de arriba.
 | `orderedQty` | Cantidad ya pedida a proveedores (orden de compra sometida, aún sin recibir). |
 | `indentedQty` | Cantidad en solicitudes de material/compra pendientes (previo a orden de compra). |
 | `projectedQty` | Proyección de ERPNext: `actualQty + orderedQty + indentedQty - reservedQty` (aproximado — es el cálculo nativo de ERPNext, no lo recalcules). |
-| `disponibleParaVender` | **El campo más útil para la UI**: `actualQty - (reservedStock ?? 0)` — lo que realmente se le puede prometer a un cliente nuevo ahora mismo, descontando lo ya reservado. Usalo en vez de `actualQty` a secas en cualquier lugar donde la UI le diga al operador "cuánto hay disponible" (selector de artículos en Facturación/Pedidos/Despachos, por ejemplo), si tenés espacio para ese cambio sin romper el flujo actual de esas pantallas — como mínimo, mostralo en la pantalla de Inventario. |
+| `disponibleParaVender` | **El campo más útil para la UI**: `actualQty - (reservedStock ?? 0)` — lo que realmente se le puede prometer a un cliente nuevo ahora mismo, descontando lo ya reservado. Usalo en vez de `actualQty` a secas en cualquier lugar donde la UI le diga al operador "cuánto hay disponible" (selector de artículos en Facturación/Pedidos/Despachos, por ejemplo), si tienes espacio para ese cambio sin romper el flujo actual de esas pantallas — como mínimo, mostralo en la pantalla de Inventario. |
 
 ### 7.2 No es un cambio gateado por el flag
 

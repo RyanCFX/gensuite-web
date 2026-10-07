@@ -10,13 +10,14 @@ import { useFeaturesStore } from '@/stores/features.store'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { resolverRuta } from '@/shared/permissions/rutas'
 import { resolverFeature, REPORTE_KEY_POR_TIPO } from '@/shared/features/catalog'
+import { mostrarItemNumeracion } from '@/features/numeracion/numeracionReferencia'
 import {
   LayoutDashboard, Users, Package, PackagePlus, FileText, Receipt, Warehouse,
   ShoppingCart, CreditCard, Truck, Wallet, BarChart3, Settings,
   Shield, Building2, UserCog, BookOpen, BookText, ClipboardList, MapPin,
   Tag, Percent, Calendar, Lock, Coins, Bell, DollarSign, Clock,
   ShieldCheck, KeyRound, LayoutTemplate, Landmark, ArrowRightLeft, Printer, Wrench,
-  ScrollText, Pill,
+  ScrollText, Pill, Hash,
   Search, ArrowRight,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -191,6 +192,7 @@ const ALL_ITEMS: SearchItem[] = [
   { id: 'cfg-roles',    label: 'Roles',                group: 'Configuración', path: '/config/roles',                icon: <ShieldCheck size={15} />, keywords: 'roles permisos' },
   { id: 'cfg-auditoria-pin', label: 'Auditoría de PIN', group: 'Configuración', path: '/config/auditoria-pin',       icon: <ScrollText size={15} />, keywords: 'audit auditoria pin log' },
   { id: 'cfg-perfil',   label: 'Mi Perfil',            group: 'Configuración', path: '/config/perfil',               icon: <UserCog size={15} />, keywords: 'perfil usuario profile settings' },
+  { id: 'cfg-numeracion', label: 'Numeración de documentos', group: 'Configuración', path: '/config/numeracion', icon: <Hash size={15} />, keywords: 'numeracion naming series secuencias documentos factura cotizacion pedido' },
 ]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -225,6 +227,11 @@ interface PermCtx {
 // (docs/PROMPT_PERMISOS_FRONTEND.md §6 + docs/tasks/80_features_tenant_discriminacion_ui.md §5)
 // — misma fuente de verdad que el guard de router y que el menú lateral.
 function itemPermitido(item: SearchItem, perm: PermCtx): boolean {
+  // Numeración de documentos (§7.1 del prompt del módulo): 22 features + 22 permisos
+  // independientes — visible solo si hay algún tipo accesible (feature ∩ permiso).
+  if (item.path === '/config/numeracion' || item.path.startsWith('/config/numeracion/')) {
+    return mostrarItemNumeracion(perm)
+  }
   // Features del tenant (§5): un ítem se muestra solo si el feature está encendido Y hay permiso.
   if (perm.featuresReady) {
     const featureKey = resolverFeature(item.path)?.feature ?? null

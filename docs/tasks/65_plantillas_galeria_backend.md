@@ -257,8 +257,8 @@ BFF):
 | Caso | Qué hace el backend | Qué debe hacer el frontend |
 |---|---|---|
 | `?type=` con un valor que no es `"Pos Invoice"` ni `"Label 5x2"` | `400`, mensaje `type inválido. Valores permitidos: "Pos Invoice", "Label 5x2".` | No debería ocurrir en uso normal si armas el query param desde tu propio enum interno mapeado (1.2) — pero si tu llamado construye el query string a mano en algún punto, valida antes de mandar, o al menos no dejes que un 400 acá tumbe toda la pestaña "Plantillas": mostrá el error igual que ya manejas otros 400 del módulo. |
-| Sin `type`, o `type` válido pero sin ítems para ese tenant (ej. tenant no-farmacia filtrando expresamente algo que no aplica) | `200` con `data: []` | **Nunca es un error.** Renderiza el estado vacío normal de la pestaña "Plantillas" (si ya tenés uno para "no hay plantillas guardadas" en el CRUD, uno equivalente acá está bien) — no muestres un mensaje de error ni un spinner infinito para un array vacío legítimo. |
-| Fallo de red / 401 / 403 / 5xx | Igual que cualquier otro endpoint de `/plantillas` | Reusa el mismo manejo global que ya tenés (interceptor de auth, mensaje de error genérico, retry si aplica) — no es un caso especial de este endpoint. |
+| Sin `type`, o `type` válido pero sin ítems para ese tenant (ej. tenant no-farmacia filtrando expresamente algo que no aplica) | `200` con `data: []` | **Nunca es un error.** Renderiza el estado vacío normal de la pestaña "Plantillas" (si ya tienes uno para "no hay plantillas guardadas" en el CRUD, uno equivalente acá está bien) — no muestres un mensaje de error ni un spinner infinito para un array vacío legítimo. |
+| Fallo de red / 401 / 403 / 5xx | Igual que cualquier otro endpoint de `/plantillas` | Reusa el mismo manejo global que ya tienes (interceptor de auth, mensaje de error genérico, retry si aplica) — no es un caso especial de este endpoint. |
 
 No hay caso `404` para este endpoint — no lo agregues como posibilidad a manejar.
 

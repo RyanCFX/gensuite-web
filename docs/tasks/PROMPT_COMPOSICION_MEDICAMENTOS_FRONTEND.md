@@ -10,7 +10,7 @@
 >
 > Este documento es **autosuficiente en el dominio**: no asume que quien lo implementa sabe qué
 > es un principio activo, una firma de composición o un "motor de recomendación por composición".
-> Se explica todo desde cero en la §1. Si en algún punto tenés que adivinar algo que no está
+> Se explica todo desde cero en la §1. Si en algún punto tienes que adivinar algo que no está
 > escrito acá ni en el `openapi.json`, **no improvises silenciosamente** — es señal de que hay
 > que preguntar antes de construir esa parte.
 >
@@ -180,7 +180,7 @@ respuesta trae:
 
 Regla: **si `data.vertical !== 'farmacia'`, todo lo de este documento queda oculto** — sin
 excepción. Esto es exactamente el mismo patrón que ya usa el resto del sistema para las pantallas
-de Aseguradoras/Lotes ARS (ver `PROMPT_ASEGURADORAS_FRONTEND.md` si lo tenés a mano como
+de Aseguradoras/Lotes ARS (ver `PROMPT_ASEGURADORAS_FRONTEND.md` si lo tienes a mano como
 referencia de un gating por vertical ya implementado).
 
 ### 3.2 Cómo saber qué puede hacer el usuario (dentro de un tenant Farmacia)
@@ -725,7 +725,7 @@ el contrato de hoy.
   "data": {
     "coincidencias": {
       "success": true,
-      "data": [ /* mismísimo ItemResponseDto que ya devuelve GET /catalog/items — reutilizá el mismo componente de fila/tarjeta que ya tenés para el listado de catálogo */ ],
+      "data": [ /* mismísimo ItemResponseDto que ya devuelve GET /catalog/items — reutilizá el mismo componente de fila/tarjeta que ya tienes para el listado de catálogo */ ],
       "meta": { "total": 3, "limit": 20, "offset": 0, "hasMore": false }
     },
     "equivalentes": [ /* mismo shape de cada elemento que en §8.2 (EquivalenteResponseDto[]) */ ],
