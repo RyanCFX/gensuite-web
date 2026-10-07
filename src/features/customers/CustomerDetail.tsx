@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { getCustomer, deleteCustomer } from '@/shared/api/customers'
 import { getSemaforoByCustomer, getSaldoFavor, getEstadoCuenta, downloadEstadoCuentaPdf } from '@/shared/api/cobros'
 import { getCreditNoteSaldoFavor, removerCreditNoteAplicada } from '@/shared/api/notes'
-import { client } from '@/shared/api/client'
+import { client, conSilencio403 } from '@/shared/api/client'
 import type { Invoice, EstadoCuentaResponse } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
 import { useFeature } from '@/shared/features/can'
@@ -74,7 +74,8 @@ function SemaforoIndicator({ customerId }: { customerId: string }) {
 function SaldoFavorIndicator({ customerId }: { customerId: string }) {
   const { data: saldo } = useQuery({
     queryKey: ['saldo-favor', customerId],
-    queryFn: () => getSaldoFavor(customerId),
+    // Enriquecimiento opcional: si falla no debe alertar, el indicador no se muestra.
+    queryFn: () => conSilencio403(() => getSaldoFavor(customerId)),
     retry: false,
   })
 

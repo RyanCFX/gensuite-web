@@ -20,7 +20,7 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { usePosTicketPrinter } from '@/shared/hooks/usePosTicketPrinter'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { useMetodoPagoCurrencies } from '@/shared/hooks/useMetodoPagoCurrencies'
-import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
+import { isApiErrorCode, ERROR_CODES, conSilencio403 } from '@/shared/api/client'
 import {
   EMPTY_PAYMENT_LINES_VALUE,
   buildSubmitPayload,
@@ -104,7 +104,8 @@ export default function CajaPage() {
 
    const { data: turno } = useQuery({
      queryKey: ['turno-actual'],
-     queryFn: getTurnoActual,
+     // Si falla (ej. 403 sin acceso) no debe alertar: se trata como turno bloqueado.
+     queryFn: () => conSilencio403(() => getTurnoActual()),
      enabled: usaModuloPos,
      staleTime: 2 * 60_000,
    })

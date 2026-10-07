@@ -101,7 +101,7 @@ import {
 } from "@/lib/formatters";
 
 import { useMetodoPagoCurrencies } from "@/shared/hooks/useMetodoPagoCurrencies";
-import { isApiErrorCode, ERROR_CODES } from "@/shared/api/client";
+import { isApiErrorCode, ERROR_CODES, conSilencio403 } from "@/shared/api/client";
 import { DocumentHistoryCard } from "@/components/shared/DocumentHistoryCard";
 import { EcfStatusCard } from "@/components/shared/EcfStatusCard";
 import { ecfBloqueaPdf, ecfPdfBloqueadoMensaje } from "@/lib/dgii";
@@ -433,7 +433,9 @@ export default function InvoiceDetail() {
   // al someter: solo se redirige a Caja si hay un turno abierto; sin turno no hay cobro posible.
   const { data: turnoActual, isLoading: turnoActualLoading } = useQuery({
     queryKey: ['turno-actual'],
-    queryFn: getTurnoActual,
+    // Lectura de fondo: si falla (ej. 403 sin acceso a turnos) no debe alertar, se trata
+    // como "sin turno" igual que cuando no hay ninguno abierto.
+    queryFn: () => conSilencio403(() => getTurnoActual()),
     enabled: !!invoice && invoice.status === "draft" && usaModuloPos,
     staleTime: 2 * 60_000,
   });
@@ -480,7 +482,9 @@ export default function InvoiceDetail() {
 
   const { data: saldoFavor } = useQuery({
     queryKey: ["saldo-favor", invoice?.customer],
-    queryFn: () => getSaldoFavor(invoice!.customer),
+    // Enriquecimiento opcional (ej. "Consumidor Final" no tiene saldo): si falla no debe
+    // alertar, la sección simplemente no se muestra.
+    queryFn: () => conSilencio403(() => getSaldoFavor(invoice!.customer)),
     enabled:
       !!invoice?.customer &&
       (invoice.status === "draft" || invoice.status === "submitted"),
