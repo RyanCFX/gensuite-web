@@ -236,7 +236,11 @@ ok(typesSrc.includes('MeFeatures') && typesSrc.includes('TenantLimites'), 'tipos
 ok(protectedSrc.includes('fetchFeatures') && protectedSrc.includes(`featStatus === 'idle'`), 'ProtectedRoute pide features una vez (idle) junto a permisos')
 ok((meSrc.match(/getMeFeatures\(\)/g) || []).length <= 2, 'getMeFeatures solo se llama desde el store (+def)', `usos: ${(meSrc.match(/getMeFeatures\(\)/g) || []).length}`)
 ok(!catalogSrc.includes('POST') && !catalogSrc.includes('PUT'), 'frontend nunca escribe features (solo lee)')
-ok(authStoreSrc.includes('useFeaturesStore') && (authStoreSrc.match(/useFeaturesStore\.getState\(\)\.clear\(\)/g) || []).length >= 4, 'auth.store limpia features en login/refresh/switch/logout')
+// Limpieza en login/refresh/switch/logout — directa o vía limpiarEstadoPorTenant() (que además
+// vacía react-query: docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md §7, sin arrastre entre tenants).
+const limpiaDirecta = (authStoreSrc.match(/useFeaturesStore\.getState\(\)\.clear\(\)/g) || []).length
+const limpiaHelper = (authStoreSrc.match(/limpiarEstadoPorTenant\(\)/g) || []).length
+ok(authStoreSrc.includes('useFeaturesStore') && (limpiaDirecta >= 4 || (authStoreSrc.includes('function limpiarEstadoPorTenant') && limpiaHelper >= 4)), 'auth.store limpia features en login/refresh/switch/logout')
 // openapi: endpoint existe, sin schema de respuesta (se normaliza defensivo)
 const openapi = JSON.parse(read('openapi.json'))
 ok(!!openapi.paths['/api/v1/me/features'], 'openapi.json documenta /api/v1/me/features')

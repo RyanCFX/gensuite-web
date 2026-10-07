@@ -136,6 +136,7 @@ export default function ItemsPage() {
   // Si cambian los permisos con la pantalla abierta, se descartan los filtros que ya no
   // corresponden (no hay estado guardado en URL/localStorage en esta pantalla).
   const visibilidadKey = JSON.stringify(datos)
+  /* eslint-disable react-hooks/set-state-in-effect -- descarta filtros que el permiso nuevo ya no permite */
   useEffect(() => {
     if (!veAlgunPrecio(datos)) { setPricesMin(''); setPricesMax('') }
     if (!datos.costo) setPriceModeFilter('all')
@@ -144,6 +145,7 @@ export default function ItemsPage() {
     // Solo ante cambio de visibilidad, no en cada tecleo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibilidadKey])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const [reintentoDato, setReintentoDato] = useState(false)
   const { data, isLoading, isError, error } = useQuery({
@@ -189,6 +191,7 @@ export default function ItemsPage() {
   // Defensa §7.3: si igual llega 403 DATO_NO_PERMITIDO (permiso cambiado con la pantalla
   // abierta), se quitan los filtros apoyados en datos y se reintenta una sola vez — el cambio
   // de estado re-dispara la query. El interceptor ya mostró el mensaje y refrescó /me/acceso.
+  /* eslint-disable react-hooks/set-state-in-effect -- reintento único tras 403, no en cada render */
   useEffect(() => {
     if (error && isApiErrorCode(error, ERROR_CODES.DATO_NO_PERMITIDO) && !reintentoDato) {
       setReintentoDato(true)
@@ -200,6 +203,7 @@ export default function ItemsPage() {
       setPage(1)
     }
   }, [error, reintentoDato])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Fuente B: datos recortados en ESTA respuesta (para pintar cada celda).
   const restr = restringidosDe(data ?? {})

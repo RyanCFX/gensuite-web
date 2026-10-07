@@ -61,7 +61,10 @@ import { usePermissionsStore } from "@/stores/permissions.store";
 import { useFeaturesStore } from "@/stores/features.store";
 import { useIsSystemManager } from "@/shared/hooks/useIsSystemManager";
 import { resolverRuta } from "@/shared/permissions/rutas";
-import { resolverFeature, REPORTE_KEY_POR_TIPO } from "@/shared/features/catalog";
+import { resolverFeature, featureKeyForPath, REPORTE_KEY_POR_TIPO } from "@/shared/features/catalog";
+import { useEsFeatureAdicional } from "@/shared/features/can";
+import { AdicionalBadge } from "@/components/shared/AdicionalBadge";
+import { AvisoVencimientoAcceso } from "@/components/shared/AvisoVencimientoAcceso";
 import { switchTenant, isApiError } from "@/shared/api/auth";
 import { CommandPalette } from "./CommandPalette";
 import { Toaster, toast } from "sonner";
@@ -874,6 +877,16 @@ const DESPACHO_ONLY_NAV_KEYS = new Set([
 
 // ─── NavItem component ────────────────────────────────────────────────────────
 
+// Etiqueta "Adicional" del ítem de menú (docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md
+// §4.1): el módulo aparece como cualquier otro; el badge solo indica que viene de un acceso
+// adicional gestionado por GenSuite. Solo decoración: nunca gatea nada.
+function AdicionalNavBadge({ path }: { path: string }) {
+  const featureKey = resolverFeature(path)?.feature ?? null;
+  const esAdicional = useEsFeatureAdicional(featureKey);
+  if (!esAdicional) return null;
+  return <AdicionalBadge compact />;
+}
+
 function NavItemBtn({
   item,
   onNav,
@@ -896,6 +909,7 @@ function NavItemBtn({
     >
       {item.icon}
       <span className="nav-label">{item.label}</span>
+      {!collapsed && <AdicionalNavBadge path={item.path} />}
     </button>
   );
 }
@@ -925,6 +939,7 @@ function NavChildBtn({
     >
       {child.icon}
       <span className="nav-label">{child.label}</span>
+      <AdicionalNavBadge path={child.path} />
     </button>
   );
 }
@@ -953,6 +968,7 @@ function ConfigNavLinkBtn({
     >
       {item.icon}
       <span>{item.label}</span>
+      <AdicionalNavBadge path={item.path} />
     </button>
   );
 }
@@ -2147,6 +2163,8 @@ function AppLayoutInner() {
           )}*/}
           {multiTab && <TabBar />}
           <div style={{ flex: 1, overflowY: "auto" }}>
+            {/* Aviso de vencimiento del acceso adicional (§4.2): solo el del módulo actual. */}
+            <AvisoVencimientoAcceso featureKey={featureKeyForPath(location.pathname)} />
             {multiTab ? (
               <KeepAlive
                 activeCacheKey={activeTabPath}

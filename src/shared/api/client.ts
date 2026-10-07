@@ -4,6 +4,13 @@ import { toast } from 'sonner'
 import { getAccessToken, getTenant, getRefreshToken, setAccessToken, setRefreshToken, setTenant, clearSession } from './storage'
 import { ocultarErp } from '@/lib/ocultarErp'
 import { invalidarReferenciaTrasEscritura, registrarVersionReferencia } from './queryClient'
+import { featureKeyForPath } from '@/shared/features/catalog'
+import {
+  esOrigenAdicional,
+  featuresFaltantesDe,
+  mensajeAccesoAdicionalVencido,
+  MENSAJE_NO_CONTRATADO,
+} from '@/shared/features/adicionales'
 import type { ApiError, ApiErrorResponse, ApiResponse, PaginatedResponse, RefreshTokenResult } from './types'
 
 // Ruta relativa por defecto: el dev server hace de proxy hacia el backend
@@ -57,6 +64,31 @@ function refreshAccesoDebounced() {
   if (Date.now() - ultimoRefreshAcceso < 5000) return
   ultimoRefreshAcceso = Date.now()
   import('@/stores/permissions.store').then((m) => m.usePermissionsStore.getState().refreshSilencioso())
+}
+
+// Refresco conjunto acceso + features tras un 403 de feature/acceso (docs/tasks/
+// PROMPT_FEATURES_ADICIONALES_FRONTEND.md §5, regla general): el `version` de /me/acceso
+// cambió y el menú hay que reconstruirlo. Ambos stores deduplican llamadas concurrentes.
+function refrescarAccesoYFeatures() {
+  refreshAccesoDebounced()
+  import('@/stores/features.store').then((m) => m.useFeaturesStore.getState().refreshSilencioso())
+}
+
+/** Tras un 403 con `origenPosible: "adicional"` (§5): si el usuario estaba viendo el módulo
+ *  que perdió, llevarlo al inicio y sacar el módulo del menú (el refresh de arriba lo
+ *  reconstruye). Nunca en `silent403` (lookups de fondo) ni si ya está en el inicio. */
+function redirigirSiEstabaEnModuloPerdido(details: unknown) {
+  try {
+    const faltantes = featuresFaltantesDe(details)
+    const path = window.location.pathname
+    if (path === '/dashboard' || path === '/inicio' || path === '/login') return
+    const feat = featureKeyForPath(path)
+    if (feat && (faltantes.length === 0 || faltantes.includes(feat))) {
+      window.location.href = '/dashboard'
+    }
+  } catch {
+    // Nunca romper el camino de error por la redirección.
+  }
 }
 
 function normalizeOrderBy(orderBy: string): string {
@@ -340,21 +372,35 @@ client.interceptors.response.use(
       if (errorCode === 'PERMISO_INSUFICIENTE') {
         // Refresco SILENCIOSO: no toca `status`, así ProtectedRoute no re-monta la app (evita el
         // loop de re-render → re-request → 403 → refresh → ...). Deduplicado en el store.
+        // Incluye el caso "el tenant contrató el módulo después" (docs/tasks/
+        // PROMPT_FEATURES_ADICIONALES_FRONTEND.md §5): el acceso adicional deja de aplicar y
+        // ahora manda el administrador del tenant — mensaje estándar + refresco, sin más.
         import('@/stores/permissions.store').then((m) => m.usePermissionsStore.getState().refreshSilencioso())
       }
     }
 
-    // Errores de features por tenant (docs/tasks/80_features_tenant_discriminacion_ui.md §9).
+    // Errores de features por tenant (docs/tasks/80_features_tenant_discriminacion_ui.md §9 +
+    // docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md §5).
     // `FEATURE_NO_CONTRATADO` (403) no debería pasar si el menú está bien gateado — si aparece,
-    // falta ocultar algo (§5/§6): se avisa con mensaje genérico (no técnico) y se refrescan los
-    // features en segundo plano para que la UI se corrija sola. `LIMITE_*` (400) y
-    // `PERFIL_NO_CONTRATADO` (400) los maneja cada pantalla con su propio mensaje (ver §9) — acá
-    // solo se dejan pasar tal cual (el `message` del backend ya viene en español).
+    // falta ocultar algo (§5/§6 de features): se avisa con mensaje genérico (no técnico) y se
+    // refrescan acceso + features en segundo plano para que la UI se corrija sola. Con
+    // `details.origenPosible === "adicional"` el usuario tuvo un acceso adicional que venció o
+    // fue retirado: mensaje propio + llevarlo al inicio si estaba en ese módulo. Sin esa clave,
+    // es el "no contratado" de siempre. Nunca reintentar. `LIMITE_*` (400) y
+    // `PERFIL_NO_CONTRATADO` (400) los maneja cada pantalla con su propio mensaje (ver §9 de
+    // features) — acá solo se dejan pasar tal cual (el `message` del backend ya viene en español).
     // Mismo import dinámico que arriba (evita el ciclo client.ts → features.store.ts → me.ts).
     if (!isAuthEndpoint && errorCode === 'FEATURE_NO_CONTRATADO') {
-      const msg = 'Este módulo no está disponible en tu plan'
-      if (!silent403 && shouldToastPermiso(msg)) toast.error(msg)
-      import('@/stores/features.store').then((m) => m.useFeaturesStore.getState().refreshSilencioso())
+      const details = (data?.error as { details?: unknown } | undefined)?.details
+      if (esOrigenAdicional(details)) {
+        const msg = mensajeAccesoAdicionalVencido(details)
+        if (!silent403 && shouldToastPermiso(msg)) toast.error(msg)
+        refrescarAccesoYFeatures()
+        if (!silent403) redirigirSiEstabaEnModuloPerdido(details)
+      } else {
+        if (!silent403 && shouldToastPermiso(MENSAJE_NO_CONTRATADO)) toast.error(MENSAJE_NO_CONTRATADO)
+        refrescarAccesoYFeatures()
+      }
     }
 
     // 429 — §3 fila 6. Puede venir de una capa que no arma un `message` comercial (proxy/

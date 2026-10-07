@@ -11,6 +11,10 @@ export interface Acceso {
   modulos: Set<string>
   pantallas: Set<string>
   componentes: Set<string>
+  /** Subconjunto de `componentes` por acceso adicional (docs/tasks/
+   *  PROMPT_FEATURES_ADICIONALES_FRONTEND.md §2.2). Solo decoración de UI — el permiso real
+   *  sigue siendo `componentes`. Nunca derivar acceso de acá. */
+  componentesAdicionales: Set<string>
   recursos: Set<string>
   filtrosBloqueados: Record<string, string[]>
 }
@@ -51,6 +55,7 @@ export const ACCESO_VACIO: Acceso = {
   modulos: new Set(),
   pantallas: new Set(),
   componentes: new Set(),
+  componentesAdicionales: new Set(),
   recursos: new Set(),
   filtrosBloqueados: {},
 }

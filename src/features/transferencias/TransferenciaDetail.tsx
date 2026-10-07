@@ -145,13 +145,13 @@ export default function TransferenciaDetail() {
             </button>
           </>
         )}
-        {tieneContabilidad && puedeVerLibro && (t.status === 'in_transit' || t.status === 'completed') && (
+        {tieneContabilidad && puedeVerLibro && t.confirmationId && (t.status === 'in_transit' || t.status === 'completed') && (
           <button
             className="btn btn-secondary btn-size-md"
             onClick={() => {
               navigate(
-                `/contabilidad/libro-diario?voucherNo=${encodeURIComponent(t.id)}` +
-                `&voucherType=Stock+Entry&fromDate=${createdDate}&toDate=${createdDate}`,
+                `/contabilidad/libro-diario?voucherNo=${encodeURIComponent(t.confirmationId as string)}` +
+                `&fromDate=${createdDate}&toDate=${createdDate}`,
               )
             }}
           >

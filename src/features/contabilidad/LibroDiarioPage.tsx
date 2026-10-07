@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Search, BookOpen, Download, Loader2 } from 'lucide-react'
@@ -64,6 +64,7 @@ type GroupBy = NonNullable<LibroDiarioParams['groupBy']>
 
 export default function LibroDiarioPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
 
   const [fromDate, setFromDate] = useState(searchParams.get('fromDate') ?? firstOfMonth())
@@ -99,23 +100,48 @@ export default function LibroDiarioPage() {
   const [queryParams, setQueryParams] = useState<LibroDiarioParams | null>(null)
 
   // ─── Read deep-link params from URL ─────────────────────────────────
+  // "Ver asientos" de los detalles navega acá con ?voucherNo=&voucherType=&fromDate=&toDate.
+  // Con multipestañas la pantalla vive en <KeepAlive> y NO se desmonta: volver a la MISMA url
+  // (o llegar con otros params) reactiva la instancia vieja — los useState NO se re-inicializan
+  // y un efecto solo-montaje no vuelve a correr, así que la página mostraba/pedía los filtros
+  // viejos (ej. tipo vacío + No. de recepción) aunque la URL trajera los nuevos. Por eso los
+  // params se aplican en CADA navegación (location.key cambia en cada navigate, incluso a la
+  // misma url), no solo al montar. Sin params en la URL no se toca nada: el tab cacheado
+  // conserva los filtros que el usuario ya tenía.
+  const ultimoDeepLink = useRef<string | null>(null)
+  /* eslint-disable react-hooks/set-state-in-effect -- sincroniza filtros con la URL en cada
+     navegación (el deep link "Ver asientos" es un sistema externo a este estado local); con
+     KeepAlive no hay remontaje que lo haga solo. Retorno temprano si la navegación ya se aplicó. */
   useEffect(() => {
+    const key = `${location.key}:${location.search}`
+    if (ultimoDeepLink.current === key) return
+    ultimoDeepLink.current = key
     const initialVoucherNo = searchParams.get('voucherNo')
     const initialVoucherType = searchParams.get('voucherType')
-    if (initialVoucherNo || initialVoucherType) {
-      const params: LibroDiarioParams = {
-        fromDate,
-        toDate,
-        account: account || undefined,
-        voucherType: initialVoucherType || undefined,
-        voucherNo: initialVoucherNo || undefined,
-        groupBy,
-      }
-      setQueryParams(params)
-    }
-    // Only run once on mount with initial URL params
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    const initialFrom = searchParams.get('fromDate')
+    const initialTo = searchParams.get('toDate')
+    if (!initialVoucherNo && !initialVoucherType && !initialFrom && !initialTo) return
+    const nextFrom = initialFrom ?? fromDate
+    const nextTo = initialTo ?? toDate
+    if (initialFrom) setFromDate(initialFrom)
+    if (initialTo) setToDate(initialTo)
+    if (initialVoucherType) setVoucherType(initialVoucherType)
+    // El deep link de transferencias no manda voucherType a propósito: si trae voucherNo sin
+    // tipo, el filtro de tipo se limpia para no arrastrar uno viejo del tab cacheado.
+    if (!initialVoucherType && initialVoucherNo) setVoucherType('')
+    if (initialVoucherNo) setVoucherNo(initialVoucherNo)
+    setQueryParams({
+      fromDate: nextFrom,
+      toDate: nextTo,
+      account: account || undefined,
+      voucherType: initialVoucherType || undefined,
+      voucherNo: initialVoucherNo || undefined,
+      groupBy,
+    })
+    // Se aplica por navegación (location.key/search), no por cada cambio de los filtros
+    // (Buscar no navega: el guard de `ultimoDeepLink` lo hace no-op).
+  }, [location.key, location.search, searchParams, account, fromDate, toDate, groupBy])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const { data, isLoading } = useQuery({
     queryKey: ['libro-diario', queryParams],

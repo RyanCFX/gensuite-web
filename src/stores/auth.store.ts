@@ -8,6 +8,7 @@ import { getMeProfile } from '@/shared/api/me'
 import type { AuthUser, AuthTenant, AuthMembership, AuthResult, RefreshTokenResult, SwitchTenantResult } from '@/shared/api/types'
 import { usePermissionsStore } from '@/stores/permissions.store'
 import { useFeaturesStore } from '@/stores/features.store'
+import { queryClient } from '@/shared/api/queryClient'
 import { connectRealtimeSocket, disconnectRealtimeSocket } from '@/shared/socket/realtimeSocket'
 
 /** `AuthUser` + un par de campos de conveniencia que el resto de la app ya lee en decenas de
@@ -76,6 +77,18 @@ function deriveFlags(state: Pick<AuthState, 'refreshToken' | 'accessToken'>) {
   }
 }
 
+/** Limpieza por cambio de tenant (docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md §7):
+ *  los accesos adicionales son por tenant — no reutilizar menú, features, featuresAdicionales
+ *  ni componentesAdicionales del tenant anterior. Los stores zustand se resetean (`clear()`, sin
+ *  persistencia) y la caché de react-query se vacía entera: ninguna clave está escopeada por
+ *  tenant, así que vaciar es la única forma de no arrastrar datos (ni avisos de vencimiento,
+ *  que derivan del store ya limpio). */
+function limpiarEstadoPorTenant() {
+  usePermissionsStore.getState().clear()
+  useFeaturesStore.getState().clear()
+  queryClient.clear()
+}
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   refreshToken: null,
   accessToken: null,
@@ -128,8 +141,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: buildStoreUser(result.user, result.tenants, result.tenant, result.access_token),
       ...deriveFlags({ refreshToken: result.refresh_token, accessToken: result.access_token }),
     })
-    usePermissionsStore.getState().clear()
-    useFeaturesStore.getState().clear()
+    limpiarEstadoPorTenant()
     if (result.access_token) connectRealtimeSocket(result.access_token)
   },
 
@@ -149,8 +161,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Un refresh puede resolver el tenant activo a uno distinto del que tenía esta pestaña (o
     // pasar de null a resuelto) — refresca el catálogo de permisos y features para ese tenant.
     if (tenantChanged) {
-      usePermissionsStore.getState().clear()
-      useFeaturesStore.getState().clear()
+      limpiarEstadoPorTenant()
     }
     if (result.access_token) connectRealtimeSocket(result.access_token)
     // `GET /me/profile` no viene en la respuesta de refresh — si nunca tuvimos `user` en memoria
@@ -177,16 +188,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: state.user ? buildStoreUser(state.user, state.memberships, result.tenant, result.access_token) : state.user,
       ...deriveFlags({ refreshToken: state.refreshToken, accessToken: result.access_token }),
     })
-    usePermissionsStore.getState().clear()
-    useFeaturesStore.getState().clear()
+    limpiarEstadoPorTenant()
     // El tenant queda fijo en el JWT desde el momento de la conexión — hay que reconectar con
     // el token nuevo para que el socket empiece a recibir los eventos del tenant nuevo.
     connectRealtimeSocket(result.access_token)
   },
 
   clearLocal: () => {
-    usePermissionsStore.getState().clear()
-    useFeaturesStore.getState().clear()
+    limpiarEstadoPorTenant()
     disconnectRealtimeSocket()
     set({
       refreshToken: null, accessToken: null, tenant: null, user: null, memberships: [],

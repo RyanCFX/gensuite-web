@@ -34,6 +34,9 @@ export function normalizeMeAcceso(raw: unknown): MeAcceso {
     modulos: asStringArray(d.modulos),
     pantallas: asStringArray(d.pantallas),
     componentes: asStringArray(d.componentes),
+    // Acceso adicional (docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md §2.2): subconjunto
+    // de `componentes`, solo para la UI. Defensivo: ausente en backends viejos → [].
+    componentesAdicionales: asStringArray(d.componentesAdicionales),
     recursos: asStringArray(d.recursos),
     filtrosBloqueados,
   }

@@ -71,6 +71,9 @@ export function normalizeMeFeatures(raw: unknown): MeFeatures {
   return {
     features,
     reportesHabilitados: reportes,
+    // Acceso adicional (docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md §2.1): lista
+    // informativa SOLO para la UI — nunca derivar acceso de acá. Defensivo: ausente → [].
+    featuresAdicionales: normalizeFeaturesAdicionales(d.featuresAdicionales),
     limites: {
       maxUsuarios: numOrNull(rawLimites.maxUsuarios),
       maxSucursales: numOrNull(rawLimites.maxSucursales),
@@ -78,6 +81,27 @@ export function normalizeMeFeatures(raw: unknown): MeFeatures {
       sucursalesActuales: numOrZero(rawLimites.sucursalesActuales),
     },
   }
+}
+
+/** Normaliza `featuresAdicionales` (§2.1): entradas `{key,nombre,tipo,origen,expiraEn}`.
+ *  Descarta entradas sin `key` string; `expiraEn` solo se conserva si es string ISO o null. */
+export function normalizeFeaturesAdicionales(raw: unknown): MeFeatures['featuresAdicionales'] {
+  if (!Array.isArray(raw)) return []
+  const out: MeFeatures['featuresAdicionales'] = []
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null) continue
+    const r = item as Record<string, unknown>
+    if (typeof r.key !== 'string' || !r.key) continue
+    const expiraEn = r.expiraEn
+    out.push({
+      key: r.key,
+      nombre: typeof r.nombre === 'string' && r.nombre ? r.nombre : r.key,
+      tipo: typeof r.tipo === 'string' ? r.tipo : 'modulo',
+      origen: typeof r.origen === 'string' ? r.origen : 'adicional',
+      expiraEn: typeof expiraEn === 'string' || expiraEn === null ? (expiraEn as string | null) : null,
+    })
+  }
+  return out
 }
 
 export async function getMeFeatures(): Promise<MeFeatures> {

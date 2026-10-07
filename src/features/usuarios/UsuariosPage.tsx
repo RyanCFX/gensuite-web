@@ -27,7 +27,7 @@ import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { formatDate } from '@/lib/formatters'
-import { Plus, Ban, UserCheck, Pencil, X, ScanLine, Mail, ArrowLeft, Eye, EyeOff } from 'lucide-react'
+import { Plus, Ban, UserCheck, Pencil, X, ScanLine, Mail, ArrowLeft, Eye, EyeOff, Shield } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
@@ -438,6 +438,9 @@ export default function UsuariosPage() {
       const grants = excepcionesTocadas && excepciones && catalogoAcceso
         ? grantsDelArbol(catalogoAcceso.modulos, excepciones)
         : undefined
+      // Acceso adicional (§6): si no se tocaron las excepciones se manda `grants: undefined` para
+      // que el backend PRESERVE los roles del acceso adicional al guardar — nunca "limpiar" roles
+      // o perfiles que el administrador no ve en el formulario.
       saveV2Mutation.mutate({ email: editingUser.email, userData: payload, perfiles: selectedPerfilesAcceso, grants })
       if (editingUser.email === authUser?.email && defaultBranch !== usuarioSucursales?.defaultBranch) {
         toast.success('Sucursal por defecto actualizada. Cierra sesión y vuelve a entrar para que los cambios tomen efecto.')
@@ -449,6 +452,9 @@ export default function UsuariosPage() {
       maxDiscountPct: maxDiscountPct > 0 ? maxDiscountPct : 0,
       adminCode: adminCode || undefined,
       ...(pin !== '' ? { adminPin: pin } : {}),
+      // Acceso adicional (§6): si no se eligió ningún perfil no se manda `perfiles` — el backend
+      // preserva los roles del acceso adicional al guardar. No intentar "limpiar" roles
+      // desconocidos que el administrador no ve.
       ...(selectedPerfiles.length > 0 ? { perfiles: selectedPerfiles } : {}),
       branches: isSystemManager ? undefined : selectedBranches,
       defaultBranch: defaultBranch || undefined,
@@ -579,6 +585,19 @@ export default function UsuariosPage() {
                             <td style={{ fontWeight: 500 }}>
                               {u.fullName}
                               {u.isDefault && <span className="badge badge-info" style={{ marginLeft: 6, fontSize: 10 }}>Por defecto</span>}
+                              {/* Acceso adicional (docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md
+                                  §6): GenSuite le dio a esta persona acceso a módulos que el tenant
+                                  no contrata. Booleano sin detalle: solo indicador con tooltip. */}
+                              {u.accesoAdicionalGestionado === true && (
+                                <span
+                                  className="badge badge-info"
+                                  style={{ marginLeft: 6, fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                                  title="Este usuario tiene acceso a módulos adicionales gestionados por GenSuite."
+                                  aria-label="Acceso adicional gestionado por GenSuite"
+                                >
+                                  <Shield size={11} aria-hidden="true" /> Adicional
+                                </span>
+                              )}
                             </td>
                             <td style={{ maxWidth: 260 }}>
                               <div style={{ display: 'grid', gridTemplateRows: 'repeat(2, auto)', gridAutoFlow: 'column', gridAutoColumns: 'max-content', gap: 4, overflowX: 'auto', paddingBottom: 2 }}>
@@ -791,6 +810,13 @@ export default function UsuariosPage() {
                   <label className="ff-label">Correo electrónico</label>
                   <input type="email" className="ff-input" value={editingUser.email} disabled />
                 </div>
+                {/* Ficha: mismo indicador que en la lista (§6) — sin detalle ni gestión. */}
+                {editingUser.accesoAdicionalGestionado === true && (
+                  <div className="inline-alert inline-alert-info" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Shield size={15} aria-hidden="true" />
+                    <span style={{ fontSize: 13 }}>Este usuario tiene acceso a módulos adicionales gestionados por GenSuite.</span>
+                  </div>
+                )}
 
                 <div className="ff-wrap">
                   <label className="ff-label">Teléfono</label>

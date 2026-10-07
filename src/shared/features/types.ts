@@ -60,7 +60,19 @@ export interface TenantLimites {
 export interface MeFeatures {
   features: Record<FeatureKey, boolean>
   reportesHabilitados: ReporteKey[]
+  /** Accesos adicionales del usuario (docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md §2.1):
+   *  SOLO informativo para la UI. Nunca derivar acceso de acá. */
+  featuresAdicionales: FeatureAdicional[]
   limites: TenantLimites
+}
+
+/** Un acceso adicional (docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md §2.1). */
+export interface FeatureAdicional {
+  key: string
+  nombre: string
+  tipo: string
+  origen: string
+  expiraEn: string | null
 }
 
 /** Códigos de error del contrato §9. */

@@ -3742,6 +3742,10 @@ export interface Usuario {
   defaultPosProfile?: string;
   /** Código de carnet/QR/barcode del empleado — único por tenant, no es secreto. null si no tiene uno asignado. */
   adminCode?: string | null;
+  /** `true` = GenSuite le dio a esta persona acceso a módulos que el tenant no contrata
+   *  (docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md §2.5/§6). Solo indicador con tooltip,
+   *  sin detalle ni gestión desde esta app. Ausente en backends viejos → tratar como false. */
+  accesoAdicionalGestionado?: boolean;
 }
 
 // GET /usuarios/lookup?email= — paso previo obligatorio antes de invitar (§6.2).
@@ -3943,6 +3947,10 @@ export interface MeAcceso {
   modulos: string[];
   pantallas: string[];
   componentes: string[];
+  /** Subconjunto de `componentes` que el usuario tiene SOLO por acceso adicional (gestionado
+   *  por GenSuite, docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md §2.2). Solo para la UI
+   *  (etiqueta "Adicional") — nunca derivar acceso de acá. Ausente en backends viejos → []. */
+  componentesAdicionales: string[];
   recursos: string[];
   /** Por pantalla efectiva, los query params que el usuario NO puede enviar. */
   filtrosBloqueados: Record<string, string[]>;
@@ -4088,6 +4096,10 @@ export interface UsuarioAcceso {
   email: string;
   perfiles: PerfilAccesoResumen[];
   grants: Grant[];
+  /** `true` = GenSuite le dio a esta persona acceso a módulos que el tenant no contrata
+   *  (docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md §2.5). Booleano sin detalle: no dice
+   *  qué módulo, hasta cuándo ni a qué precio. Ausente en backends viejos → tratar como false. */
+  accesoAdicionalGestionado?: boolean;
 }
 
 export type TrazaEstado =
@@ -7240,7 +7252,36 @@ export interface MeFeatures {
   features: Record<TenantFeatureKey, boolean>;
   /** Claves de reporte ENCENDIDAS — un reporte ausente está apagado, no hay booleano por reporte. */
   reportesHabilitados: TenantReporteKey[];
+  /** Accesos adicionales del usuario (docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md §2.1):
+   *  SOLO informativo para la UI (etiqueta "Adicional" + aviso de vencimiento). Nunca derivar
+   *  acceso de acá — el permiso real ya viene en `features`/`reportesHabilitados` (efectivos).
+   *  No incluye latentes (tenant ya lo contrata) ni vencidos. Vacío sin acceso adicional. */
+  featuresAdicionales: FeatureAdicional[];
   limites: TenantLimites;
+}
+
+/** Un acceso adicional a un módulo/reporte/dashboard (docs/tasks/
+ *  PROMPT_FEATURES_ADICIONALES_FRONTEND.md §2.1). Solo para decorar la UI. */
+export interface FeatureAdicional {
+  /** Clave de feature (módulo) o de reporte. */
+  key: string;
+  /** Nombre legible para el aviso de vencimiento. */
+  nombre: string;
+  /** `modulo` | `reporte` | `dashboard_tipo` | `dashboard_reporte`. */
+  tipo: string;
+  /** Siempre `"adicional"` cuando viene del backend. */
+  origen: string;
+  /** ISO de vencimiento, `null` = no vence. */
+  expiraEn: string | null;
+}
+
+/** `details` de un 403 `FEATURE_NO_CONTRATADO` (docs/tasks/
+ *  PROMPT_FEATURES_ADICIONALES_FRONTEND.md §2.4). `origenPosible === "adicional"` = el usuario
+ *  tuvo un acceso adicional a ese módulo que venció o dejó de aplicar; sin esa clave es el
+ *  "no contratado" de siempre. */
+export interface FeatureNoContratadoDetails {
+  featuresFaltantes?: string[];
+  origenPosible?: string;
 }
 
 // ─── Farmacia ARS v2 — cobertura dentro de la factura ───────────────────────

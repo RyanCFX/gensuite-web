@@ -10,6 +10,8 @@ interface FeaturesState {
   error: string | null
   features: MeFeatures['features'] | null
   reportesHabilitados: string[]
+  /** Accesos adicionales (docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md §2.1): solo UI. */
+  featuresAdicionales: MeFeatures['featuresAdicionales']
   limites: MeFeatures['limites'] | null
   /**
    * Carga inicial (§3): UNA sola vez al iniciar sesión o al cambiar de tenant, junto con
@@ -30,6 +32,7 @@ const INITIAL = {
   error: null as string | null,
   features: null as MeFeatures['features'] | null,
   reportesHabilitados: [] as string[],
+  featuresAdicionales: [] as MeFeatures['featuresAdicionales'],
   limites: null as MeFeatures['limites'] | null,
 }
 
@@ -42,6 +45,8 @@ function aplicar(set: (partial: Partial<FeaturesState>) => void, data: MeFeature
   set({
     features: data.features,
     reportesHabilitados: data.reportesHabilitados,
+    // Solo UI (§2.1): se guarda tal cual para etiqueta "Adicional" + aviso de vencimiento.
+    featuresAdicionales: data.featuresAdicionales ?? [],
     limites: data.limites,
   })
 }

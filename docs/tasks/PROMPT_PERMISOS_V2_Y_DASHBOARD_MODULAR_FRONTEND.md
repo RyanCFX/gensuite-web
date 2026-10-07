@@ -928,3 +928,22 @@ indiquen). Casos mínimos:
 Al terminar, entregá un resumen con: pantallas migradas a `/opciones`, pantallas con filtros
 protegidos, selects que no migraste y por qué, llamadas directas a ERPNext encontradas, y
 cualquier contradicción entre este documento y el `openapi.json`.
+
+---
+
+## 14. Referencia cruzada: accesos adicionales por usuario (frontend implementado)
+
+Ver `docs/tasks/PROMPT_FEATURES_ADICIONALES_FRONTEND.md` (extiende este documento: un usuario
+puede tener acceso a un módulo que su tenant no contrata porque GenSuite se lo dio a él).
+Lo implementado en el frontend:
+
+- `GET /me/features` y `GET /me/bootstrap` traen `featuresAdicionales` (solo UI: etiqueta
+  "Adicional" + aviso de vencimiento ≤ 7 días); `GET /me/acceso` trae `componentesAdicionales`
+  (subconjunto decorativo de `componentes`). El menú y los guards siguen usando `features` ∩
+  acceso — nunca se deriva acceso de esas listas.
+- `403 FEATURE_NO_CONTRATADO` con `details.origenPosible === "adicional"` = el acceso venció o
+  fue retirado (mensaje propio + refresh de acceso/features + redirect al inicio); sin esa
+  clave, el "no contratado" de siempre.
+- Lista/ficha de usuarios: indicador `accesoAdicionalGestionado` (tooltip, sin detalle); al
+  guardar no se limpian roles/perfiles desconocidos (el backend los preserva).
+- Cambio de tenant: se vacían stores + react-query (ninguna clave está escopeada por tenant).

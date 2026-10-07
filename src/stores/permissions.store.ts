@@ -62,6 +62,8 @@ function aplicarAcceso(set: (partial: Partial<PermissionsState>) => void, n: MeA
       modulos: new Set(n.modulos),
       pantallas: new Set(n.pantallas),
       componentes: new Set(n.componentes),
+      // Solo UI (§2.2): subconjunto decorativo, nunca fuente de permiso.
+      componentesAdicionales: new Set(n.componentesAdicionales ?? []),
       recursos: new Set(n.recursos),
       filtrosBloqueados: n.filtrosBloqueados,
     },

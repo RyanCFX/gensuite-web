@@ -71,11 +71,13 @@ export default function StockPage() {
   // Sin `existenciasAlmacen` no se envían warehouse/branch (§7.2) y se descartan si cambian los
   // permisos con la pantalla abierta.
   const visibilidadKey = JSON.stringify(datos)
+  /* eslint-disable react-hooks/set-state-in-effect -- descarta filtros que el permiso nuevo ya no permite */
   useEffect(() => {
     if (!datos.existenciasAlmacen) { setWarehouse('all'); setBranch('') }
     if (!datos.stock) setStockFilter('all')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibilidadKey])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const rawParams = {
     warehouse: datos.existenciasAlmacen && warehouse !== 'all' ? warehouse : undefined,
@@ -93,6 +95,7 @@ export default function StockPage() {
 
   // Defensa §7.3: ante 403 DATO_NO_PERMITIDO se quitan warehouse/branch y el orden por stock,
   // y se reintenta una sola vez.
+  /* eslint-disable react-hooks/set-state-in-effect -- reintento único tras 403, no en cada render */
   useEffect(() => {
     if (error && isApiErrorCode(error, ERROR_CODES.DATO_NO_PERMITIDO) && !reintentoDato) {
       setReintentoDato(true)
@@ -101,6 +104,7 @@ export default function StockPage() {
       if (orderBy.replace(/^-/, '') === 'currentStock') sort('itemCode')
     }
   }, [error, reintentoDato, orderBy, sort])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const summary = data?.summary
   const restr = restringidosDe(data ?? {})
