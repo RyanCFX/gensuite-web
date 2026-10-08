@@ -41,6 +41,8 @@ import { DatePicker } from '@/shared/ui/DatePicker'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
+import { DeliveryFormSection, EMPTY_DELIVERY_FORM } from '@/features/delivery/DeliveryFormSection'
+import type { DeliveryFormValue } from '@/features/delivery/DeliveryFormSection'
 import { useOpcionesArray } from '@/shared/hooks/useOpciones'
 import { getClienteDetalle, getStockSettingsLookup } from '@/shared/api/formularios'
 
@@ -145,6 +147,10 @@ export default function QuotationForm() {
   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
   const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
   const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
+  // ── Delivery (§2.4) — pasa a la factura derivada ──
+  const [delivery, setDelivery] = useState<DeliveryFormValue>(EMPTY_DELIVERY_FORM)
+  const [direccionEntregaTouched, setDireccionEntregaTouched] = useState(false)
+  const deliverySinDireccion = delivery.esDelivery && !delivery.direccionEntrega.trim()
   const [validTill, setValidTill] = useState(defaultValidTill())
   const [items, setItems] = useState<LineItem[]>([])
   // Anchos de columna de la tabla de artículos — el usuario puede arrastrar los divisores del
@@ -327,6 +333,13 @@ useEffect(() => {
        setClienteOcasionalRnc(existingQuotation.clienteOcasionalRnc ?? '')
        setClienteOcasionalDireccion(existingQuotation.clienteOcasionalDireccion ?? '')
      }
+     setDelivery({
+       esDelivery: existingQuotation.esDelivery ?? false,
+       direccionEntrega: existingQuotation.direccionEntrega ?? '',
+       telefonoEntrega: existingQuotation.telefonoEntrega ?? '',
+       referenciaEntrega: existingQuotation.referenciaEntrega ?? '',
+     })
+     setDireccionEntregaTouched(false)
      setInitialized(true)
    }, [existingQuotation, initialized])
 
@@ -602,6 +615,14 @@ function buildDto(): CreateQuotationDto {
        })),
        notes: notes || undefined,
        taxesTemplate: undefined,
+       ...(delivery.esDelivery
+         ? {
+             esDelivery: true,
+             direccionEntrega: delivery.direccionEntrega.trim(),
+             telefonoEntrega: delivery.telefonoEntrega.trim() || undefined,
+             referenciaEntrega: delivery.referenciaEntrega.trim().slice(0, 500) || undefined,
+           }
+         : {}),
      }
    }
 
@@ -930,6 +951,7 @@ function buildDto(): CreateQuotationDto {
     branch,
     currency,
     conversionRate,
+    delivery,
   }, isEdit || duplicateId ? initialized : true)
   useBeforeUnloadWarning(isDirty)
 
@@ -962,6 +984,13 @@ if (esClienteOcasional) {
      }
     if (validItems.length === 0) {
       toast.error('Agrega al menos un artículo')
+      return
+    }
+    // Delivery (§2.4): dirección obligatoria en la práctica.
+    if (delivery.esDelivery && deliverySinDireccion) {
+      setDireccionEntregaTouched(true)
+      toast.error('La cotización con delivery requiere la dirección de entrega')
+      document.getElementById('direccionEntrega')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
 
@@ -1189,6 +1218,19 @@ if (esClienteOcasional) {
               </div>
 
             </div>
+            <DeliveryFormSection
+              value={delivery}
+              onChange={(v) => {
+                setDelivery(v)
+                if (!v.esDelivery) setDireccionEntregaTouched(false)
+              }}
+              clienteOcasional={esClienteOcasional}
+              direccionOcasional={clienteOcasionalDireccion}
+              customerId={customerId}
+              monedaBase={monedaBase}
+              currencyActual={currency}
+              direccionError={direccionEntregaTouched}
+            />
           </div>
         </div>
 

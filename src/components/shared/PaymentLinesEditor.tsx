@@ -10,6 +10,7 @@ import {
   overpayAmount,
   missingAmount,
   hasCashPayment,
+  esLineaTienda,
   PAYMENT_LINES_TOLERANCE,
   type PaymentLineDraft,
   type VueltoLineDraft,
@@ -47,9 +48,12 @@ interface PaymentLinesEditorProps {
    * (docs/tasks/70_caja_pos_sin_soporte_multimoneda.md) — solo se ofrecen al cajero los métodos
    * de pago cuya cuenta real opera en esta misma moneda, y los montos se muestran en ella. */
   currency?: string
+  /** §2.2 delivery: muestra el check "Se cobra al entregar" por línea (default encendido).
+   *  El vuelto se calcula solo sobre las líneas de tienda. */
+  mostrarContraEntrega?: boolean
 }
 
-export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP' }: PaymentLinesEditorProps) {
+export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP', mostrarContraEntrega = false }: PaymentLinesEditorProps) {
   const { data: metodos } = useOpcionesArray('metodos-pago', { limit: 100})
   const { data: bancos } = useQuery({ queryKey: ['bancos'], queryFn: listBancosLookup})
   const { data: denominaciones } = useQuery({ queryKey: ['denominaciones'], queryFn: listDenominacionesLookup})
@@ -67,13 +71,16 @@ export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP
   const metodosActivos = todosMetodosActivos.filter((m) => (metodoCurrencies[m.name] ?? 'DOP') === currency)
   const denominacionesActivas = (denominaciones ?? []).filter((d) => d.activo)
 
+  // §2.2 delivery: el vuelto se calcula solo sobre las líneas de tienda.
+  const esTienda = (p: PaymentLineDraft) => esLineaTienda(p, mostrarContraEntrega)
   const total = sumPayments(value.payments)
   const missing = missingAmount(value.payments, amountDue)
   // Sobrepago con vuelto automático: la suma supera el total a cobrar y hay 1 o más líneas en
   // efectivo (type Cash) — el excedente se devuelve como vuelto sin pedir nada más al cajero.
   const over = overpayAmount(value.payments, amountDue)
-  const cash = cashAmount(value.payments, metodos ?? [])
-  const hasCash = hasCashPayment(value.payments, metodos ?? [])
+  const lineasTienda = value.payments.filter(esTienda)
+  const cash = cashAmount(lineasTienda, metodos ?? [])
+  const hasCash = hasCashPayment(lineasTienda, metodos ?? [])
   const showVuelto = over > 0 && hasCash
   const overExceedsCash = over > 0 && hasCash && over > cash + PAYMENT_LINES_TOLERANCE
   const totalsOk = missing === 0 && !overExceedsCash && !(over > 0 && !hasCash)
@@ -221,6 +228,23 @@ export function PaymentLinesEditor({ amountDue, value, onChange, currency = 'DOP
                   </div>
                 )
               })()}
+
+              {mostrarContraEntrega && (
+                <label className="ff-check-wrap" style={{ alignSelf: 'flex-start' }}>
+                  <input
+                    type="checkbox"
+                    className="ff-check"
+                    checked={p.contraEntrega ?? true}
+                    onChange={(e) => updateLine(idx, { contraEntrega: e.target.checked })}
+                  />
+                  <span style={{ fontSize: 13 }}>
+                    Se cobra al entregar
+                    <span className="td-muted" style={{ fontSize: 12 }}>
+                      {' '}— lo cobra el repartidor (queda por conciliar)
+                    </span>
+                  </span>
+                </label>
+              )}
 
               <button
                 type="button"

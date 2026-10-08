@@ -5,6 +5,7 @@ import { useFeaturesStore } from '@/stores/features.store'
 import { SYSTEM_MANAGER_ROLE } from '@/shared/hooks/useIsSystemManager'
 import { resolverRuta } from '@/shared/permissions/rutas'
 import { resolverFeature, REPORTE_KEY_POR_TIPO } from '@/shared/features/catalog'
+import { useDeliveryPuerta, deliveryRutaPermitida } from '@/shared/hooks/useDelivery'
 import SinAccesoPage from '@/features/_shared/SinAccesoPage'
 import ModuloNoContratadoPage from '@/features/_shared/ModuloNoContratadoPage'
 
@@ -56,6 +57,8 @@ export function RequireAccion() {
   const featuresReady = useFeaturesStore((s) => s.status === 'ready')
 
   const ruta = resolverRuta(pathname)
+  const deliveryPuerta = useDeliveryPuerta()
+  const esRutaDelivery = pathname === '/delivery' || pathname.startsWith('/delivery/')
 
   if (!ruta) {
     if (import.meta.env.DEV) {
@@ -72,7 +75,18 @@ export function RequireAccion() {
   // todos modos bloquea la app hasta tener features, así que esto casi nunca se ve).
   if (featuresReady) {
     const feat = resolverFeature(pathname)?.feature ?? null
-    if (feat !== null && features?.[feat] !== true) {
+    if (esRutaDelivery) {
+      // Delivery: feature + habilitación local, o modo drenaje (§1). Mientras carga la
+      // habilitación no se decide (fail-open; el backend responde 403 de todos modos).
+      if (!deliveryPuerta.cargando && !deliveryRutaPermitida(pathname, deliveryPuerta)) {
+        // Feature contratada pero sin habilitar: no es un tema de plan — el mensaje lo dice.
+        return deliveryPuerta.feature && !deliveryPuerta.habilitado ? (
+          <ModuloNoContratadoPage detalle="Delivery está contratado pero aún no está habilitado. Pida a un administrador activarlo en Configuración → Facturación → Despacho → Delivery." />
+        ) : (
+          <ModuloNoContratadoPage />
+        )
+      }
+    } else if (feat !== null && features?.[feat] !== true) {
       return <ModuloNoContratadoPage />
     }
     // Reportes: la pantalla contenedora es núcleo, pero cada reporte individual se filtra por

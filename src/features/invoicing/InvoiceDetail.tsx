@@ -102,6 +102,9 @@ import {
 
 import { useMetodoPagoCurrencies } from "@/shared/hooks/useMetodoPagoCurrencies";
 import { isApiErrorCode, ERROR_CODES, conSilencio403 } from "@/shared/api/client";
+import { esErrorDelivery } from "@/lib/deliveryErrors";
+import { DeliveryEntregaBadge, DeliveryCobroBadge } from "@/features/delivery/DeliveryBadges";
+import { DeliveryInfoCard } from "@/features/delivery/DeliveryInfoCard";
 import { CreditoEstadoBadge } from "@/shared/ui/CreditoEstadoBadge";
 import { ReactivarBotonInline } from "./CreditNoteActionModals";
 import {
@@ -749,6 +752,14 @@ export default function InvoiceDetail() {
     }
   }, [invoice, paymentRequired, usaModuloPos, pendingAmount, flujoCobro, paymentsSeededFor, facturacionConfig, invoiceCurrency]);
 
+  // §2.2 delivery: la venta puede cobrarse contra entrega (repartidor) o en tienda.
+  const esDeliverySubmit = invoice?.delivery?.esDelivery ?? false;
+  // Un cliente a crédito no cobra contra entrega (solo logística): sin el check ni `contraEntrega`
+  // (evita 400 DELIVERY_CONTRA_ENTREGA_CLIENTE_CREDITO).
+  const contraEntregaPosible = esDeliverySubmit && semaforoCliente?.tieneCredito !== true;
+  // Directo: una sola línea — "Se cobra al entregar" encendido por defecto en delivery.
+  const [directoContraEntrega, setDirectoContraEntrega] = useState(true);
+
   function paymentsAreValid(): boolean {
     if (flujoCobro === "directo") {
       if (!directoMop) return false;
@@ -771,10 +782,14 @@ export default function InvoiceDetail() {
     if (sum <= 0) return false;
     // Sobrepago con vuelto automático (igual que en Caja): permitido solo con al menos una línea
     // en efectivo, sin superar el efectivo recibido y con el desglose coincidiendo.
+    // §2.2: el vuelto se calcula solo sobre las líneas de tienda.
+    const lineasVuelto = contraEntregaPosible
+      ? payments.payments.filter((p) => p.contraEntrega === false)
+      : payments.payments;
     const over = overpayAmount(payments.payments, pendingAmount);
     if (over === 0) return sum <= pendingAmount + PAYMENT_LINES_TOLERANCE;
-    if (!hasCashPayment(payments.payments, metodosActivos)) return false;
-    const cash = cashAmount(payments.payments, metodosActivos);
+    if (!hasCashPayment(lineasVuelto, metodosActivos)) return false;
+    const cash = cashAmount(lineasVuelto, metodosActivos);
     if (over > cash + PAYMENT_LINES_TOLERANCE) return false;
     if (declaredVuelto(payments).length === 0) return false;
     return (
@@ -820,7 +835,12 @@ export default function InvoiceDetail() {
         return;
       }
 
-      if (updated.cobro?.fullyPaid) {
+      if (updated.delivery?.esDelivery && updated.delivery.cobro?.estado === "por_conciliar") {
+        // §2.2/§3.3: lo que cobra el repartidor queda por conciliar — no es un "pago parcial".
+        toast.success(
+          `Factura sometida — ${formatMoney(updated.delivery.cobro.montoPorConciliar, invoiceCurrency)} se cobran al entregar (quedan por conciliar)`,
+        );
+      } else if (updated.cobro?.fullyPaid) {
         toast.success("Factura sometida y cobrada");
       } else if (updated.isPos && updated.outstandingAmount > 0) {
         toast.success(
@@ -910,6 +930,23 @@ export default function InvoiceDetail() {
       }
       if (isApiErrorCode(err, ERROR_CODES.STOCK_INSUFFICIENT_OR_RESERVED)) {
         toast.error(formatStockInsufficientMessage(err), { duration: 8000 });
+        return;
+      }
+      // §2.2 delivery: el mensaje del BFF ya es accionable (incluye códigos entre
+      // corchetes desde ERPNext) — se muestra tal cual con duración larga.
+      if (
+        esErrorDelivery(
+          err,
+          "DELIVERY_CONTRA_ENTREGA_SIN_DELIVERY",
+          "DELIVERY_CONTRA_ENTREGA_CLIENTE_CREDITO",
+          "DELIVERY_PAGO_INCOMPLETO",
+          "DELIVERY_RESERVA_FALLIDA",
+          "DELIVERY_ARTICULO_INACTIVO",
+          "DELIVERY_PERIODO_CERRADO",
+        )
+      ) {
+        queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+        toast.error(msg || "No se pudo someter la venta con delivery", { duration: 8000 });
         return;
       }
       // §4.3: una nota/saldo enlazado en borrador que venció antes de someter
@@ -1056,8 +1093,17 @@ export default function InvoiceDetail() {
     const body: SubmitInvoiceDto | undefined = !paymentsFilled
       ? undefined
       : flujoCobro === "directo"
-        ? { payments: [{ modeOfPayment: directoMop, amount: Number(directoAmount) }] }
-        : buildSubmitPayload(payments, pendingAmount, metodosActivos);
+        ? {
+            payments: [
+              {
+                modeOfPayment: directoMop,
+                amount: Number(directoAmount),
+                // §2.2: en delivery el default es contra entrega; fuera no viaja.
+                ...(contraEntregaPosible ? { contraEntrega: directoContraEntrega } : {}),
+              },
+            ],
+          }
+        : buildSubmitPayload(payments, pendingAmount, metodosActivos, contraEntregaPosible);
     setLastSubmitBody(body);
     submitMutation.mutate(body);
   }
@@ -1226,7 +1272,17 @@ export default function InvoiceDetail() {
       toast.success(`Despacho ${despacho.id} creado en Borrador — revísalo y somételo`);
       navigate(`/despachos/${despacho.id}`);
     },
-    onError: (err: { message?: string }) => toast.error(err?.message ?? "Error al crear el despacho"),
+    onError: (err: ApiError) => {
+      // §4.1: factura delivery — para delivery se usan siempre los viajes.
+      if (esErrorDelivery(err, "DELIVERY_FACTURA_NO_DISPONIBLE")) {
+        toast.error(err?.message ?? "Esta factura es delivery: asignala en un viaje", {
+          duration: 8000,
+          action: { label: "Ir a viajes", onClick: () => navigate("/delivery/viajes") },
+        });
+        return;
+      }
+      toast.error(err?.message ?? "Error al crear el despacho");
+    },
   });
 
   // No hay un campo en la factura que diga "ya está despachada" — se resuelve buscando los
@@ -1243,7 +1299,12 @@ export default function InvoiceDetail() {
     (d) => d.status === "submitted" && d.deliveryStatus === "Completed",
   );
   const mostrarDespachar =
-    invoice?.status === "submitted" && despachoHabilitado && !despachoBorradorExistente && !yaDespachadaPorCompleto;
+    invoice?.status === "submitted" &&
+    despachoHabilitado &&
+    // §4.1: las ventas delivery no van por Delivery Note — siempre por viajes.
+    !esDeliverySubmit &&
+    !despachoBorradorExistente &&
+    !yaDespachadaPorCompleto;
 
   const isActionsLoading =
     submitMutation.isPending ||
@@ -1495,6 +1556,13 @@ export default function InvoiceDetail() {
               </span>
             )}
             <EstadoArsBadge estado={estadoArs} />
+            {/* §2.3 delivery: insignia de entrega y otra de cobro. */}
+            {invoice.delivery?.esDelivery && (
+              <>
+                <DeliveryEntregaBadge estado={invoice.delivery.estado} />
+                <DeliveryCobroBadge estado={invoice.delivery.cobro?.estado} />
+              </>
+            )}
             {relacionClienteSocio && (
               <Badge variant="info">Cliente socio</Badge>
             )}
@@ -1722,6 +1790,18 @@ export default function InvoiceDetail() {
                         onChange={(e) => setDirectoAmount(e.target.value)}
                       />
                     </div>
+                    {/* §2.2: en delivery el default es "lo cobra el repartidor". */}
+                    {contraEntregaPosible && (
+                      <label className="ff-check-wrap" style={{ alignSelf: "flex-end", paddingBottom: 8 }}>
+                        <input
+                          type="checkbox"
+                          className="ff-check"
+                          checked={directoContraEntrega}
+                          onChange={(e) => setDirectoContraEntrega(e.target.checked)}
+                        />
+                        <span style={{ fontSize: 13 }}>Se cobra al entregar</span>
+                      </label>
+                    )}
                   </div>
                 ) : (
                   <PaymentLinesEditor
@@ -1729,6 +1809,7 @@ export default function InvoiceDetail() {
                     value={payments}
                     onChange={setPayments}
                     currency={invoiceCurrency}
+                    mostrarContraEntrega={contraEntregaPosible}
                   />
                 )}
 
@@ -1946,6 +2027,9 @@ export default function InvoiceDetail() {
       )}
 
       {(ecfResult ?? invoice.ecf) && <EcfStatusCard ecf={ecfResult ?? invoice.ecf!} />}
+
+      {/* §2.3 delivery: bloque con entrega y cobro. */}
+      <DeliveryInfoCard delivery={invoice.delivery} currency={invoice.currency} />
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header navy-card-header">

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Lock } from 'lucide-react'
 import { getFacturacionConfig } from '@/shared/api/config'
@@ -17,6 +17,8 @@ import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { listDenominacionesLookup } from '@/shared/api/formularios'
+import { TurnoDeliveryAviso } from '@/features/delivery/TurnoDeliveryAviso'
+import { facturasBloqueoTurno, esErrorDelivery, type TurnoBloqueoDeliveryFactura } from '@/lib/deliveryErrors'
 
 const PREVIEW_COLUMNS = [
   { key: 'metodo', width: 200 },
@@ -47,11 +49,14 @@ export function CerrarTurnoModal({
   onClose,
   onClosed,
 }: CerrarTurnoModalProps) {
+  const queryClient = useQueryClient()
   const [cierreStep, setCierreStep] = useState<'preview' | 'result'>('preview')
   const [closingAmounts, setClosingAmounts] = useState<ClosingAmountLine[]>([])
   const [cierreResult, setCierreResult] = useState<CierreTurnoResult | null>(null)
   const [seededKey, setSeededKey] = useState<string | null>(null)
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
+  // §3.4: lista del 409 TURNO_CON_COBROS_DELIVERY_POR_CONCILIAR (sin excepción para admin).
+  const [bloqueoFacturas, setBloqueoFacturas] = useState<TurnoBloqueoDeliveryFactura[] | null>(null)
   const { widths: previewColWidths, startResize: startPreviewResize } = useResizableColumns(PREVIEW_COLUMNS)
   const { widths: resultColWidths, startResize: startResultResize } = useResizableColumns(RESULT_COLUMNS)
 
@@ -69,6 +74,7 @@ export function CerrarTurnoModal({
     setClosingAmounts([])
     setSeededKey(null)
     setPdfPreviewUrl(null)
+    setBloqueoFacturas(null)
   }
 
   const { data: facturacionConfig } = useQuery({
@@ -106,7 +112,8 @@ export function CerrarTurnoModal({
   ) {
     setSeededKey(preview.posOpeningEntry)
     setClosingAmounts(
-      preview.paymentReconciliation.map((p) => ({
+      // §3.4: la fila `esDeliveryTransito` no se cuenta — no entra al arqueo.
+      preview.paymentReconciliation.filter((p) => !p.esDeliveryTransito).map((p) => ({
         modeOfPayment: p.modeOfPayment,
         // Métodos que no exigen conciliación se dan por conciliados
         // automáticamente contra `expectedAmount` — el cajero no los toca.
@@ -139,6 +146,13 @@ export function CerrarTurnoModal({
         .catch(() => toast.error('No se pudo generar la vista previa del PDF del turno'))
     },
     onError: (err: ApiError) => {
+      if (esErrorDelivery(err, 'TURNO_CON_COBROS_DELIVERY_POR_CONCILIAR')) {
+        setBloqueoFacturas(facturasBloqueoTurno(err))
+        toast.error(err.message ?? 'El turno tiene cobros delivery por conciliar')
+        queryClient.invalidateQueries({ queryKey: ['turno-actual'] })
+        queryClient.invalidateQueries({ queryKey: ['turno-preview-cierre'] })
+        return
+      }
       toast.error(
         err?.message ??
           'No se pudo cerrar el turno. Verifica que tengas permiso para cerrar el turno de este cajero.',
@@ -233,6 +247,12 @@ export function CerrarTurnoModal({
     )
   }
 
+  // §3.4: filas de tránsito delivery informativas (sin conteo); `puedeCerrar` undefined = true.
+  const filasConteo = preview?.paymentReconciliation.filter((p) => !p.esDeliveryTransito) ?? []
+  const filasTransito = preview?.paymentReconciliation.filter((p) => p.esDeliveryTransito) ?? []
+  const bloqueadoPorDelivery = preview?.puedeCerrar === false
+  const facturasDelivery = bloqueoFacturas ?? preview?.cobrosDeliveryPorConciliar?.facturas ?? []
+
   const cierreValido =
     preview &&
     closingAmounts.every((c) => {
@@ -294,13 +314,24 @@ export function CerrarTurnoModal({
                 className="skeleton-box"
                 style={{ height: 120, display: 'block' }}
               />
-            ) : preview.paymentReconciliation.length === 0 ? (
+            ) : (
+              <>
+                {(bloqueadoPorDelivery || bloqueoFacturas) && (
+                  <TurnoDeliveryAviso
+                    cantidad={bloqueoFacturas ? bloqueoFacturas.length : preview.cobrosDeliveryPorConciliar?.cantidad}
+                    monto={bloqueoFacturas ? undefined : preview.cobrosDeliveryPorConciliar?.monto}
+                    facturas={facturasDelivery}
+                    onNavigate={closeModal}
+                  />
+                )}
+                {filasConteo.length === 0 && filasTransito.length === 0 ? (
               <p className="ff-hint">
                 Este turno no registró movimientos — no hay nada que contar.
                 Puedes cerrarlo directamente.
               </p>
             ) : (
               <>
+                {filasConteo.length > 0 && (<>
                 <p className="ff-hint">
                   Ingresa el monto contado físicamente por cada método de
                   pago. El sistema ya calculó lo que debería haber según las
@@ -330,7 +361,7 @@ export function CerrarTurnoModal({
                       </tr>
                     </thead>
                     <tbody>
-                      {preview.paymentReconciliation.map((p) => {
+                      {filasConteo.map((p) => {
                         const isCaja = isCajaMethod(p.modeOfPayment)
                         const derivedFromArqueo =
                           isCaja && arqueoEfectivoRequerido
@@ -561,6 +592,52 @@ export function CerrarTurnoModal({
                     })()}
                   </div>
                 )}
+                </>)}
+
+                {filasTransito.length > 0 && (
+                  <div style={{ border: '1px solid var(--border-default)', borderRadius: 'var(--radius-md)', padding: 12 }}>
+                    <label className="ff-label" style={{ margin: 0 }}>Ventas delivery — contra entrega</label>
+                    <p className="ff-hint" style={{ margin: '4px 0 8px' }}>
+                      Informativo: no se cuenta físicamente. Se liquida cuando el repartidor entrega el dinero.
+                    </p>
+                    {filasTransito.map((p) => (
+                      <div key={p.modeOfPayment} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                        <span>{p.modeOfPayment}</span>
+                        <span style={{ fontFamily: 'var(--font-body)' }}>{formatDOP(p.expectedAmount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {(preview.desgloseLiquidacionesDelivery?.length ?? 0) > 0 && (
+                  <div className="table-scroll">
+                    <p className="ff-hint" style={{ margin: '0 0 4px' }}>
+                      Liquidaciones delivery incluidas en el esperado de cada método:
+                    </p>
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Método</th>
+                          <th style={{ textAlign: 'right' }}>Esperado propio</th>
+                          <th style={{ textAlign: 'right' }}>Liquidaciones delivery</th>
+                          <th style={{ textAlign: 'right' }}>Esperado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {preview.desgloseLiquidacionesDelivery!.map((d) => (
+                          <tr key={d.modo}>
+                            <td>{d.modo}</td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatDOP(d.expectedNativo)}</td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatDOP(d.liquidacionesDelivery)}</td>
+                            <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontWeight: 600 }}>{formatDOP(d.expected)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            )}
               </>
             )
           ) : (
@@ -672,7 +749,7 @@ export function CerrarTurnoModal({
                 className="btn btn-primary"
                 onClick={() => cerrarMutation.mutate()}
                 disabled={
-                  !preview || cerrarMutation.isPending || !cierreValido
+                  !preview || cerrarMutation.isPending || !cierreValido || bloqueadoPorDelivery
                 }
               >
                 {cerrarMutation.isPending

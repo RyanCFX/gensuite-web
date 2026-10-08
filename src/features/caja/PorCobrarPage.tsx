@@ -28,6 +28,7 @@ import {
   overpayAmount,
   missingAmount,
   hasCashPayment,
+  esLineaTienda,
   isPaymentLinesValid,
   emptyPaymentLine,
   resolveDefaultModeOfPago,
@@ -44,6 +45,9 @@ import { SearchInput } from '@/shared/ui/SearchInput'
 import { listDenominacionesLookup } from '@/shared/api/formularios'
 import { Select, SelectItem } from '@/components/ui/select'
 import { usePuede } from '@/shared/permissions/can'
+import { useDeliveryPuerta } from '@/shared/hooks/useDelivery'
+import { codigoDelivery } from '@/lib/deliveryErrors'
+import { DeliveryCobroBadge, DeliveryEntregaBadge } from '@/features/delivery/DeliveryBadges'
 
 const PAGE_SIZE = 20
 
@@ -91,6 +95,17 @@ export default function PorCobrarPage() {
   // de la factura y solo se envía si lo cambió.
   const [ncfTypeElegido, setNcfTypeElegido] = useState('')
   const puedeCobrar = usePuede('caja.cobrar')
+  const deliveryPuerta = useDeliveryPuerta()
+
+  // ─── Delivery (§3.2) ───────────────────────────────────────────────
+  // El switch viene con el valor de la factura. Encenderlo (venta que no era delivery) solo
+  // se ofrece con la puerta abierta; apagarlo siempre se puede (también en modo drenaje).
+  const [deliveryOn, setDeliveryOn] = useState(false)
+  const [direccionEntrega, setDireccionEntrega] = useState('')
+  const [telefonoEntrega, setTelefonoEntrega] = useState('')
+  const [referenciaEntrega, setReferenciaEntrega] = useState('')
+  const [despachoFuturo, setDespachoFuturo] = useState(false)
+  const [directoContraEntrega, setDirectoContraEntrega] = useState(true)
   const ncfTypeFactura = selectedInvoice?.ncfType
   const selectedNcfType = ncfTypeElegido || ncfTypeFactura
   const ncfCambiado = !!ncfTypeElegido && ncfTypeElegido !== ncfTypeFactura
@@ -209,12 +224,31 @@ const [directoMop, setDirectoMop] = useState('')
     staleTime: 60 * 60_000,
   })
 
+  // Líneas de pago efectivas: con delivery, `contraEntrega` por defecto es true (lo cobra el
+  // repartidor); sin delivery nunca viaja (buildSubmitPayload solo lo agrega si esDelivery).
+  const paymentsEfectivos: PaymentLinesValue = deliveryOn
+    ? {
+        ...paymentsValue,
+        payments: paymentsValue.payments.map((p) => ({ ...p, contraEntrega: p.contraEntrega ?? true })),
+      }
+    : paymentsValue
+
   // ─── Completar cobro mutation ───────────────────────────────────────
   const completarMutation = useMutation({
     mutationFn: (dto: CobrarFacturaDto) => completarCobro(selectedInvoice!.id, dto),
     onSuccess: async (res) => {
       const invoiceId = selectedInvoice!.id
       const msg = `Factura cobrada — NCF: ${res.ncf}`
+      if (res.delivery?.esDelivery) {
+        const cobro = res.delivery.cobro
+        toast.info(
+          `Delivery: entrega ${res.delivery.estado ?? 'pendiente'}` +
+            (cobro && cobro.estado === 'por_conciliar'
+              ? ` — ${formatMoney(cobro.montoPorConciliar, selectedInvoiceCurrency)} por conciliar al regresar el repartidor`
+              : ''),
+          { duration: 8000 },
+        )
+      }
       if (res.fullyPaid) {
         toast.success(msg)
       } else {
@@ -222,6 +256,9 @@ const [directoMop, setDirectoMop] = useState('')
       }
       closeModal()
       queryClient.invalidateQueries({ queryKey: ['caja-por-cobrar'] })
+      queryClient.invalidateQueries({ queryKey: ['delivery-pendientes'] })
+      queryClient.invalidateQueries({ queryKey: ['delivery-cobros'] })
+      queryClient.invalidateQueries({ queryKey: ['turno-actual'] })
       // Este es el cierre real de la venta (§5.2 del doc de plantillas) — someter la factura
       // solo la reservó y la mandó aquí sin NCF ni pago completo. El gate es `usaModuloPos`
       // (toda factura en esta cola es una venta POS), no el formato de página genérico.
@@ -239,7 +276,19 @@ const [directoMop, setDirectoMop] = useState('')
         }
       }
     },
-    onError: (err: { message?: string }) => {
+    onError: (err: { message?: string; details?: Record<string, unknown> }) => {
+      // §9: mostrar el `message` del BFF; `code` solo para la lógica.
+      const dCode = codigoDelivery(err)
+      if (dCode && (dCode.startsWith('DELIVERY_') || dCode === 'STOCK_INSUFFICIENT_OR_RESERVED')) {
+        const faltantes = Array.isArray(err.details?.faltantes)
+          ? (err.details!.faltantes as { itemCode?: string; item?: string; faltante?: number }[])
+              .map((f) => `${f.itemCode ?? f.item ?? ''}${f.faltante != null ? ` (faltan ${f.faltante})` : ''}`)
+              .filter(Boolean)
+              .join(', ')
+          : ''
+        toast.error(`${err.message ?? 'Error de delivery'}${faltantes ? ` — ${faltantes}` : ''}`, { duration: 10000 })
+        return
+      }
       if (isApiErrorCode(err, ERROR_CODES.POS_PAYMENT_CURRENCY_MISMATCH)) {
         toast.error(err.message, { duration: 8000 })
         return
@@ -293,6 +342,12 @@ function openModal(invoice: PendienteCobroItem) {
      setSelectedInvoice(invoice)
      setClienteOcasionalRnc('')
      setNcfTypeElegido(invoice.ncfType ?? '')
+     setDeliveryOn(!!invoice.esDelivery)
+     setDireccionEntrega(invoice.direccionEntrega ?? '')
+     setTelefonoEntrega('')
+     setReferenciaEntrega('')
+     setDespachoFuturo(false)
+     setDirectoContraEntrega(true)
      const invoiceCurrency = invoice.currency ?? monedaBase
      if (flujoCobro === 'directo') {
        setDirectoMop(resolveDefaultModeOfPago(facturacion, invoiceCurrency))
@@ -308,6 +363,7 @@ function openModal(invoice: PendienteCobroItem) {
            ...emptyPaymentLine(),
            modeOfPayment: cashMethodCurrency === invoiceCurrency ? cashMethod : resolveDefaultModeOfPago(facturacion, invoiceCurrency),
            amount: String(montoACobrarDe(invoice)),
+           ...(invoice.esDelivery ? { contraEntrega: true } : {}),
          }],
        })
      }
@@ -319,7 +375,7 @@ function openModal(invoice: PendienteCobroItem) {
   }
 
   const cobroIsDirty = useDirtyCheck(
-    { directoMop, paymentsValue, clienteOcasionalRnc },
+    { directoMop, paymentsValue, clienteOcasionalRnc, deliveryOn, direccionEntrega, telefonoEntrega, referenciaEntrega, despachoFuturo, directoContraEntrega },
     !!selectedInvoice,
   )
   const { requestClose: requestCloseModal, confirming: confirmingCloseModal, confirmDiscard: confirmDiscardModal, cancelDiscard: cancelDiscardModal } = useConfirmClose(cobroIsDirty, closeModal)
@@ -335,10 +391,32 @@ function validateAndSubmit() {
      }
      const total = selectedRoundedTotal
 
+     if (deliveryOn && !direccionEntrega.trim()) {
+       toast.error('La dirección de entrega es obligatoria para una venta con delivery')
+       return
+     }
+     // Solo se envían los campos delivery si el cajero cambió algo respecto a la factura.
+     const deliveryDto: Partial<CobrarFacturaDto> = deliveryDirty
+       ? deliveryOn
+         ? {
+             esDelivery: true,
+             direccionEntrega: direccionEntrega.trim(),
+             ...(telefonoEntrega.trim() ? { telefonoEntrega: telefonoEntrega.trim() } : {}),
+             ...(referenciaEntrega.trim() ? { referenciaEntrega: referenciaEntrega.trim() } : {}),
+             ...(despachoFuturo ? { despachoFuturo: true } : {}),
+           }
+         : { esDelivery: false }
+       : {}
+
      if (flujoCobro === 'directo') {
        if (!directoMop) { toast.error('Selecciona un método de pago'); return }
        const dto: CobrarFacturaDto = {
-         payments: [{ modeOfPayment: directoMop, amount: total }],
+         payments: [{
+           modeOfPayment: directoMop,
+           amount: total,
+           ...(deliveryOn ? { contraEntrega: directoContraEntrega } : {}),
+         }],
+         ...deliveryDto,
          ...(ncfCambiado ? { ncfType: ncfTypeElegido } : {}),
          ...(exigeRncOcasional ? { rnc: clienteOcasionalRnc || undefined } : {}),
        }
@@ -346,7 +424,7 @@ function validateAndSubmit() {
        return
      }
 
-      const validLines = paymentsValue.payments.filter((p) => p.modeOfPayment && Number(p.amount) > 0)
+      const validLines = paymentsEfectivos.payments.filter((p) => p.modeOfPayment && Number(p.amount) > 0)
       if (validLines.length === 0) { toast.error('Agrega al menos una línea de pago válida'); return }
       // El botón ya se deshabilita con faltante, pero se valida igual por seguridad: no se puede
       // completar el cobro por menos del total.
@@ -360,33 +438,49 @@ function validateAndSubmit() {
       const entered = sumPayments(paymentsValue.payments)
       const over = overpayAmount(paymentsValue.payments, total)
       if (over > 0) {
-        if (!hasCashPayment(paymentsValue.payments, metodosActivos)) {
+        // §2.2: el vuelto se calcula solo sobre las líneas de tienda.
+        const tienda = paymentsEfectivos.payments.filter((p) => esLineaTienda(p, deliveryOn))
+        if (!hasCashPayment(tienda, metodosActivos)) {
           toast.error(`La suma de pagos (${formatMoney(entered, selectedInvoiceCurrency)}) excede el total (${formatMoney(total, selectedInvoiceCurrency)}) — agrega una línea en efectivo para registrar el excedente como vuelto`)
           return
         }
-        const cash = cashAmount(paymentsValue.payments, metodosActivos)
+        const cash = cashAmount(tienda, metodosActivos)
         if (over > cash + PAYMENT_LINES_TOLERANCE) {
           toast.error(`El vuelto (${formatMoney(over, selectedInvoiceCurrency)}) supera el efectivo recibido (${formatMoney(cash, selectedInvoiceCurrency)})`)
           return
         }
       }
-      if (!isPaymentLinesValid(paymentsValue, total, metodosActivos, denominacionesActivas)) {
+      if (!isPaymentLinesValid(paymentsEfectivos, total, metodosActivos, denominacionesActivas, deliveryOn)) {
         toast.error('Verifica las líneas de pago y el desglose del vuelto')
         return
       }
 
-      const payload = buildSubmitPayload(paymentsValue, total, metodosActivos)
+      const payload = buildSubmitPayload(paymentsEfectivos, total, metodosActivos, deliveryOn)
      completarMutation.mutate({
        ...payload,
+       ...deliveryDto,
        ...(ncfCambiado ? { ncfType: ncfTypeElegido } : {}),
        ...(exigeRncOcasional ? { rnc: clienteOcasionalRnc || undefined } : {}),
      })
    }
 
+  const deliveryDirty =
+    !!selectedInvoice &&
+    (deliveryOn !== !!selectedInvoice.esDelivery ||
+      (deliveryOn &&
+        (direccionEntrega.trim() !== (selectedInvoice.direccionEntrega ?? '').trim() ||
+          !!telefonoEntrega.trim() ||
+          !!referenciaEntrega.trim() ||
+          despachoFuturo)))
+  const mostrarSwitchDelivery =
+    !!selectedInvoice?.esDelivery || deliveryPuerta.operativo
+  const faltaDireccion = deliveryOn && !direccionEntrega.trim()
+
   const canSubmitCaja =
     flujoCobro !== 'caja' ||
     (missingAmount(paymentsValue.payments, selectedRoundedTotal) === 0 &&
-      isPaymentLinesValid(paymentsValue, selectedRoundedTotal, metodosActivos, denominacionesActivas))
+      isPaymentLinesValid(paymentsEfectivos, selectedRoundedTotal, metodosActivos, denominacionesActivas, deliveryOn)) &&
+    !(deliveryOn && !direccionEntrega.trim())
 
   // Con sobrepago válido, lo que realmente se cobra es el total (el excedente vuelve como vuelto).
   const submitButtonAmount =
@@ -504,7 +598,14 @@ function validateAndSubmit() {
                     )
                   : pendientes.map((inv) => (
                       <tr key={inv.id}>
-                        <td style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500 }}>{inv.id}</td>
+                        <td style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500 }}>
+                          {inv.id}
+                          {inv.esDelivery && (
+                            <div style={{ marginTop: 2 }}>
+                              <span className="badge badge-info">Delivery</span>
+                            </div>
+                          )}
+                        </td>
                         <td>{inv.esClienteOcasional ? (
                            <span>
                              {inv.clienteOcasionalNombre ?? inv.customerName}
@@ -512,7 +613,11 @@ function validateAndSubmit() {
                            </span>
                          ) : (
                            inv.customerName
-                         )}</td>
+                         )}
+                          {inv.esDelivery && inv.direccionEntrega && (
+                            <div className="td-muted" style={{ fontSize: 11 }}>{inv.direccionEntrega}</div>
+                          )}
+                        </td>
                         <td className="td-muted">{formatDate(inv.postingDate)}</td>
                         <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>
                           {formatMoney(inv.roundedTotal ?? inv.grandTotal, inv.currency ?? monedaBase)}
@@ -576,7 +681,7 @@ function validateAndSubmit() {
                 <button
                   className="btn btn-primary"
                   onClick={validateAndSubmit}
-                  disabled={completarMutation.isPending || (flujoCobro === 'caja' && !canSubmitCaja)}
+                  disabled={completarMutation.isPending || faltaDireccion || (flujoCobro === 'caja' && !canSubmitCaja)}
                 >
                   {completarMutation.isPending ? 'Procesando…' : `Cobrar ${formatMoney(
                     flujoCobro === 'directo' ? selectedRoundedTotal : submitButtonAmount,
@@ -665,6 +770,66 @@ function validateAndSubmit() {
                   )}
                 </div>
 
+               {mostrarSwitchDelivery && (
+                 <>
+                   <div className="divider" />
+                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                     <label className="ff-toggle-wrap">
+                       <span className="ff-toggle">
+                         <input
+                           type="checkbox"
+                           checked={deliveryOn}
+                           disabled={!puedeCobrar}
+                           onChange={(e) => setDeliveryOn(e.target.checked)}
+                         />
+                         <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
+                       </span>
+                       Con delivery
+                       {selectedInvoice.esDelivery && (
+                         <span style={{ marginLeft: 8, display: 'inline-flex', gap: 4 }}>
+                           <DeliveryEntregaBadge estado="pendiente" />
+                           <DeliveryCobroBadge estado="por_conciliar" />
+                         </span>
+                       )}
+                     </label>
+                     {!deliveryOn && selectedInvoice.esDelivery && (
+                       <div className="inline-alert inline-alert-warning">
+                         Al apagar delivery se libera la reserva de stock y la venta pasa a venta normal:
+                         rigen las validaciones habituales de stock y seriales, y el cobro se registra en caja.
+                       </div>
+                     )}
+                     {deliveryOn && (
+                       <>
+                         <div className="ff-wrap">
+                           <label className="ff-label ff-required" htmlFor="cajaDireccionEntrega">Dirección de entrega</label>
+                           <input
+                             id="cajaDireccionEntrega"
+                             className={`ff-input${faltaDireccion ? ' items-input-error' : ''}`}
+                             value={direccionEntrega}
+                             onChange={(e) => setDireccionEntrega(e.target.value)}
+                             placeholder="Calle, número, sector, ciudad"
+                           />
+                           {faltaDireccion && (
+                             <p className="ff-hint" style={{ color: 'var(--color-error)' }}>La dirección de entrega es obligatoria.</p>
+                           )}
+                         </div>
+                         <div className="form-row">
+                           <div className="ff-wrap">
+                             <label className="ff-label" htmlFor="cajaTelefonoEntrega">Teléfono de entrega</label>
+                             <input id="cajaTelefonoEntrega" className="ff-input" value={telefonoEntrega} onChange={(e) => setTelefonoEntrega(e.target.value)} />
+                           </div>
+                           <div className="ff-wrap">
+                             <label className="ff-label" htmlFor="cajaReferenciaEntrega">Referencia</label>
+                             <input id="cajaReferenciaEntrega" className="ff-input" maxLength={500} value={referenciaEntrega} onChange={(e) => setReferenciaEntrega(e.target.value)} />
+                           </div>
+                         </div>
+                         {/* Despacho futuro oculto con delivery encendido: el BFF lo fuerza (§2.1/§10). */}
+                       </>
+                     )}
+                   </div>
+                 </>
+               )}
+
                <div className="divider" />
 
                {flujoCobro === 'directo' ? (
@@ -680,6 +845,12 @@ function validateAndSubmit() {
                        placeholder="Seleccionar…"
                      />
                    </div>
+                   {deliveryOn && (
+                     <label className="ff-check-wrap" style={{ alignSelf: 'flex-start' }}>
+                       <input type="checkbox" className="ff-check" checked={directoContraEntrega} onChange={(e) => setDirectoContraEntrega(e.target.checked)} />
+                       <span style={{ fontSize: 13 }}>Se cobra al entregar <span className="td-muted">— lo cobra el repartidor (queda por conciliar)</span></span>
+                     </label>
+                   )}
                    <p className="ff-hint" style={{ margin: 0 }}>
                      Se cobrará el total de {formatMoney(selectedRoundedTotal, selectedInvoiceCurrency)} con este método.
                    </p>
@@ -696,6 +867,7 @@ function validateAndSubmit() {
                      value={paymentsValue}
                      onChange={setPaymentsValue}
                      currency={selectedInvoiceCurrency}
+                     mostrarContraEntrega={deliveryOn}
                    />
                  </>
                )}

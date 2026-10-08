@@ -36,6 +36,18 @@ function registerListeners(s: Socket) {
   s.on('despacho.solicitud.creada', invalidateDespachos)
   s.on('despacho.solicitud.confirmada', invalidateDespachos)
   s.on('despacho.solicitud.cancelada', invalidateDespachos)
+
+  // Delivery (§8 PROMPT_DELIVERY_FRONTEND.md): el payload es mínimo ({tenantId,id,branch?,turno?,
+  // estado?,resultado?,timestamp}) — solo se invalida la query REST, nunca se pinta el payload.
+  const invalidar = (...keys: string[][]) => () => {
+    for (const queryKey of keys) queryClient.invalidateQueries({ queryKey })
+  }
+  s.on('delivery.pendiente.nuevo', invalidar(['delivery-pendientes'], ['delivery-drenaje']))
+  s.on('delivery.viaje.actualizado', invalidar(['delivery-viajes'], ['delivery-viaje']))
+  s.on('delivery.viaje.despachado', invalidar(['delivery-viajes'], ['delivery-viaje'], ['delivery-pendientes']))
+  s.on('delivery.entrega.confirmada', invalidar(['delivery-viajes'], ['delivery-viaje'], ['delivery-pendientes'], ['delivery-cobros']))
+  s.on('delivery.cobro.por_conciliar', invalidar(['delivery-cobros'], ['delivery-cobros-resumen'], ['turno-actual'], ['delivery-drenaje']))
+  s.on('delivery.cobro.conciliado', invalidar(['delivery-cobros'], ['delivery-cobros-resumen'], ['turnos'], ['turno'], ['turno-actual'], ['delivery-drenaje']))
 }
 
 /** Conecta el socket compartido de la app con el `access_token` actual. Idempotente: si ya hay

@@ -25,6 +25,8 @@ export const ENDPOINTS = {
     permissionsByDoc: (doctype: string, name: string) =>
       `/me/permissions/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
     features: '/me/features',
+    // Lectura para todos los usuarios (§1, §7 PROMPT_DELIVERY_FRONTEND.md).
+    configuracionOperativa: '/me/configuracion-operativa',
     profile: '/me/profile',
     password: '/me/password',
     mfaFactors: '/me/mfa/factors',
@@ -431,6 +433,10 @@ export const ENDPOINTS = {
     despachoHabilitar: '/config/despacho/habilitar',
     despachoDeshabilitar: '/config/despacho/deshabilitar',
     despachoFuturo: '/config/despacho/futuro',
+    // Delivery con cobro contra entrega — docs/tasks/PROMPT_DELIVERY_FRONTEND.md §7.
+    deliveryHabilitar: '/config/delivery/habilitar',
+    deliveryDeshabilitar: '/config/delivery/deshabilitar',
+    deliveryConfig: '/config/delivery',
     ecf: '/config/ecf',
     ecfSecuencias: '/config/ecf/secuencias',
     ecfSecuenciasAnularRangos: '/config/ecf/secuencias/anular-rangos',
@@ -751,6 +757,24 @@ export const ENDPOINTS = {
       byId: (id: string) => `/despachos/confirmaciones/${encodeURIComponent(id)}`,
       confirmar: (id: string) => `/despachos/confirmaciones/${encodeURIComponent(id)}/confirmar`,
     },
+  },
+  // Delivery con cobro contra entrega — docs/tasks/PROMPT_DELIVERY_FRONTEND.md.
+  delivery: {
+    pendientes: '/delivery/pendientes',
+    cobros: '/delivery/cobros',
+    cobrosResumen: '/delivery/cobros/resumen',
+    conciliar: '/delivery/cobros/conciliar',
+    confirmarEntregas: '/delivery/entregas/confirmar',
+    anularFactura: (invoiceId: string) => `/delivery/facturas/${encodeURIComponent(invoiceId)}/anular`,
+    viajes: '/delivery/viajes',
+    viajeById: (id: string) => `/delivery/viajes/${encodeURIComponent(id)}`,
+    viajeDespachar: (id: string) => `/delivery/viajes/${encodeURIComponent(id)}/despachar`,
+    viajeCancelar: (id: string) => `/delivery/viajes/${encodeURIComponent(id)}/cancelar`,
+    viajePdf: (id: string) => `/delivery/viajes/${encodeURIComponent(id)}/pdf`,
+    repartidores: '/delivery/repartidores',
+    repartidorById: (id: string) => `/delivery/repartidores/${encodeURIComponent(id)}`,
+    vehiculos: '/delivery/vehiculos',
+    vehiculoById: (id: string) => `/delivery/vehiculos/${encodeURIComponent(id)}`,
   },
   apertura: {
     preflight: '/apertura/preflight',

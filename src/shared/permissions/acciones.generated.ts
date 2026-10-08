@@ -1,6 +1,5 @@
 // GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
-// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (467 acciones) + 6 de `catalogo.servicios.*`
-// (openapi.json: Lista de Servicios — ver/nuevo/activar/editar/precios/eliminar). Regenerar: node scripts/gen-acciones.mjs
+// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 + docs/tasks/PROMPT_DELIVERY_FRONTEND.md §1 (494 acciones). Regenerar: node scripts/gen-acciones.mjs
 
 export type AccionId =
   | 'apertura.compras.anular'
@@ -136,6 +135,9 @@ export type AccionId =
   | 'config.cobros.editar'
   | 'config.cobros.ver'
   | 'config.currencies.ver'
+  | 'config.delivery.configurar'
+  | 'config.delivery.deshabilitar'
+  | 'config.delivery.habilitar'
   | 'config.denominaciones.crear'
   | 'config.denominaciones.editar'
   | 'config.denominaciones.listar'
@@ -221,6 +223,24 @@ export type AccionId =
   | 'cotizaciones.listar'
   | 'cotizaciones.someter'
   | 'dashboard.ver'
+  | 'delivery.cobros.conciliar'
+  | 'delivery.cobros.conciliar-con-diferencia'
+  | 'delivery.cobros.listar'
+  | 'delivery.entregas.anular'
+  | 'delivery.entregas.confirmar'
+  | 'delivery.pendientes.listar'
+  | 'delivery.repartidores.crear'
+  | 'delivery.repartidores.editar'
+  | 'delivery.repartidores.listar'
+  | 'delivery.vehiculos.crear'
+  | 'delivery.vehiculos.editar'
+  | 'delivery.vehiculos.listar'
+  | 'delivery.viajes.cancelar'
+  | 'delivery.viajes.crear'
+  | 'delivery.viajes.despachar'
+  | 'delivery.viajes.editar'
+  | 'delivery.viajes.imprimir'
+  | 'delivery.viajes.listar'
   | 'departamentos.crear'
   | 'departamentos.editar'
   | 'departamentos.eliminar'
@@ -611,6 +631,9 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'config.cobros.editar',
   'config.cobros.ver',
   'config.currencies.ver',
+  'config.delivery.configurar',
+  'config.delivery.deshabilitar',
+  'config.delivery.habilitar',
   'config.denominaciones.crear',
   'config.denominaciones.editar',
   'config.denominaciones.listar',
@@ -696,6 +719,24 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'cotizaciones.listar',
   'cotizaciones.someter',
   'dashboard.ver',
+  'delivery.cobros.conciliar',
+  'delivery.cobros.conciliar-con-diferencia',
+  'delivery.cobros.listar',
+  'delivery.entregas.anular',
+  'delivery.entregas.confirmar',
+  'delivery.pendientes.listar',
+  'delivery.repartidores.crear',
+  'delivery.repartidores.editar',
+  'delivery.repartidores.listar',
+  'delivery.vehiculos.crear',
+  'delivery.vehiculos.editar',
+  'delivery.vehiculos.listar',
+  'delivery.viajes.cancelar',
+  'delivery.viajes.crear',
+  'delivery.viajes.despachar',
+  'delivery.viajes.editar',
+  'delivery.viajes.imprimir',
+  'delivery.viajes.listar',
   'departamentos.crear',
   'departamentos.editar',
   'departamentos.eliminar',

@@ -145,6 +145,15 @@ export const RUTAS_PERMISOS: readonly RutaPermiso[] = [
   { pattern: '/relaciones-comerciales', accion: 'relaciones.listar' },
 
   // Caja / Cobros / Pagos
+  // Delivery con cobro contra entrega — docs/tasks/PROMPT_DELIVERY_FRONTEND.md §6.
+  { pattern: '/delivery/pendientes', accion: 'delivery.pendientes.listar' },
+  { pattern: '/delivery/viajes/nuevo', accion: 'delivery.viajes.crear' },
+  { pattern: '/delivery/viajes/:id/editar', accion: 'delivery.viajes.editar' },
+  { pattern: '/delivery/viajes/*', accion: 'delivery.viajes.listar' },
+  { pattern: '/delivery/viajes', accion: 'delivery.viajes.listar' },
+  { pattern: '/delivery/repartidores', accion: 'delivery.repartidores.listar' },
+  { pattern: '/delivery/vehiculos', accion: 'delivery.vehiculos.listar' },
+  { pattern: '/delivery/cobros', accion: 'delivery.cobros.listar' },
   { pattern: '/caja/pendientes', accion: 'caja.listar' },
   { pattern: '/caja/por-cobrar', accion: 'caja.listar' },
   { pattern: '/turnos/*', accion: 'pos.turno.listar' },

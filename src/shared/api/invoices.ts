@@ -37,6 +37,11 @@ export interface ListInvoicesParams extends PaginationParams {
   sinLote?: boolean
   /** `true` = excluye facturas que ya tienen nota de crédito. */
   sinNotaCredito?: boolean
+  // ── Delivery (§2.3 docs/tasks/PROMPT_DELIVERY_FRONTEND.md) — filtros protegidos
+  // por permisos v2: respetar `filtrosPermitidos` del catálogo (ver useFiltrosPantalla).
+  esDelivery?: boolean
+  estadoDelivery?: string
+  estadoCobroDelivery?: string
 }
 
 export async function listInvoices(params?: ListInvoicesParams) {

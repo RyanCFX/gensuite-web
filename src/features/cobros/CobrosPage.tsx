@@ -203,7 +203,12 @@ export default function CobrosPage() {
                       </td>
                       <td>{cobro.customerName}</td>
                       <td>{formatDate(cobro.postingDate)}</td>
-                      <td>{cobro.modeOfPayment}</td>
+                      <td>
+                        {cobro.esDeliveryPorConciliar ? 'Delivery por conciliar' : cobro.modeOfPayment}
+                        {cobro.esDeliveryPorConciliar && (
+                          <span className="badge badge-warning" style={{ marginLeft: 6 }}>Por conciliar</span>
+                        )}
+                      </td>
                       <td>
                         {cobro.isPosSale ? (
                           <span className="badge badge-info">Venta al contado</span>

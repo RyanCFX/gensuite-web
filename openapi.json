@@ -7862,6 +7862,48 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "esDelivery",
+            "required": false,
+            "in": "query",
+            "description": "Solo facturas con delivery (true) o sin delivery (false).",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "estadoDelivery",
+            "required": false,
+            "in": "query",
+            "description": "Estado de entrega de la venta delivery.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pendiente",
+                "asignado",
+                "en_ruta",
+                "entregado",
+                "no_entregado",
+                "retirado",
+                "cancelado"
+              ]
+            }
+          },
+          {
+            "name": "estadoCobroDelivery",
+            "required": false,
+            "in": "query",
+            "description": "Estado del cobro contra entrega de la venta delivery.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "no_aplica",
+                "por_conciliar",
+                "conciliado",
+                "revertido"
+              ]
+            }
           }
         ],
         "responses": {
@@ -8839,6 +8881,106 @@
           }
         ],
         "summary": "Configurar despacho a futuro (permitirlo, si bloquea venta, auto-asignar seriales)",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/delivery/habilitar": {
+      "post": {
+        "description": "Exige el despacho habilitado (409 DELIVERY_REQUIERE_DESPACHO_HABILITADO). Provisiona (idempotente) la cuenta \"Cobros delivery en tránsito\", el modo de pago puente \"Delivery por conciliar\", un vehículo genérico y el Role Profile \"Delivery\", y marca Facturacion Config.delivery_habilitado=1.",
+        "operationId": "ConfigController_enableDeliveryModule",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Habilitar delivery con cobro contra entrega para este tenant",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/delivery/deshabilitar": {
+      "post": {
+        "description": "Marca Facturacion Config.delivery_habilitado=0. Responde 409 DELIVERY_CON_PENDIENTES (`details`: pendientesEntrega, viajesAbiertos, cobrosPorConciliar) si hay trabajo vivo. La cuenta y el modo de pago puente no se borran.",
+        "operationId": "ConfigController_disableDeliveryModule",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deshabilitar delivery para este tenant",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
+    "/api/v1/config/delivery": {
+      "put": {
+        "description": "Al menos un campo. `permiteDiferencias=true` exige `cuentaDiferencias` (existente y de la compañía). Ver docs/plans/PLAN_DELIVERY_COBRO_CONTRA_ENTREGA.md D6/D8.",
+        "operationId": "ConfigController_updateDeliveryConfig",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDeliveryConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Configurar delivery (automatismos, diferencias, vehículo y ciudad por defecto)",
         "tags": [
           "Configuración"
         ]
@@ -26725,6 +26867,294 @@
         ]
       }
     },
+    "/api/v1/credit-notes/{id}/reactivar": {
+      "post": {
+        "description": "Pasa de `vencido`/`perdido` a `vigente`. Si se había dado de baja con asiento, cancela ese asiento. Requiere el permiso correspondiente; sin él se puede autorizar con el código (`pinOverride`) de otro usuario que sí lo tenga (403 `PERMISO_REQUERIDO` con `details.admiteAutorizacionPin` si no se manda).",
+        "operationId": "CreditoVencimientoNotasController_reactivar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReactivarCreditoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reactiva una nota de crédito vencida o dada de baja con un vencimiento nuevo.",
+        "tags": [
+          "Notas de Crédito y Débito"
+        ]
+      }
+    },
+    "/api/v1/credit-notes/{id}/vencimiento": {
+      "patch": {
+        "description": "Requiere el permiso correspondiente; sin él se puede autorizar con el código (`pinOverride`) de otro usuario que sí lo tenga (403 `PERMISO_REQUERIDO` con `details.admiteAutorizacionPin` si no se manda).",
+        "operationId": "CreditoVencimientoNotasController_cambiarVencimiento",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiarVencimientoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambia (acorta o extiende) o quita el vencimiento de una nota de crédito vigente.",
+        "tags": [
+          "Notas de Crédito y Débito"
+        ]
+      }
+    },
+    "/api/v1/credit-notes/{id}/dar-de-baja": {
+      "post": {
+        "description": "Journal Entry contra la «Cuenta de Saldos Vencidos» de Facturación (con la sucursal del documento). Se revierte reactivando. Requiere el permiso correspondiente; sin él se puede autorizar con el código (`pinOverride`) de otro usuario que sí lo tenga (403 `PERMISO_REQUERIDO` con `details.admiteAutorizacionPin` si no se manda).",
+        "operationId": "CreditoVencimientoNotasController_darDeBaja",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DarDeBajaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Da de baja el saldo no usado de una nota de crédito VENCIDA (genera un asiento).",
+        "tags": [
+          "Notas de Crédito y Débito"
+        ]
+      }
+    },
+    "/api/v1/cobros/saldo-favor/{paymentEntryId}/reactivar": {
+      "post": {
+        "description": "Requiere el permiso correspondiente; sin él se puede autorizar con el código (`pinOverride`) de otro usuario que sí lo tenga (403 `PERMISO_REQUERIDO` con `details.admiteAutorizacionPin` si no se manda).",
+        "operationId": "CreditoVencimientoSaldosController_reactivar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentEntryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReactivarCreditoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reactiva un saldo a favor (Payment Entry) vencido o dado de baja.",
+        "tags": [
+          "Cobros"
+        ]
+      }
+    },
+    "/api/v1/cobros/saldo-favor/{paymentEntryId}/vencimiento": {
+      "patch": {
+        "description": "Requiere el permiso correspondiente; sin él se puede autorizar con el código (`pinOverride`) de otro usuario que sí lo tenga (403 `PERMISO_REQUERIDO` con `details.admiteAutorizacionPin` si no se manda).",
+        "operationId": "CreditoVencimientoSaldosController_cambiarVencimiento",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentEntryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiarVencimientoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cambia o quita el vencimiento de un saldo a favor vigente.",
+        "tags": [
+          "Cobros"
+        ]
+      }
+    },
+    "/api/v1/cobros/saldo-favor/{paymentEntryId}/dar-de-baja": {
+      "post": {
+        "description": "Requiere el permiso correspondiente; sin él se puede autorizar con el código (`pinOverride`) de otro usuario que sí lo tenga (403 `PERMISO_REQUERIDO` con `details.admiteAutorizacionPin` si no se manda).",
+        "operationId": "CreditoVencimientoSaldosController_darDeBaja",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "paymentEntryId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DarDeBajaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Da de baja un saldo a favor VENCIDO (genera un asiento).",
+        "tags": [
+          "Cobros"
+        ]
+      }
+    },
     "/api/v1/dashboard/catalogo": {
       "get": {
         "description": "Solo trae lo contratado por el tenant (GenSuite Control) y permitido al usuario. El frontend arma el dashboard con esta lista y pide cada reporte a GET /dashboard/widgets/:key.",
@@ -32139,6 +32569,1255 @@
         ]
       }
     },
+    "/api/v1/delivery/repartidores": {
+      "get": {
+        "operationId": "RepartidoresController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "description": "Filtra por estado.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "activo",
+                "suspendido",
+                "retirado"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda por nombre, id o teléfono.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar repartidores (Driver)",
+        "tags": [
+          "Delivery — Repartidores"
+        ]
+      },
+      "post": {
+        "operationId": "RepartidoresController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRepartidorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear repartidor",
+        "tags": [
+          "Delivery — Repartidores"
+        ]
+      }
+    },
+    "/api/v1/delivery/repartidores/{id}": {
+      "get": {
+        "operationId": "RepartidoresController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un repartidor",
+        "tags": [
+          "Delivery — Repartidores"
+        ]
+      },
+      "put": {
+        "description": "También sirve para suspenderlo o darlo de baja (`estado`). Un repartidor que no está activo no se puede asignar a un viaje.",
+        "operationId": "RepartidoresController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRepartidorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar repartidor",
+        "tags": [
+          "Delivery — Repartidores"
+        ]
+      }
+    },
+    "/api/v1/delivery/vehiculos": {
+      "get": {
+        "operationId": "VehiculosController_findAll",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda por placa, marca o modelo.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar vehículos (Vehicle)",
+        "tags": [
+          "Delivery — Vehículos"
+        ]
+      },
+      "post": {
+        "description": "Los campos obligatorios nativos que no aportan (odómetro, combustible, UOM) se completan con defaults.",
+        "operationId": "VehiculosController_create",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVehiculoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear vehículo",
+        "tags": [
+          "Delivery — Vehículos"
+        ]
+      }
+    },
+    "/api/v1/delivery/vehiculos/{id}": {
+      "get": {
+        "operationId": "VehiculosController_findOne",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un vehículo (el id es la placa)",
+        "tags": [
+          "Delivery — Vehículos"
+        ]
+      },
+      "put": {
+        "operationId": "VehiculosController_update",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVehiculoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar vehículo (marca, modelo, color — la placa no cambia)",
+        "tags": [
+          "Delivery — Vehículos"
+        ]
+      }
+    },
+    "/api/v1/delivery/viajes": {
+      "post": {
+        "description": "Crea la Delivery Trip en BORRADOR con una parada por factura y el Delivery Note en borrador de cada una (una factura admite UN solo despacho: 409 DELIVERY_FACTURA_YA_DESPACHADA). `despachar: true` hace además el despacho en el mismo paso (exige también `delivery.viajes.despachar`); si ese segundo paso falla, el viaje queda creado en borrador y el error trae `details.viaje`. `tracking` asigna seriales/lotes (D16). Si algo falla antes de crear la Trip, se borran los despachos en borrador creados en esta llamada.",
+        "operationId": "ViajesController_crear",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateViajeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Asignar facturas a un repartidor (crear viaje)",
+        "tags": [
+          "Delivery — Viajes"
+        ]
+      },
+      "get": {
+        "operationId": "DeliveryDrenajeController_listarViajes",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "borrador",
+                "programado",
+                "en_ruta",
+                "completado",
+                "cancelado"
+              ]
+            }
+          },
+          {
+            "name": "repartidor",
+            "required": false,
+            "in": "query",
+            "description": "Repartidor (Driver).",
+            "schema": {
+              "example": "HR-DRI-2026-00001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaDesde",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de salida, desde.",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaHasta",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de salida, hasta.",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "description": "Viajes con alguna factura de esa sucursal (el Delivery Trip no tiene sucursal propia).",
+            "schema": {
+              "example": "Sucursal Santiago",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar viajes (Delivery Trip)",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/viajes/{id}": {
+      "put": {
+        "description": "Reemplaza repartidor, vehículo, salida y/o facturas. Crea los despachos en borrador de las facturas nuevas y borra los de las que salen (esas vuelven a Pendiente). Solo borrador: 409 DELIVERY_VIAJE_NO_EDITABLE.",
+        "operationId": "ViajesController_actualizar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateViajeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar un viaje en borrador",
+        "tags": [
+          "Delivery — Viajes"
+        ]
+      },
+      "delete": {
+        "description": "Borra la Trip y sus despachos en borrador; las facturas vuelven a Pendiente.",
+        "operationId": "ViajesController_eliminar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Borrar un viaje en borrador",
+        "tags": [
+          "Delivery — Viajes"
+        ]
+      },
+      "get": {
+        "description": "Por parada: factura, dirección, resultado, cobro previsto, despacho y `trackingPendiente` (seriales/lotes que faltan asignar antes de despachar, D16).",
+        "operationId": "DeliveryDrenajeController_detalleViaje",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalle de un viaje con sus paradas",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/viajes/{id}/cancelar": {
+      "post": {
+        "description": "Cancela la Trip y luego sus despachos (vuelve el stock); las facturas pasan a Pendiente. Con alguna parada visitada: 409 DELIVERY_VIAJE_CON_ENTREGAS.",
+        "operationId": "ViajesController_cancelar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelarViajeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancelar un viaje despachado (sin paradas visitadas)",
+        "tags": [
+          "Delivery — Viajes"
+        ]
+      }
+    },
+    "/api/v1/delivery/viajes/{id}/pdf": {
+      "get": {
+        "operationId": "ViajesController_getPdf",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Hoja de ruta en PDF (print format \"Hoja de Ruta RD\")",
+        "tags": [
+          "Delivery — Viajes"
+        ]
+      }
+    },
+    "/api/v1/delivery/pendientes": {
+      "get": {
+        "description": "Facturas sometidas con delivery en estado `pendiente` o `no_entregado` (por defecto ambas). Paginado y filtrado en ERPNext.",
+        "operationId": "DeliveryDrenajeController_listarPendientes",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "Sucursal Santiago",
+              "type": "string"
+            }
+          },
+          {
+            "name": "customer",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "CUST-0001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "description": "Estado de entrega. Por defecto trae ambos: `pendiente` (sin asignar) y `no_entregado` (la entrega falló; la salida es anular la venta, no se reasigna).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pendiente",
+                "no_entregado"
+              ]
+            }
+          },
+          {
+            "name": "fechaDesde",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de la factura, desde.",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaHasta",
+            "required": false,
+            "in": "query",
+            "description": "Fecha de la factura, hasta.",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda por factura, NCF o nombre del cliente.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ventas delivery pendientes de asignar a un repartidor",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/viajes/{id}/despachar": {
+      "post": {
+        "description": "Valida tracking y stock de TODOS los despachos antes de someter ninguno; somete los Delivery Note (con compensación: 409 DELIVERY_DESPACHO_PARCIAL_REVERTIDO) y luego la Trip. Idempotente. Si los despachos se sometieron pero la Trip no, responde `estado: dns_sometidos_trip_pendiente` y se reintenta.",
+        "operationId": "DeliveryDrenajeController_despachar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DespacharViajeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Despachar un viaje asignado",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/entregas/confirmar": {
+      "post": {
+        "description": "Marca la parada como visitada con su resultado. Cada ítem es independiente. Con `delivery_confirmar_entrega_concilia_cobro` y resultado `entregado`, intenta conciliar el cobro con lo previsto; si el usuario no tiene `delivery.cobros.conciliar` la entrega se confirma igual y `autoConciliacion = { omitida: true, motivo: \"SIN_PERMISO\" }`.",
+        "operationId": "DeliveryDrenajeController_confirmarEntregas",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmarEntregasDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirmar entregas (entregado / no entregado)",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/facturas/{invoiceId}/anular": {
+      "post": {
+        "description": "Devuelve el despacho (stock), emite la nota de crédito total con el pago negado contra el modo puente y cierra el pedido interno de la reserva. Solo con el cobro `por_conciliar` (409 DELIVERY_ANULACION_NO_PERMITIDA si no). Reintentable.",
+        "operationId": "DeliveryDrenajeController_anular",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnularFacturaDeliveryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Anular una venta delivery con entrega fallida",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/cobros": {
+      "get": {
+        "description": "Por fila: `previsto[]`, repartidor, viaje, turno del cobro inicial y estado de la entrega.",
+        "operationId": "DeliveryDrenajeController_listarCobros",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderBy",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "description": "Estado del cobro. `todos` = por conciliar, conciliado y revertido.",
+            "schema": {
+              "default": "por_conciliar",
+              "type": "string",
+              "enum": [
+                "por_conciliar",
+                "conciliado",
+                "revertido",
+                "no_aplica",
+                "todos"
+              ]
+            }
+          },
+          {
+            "name": "repartidor",
+            "required": false,
+            "in": "query",
+            "description": "Repartidor (Driver) del viaje.",
+            "schema": {
+              "example": "HR-DRI-2026-00001",
+              "type": "string"
+            }
+          },
+          {
+            "name": "viaje",
+            "required": false,
+            "in": "query",
+            "description": "Viaje (Delivery Trip).",
+            "schema": {
+              "example": "MAT-DT-2026-00003",
+              "type": "string"
+            }
+          },
+          {
+            "name": "turno",
+            "required": false,
+            "in": "query",
+            "description": "Turno (POS Opening Entry) del cobro inicial.",
+            "schema": {
+              "example": "POS-OPE-2026-00007",
+              "type": "string"
+            }
+          },
+          {
+            "name": "estadoEntrega",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pendiente",
+                "asignado",
+                "en_ruta",
+                "entregado",
+                "no_entregado",
+                "retirado",
+                "cancelado"
+              ]
+            }
+          },
+          {
+            "name": "fechaDesde",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "fechaHasta",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "example": "2026-10-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Búsqueda por factura, NCF o nombre del cliente.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cobros delivery (por defecto, los por conciliar)",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/cobros/resumen": {
+      "get": {
+        "description": "Totales por turno y por repartidor, y el saldo de la cuenta en tránsito: el control de auditoría compara la suma de pendientes con el saldo del GL (`cuentaPuente.cuadra`).",
+        "operationId": "DeliveryDrenajeController_resumenCobros",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Resumen de cobros por conciliar",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/cobros/conciliar": {
+      "post": {
+        "description": "Por cada ítem crea un Payment Entry Internal Transfer de la cuenta en tránsito a la cuenta real del modo recibido, en el turno abierto del cajero que concilia (con POS exige turno: 409 TURNO_NO_ABIERTO). Recibido mayor al pendiente: 400 DELIVERY_COBRO_MONTO_NO_CUADRA; menor: solo con `diferencia` y la acción `delivery.cobros.conciliar-con-diferencia`. Cada ítem es independiente y la respuesta es por ítem.",
+        "operationId": "DeliveryDrenajeController_conciliar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConciliarCobrosDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Conciliar cobros delivery (el repartidor entrega el dinero)",
+        "tags": [
+          "Delivery"
+        ]
+      }
+    },
     "/api/v1/permisos/catalogo": {
       "get": {
         "operationId": "PermisosController_getCatalogo",
@@ -32443,7 +34122,7 @@
     },
     "/api/v1/me/features": {
       "get": {
-        "description": "docs/plans/PLAN_FEATURES_TENANT.md §10. El frontend arma el menú intersectando esto con GET /me/permissions: un ítem aparece solo si el feature está encendido (acá) Y el usuario tiene permiso sobre al menos una acción de ese módulo (endpoint existente, sin cambios). `usuariosActuales`/`sucursalesActuales` se calculan con el mismo método que usa el límite al crear, para poder mostrar \"X de Y\" sin un segundo roundtrip.\n\n`features` siempre trae las 42 claves de `public.features` con `type='modulo'` (nunca falta una) — el shape exacto es `MeFeaturesResponseDto`, ver el schema de esta respuesta.",
+        "description": "docs/plans/PLAN_FEATURES_TENANT.md §10. El frontend arma el menú intersectando esto con GET /me/permissions: un ítem aparece solo si el feature está encendido (acá) Y el usuario tiene permiso sobre al menos una acción de ese módulo (endpoint existente, sin cambios). `usuariosActuales`/`sucursalesActuales` se calculan con el mismo método que usa el límite al crear, para poder mostrar \"X de Y\" sin un segundo roundtrip.\n\n`features` siempre trae las 44 claves de `public.features` con `type='modulo'` (nunca falta una) — el shape exacto es `MeFeaturesResponseDto`, ver el schema de esta respuesta.",
         "operationId": "MeController_getFeatures",
         "parameters": [
           {
@@ -45091,6 +46770,26 @@
                 "$ref": "#/components/schemas/PinOverrideDto"
               }
             ]
+          },
+          "esDelivery": {
+            "type": "boolean",
+            "default": false,
+            "description": "Venta con delivery (docs/plans/PLAN_DELIVERY_COBRO_CONTRA_ENTREGA.md). Exige una dirección de entrega, fuerza despacho a futuro (update_stock=0) y reserva el stock al emitir. Requiere la feature `delivery` y el toggle del tenant habilitado (si no, 400 DELIVERY_NO_HABILITADO / 403 FEATURE_NO_CONTRATADO). Enviar `despachoFuturo: false` junto con `esDelivery: true` da 400 DELIVERY_REQUIERE_DESPACHO_FUTURO. Al editar (PUT) omitirlo equivale a `false`."
+          },
+          "direccionEntrega": {
+            "type": "string",
+            "example": "Calle 5 #12, Los Prados, Santo Domingo",
+            "description": "Dirección de entrega (override). Si se omite se usa la dirección del comprador ocasional o la del cliente registrado (`Customer.address`); si todo está vacío, 400 DELIVERY_DIRECCION_REQUERIDA. No modifica la ficha del cliente."
+          },
+          "telefonoEntrega": {
+            "type": "string",
+            "example": "809-555-0100",
+            "description": "Teléfono de contacto para el repartidor (solo con `esDelivery`)."
+          },
+          "referenciaEntrega": {
+            "type": "string",
+            "example": "Portón verde, tocar el timbre dos veces",
+            "description": "Referencias o instrucciones de entrega (solo con `esDelivery`, máx 500)."
           }
         },
         "required": [
@@ -45212,6 +46911,26 @@
                 "$ref": "#/components/schemas/PinOverrideDto"
               }
             ]
+          },
+          "esDelivery": {
+            "type": "boolean",
+            "default": false,
+            "description": "Venta con delivery (docs/plans/PLAN_DELIVERY_COBRO_CONTRA_ENTREGA.md). Exige una dirección de entrega, fuerza despacho a futuro (update_stock=0) y reserva el stock al emitir. Requiere la feature `delivery` y el toggle del tenant habilitado (si no, 400 DELIVERY_NO_HABILITADO / 403 FEATURE_NO_CONTRATADO). Enviar `despachoFuturo: false` junto con `esDelivery: true` da 400 DELIVERY_REQUIERE_DESPACHO_FUTURO. Al editar (PUT) omitirlo equivale a `false`."
+          },
+          "direccionEntrega": {
+            "type": "string",
+            "example": "Calle 5 #12, Los Prados, Santo Domingo",
+            "description": "Dirección de entrega (override). Si se omite se usa la dirección del comprador ocasional o la del cliente registrado (`Customer.address`); si todo está vacío, 400 DELIVERY_DIRECCION_REQUERIDA. No modifica la ficha del cliente."
+          },
+          "telefonoEntrega": {
+            "type": "string",
+            "example": "809-555-0100",
+            "description": "Teléfono de contacto para el repartidor (solo con `esDelivery`)."
+          },
+          "referenciaEntrega": {
+            "type": "string",
+            "example": "Portón verde, tocar el timbre dos veces",
+            "description": "Referencias o instrucciones de entrega (solo con `esDelivery`, máx 500)."
           }
         },
         "required": [
@@ -45308,6 +47027,10 @@
             "type": "string",
             "example": "BA-00001",
             "description": "Cuenta bancaria (Bank Account) a la que se acredita este pago. Obligatorio si el método de pago tiene \"requiresBankAccount\" activo y no tiene una cuenta bancaria por defecto configurada (ver Config \u003E Métodos de Pago)."
+          },
+          "contraEntrega": {
+            "type": "boolean",
+            "description": "Solo en ventas con delivery: `true` (default en esas ventas) = lo cobra el repartidor al entregar (queda \"por conciliar\" contra la cuenta en tránsito); `false` = ya se cobró en tienda con este método. Enviarlo en `true` en una venta sin delivery da 400 DELIVERY_CONTRA_ENTREGA_SIN_DELIVERY."
           }
         },
         "required": [
@@ -45653,6 +47376,44 @@
             "default": false,
             "description": "Igual que `tasaFijaCxc`, pero para pagos a proveedores (Cuentas por Pagar)."
           },
+          "creditoVigenciaDias": {
+            "type": "number",
+            "default": 0,
+            "minimum": 0,
+            "maximum": 3650,
+            "description": "Días de vigencia de una nota de crédito desde su fecha. `0` = no vence. Se fija al crear la nota: cambiarlo no altera las ya emitidas. (docs/plans/PLAN_VENCIMIENTO_SALDOS_A_FAVOR.md)"
+          },
+          "creditoUso": {
+            "type": "string",
+            "enum": [
+              "multiple",
+              "unico"
+            ],
+            "default": "multiple",
+            "description": "`multiple`: una nota de crédito se aplica a varias facturas hasta agotarla (comportamiento anterior). `unico`: solo una aplicación; lo que sobre se trata según `creditoRemanenteUnico`. Se fija al crear la nota."
+          },
+          "creditoRemanenteUnico": {
+            "type": "string",
+            "enum": [
+              "saldo_favor",
+              "perder"
+            ],
+            "default": "saldo_favor",
+            "description": "Solo con `creditoUso = unico`: qué pasa con lo no usado tras la única aplicación. `saldo_favor`: la nota pasa a saldo a favor (uso múltiple, con la vigencia de `saldoFavorVigenciaDias`). `perder`: se da de baja contra `saldoVencidoCuenta` (exige esa cuenta)."
+          },
+          "saldoFavorVigenciaDias": {
+            "type": "number",
+            "default": 0,
+            "minimum": 0,
+            "maximum": 3650,
+            "description": "Días de vigencia de TODO saldo a favor del cliente (anticipo sin aplicar, cobro de más, reembolso de pedido cancelado, remanente de una nota de uso único). `0` = no vence. Cuenta desde que nace el saldo. No aplica a clientes aseguradora."
+          },
+          "saldoVencidoCuenta": {
+            "type": "string",
+            "nullable": true,
+            "example": "4-9-01-001 - Saldos a favor vencidos - FS",
+            "description": "Cuenta de INGRESO (hoja, activa, de la compañía) donde se registra lo que se pierde: baja de un saldo vencido o remanente `perder`. Obligatoria con `creditoUso = unico` y `creditoRemanenteUnico = perder`."
+          },
           "permitirPagoMonedaDistintaBanco": {
             "type": "boolean",
             "default": false,
@@ -45726,6 +47487,41 @@
             "type": "boolean",
             "example": false,
             "description": "Solo para ventas que NO son a futuro (inmediatas): si al confirmar stock (justo antes de someter la factura) el BFF asigna automáticamente los seriales/lotes disponibles (nativo `get_auto_data` de ERPNext) en vez de exigir asignación manual previa (POST /invoices/:id/asignar-serial-lote)."
+          }
+        }
+      },
+      "UpdateDeliveryConfigDto": {
+        "type": "object",
+        "properties": {
+          "confirmarEntregaConciliaCobro": {
+            "type": "boolean",
+            "example": false,
+            "description": "Confirmar una entrega como \"entregado\" concilia automáticamente el cobro pendiente de esa factura con lo previsto (D6). Si quien confirma no tiene permiso de conciliar, la entrega se confirma igual y el cobro queda para caja."
+          },
+          "conciliarCobroConfirmaEntrega": {
+            "type": "boolean",
+            "example": false,
+            "description": "Conciliar el cobro de una factura \"en ruta\" marca su parada como entregada (D6)."
+          },
+          "permiteDiferencias": {
+            "type": "boolean",
+            "example": false,
+            "description": "Permite conciliar un cobro con faltante (recibido menor al previsto). Exige `cuentaDiferencias` (la del request o la ya configurada) y el permiso `delivery.cobros.conciliar-con-diferencia` al conciliar (D8)."
+          },
+          "cuentaDiferencias": {
+            "type": "string",
+            "example": "1199 - Faltantes de caja - ACME",
+            "description": "Cuenta contable donde se registra el faltante al conciliar con diferencia. Debe existir, ser de movimiento y de la compañía del tenant. Cadena vacía la quita."
+          },
+          "vehiculoPorDefecto": {
+            "type": "string",
+            "example": "SIN-VEHICULO",
+            "description": "Vehículo por defecto de los viajes cuando no se indica uno (el genérico lo provisiona POST /config/delivery/habilitar)."
+          },
+          "ciudadPorDefecto": {
+            "type": "string",
+            "example": "Santo Domingo",
+            "description": "Ciudad por defecto de las direcciones de entrega (Address.city es obligatorio en ERPNext)."
           }
         }
       },
@@ -47354,6 +49150,26 @@
             ],
             "example": "B02",
             "description": "Sobrescribe el tipo de comprobante de la factura al cobrar. Opcional: si no se envía se usa el que la factura trae al crearse. Solo tipos de venta: B01/B02/B14/B15 o su equivalente electrónico E31/E32/E44/E45 (se guarda como B0x). Con B01/E31 sobre un comprador ocasional se exige `rnc`."
+          },
+          "esDelivery": {
+            "type": "boolean",
+            "description": "Solo en POST /caja/facturas/:id/completar-cobro. Cambia si la venta es con delivery. Si se omite, rige lo que trae la factura. De off a on exige dirección y reserva el stock; de on a off la venta vuelve a ser común (se recalcula update_stock con `despachoFuturo`)."
+          },
+          "direccionEntrega": {
+            "type": "string",
+            "description": "Dirección de entrega (override). Omitido = la que trae la factura."
+          },
+          "telefonoEntrega": {
+            "type": "string",
+            "description": "Teléfono de contacto para el repartidor."
+          },
+          "referenciaEntrega": {
+            "type": "string",
+            "description": "Referencias o instrucciones de entrega (máx 500)."
+          },
+          "despachoFuturo": {
+            "type": "boolean",
+            "description": "Solo al APAGAR delivery en completar-cobro: indica si la venta común resultante es a futuro (true) o inmediata (false). Mismo significado que `despachoFuturo` en facturas."
           }
         },
         "required": [
@@ -51640,6 +53456,18 @@
           "pedidoRequiereConfirmacionDespacho": {
             "type": "boolean"
           },
+          "deliveryHabilitado": {
+            "type": "boolean"
+          },
+          "deliveryConfirmarEntregaConciliaCobro": {
+            "type": "boolean"
+          },
+          "deliveryConciliarCobroConfirmaEntrega": {
+            "type": "boolean"
+          },
+          "deliveryPermiteDiferencias": {
+            "type": "boolean"
+          },
           "pedidoConduceIncluyePrecios": {
             "type": "boolean"
           },
@@ -51707,6 +53535,10 @@
           "despachoFuturoHabilitado",
           "despachoFuturoBloqueaVenta",
           "pedidoRequiereConfirmacionDespacho",
+          "deliveryHabilitado",
+          "deliveryConfirmarEntregaConciliaCobro",
+          "deliveryConciliarCobroConfirmaEntrega",
+          "deliveryPermiteDiferencias",
           "pedidoConduceIncluyePrecios",
           "pedirPinPrecioMinimoServicios",
           "pedirPinPrecioMinimoProductos",
@@ -52015,6 +53847,23 @@
                 "$ref": "#/components/schemas/PinOverrideDto"
               }
             ]
+          },
+          "esDelivery": {
+            "type": "boolean",
+            "default": false,
+            "description": "Venta con delivery (docs/plans/PLAN_DELIVERY_COBRO_CONTRA_ENTREGA.md): la cotización lleva la dirección de entrega y el pedido/factura que nace de ella la hereda. Requiere la feature `delivery` habilitada. Fuerza despacho a futuro en la factura derivada."
+          },
+          "direccionEntrega": {
+            "type": "string",
+            "description": "Dirección de entrega (override). Si se omite se usa la del cliente. Obligatoria con `esDelivery` (400 DELIVERY_DIRECCION_REQUERIDA si no hay ninguna)."
+          },
+          "telefonoEntrega": {
+            "type": "string",
+            "description": "Teléfono de contacto para el repartidor."
+          },
+          "referenciaEntrega": {
+            "type": "string",
+            "description": "Referencias o instrucciones de entrega (máx 500)."
           }
         },
         "required": [
@@ -52167,6 +54016,84 @@
           "customer",
           "postingDate",
           "items"
+        ]
+      },
+      "ReactivarCreditoDto": {
+        "type": "object",
+        "properties": {
+          "pinOverride": {
+            "description": "Código (PIN + usuario o código de tarjeta) de OTRO usuario que sí tenga el permiso. Solo se usa si quien llama no lo tiene; si lo tiene, se ignora. Sin permiso y sin este campo la respuesta es 403 `PERMISO_REQUERIDO` con `details.admiteAutorizacionPin = true`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PinOverrideDto"
+              }
+            ]
+          },
+          "venceEl": {
+            "type": "string",
+            "example": "2026-12-31",
+            "description": "Nuevo vencimiento (`YYYY-MM-DD`, hoy o futuro). Si se omite junto con `dias`, se usa la vigencia configurada (nota de crédito o saldo a favor); con vigencia 0 queda SIN vencimiento."
+          },
+          "dias": {
+            "type": "number",
+            "example": 30,
+            "description": "Alternativa a `venceEl`: días desde hoy."
+          },
+          "motivo": {
+            "type": "string",
+            "example": "Cliente reclamó dentro de la política",
+            "description": "Obligatorio (queda en el historial)."
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "CambiarVencimientoDto": {
+        "type": "object",
+        "properties": {
+          "pinOverride": {
+            "description": "Código (PIN + usuario o código de tarjeta) de OTRO usuario que sí tenga el permiso. Solo se usa si quien llama no lo tiene; si lo tiene, se ignora. Sin permiso y sin este campo la respuesta es 403 `PERMISO_REQUERIDO` con `details.admiteAutorizacionPin = true`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PinOverrideDto"
+              }
+            ]
+          },
+          "venceEl": {
+            "type": "string",
+            "example": "2026-12-31",
+            "nullable": true,
+            "description": "Nueva fecha de vencimiento (`YYYY-MM-DD`, hoy o futuro) de un crédito VIGENTE. `null` = quitar el vencimiento. Un crédito vencido se reactiva, no se cambia."
+          },
+          "motivo": {
+            "type": "string",
+            "example": "Acuerdo comercial con el cliente"
+          }
+        },
+        "required": [
+          "venceEl",
+          "motivo"
+        ]
+      },
+      "DarDeBajaDto": {
+        "type": "object",
+        "properties": {
+          "pinOverride": {
+            "description": "Código (PIN + usuario o código de tarjeta) de OTRO usuario que sí tenga el permiso. Solo se usa si quien llama no lo tiene; si lo tiene, se ignora. Sin permiso y sin este campo la respuesta es 403 `PERMISO_REQUERIDO` con `details.admiteAutorizacionPin = true`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PinOverrideDto"
+              }
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "example": "Saldo vencido sin reclamo del cliente"
+          }
+        },
+        "required": [
+          "motivo"
         ]
       },
       "DashboardReporteCatalogoDto": {
@@ -52751,6 +54678,23 @@
                 "$ref": "#/components/schemas/PinOverrideDto"
               }
             ]
+          },
+          "esDelivery": {
+            "type": "boolean",
+            "default": false,
+            "description": "Venta con delivery (docs/plans/PLAN_DELIVERY_COBRO_CONTRA_ENTREGA.md): el pedido lleva la dirección de entrega y la factura que nace de él la hereda. Requiere la feature `delivery` habilitada. Fuerza despacho a futuro en la factura derivada."
+          },
+          "direccionEntrega": {
+            "type": "string",
+            "description": "Dirección de entrega (override). Si se omite se usa la del cliente. Obligatoria con `esDelivery` (400 DELIVERY_DIRECCION_REQUERIDA si no hay ninguna)."
+          },
+          "telefonoEntrega": {
+            "type": "string",
+            "description": "Teléfono de contacto para el repartidor."
+          },
+          "referenciaEntrega": {
+            "type": "string",
+            "description": "Referencias o instrucciones de entrega (máx 500)."
           }
         },
         "required": [
@@ -53762,6 +55706,422 @@
           "reason"
         ]
       },
+      "CreateRepartidorDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "Juan Pérez",
+            "description": "Nombre completo (Driver.full_name)."
+          },
+          "telefono": {
+            "type": "string",
+            "example": "809-555-0101"
+          },
+          "licencia": {
+            "type": "string",
+            "example": "LIC-123456",
+            "description": "Número de licencia de conducir."
+          },
+          "empleado": {
+            "type": "string",
+            "example": "HR-EMP-00012",
+            "description": "Empleado (RRHH) al que corresponde el repartidor, si lo hay."
+          },
+          "usuario": {
+            "type": "string",
+            "example": "juan@acme.do",
+            "description": "Usuario del sistema vinculado (para una futura app del repartidor)."
+          },
+          "transportista": {
+            "type": "string",
+            "example": "Motoconchos El Rápido",
+            "description": "Repartidor externo (motoconcho o empresa de mensajería): nombre del Supplier transportista (Driver.transporter)."
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "suspendido",
+              "retirado"
+            ],
+            "default": "activo"
+          }
+        },
+        "required": [
+          "nombre"
+        ]
+      },
+      "UpdateRepartidorDto": {
+        "type": "object",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "example": "Juan A. Pérez"
+          },
+          "telefono": {
+            "type": "string",
+            "example": "809-555-0101"
+          },
+          "licencia": {
+            "type": "string",
+            "example": "LIC-123456"
+          },
+          "empleado": {
+            "type": "string",
+            "example": "HR-EMP-00012"
+          },
+          "usuario": {
+            "type": "string",
+            "example": "juan@acme.do"
+          },
+          "transportista": {
+            "type": "string",
+            "example": "Motoconchos El Rápido"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "activo",
+              "suspendido",
+              "retirado"
+            ]
+          }
+        }
+      },
+      "CreateVehiculoDto": {
+        "type": "object",
+        "properties": {
+          "placa": {
+            "type": "string",
+            "example": "A123456",
+            "description": "Placa. Es el identificador del vehículo (Vehicle.license_plate = name)."
+          },
+          "marca": {
+            "type": "string",
+            "example": "Honda"
+          },
+          "modelo": {
+            "type": "string",
+            "example": "CG 150"
+          },
+          "color": {
+            "type": "string",
+            "example": "Rojo"
+          }
+        },
+        "required": [
+          "placa",
+          "marca",
+          "modelo"
+        ]
+      },
+      "UpdateVehiculoDto": {
+        "type": "object",
+        "properties": {
+          "marca": {
+            "type": "string",
+            "example": "Honda"
+          },
+          "modelo": {
+            "type": "string",
+            "example": "CG 150"
+          },
+          "color": {
+            "type": "string",
+            "example": "Azul"
+          }
+        }
+      },
+      "ViajeFacturaDto": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string",
+            "example": "ACC-SINV-2026-00042",
+            "description": "Factura delivery sometida y pendiente."
+          },
+          "orden": {
+            "type": "number",
+            "example": 1,
+            "description": "Orden de la parada en la ruta (1 = primera)."
+          }
+        },
+        "required": [
+          "invoiceId"
+        ]
+      },
+      "ViajeTrackingFacturaDto": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string",
+            "example": "ACC-SINV-2026-00042"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssignDespachoTrackingItemDto"
+            }
+          }
+        },
+        "required": [
+          "invoiceId",
+          "items"
+        ]
+      },
+      "CreateViajeDto": {
+        "type": "object",
+        "properties": {
+          "repartidor": {
+            "type": "string",
+            "example": "HR-DRI-2026-00001",
+            "description": "Repartidor (Driver) ACTIVO."
+          },
+          "vehiculo": {
+            "type": "string",
+            "example": "A123456",
+            "description": "Vehículo (placa). Si se omite se usa el vehículo genérico por defecto del tenant."
+          },
+          "salida": {
+            "type": "string",
+            "example": "2026-10-08T14:30:00-04:00",
+            "description": "Salida prevista. Por defecto, ahora."
+          },
+          "facturas": {
+            "description": "Una parada por factura (1 a 100).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViajeFacturaDto"
+            }
+          },
+          "notas": {
+            "type": "string",
+            "example": "Entregar antes de las 5 pm"
+          },
+          "despachar": {
+            "type": "boolean",
+            "default": false,
+            "description": "true = asignar Y despachar en un solo paso (exige además `delivery.viajes.despachar`). Si el despacho falla, el viaje queda creado en borrador y el error trae `details.viaje`."
+          },
+          "tracking": {
+            "description": "Seriales/lotes por factura (D16), aplicados al despacho en borrador.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViajeTrackingFacturaDto"
+            }
+          }
+        },
+        "required": [
+          "repartidor",
+          "facturas"
+        ]
+      },
+      "UpdateViajeDto": {
+        "type": "object",
+        "properties": {
+          "repartidor": {
+            "type": "string",
+            "example": "HR-DRI-2026-00002"
+          },
+          "vehiculo": {
+            "type": "string",
+            "example": "A123456"
+          },
+          "salida": {
+            "type": "string",
+            "example": "2026-10-08T15:00:00-04:00"
+          },
+          "facturas": {
+            "description": "Si se envía REEMPLAZA las paradas: se crean los despachos en borrador de las facturas nuevas y se borran los de las que salen del viaje.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViajeFacturaDto"
+            }
+          },
+          "notas": {
+            "type": "string"
+          }
+        }
+      },
+      "CancelarViajeDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "example": "El repartidor sufrió una avería",
+            "minLength": 10,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "DespacharViajeDto": {
+        "type": "object",
+        "properties": {
+          "tracking": {
+            "description": "Seriales/lotes por factura (D16). Se asignan antes de someter. Sin esto, si `despacho_confirmar_stock_asigna_seriales=1` se auto-asignan; si aun así falta algo: 409 DELIVERY_TRACKING_PENDIENTE (antes de someter ningún despacho).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ViajeTrackingFacturaDto"
+            }
+          }
+        }
+      },
+      "EntregaItemDto": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string",
+            "example": "ACC-SINV-2026-00042"
+          },
+          "resultado": {
+            "type": "string",
+            "enum": [
+              "entregado",
+              "no_entregado"
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "example": "Cliente ausente, no contestó el teléfono",
+            "description": "Obligatorio si `resultado = no_entregado`."
+          }
+        },
+        "required": [
+          "invoiceId",
+          "resultado"
+        ]
+      },
+      "ConfirmarEntregasDto": {
+        "type": "object",
+        "properties": {
+          "entregas": {
+            "description": "1 a 100 entregas.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntregaItemDto"
+            }
+          }
+        },
+        "required": [
+          "entregas"
+        ]
+      },
+      "AnularFacturaDeliveryDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "example": "Entrega fallida: el cliente rechazó el pedido",
+            "minLength": 10,
+            "maxLength": 500,
+            "description": "Motivo de la anulación (queda en la nota de crédito)."
+          },
+          "motivoAnulacion": {
+            "type": "number",
+            "enum": [1, 2, 3, 4, 5],
+            "default": 1,
+            "description": "Código de modificación DGII de la nota de crédito (Tabla VI). Solo se usa si el tenant emite la nota como e-CF (E34); por defecto 1 = Anula."
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "ConciliacionLineaDto": {
+        "type": "object",
+        "properties": {
+          "modeOfPayment": {
+            "type": "string",
+            "example": "Efectivo RD",
+            "description": "Modo de pago REAL con el que pagó el cliente al repartidor. Si se omite se usa el modo de caja por defecto de la moneda. No puede ser el modo puente \"Delivery por conciliar\"."
+          },
+          "amount": {
+            "type": "number",
+            "example": 1500,
+            "description": "Monto recibido con este modo."
+          },
+          "cardNumber": {
+            "type": "string"
+          },
+          "authorizationCode": {
+            "type": "string"
+          },
+          "bank": {
+            "type": "string"
+          },
+          "checkNumber": {
+            "type": "string"
+          },
+          "bankAccount": {
+            "type": "string",
+            "example": "BA-00001",
+            "description": "Cuenta bancaria destino (modos que la exigen)."
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      },
+      "DiferenciaConciliacionDto": {
+        "type": "object",
+        "properties": {
+          "motivo": {
+            "type": "string",
+            "example": "El cliente pagó RD$100 menos; el repartidor lo cubrirá",
+            "description": "Motivo obligatorio del faltante (queda en el asiento de diferencia)."
+          }
+        },
+        "required": [
+          "motivo"
+        ]
+      },
+      "ConciliacionItemDto": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "string",
+            "example": "ACC-SINV-2026-00042"
+          },
+          "recibido": {
+            "description": "Lo que el repartidor entregó, por modo de pago real. Su suma debe ser igual al pendiente; si es menor, hace falta `diferencia`. Si es mayor: 400 DELIVERY_COBRO_MONTO_NO_CUADRA.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConciliacionLineaDto"
+            }
+          },
+          "diferencia": {
+            "description": "Faltante permitido (D8): requiere `delivery_permite_diferencias`, la cuenta de diferencias y la acción `delivery.cobros.conciliar-con-diferencia`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DiferenciaConciliacionDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "invoiceId",
+          "recibido"
+        ]
+      },
+      "ConciliarCobrosDto": {
+        "type": "object",
+        "properties": {
+          "conciliaciones": {
+            "description": "1 a 100 conciliaciones, independientes entre sí.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConciliacionItemDto"
+            }
+          }
+        },
+        "required": [
+          "conciliaciones"
+        ]
+      },
       "CreatePermisoDto": {
         "type": "object",
         "properties": {
@@ -54411,6 +56771,18 @@
             "type": "boolean",
             "description": "Notas de Crédito — Aplicar / Deshacer"
           },
+          "ventas.nota-credito.reactivar": {
+            "type": "boolean",
+            "description": "Notas de Crédito — Reactivar crédito vencido"
+          },
+          "ventas.nota-credito.cambiar-vencimiento": {
+            "type": "boolean",
+            "description": "Notas de Crédito — Cambiar vencimiento"
+          },
+          "ventas.nota-credito.dar-de-baja": {
+            "type": "boolean",
+            "description": "Notas de Crédito — Dar de baja saldo vencido"
+          },
           "ventas.nota-credito.imprimir": {
             "type": "boolean",
             "description": "Notas de Crédito — Descargar PDF"
@@ -54522,6 +56894,78 @@
           "despachos.confirmaciones.confirmar": {
             "type": "boolean",
             "description": "Despachos — Confirmaciones — Confirmar solicitud (transferencia automática)"
+          },
+          "delivery.pendientes.listar": {
+            "type": "boolean",
+            "description": "Delivery — Pendientes por delivery — Ver pendientes por delivery"
+          },
+          "delivery.viajes.listar": {
+            "type": "boolean",
+            "description": "Delivery — Viajes — Ver"
+          },
+          "delivery.viajes.crear": {
+            "type": "boolean",
+            "description": "Delivery — Viajes — Asignar a repartidor (crear viaje)"
+          },
+          "delivery.viajes.editar": {
+            "type": "boolean",
+            "description": "Delivery — Viajes — Editar viaje en borrador"
+          },
+          "delivery.viajes.despachar": {
+            "type": "boolean",
+            "description": "Delivery — Viajes — Despachar viaje"
+          },
+          "delivery.viajes.cancelar": {
+            "type": "boolean",
+            "description": "Delivery — Viajes — Cancelar o borrar viaje"
+          },
+          "delivery.viajes.imprimir": {
+            "type": "boolean",
+            "description": "Delivery — Viajes — Imprimir hoja de ruta"
+          },
+          "delivery.entregas.confirmar": {
+            "type": "boolean",
+            "description": "Delivery — Entregas — Confirmar entrega"
+          },
+          "delivery.entregas.anular": {
+            "type": "boolean",
+            "description": "Delivery — Entregas — Anular venta de una entrega fallida"
+          },
+          "delivery.cobros.listar": {
+            "type": "boolean",
+            "description": "Caja — Cobros delivery por conciliar — Ver cobros por conciliar"
+          },
+          "delivery.cobros.conciliar": {
+            "type": "boolean",
+            "description": "Caja — Cobros delivery por conciliar — Conciliar cobro"
+          },
+          "delivery.cobros.conciliar-con-diferencia": {
+            "type": "boolean",
+            "description": "Caja — Cobros delivery por conciliar — Conciliar cobro con diferencia (faltante)"
+          },
+          "delivery.repartidores.listar": {
+            "type": "boolean",
+            "description": "Delivery — Repartidores — Ver"
+          },
+          "delivery.repartidores.crear": {
+            "type": "boolean",
+            "description": "Delivery — Repartidores — Nuevo repartidor"
+          },
+          "delivery.repartidores.editar": {
+            "type": "boolean",
+            "description": "Delivery — Repartidores — Editar repartidor"
+          },
+          "delivery.vehiculos.listar": {
+            "type": "boolean",
+            "description": "Delivery — Vehículos — Ver"
+          },
+          "delivery.vehiculos.crear": {
+            "type": "boolean",
+            "description": "Delivery — Vehículos — Nuevo vehículo"
+          },
+          "delivery.vehiculos.editar": {
+            "type": "boolean",
+            "description": "Delivery — Vehículos — Editar vehículo"
           },
           "cotizaciones.crear": {
             "type": "boolean",
@@ -55230,6 +57674,18 @@
           "config.despacho.configurar": {
             "type": "boolean",
             "description": "Configuración de Facturación — Configurar despacho a futuro"
+          },
+          "config.delivery.habilitar": {
+            "type": "boolean",
+            "description": "Configuración de Facturación — Habilitar delivery (cobro contra entrega)"
+          },
+          "config.delivery.deshabilitar": {
+            "type": "boolean",
+            "description": "Configuración de Facturación — Deshabilitar delivery"
+          },
+          "config.delivery.configurar": {
+            "type": "boolean",
+            "description": "Configuración de Facturación — Configurar delivery (automatismos y diferencias)"
           },
           "config.cobros.ver": {
             "type": "boolean",
@@ -56170,6 +58626,9 @@
           "ventas.nota-credito.someter",
           "ventas.nota-credito.reembolsar",
           "ventas.nota-credito.aplicar",
+          "ventas.nota-credito.reactivar",
+          "ventas.nota-credito.cambiar-vencimiento",
+          "ventas.nota-credito.dar-de-baja",
           "ventas.nota-credito.imprimir",
           "ventas.nota-debito.crear",
           "ventas.nota-debito.listar",
@@ -56198,6 +58657,24 @@
           "despachos.confirmar-stock",
           "despachos.confirmaciones.ver",
           "despachos.confirmaciones.confirmar",
+          "delivery.pendientes.listar",
+          "delivery.viajes.listar",
+          "delivery.viajes.crear",
+          "delivery.viajes.editar",
+          "delivery.viajes.despachar",
+          "delivery.viajes.cancelar",
+          "delivery.viajes.imprimir",
+          "delivery.entregas.confirmar",
+          "delivery.entregas.anular",
+          "delivery.cobros.listar",
+          "delivery.cobros.conciliar",
+          "delivery.cobros.conciliar-con-diferencia",
+          "delivery.repartidores.listar",
+          "delivery.repartidores.crear",
+          "delivery.repartidores.editar",
+          "delivery.vehiculos.listar",
+          "delivery.vehiculos.crear",
+          "delivery.vehiculos.editar",
           "cotizaciones.crear",
           "cotizaciones.listar",
           "cotizaciones.enmendar",
@@ -56375,6 +58852,9 @@
           "config.despacho.habilitar",
           "config.despacho.deshabilitar",
           "config.despacho.configurar",
+          "config.delivery.habilitar",
+          "config.delivery.deshabilitar",
+          "config.delivery.configurar",
           "config.cobros.ver",
           "config.cobros.editar",
           "config.apartados.ver",
@@ -56693,6 +59173,79 @@
           },
           "pedidos": {
             "type": "boolean"
+          },
+          "productos": {
+            "type": "boolean"
+          },
+          "delivery": {
+            "type": "boolean",
+            "description": "Delivery con cobro contra entrega (depende de despacho)."
+          },
+          "numeracionCliente": {
+            "type": "boolean"
+          },
+          "numeracionCotizacion": {
+            "type": "boolean"
+          },
+          "numeracionPedido": {
+            "type": "boolean"
+          },
+          "numeracionDespacho": {
+            "type": "boolean"
+          },
+          "numeracionFacturaVenta": {
+            "type": "boolean"
+          },
+          "numeracionNotaCreditoVenta": {
+            "type": "boolean"
+          },
+          "numeracionProveedor": {
+            "type": "boolean"
+          },
+          "numeracionSolicitudCompra": {
+            "type": "boolean"
+          },
+          "numeracionSolicitudCotizacion": {
+            "type": "boolean"
+          },
+          "numeracionCotizacionProveedor": {
+            "type": "boolean"
+          },
+          "numeracionOrdenCompra": {
+            "type": "boolean"
+          },
+          "numeracionRecepcionCompra": {
+            "type": "boolean"
+          },
+          "numeracionFacturaCompra": {
+            "type": "boolean"
+          },
+          "numeracionMovimientoInventario": {
+            "type": "boolean"
+          },
+          "numeracionAjusteInventario": {
+            "type": "boolean"
+          },
+          "numeracionLote": {
+            "type": "boolean"
+          },
+          "numeracionPago": {
+            "type": "boolean"
+          },
+          "numeracionAsientoDiario": {
+            "type": "boolean"
+          },
+          "numeracionSolicitudPago": {
+            "type": "boolean"
+          },
+          "numeracionEmpleado": {
+            "type": "boolean"
+          },
+          "numeracionReclamoGastos": {
+            "type": "boolean"
+          },
+          "numeracionActivo": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -56715,7 +59268,72 @@
           "devoluciones",
           "notasCredito",
           "notasDebito",
-          "pedidos"
+          "pedidos",
+          "productos",
+          "delivery",
+          "numeracionCliente",
+          "numeracionCotizacion",
+          "numeracionPedido",
+          "numeracionDespacho",
+          "numeracionFacturaVenta",
+          "numeracionNotaCreditoVenta",
+          "numeracionProveedor",
+          "numeracionSolicitudCompra",
+          "numeracionSolicitudCotizacion",
+          "numeracionCotizacionProveedor",
+          "numeracionOrdenCompra",
+          "numeracionRecepcionCompra",
+          "numeracionFacturaCompra",
+          "numeracionMovimientoInventario",
+          "numeracionAjusteInventario",
+          "numeracionLote",
+          "numeracionPago",
+          "numeracionAsientoDiario",
+          "numeracionSolicitudPago",
+          "numeracionEmpleado",
+          "numeracionReclamoGastos",
+          "numeracionActivo"
+        ]
+      },
+      "FeatureAdicionalDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "gastos"
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Gastos"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "modulo",
+              "reporte",
+              "dashboard_tipo",
+              "dashboard_reporte"
+            ]
+          },
+          "origen": {
+            "type": "string",
+            "enum": [
+              "adicional"
+            ]
+          },
+          "expiraEn": {
+            "type": "string",
+            "nullable": true,
+            "description": "ISO 8601; null = sin vencimiento. Para avisar \"tu acceso adicional vence en N días\".",
+            "example": "2026-12-31T23:59:59.000Z"
+          }
+        },
+        "required": [
+          "key",
+          "nombre",
+          "tipo",
+          "origen",
+          "expiraEn"
         ]
       },
       "LimitesFeaturesDto": {
@@ -56763,6 +59381,13 @@
               "type": "string"
             }
           },
+          "featuresAdicionales": {
+            "description": "Features que GenSuite le dio a ESTE usuario aunque el tenant no los contrate (acceso adicional). Solo para la UI (etiqueta \"Adicional\", aviso de vencimiento): el acceso NO se deriva de esta lista — `features` y `/me/acceso` ya lo incluyen. No trae los add-ons latentes (el tenant ya contrata el feature).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeatureAdicionalDto"
+            }
+          },
           "limites": {
             "$ref": "#/components/schemas/LimitesFeaturesDto"
           }
@@ -56770,6 +59395,7 @@
         "required": [
           "features",
           "reportesHabilitados",
+          "featuresAdicionales",
           "limites"
         ]
       },

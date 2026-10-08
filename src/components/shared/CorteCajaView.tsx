@@ -79,7 +79,13 @@ export function CorteCajaView({ corteCaja, currency }: { corteCaja: CorteCaja; c
               ) : (
                 corteCaja.ingresos.map((i) => (
                   <tr key={i.metodo}>
-                    <td>{i.metodo}</td>
+                    <td>
+                      {i.esDeliveryTransito || i.esDeliveryPorConciliar ? 'Delivery por conciliar' : i.metodo}
+                      {i.esDeliveryTransito && <span className="td-muted" style={{ fontSize: 11 }}> (contra entrega, informativo)</span>}
+                      {(i.liquidacionesDelivery ?? 0) > 0 && (
+                        <span className="td-muted" style={{ fontSize: 11 }}> (incluye liquidaciones delivery: {formatMoney(i.liquidacionesDelivery, currency)})</span>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatMoney(i.ventasContado, currency)}</td>
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatMoney(i.recibosCobrados, currency)}</td>
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontWeight: 600 }}>{formatMoney(i.total, currency)}</td>
@@ -106,6 +112,15 @@ export function CorteCajaView({ corteCaja, currency }: { corteCaja: CorteCaja; c
           </table>
         </div>
       </div>
+
+      {corteCaja.delivery && (
+        <div className="card" style={{ padding: '14px 16px' }}>
+          <div className="card-title" style={{ fontSize: 13, marginBottom: 8 }}>Delivery</div>
+          {row('Ventas contra entrega', corteCaja.delivery.ventasContraEntrega)}
+          {row('Liquidaciones recibidas', corteCaja.delivery.liquidacionesRecibidas)}
+          {row('Liquidaciones en efectivo', corteCaja.delivery.liquidacionesEfectivo)}
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
         <div className="card" style={{ padding: '14px 16px' }}>

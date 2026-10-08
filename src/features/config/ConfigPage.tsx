@@ -45,6 +45,7 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { Select, SelectItem } from '@/components/ui/select'
 import { AccountSelect } from '@/components/shared/AccountSelect'
+import { DeliveryConfigSection } from './DeliveryConfigSection'
 import { formatDate } from '@/lib/formatters'
 import { Plus, Trash2, Save, FileWarning, X, Pencil, ChevronLeft, ChevronRight, Info, ChevronDown, Check, Search, TrafficCone, TriangleAlert, BellRing, BarChart3 } from 'lucide-react'
 import EjercicioFiscalSection from './EjercicioFiscalSection'
@@ -4078,6 +4079,10 @@ function FacturacionConfigSection() {
             </div>
           </div>
         </div>
+
+        {/* Delivery — docs/tasks/PROMPT_DELIVERY_FRONTEND.md §6/§7 (dentro de
+            Facturación, junto a Despacho). Se oculta solo si falta la feature. */}
+        <DeliveryConfigSection />
 
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button

@@ -2242,6 +2242,12 @@ label.ff-label.ff-required { color: #0E3D51; }
   text-transform: uppercase;
 }
 
+/* Botones secundarios dentro de un encabezado navy (ej. Delivery: "Marcar entregadas",
+   "Agregar desde pendientes"): sin fondo propio quedaban texto oscuro sobre navy (ilegibles). */
+.card-header.navy-card-header .btn-secondary {
+  background: #fff;
+}
+
 .navy-header-hint {
   font-size: 12px;
   color: var(--on-dark-sub);
