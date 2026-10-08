@@ -99,6 +99,10 @@ export const ENDPOINTS = {
     removerAplicacion: (id: string, invoiceId: string) => `/credit-notes/${id}/aplicar-a-factura/${invoiceId}`,
     saldoFavor: (customerId: string) => `/credit-notes/saldo-favor/${customerId}`,
     pdf: (id: string) => `/credit-notes/${id}/pdf`,
+    // Vencimiento y uso (§5 docs/tasks/PROMPT_VENCIMIENTO_SALDOS_A_FAVOR_FRONTEND.md)
+    reactivar: (id: string) => `/credit-notes/${id}/reactivar`,
+    vencimiento: (id: string) => `/credit-notes/${id}/vencimiento`,
+    darDeBaja: (id: string) => `/credit-notes/${id}/dar-de-baja`,
   },
   devoluciones: {
     create: '/devoluciones',
@@ -505,6 +509,11 @@ export const ENDPOINTS = {
     estadoCuenta: (customerId: string) => `/cobros/estado-cuenta/${customerId}`,
     estadoCuentaPdf: (customerId: string) => `/cobros/estado-cuenta/${customerId}/pdf`,
     pdf: (id: string) => `/cobros/${id}/pdf`,
+    // Vencimiento de saldos tipo pago (§5). La baja de Payment Entry puede no
+    // funcionar aún en ERPNext — ver §11 del prompt (límite conocido).
+    saldoFavorReactivar: (paymentEntryId: string) => `/cobros/saldo-favor/${paymentEntryId}/reactivar`,
+    saldoFavorVencimiento: (paymentEntryId: string) => `/cobros/saldo-favor/${paymentEntryId}/vencimiento`,
+    saldoFavorDarDeBaja: (paymentEntryId: string) => `/cobros/saldo-favor/${paymentEntryId}/dar-de-baja`,
   },
   pagos: {
     list: '/pagos',

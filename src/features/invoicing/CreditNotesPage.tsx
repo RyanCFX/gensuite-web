@@ -21,6 +21,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { esClienteEmisorNoEncontrado } from '@/lib/ecfErrors'
 import { formatDate, formatMoney, todayIso } from '@/lib/formatters'
+import { formatVenceEl, creditoNoAplicableTooltip } from '@/lib/creditoVencimiento'
+import { CreditoEstadoBadge } from '@/shared/ui/CreditoEstadoBadge'
+import type { CreditoEstado } from '@/shared/api/types'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
@@ -44,7 +47,9 @@ const LIST_COLUMNS = [
   { key: 'cliente', width: 180 },
   { key: 'fecha', width: 100 },
   { key: 'total', width: 120 },
-  { key: 'estado', width: 110 },
+  { key: 'estado', width: 130 },
+  // §4.1: columna Vence (`venceEl`, vacío = «—»). Sin vencimiento se ve igual que antes.
+  { key: 'vence', width: 110 },
   { key: 'reembolso', width: 200 },
   { key: 'actions', width: 60 },
 ]
@@ -78,6 +83,14 @@ interface CreditNoteRow {
   /** Viene negativo desde la API (es una factura de signo invertido) — usar Math.abs() para mostrarlo/aplicarlo como monto */
   grandTotal?: number
   status: string
+  // ─── Vencimiento y uso (§3.1) — ausentes en respuestas viejas / tenants sin configurar ───
+  venceEl?: string | null
+  diasRestantes?: number | null
+  estado?: CreditoEstado
+  puedeAplicar?: boolean
+  uso?: 'multiple' | 'unico'
+  remanente?: 'saldo_favor' | 'perder' | null
+  origenSaldoFavor?: boolean
   reason?: string
   items: NoteItem[]
   /** true si ya fue reembolsada en efectivo/transferencia; false = sigue como saldo a favor pendiente */
@@ -146,6 +159,9 @@ export default function CreditNotesPage() {
   const [postingDateFrom, setPostingDateFrom] = useState('')
   const [postingDateTo, setPostingDateTo] = useState('')
   const [ncf, setNcf] = useState('')
+  // §4.1: hoy `GET /credit-notes` NO tiene query param de estado — se filtra en
+  // cliente sobre la página cargada (un filtro de servidor sería una mejora, §11).
+  const [estadoVigencia, setEstadoVigencia] = useState<'' | CreditoEstado>('')
   const [ncfType, setNcfType] = useState('')
   const [grandTotalMin, setGrandTotalMin] = useState('')
   const [grandTotalMax, setGrandTotalMax] = useState('')
@@ -261,7 +277,10 @@ export default function CreditNotesPage() {
     label: inv.customerName ?? inv.id,
     sublabel: (inv.ncf ?? inv.id) + ' — ' + formatDate(inv.postingDate),
   }))
-  const notes = (Array.isArray(notesData) ? notesData : []) as unknown as CreditNoteRow[]
+  const allNotes = (Array.isArray(notesData) ? notesData : []) as unknown as CreditNoteRow[]
+  // Filtro de servidor inexistente (§11): se filtra en cliente. Las notas sin
+  // `estado` (respuesta vieja) solo salen con el filtro en «todos».
+  const notes = estadoVigencia ? allNotes.filter((n) => n.estado === estadoVigencia) : allNotes
 
   const activeMoreFiltersCount = [
     ncfType, createdAtFrom, createdAtTo, postingDateFrom, postingDateTo,
@@ -408,6 +427,18 @@ export default function CreditNotesPage() {
               <OpcionesSelect hideOnForbidden filterLabel="Departamento" filterStyle={{ width: 200 }} recurso="departamentos" value={department} onChange={setDepartment} placeholder="Todos los departamentos" />
               <FilterField label="NCF">
                 <SearchInput variant="field" style={{ width: 160 }} placeholder="Buscar NCF…" value={ncf} onChange={(v) => setNcf(v)} /></FilterField>
+              <FilterField label="Vigencia">
+                <div style={{ width: 170 }}>
+                  <Select value={estadoVigencia || '__todos'} onValueChange={(v) => setEstadoVigencia(v === '__todos' ? '' : (v as CreditoEstado))} placeholder="Todos los estados">
+                    <SelectItem value="__todos">Todos los estados</SelectItem>
+                    <SelectItem value="vigente">Vigente</SelectItem>
+                    <SelectItem value="por_vencer">Por vencer</SelectItem>
+                    <SelectItem value="vencido">Vencido</SelectItem>
+                    <SelectItem value="perdido">Dada de baja</SelectItem>
+                    <SelectItem value="agotado">Agotada</SelectItem>
+                  </Select>
+                </div>
+              </FilterField>
 
               <button type="button" className="btn btn-secondary btn-size-sm" onClick={() => setMoreFiltersOpen(true)}>
                 <SlidersHorizontal size={13} />
@@ -479,6 +510,10 @@ export default function CreditNotesPage() {
                 resizeHandle={<span className="col-resize-handle" onMouseDown={listStartResize('estado')} />}
               />
               <th>
+                Vence
+                <span className="col-resize-handle" onMouseDown={listStartResize('vence')} />
+              </th>
+              <th>
                 Reembolso
                 <span className="col-resize-handle" onMouseDown={listStartResize('reembolso')} />
               </th>
@@ -489,14 +524,14 @@ export default function CreditNotesPage() {
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 11 }).map((__, j) => (
+                  {Array.from({ length: 12 }).map((__, j) => (
                     <td key={j}><div className="skeleton-box" style={{ height: 14, width: '100%' }} /></td>
                   ))}
                 </tr>
               ))
             ) : notes.length === 0 ? (
               <tr>
-                <td colSpan={11}>
+                <td colSpan={12}>
                   <div className="empty-state">
                     <div className="empty-title">Sin notas de crédito</div>
                     <p className="empty-sub">Crea una nota de crédito para procesar una devolución.</p>
@@ -513,7 +548,10 @@ export default function CreditNotesPage() {
                 const isSubmittedWithUsageInfo = note.availableAmount !== undefined
                 const hasAppliedTo = (note.appliedTo?.length ?? 0) > 0
                 const isExpanded = expandedNoteId === note.id
-                const canAct = isSubmittedWithUsageInfo && (note.availableAmount ?? 0) > 0
+                // §3.1/§4.3: `puedeAplicar` manda para habilitar «Aplicar». Ausente
+                // (respuesta vieja) = comportamiento histórico (habilitado).
+                const puedeAplicar = note.puedeAplicar ?? true
+                const canAct = isSubmittedWithUsageInfo && (note.availableAmount ?? 0) > 0 && puedeAplicar
                 return (
                 <Fragment key={note.id}>
                 <tr
@@ -544,9 +582,23 @@ export default function CreditNotesPage() {
                   <td>{formatDate(note.postingDate)}</td>
                   <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatMoney(Math.abs(note.grandTotal ?? 0), note.currency)}</td>
                   <td>
-                    <span className={`badge ${STATUS_BADGE[statusLower] ?? 'badge-neutral'}`}>
-                      {STATUS_LABEL[statusLower] ?? note.status}
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                      <span className={`badge ${STATUS_BADGE[statusLower] ?? 'badge-neutral'}`}>
+                        {STATUS_LABEL[statusLower] ?? note.status}
+                      </span>
+                      {/* §3.2: badge de vigencia. Sin `estado` (tenant sin configurar)
+                          no se renderiza nada — la pantalla se ve idéntica a antes. */}
+                      <CreditoEstadoBadge estado={note.estado} diasRestantes={note.diasRestantes} venceEl={note.venceEl} />
+                      {note.uso === 'unico' && (
+                        <span className="badge badge-info" title={note.remanente === 'perder' ? 'Si sobra saldo: se pierde' : 'Si sobra saldo: pasa a saldo a favor'}>
+                          Uso único
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  {/* §4.1: columna Vence — vacío = «—» (igual que antes sin vencimiento). */}
+                  <td style={{ fontFamily: 'var(--font-body)', fontSize: 12 }}>
+                    {note.venceEl ? formatVenceEl(note.venceEl) : <span className="td-dim">—</span>}
                   </td>
                   <td>
                     {!isSubmittedWithUsageInfo ? (
@@ -565,6 +617,17 @@ export default function CreditNotesPage() {
                               <ArrowRightLeft size={13} /> Aplicar a factura
                             </button>
                           </>
+                        )}
+                        {/* §4.2: vencida/perdida/dada de baja — se muestra deshabilitada
+                            con su motivo, nunca se oculta (§9). */}
+                        {isSubmittedWithUsageInfo && (note.availableAmount ?? 0) > 0 && !puedeAplicar && (
+                          <span
+                            className="btn btn-secondary btn-size-sm"
+                            style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                            title={creditoNoAplicableTooltip(note.venceEl)}
+                          >
+                            <ArrowRightLeft size={13} /> Aplicar a factura
+                          </span>
                         )}
                       </div>
                     )}

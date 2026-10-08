@@ -8,6 +8,8 @@ import { getCreditNoteSaldoFavor, removerCreditNoteAplicada } from '@/shared/api
 import { client, conSilencio403 } from '@/shared/api/client'
 import type { Invoice, EstadoCuentaResponse } from '@/shared/api/types'
 import { formatDate, formatDOP } from '@/lib/formatters'
+import { formatVenceEl } from '@/lib/creditoVencimiento'
+import { CreditoEstadoBadge } from '@/shared/ui/CreditoEstadoBadge'
 import { useFeature } from '@/shared/features/can'
 import { Pencil, Ban, Building2, User, ArrowLeft, Wallet, Receipt, X, FileText, Download, Eye, EyeOff, ChevronDown, ChevronRight } from 'lucide-react'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
@@ -18,6 +20,9 @@ const CREDIT_NOTES_COLUMNS = [
   { key: 'total', width: 110 },
   { key: 'reembolsado', width: 110 },
   { key: 'disponible', width: 110 },
+  // §4.2: badge de vigencia + vencimiento por fila (vacío = «—», igual que antes).
+  { key: 'estado', width: 130 },
+  { key: 'vence', width: 100 },
   { key: 'aplicadaA', width: 220 },
 ]
 
@@ -79,14 +84,22 @@ function SaldoFavorIndicator({ customerId }: { customerId: string }) {
     retry: false,
   })
 
-  if (!saldo || saldo.balance <= 0) return null
+  if (!saldo || (saldo.balance <= 0 && (saldo.vencidoAmount ?? 0) <= 0)) return null
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
       <div className="card-body">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <Wallet size={16} style={{ color: 'var(--success-text)' }} />
-          <span style={{ fontWeight: 500 }}>Saldo a favor: {formatDOP(saldo.balance)}</span>
+          {/* §3.3: `balance` es solo lo aplicable hoy — lo vencido va aparte. */}
+          {saldo.balance > 0 && (
+            <span style={{ fontWeight: 500 }}>Saldo a favor: {formatDOP(saldo.balance)}</span>
+          )}
+          {(saldo.vencidoAmount ?? 0) > 0 && (
+            <span style={{ fontSize: 13, color: 'var(--error-text, #b91c1c)' }}>
+              {formatDOP(saldo.vencidoAmount)} vencido — reactivar
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -148,6 +161,12 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
               Disponible: {formatDOP(saldo.balance)}
             </span>
           )}
+          {/* §3.3: lo vencido se muestra aparte del disponible. */}
+          {(saldo.vencidoAmount ?? 0) > 0 && (
+            <span style={{ fontSize: 12, color: '#fca5a5' }}>
+              {formatDOP(saldo.vencidoAmount)} vencido
+            </span>
+          )}
           <button
             className="btn btn-ghost btn-size-sm"
             style={{ color: 'var(--on-dark-ink)' }}
@@ -186,6 +205,14 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
                 <span className="col-resize-handle" onMouseDown={startResize('disponible')} />
               </th>
               <th>
+                Estado
+                <span className="col-resize-handle" onMouseDown={startResize('estado')} />
+              </th>
+              <th>
+                Vence
+                <span className="col-resize-handle" onMouseDown={startResize('vence')} />
+              </th>
+              <th>
                 Aplicada a
                 <span className="col-resize-handle" onMouseDown={startResize('aplicadaA')} />
               </th>
@@ -199,6 +226,12 @@ function CreditNotesIndicator({ customerId }: { customerId: string }) {
                 <td style={{ textAlign: 'right' }}>{formatDOP(entry.grandTotal)}</td>
                 <td style={{ textAlign: 'right' }}>{formatDOP(entry.refundedAmount)}</td>
                 <td style={{ textAlign: 'right', fontWeight: 500 }}>{formatDOP(entry.availableAmount)}</td>
+                <td>
+                  <CreditoEstadoBadge estado={entry.estado} diasRestantes={entry.diasRestantes} venceEl={entry.venceEl} />
+                </td>
+                <td style={{ fontSize: 12 }}>
+                  {entry.venceEl ? formatVenceEl(entry.venceEl) : <span className="td-dim">—</span>}
+                </td>
                 <td>
                   {entry.appliedTo.length === 0 ? (
                     <span className="td-dim">—</span>

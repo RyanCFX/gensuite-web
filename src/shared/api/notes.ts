@@ -10,6 +10,10 @@ import type {
   AplicarCreditNoteResult,
   CreditNoteSaldoFavorResult,
   PaginationParams,
+  ReactivarCreditoDto,
+  CambiarVencimientoDto,
+  DarDeBajaDto,
+  AccionCreditoResult,
 } from './types'
 
 export interface ListNotesParams extends PaginationParams {
@@ -76,6 +80,37 @@ export async function removerCreditNoteAplicada(id: string, invoiceId: string) {
 export async function getCreditNoteSaldoFavor(customerId: string) {
   const res = await client.get<{ success: true; data: CreditNoteSaldoFavorResult }>(
     ENDPOINTS.creditNotes.saldoFavor(customerId),
+  )
+  return unwrap(res)
+}
+
+// ─── Vencimiento y uso (§5 docs/tasks/PROMPT_VENCIMIENTO_SALDOS_A_FAVOR_FRONTEND.md) ───
+// Las tres aceptan `pinOverride` en el body cuando el usuario no tiene el permiso —
+// ver useAccionConAutorizacion (@/shared/hooks/useAccionConAutorizacion).
+
+/** POST /credit-notes/:id/reactivar — pasa un crédito `vencido`/`perdido` a `vigente`. */
+export async function reactivarCreditNote(id: string, data: ReactivarCreditoDto) {
+  const res = await client.post<{ success: true; data: AccionCreditoResult }>(
+    ENDPOINTS.creditNotes.reactivar(id),
+    data,
+  )
+  return unwrap(res)
+}
+
+/** PATCH /credit-notes/:id/vencimiento — cambia la fecha de un crédito vigente. */
+export async function cambiarVencimientoCreditNote(id: string, data: CambiarVencimientoDto) {
+  const res = await client.patch<{ success: true; data: AccionCreditoResult }>(
+    ENDPOINTS.creditNotes.vencimiento(id),
+    data,
+  )
+  return unwrap(res)
+}
+
+/** POST /credit-notes/:id/dar-de-baja — registra la pérdida del saldo vencido. */
+export async function darDeBajaCreditNote(id: string, data: DarDeBajaDto) {
+  const res = await client.post<{ success: true; data: AccionCreditoResult }>(
+    ENDPOINTS.creditNotes.darDeBaja(id),
+    data,
   )
   return unwrap(res)
 }

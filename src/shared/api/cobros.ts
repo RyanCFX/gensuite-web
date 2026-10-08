@@ -15,6 +15,10 @@ import type {
   PaginationParams,
   EstadoCuentaResponse,
   FormatoImpresion,
+  ReactivarCreditoDto,
+  CambiarVencimientoDto,
+  DarDeBajaDto,
+  AccionCreditoResult,
 } from './types'
 
 // ─── List Cobros ──────────────────────────────────────────────────────────────
@@ -147,6 +151,38 @@ export async function registerPago(data: RegisterPagoDto) {
 export async function getSaldoFavor(customerId: string) {
   const res = await client.get<{ success: true; data: SaldoFavorResult }>(
     ENDPOINTS.cobros.saldoFavor(customerId),
+  )
+  return unwrap(res)
+}
+
+// ─── Vencimiento de saldos tipo pago (§5) ─────────────────────────────────────
+// NOTA (§11, límite conocido): la verificación en vivo contra ERPNext de la BAJA de
+// saldos de tipo pago anticipado (Payment Entry) está pendiente y puede no funcionar
+// todavía — la pantalla se implementa igual y el error real se reporta tal cual.
+
+/** POST /cobros/saldo-favor/:paymentEntryId/reactivar */
+export async function reactivarSaldoFavor(paymentEntryId: string, data: ReactivarCreditoDto) {
+  const res = await client.post<{ success: true; data: AccionCreditoResult }>(
+    ENDPOINTS.cobros.saldoFavorReactivar(paymentEntryId),
+    data,
+  )
+  return unwrap(res)
+}
+
+/** PATCH /cobros/saldo-favor/:paymentEntryId/vencimiento */
+export async function cambiarVencimientoSaldoFavor(paymentEntryId: string, data: CambiarVencimientoDto) {
+  const res = await client.patch<{ success: true; data: AccionCreditoResult }>(
+    ENDPOINTS.cobros.saldoFavorVencimiento(paymentEntryId),
+    data,
+  )
+  return unwrap(res)
+}
+
+/** POST /cobros/saldo-favor/:paymentEntryId/dar-de-baja */
+export async function darDeBajaSaldoFavor(paymentEntryId: string, data: DarDeBajaDto) {
+  const res = await client.post<{ success: true; data: AccionCreditoResult }>(
+    ENDPOINTS.cobros.saldoFavorDarDeBaja(paymentEntryId),
+    data,
   )
   return unwrap(res)
 }

@@ -2918,6 +2918,15 @@ function FacturacionConfigSection() {
    const [tasasActualizacionAutomatica, setTasasActualizacionAutomatica] = useState(false)
    const [tasasHoraActualizacion, setTasasHoraActualizacion] = useState('06:00')
    const [tasasProveedor, setTasasProveedor] = useState<'Banco Central RD' | 'Currency Exchange Settings'>('Banco Central RD')
+   // ─── Notas de crédito y saldos a favor (§2 docs/tasks/ ─────────────────────
+   // PROMPT_VENCIMIENTO_SALDOS_A_FAVOR_FRONTEND.md). `0` = no vencen. `null` en la
+   // cuenta = sin cuenta configurada (se manda `null` en el PUT para quitarla).
+   const [creditoVigenciaDias, setCreditoVigenciaDias] = useState(0)
+   const [creditoUso, setCreditoUso] = useState<'multiple' | 'unico'>('multiple')
+   const [creditoRemanenteUnico, setCreditoRemanenteUnico] = useState<'saldo_favor' | 'perder'>('saldo_favor')
+   const [saldoFavorVigenciaDias, setSaldoFavorVigenciaDias] = useState(0)
+   const [saldoVencidoCuenta, setSaldoVencidoCuenta] = useState('')
+   const [cuentaTouched, setCuentaTouched] = useState(false)
 
    useEffect(() => {
      if (data) {
@@ -2957,6 +2966,12 @@ function FacturacionConfigSection() {
         setTasasActualizacionAutomatica(data.tasasActualizacionAutomatica ?? false)
         setTasasHoraActualizacion(data.tasasHoraActualizacion ?? '06:00')
         setTasasProveedor(data.tasasProveedor ?? 'Banco Central RD')
+        setCreditoVigenciaDias(data.creditoVigenciaDias ?? 0)
+        setCreditoUso(data.creditoUso ?? 'multiple')
+        setCreditoRemanenteUnico(data.creditoRemanenteUnico ?? 'saldo_favor')
+        setSaldoFavorVigenciaDias(data.saldoFavorVigenciaDias ?? 0)
+        setSaldoVencidoCuenta(data.saldoVencidoCuenta ?? '')
+        setCuentaTouched(false)
       }
     }, [data])
 
@@ -3952,10 +3967,131 @@ function FacturacionConfigSection() {
           </div>
         </div>
 
+        <hr style={{ border: 'none', borderTop: '1px solid var(--border-default)', margin: '4px 0' }} />
+
+        <div className="ff-wrap">
+          <label className="ff-label" style={{ fontSize: 14, fontWeight: 600 }}>Notas de crédito y saldos a favor</label>
+          <p className="ff-hint" style={{ marginBottom: 12 }}>
+            Vigencia y política de uso de las notas de crédito y los saldos a favor del cliente.
+            Se fija al emitir cada nota o al nacer cada saldo — cambiarlo no afecta los ya emitidos.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="ff-wrap" style={{ maxWidth: 220 }}>
+              <label className="ff-label">
+                Vigencia de las notas de crédito (días)
+                <FieldTooltip>
+                  0 = no vencen. Se fija al emitir la nota; cambiarlo no afecta las ya emitidas.
+                </FieldTooltip>
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={3650}
+                step={1}
+                className="ff-input"
+                value={creditoVigenciaDias}
+                onChange={(e) => setCreditoVigenciaDias(Math.min(3650, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+              />
+              {creditoVigenciaDias === 0 && (
+                <p className="ff-hint" style={{ marginTop: 4 }}>0 = no vencen.</p>
+              )}
+            </div>
+
+            <div className="ff-wrap" style={{ maxWidth: 320 }}>
+              <label className="ff-label">
+                Uso de las notas de crédito
+              </label>
+              <Select value={creditoUso} onValueChange={(v) => setCreditoUso(v as 'multiple' | 'unico')}>
+                <SelectItem value="multiple">Varias facturas — se pueden aplicar a varias facturas hasta agotarse</SelectItem>
+                <SelectItem value="unico">Uso único — solo se pueden aplicar a una factura</SelectItem>
+              </Select>
+            </div>
+
+            {creditoUso === 'unico' && (
+              <div className="ff-wrap" style={{ maxWidth: 320 }}>
+                <label className="ff-label">
+                  Si sobra saldo en una nota de uso único
+                </label>
+                <Select value={creditoRemanenteUnico} onValueChange={(v) => setCreditoRemanenteUnico(v as 'saldo_favor' | 'perder')}>
+                  <SelectItem value="saldo_favor">Pasa a saldo a favor del cliente</SelectItem>
+                  <SelectItem value="perder">Se pierde (se da de baja contra la cuenta de saldos vencidos)</SelectItem>
+                </Select>
+                {creditoRemanenteUnico === 'perder' && (
+                  <p className="ff-hint" style={{ marginTop: 6, color: 'var(--color-warning, #b45309)' }}>
+                    Lo que no se use se registrará como ingreso. Consulte con su contador el tratamiento fiscal.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="ff-wrap" style={{ maxWidth: 220 }}>
+              <label className="ff-label">
+                Vigencia de los saldos a favor (días)
+                <FieldTooltip>
+                  0 = no vencen. Aplica a anticipos sin aplicar, cobros de más, reembolsos como saldo y
+                  remanentes. Se cuenta desde que nace el saldo. No aplica a aseguradoras.
+                </FieldTooltip>
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={3650}
+                step={1}
+                className="ff-input"
+                value={saldoFavorVigenciaDias}
+                onChange={(e) => setSaldoFavorVigenciaDias(Math.min(3650, Math.max(0, parseInt(e.target.value, 10) || 0)))}
+              />
+              {saldoFavorVigenciaDias === 0 && (
+                <p className="ff-hint" style={{ marginTop: 4 }}>0 = no vencen.</p>
+              )}
+            </div>
+
+            <div className="ff-wrap" style={{ maxWidth: 320 }}>
+              <label className="ff-label">
+                Cuenta de saldos vencidos
+                {(creditoUso === 'unico' && creditoRemanenteUnico === 'perder') && (
+                  <span className="ff-required"> *</span>
+                )}
+                <FieldTooltip>
+                  Cuenta de ingreso donde se registra lo que se pierde (baja de un saldo vencido o
+                  remanente «perder»). Obligatoria si el uso es único y el sobrante se pierde.
+                </FieldTooltip>
+              </label>
+              <AccountSelect
+                id="saldoVencidoCuenta"
+                value={saldoVencidoCuenta}
+                onChange={(v) => { setSaldoVencidoCuenta(v); setCuentaTouched(true) }}
+                placeholder="Buscar cuenta de ingreso…"
+                rootType="Income"
+                ledgerOnly={true}
+                error={creditoUso === 'unico' && creditoRemanenteUnico === 'perder' && !saldoVencidoCuenta && (cuentaTouched || saveMutation.isError)}
+              />
+              {(creditoUso === 'unico' && creditoRemanenteUnico === 'perder' && !saldoVencidoCuenta) && (
+                <p className="ff-hint" style={{ marginTop: 4, color: 'var(--error-text)' }}>
+                  {(cuentaTouched || saveMutation.isError)
+                    ? 'Con uso único y remanente "perder" debe indicar la cuenta de saldos vencidos.'
+                    : 'Requerida con uso único + «se pierde».'}
+                </p>
+              )}
+              <p className="ff-hint" style={{ marginTop: 4 }}>Aquí se registra lo que se pierde.</p>
+            </div>
+          </div>
+        </div>
+
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button
             className="btn btn-primary btn-size-sm"
- onClick={() => saveMutation.mutate({
+  onClick={() => {
+    // §2: con uso único + remanente "perder" la cuenta es obligatoria — marcar
+    // el campo como requerido antes de enviar (el backend igual responde 400).
+    if (creditoUso === 'unico' && creditoRemanenteUnico === 'perder' && !saldoVencidoCuenta) {
+      setCuentaTouched(true)
+      toast.error('Con uso único y remanente "perder" debe indicar la cuenta de saldos vencidos.')
+      document.getElementById('saldoVencidoCuenta')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+    saveMutation.mutate({
                 rolesCancelacionFactura: selectedRoles,
                 flujoCobro,
                 requiereUbicacionVenta,
@@ -3989,7 +4125,15 @@ function FacturacionConfigSection() {
                 tasasProveedor,
                 pedidoRequiereConfirmacionDespacho,
                 pedidoConduceIncluyePrecios,
-              })}
+                creditoVigenciaDias,
+                creditoUso,
+                // Solo visible/editable con uso único — fuera de ahí se manda el
+                // default para no dejar un valor huérfano en el servidor.
+                creditoRemanenteUnico: creditoUso === 'unico' ? creditoRemanenteUnico : 'saldo_favor',
+                saldoFavorVigenciaDias,
+                // Para quitar la cuenta se manda `null` explícito (no omitir la clave).
+                saldoVencidoCuenta: saldoVencidoCuenta || null,
+              })}}
             disabled={saveMutation.isPending}
           >
             <Save size={14} /> Guardar

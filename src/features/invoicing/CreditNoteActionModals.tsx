@@ -18,6 +18,12 @@ import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { ReactivarCreditoModal } from './CreditoAccionModals'
+import {
+  esCreditoDadoDeBajaError,
+  esCreditoVencidoError,
+  esUsoUnicoConsumidoError,
+} from '@/lib/creditoVencimiento'
 import { useOpcionesLista, useOpcionesArray } from '@/shared/hooks/useOpciones'
 import { reglasCuentaBancaria } from '@/lib/pagoBancario'
 
@@ -27,6 +33,31 @@ export interface CreditNoteActionTarget {
   returnAgainst?: string | null
   grandTotal?: number | null
   currency?: string
+}
+
+/** Botón «Reactivar» inline para los avisos de 409 (§8): abre el modal de reactivar. */
+export function ReactivarBotonInline({
+  noteId,
+  label,
+  kind = 'nota',
+  customerId,
+}: {
+  noteId: string
+  label?: string
+  kind?: 'nota' | 'saldo'
+  customerId?: string
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button className="btn btn-primary btn-size-sm" onClick={() => setOpen(true)}>
+        {label ?? 'Reactivar'}
+      </button>
+      {open && (
+        <ReactivarCreditoModal target={{ kind, id: noteId, customerId }} onClose={() => setOpen(false)} />
+      )}
+    </>
+  )
 }
 
 // ─── Reembolsar ─────────────────────────────────────────────────────────────
@@ -53,6 +84,10 @@ export function RefundCreditNoteModal({ note, onClose }: { note: CreditNoteActio
     .filter((c) => !refundBankAccountSearch || c.accountName.toLowerCase().includes(refundBankAccountSearch.toLowerCase()))
     .map((c) => ({ value: c.id, label: c.accountName, sublabel: c.bank }))
 
+  // §4.4: una nota vencida no se reembolsa — el 409 CREDITO_VENCIDO se muestra
+  // con oferta de reactivarla primero.
+  const [vencidaParaReactivar, setVencidaParaReactivar] = useState(false)
+
   const refundMutation = useMutation({
     mutationFn: () => refundCreditNote(note.id, {
       modeOfPayment: refundModeOfPayment,
@@ -65,7 +100,12 @@ export function RefundCreditNoteModal({ note, onClose }: { note: CreditNoteActio
       toast.success('Nota de crédito reembolsada')
       onClose()
     },
-    onError: (err: { message?: string }) => {
+    onError: (err: ApiError) => {
+      if (esCreditoVencidoError(err)) {
+        setVencidaParaReactivar(true)
+        toast.error(err?.message ?? 'La nota de crédito está vencida')
+        return
+      }
       toast.error(err?.message ?? 'Error al reembolsar la nota de crédito')
     },
   })
@@ -137,16 +177,34 @@ export function RefundCreditNoteModal({ note, onClose }: { note: CreditNoteActio
               </div>
             )}
           </div>
+          {vencidaParaReactivar && (
+            <div className="inline-alert" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Wallet size={16} />
+              <span style={{ fontSize: 13 }}>
+                Esta nota está vencida y no se puede reembolsar. Reactivala primero para poder usarla.
+              </span>
+              <button
+                className="btn btn-secondary btn-size-sm"
+                onClick={() => setVencidaParaReactivar(false)}
+              >
+                Cerrar aviso
+              </button>
+            </div>
+          )}
           <div className="modal-foot">
             <button className="btn btn-secondary" onClick={reembolsoClose.requestClose}>Volver</button>
-            <button
-              className="btn btn-primary"
-              onClick={() => refundMutation.mutate()}
-              disabled={!canConfirmRefund || refundMutation.isPending}
-            >
-              {refundMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
-              <Wallet size={14} /> Confirmar reembolso
-            </button>
+            {vencidaParaReactivar ? (
+              <ReactivarBotonInline noteId={note.id} />
+            ) : (
+              <button
+                className="btn btn-primary"
+                onClick={() => refundMutation.mutate()}
+                disabled={!canConfirmRefund || refundMutation.isPending}
+              >
+                {refundMutation.isPending && <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />}
+                <Wallet size={14} /> Confirmar reembolso
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -222,6 +280,15 @@ export function ApplyCreditNoteModal({ note, onClose }: { note: CreditNoteAction
     : undefined
   const canUndoApply = alreadyAppliedToSelected?.status === 'pending'
 
+  // §4.3: aviso de sobrante en notas de uso único. Si el monto a aplicar es menor
+  // al disponible, lo que sobra se resuelve en el backend (saldo a favor / perder).
+  const disponibleNota = applyTargetEntry?.availableAmount ?? Math.abs(note.grandTotal ?? 0)
+  const esUsoUnico = applyTargetEntry?.uso === 'unico' && applyTargetEntry?.origenSaldoFavor !== true
+  const aplicaParcial = esUsoUnico && applyAmount > 0 && applyAmount < disponibleNota - 0.005
+  const [sobranteConfirmado, setSobranteConfirmado] = useState(false)
+  // §8: el 409 vencido / dado de baja ofrece reactivar; el de uso único refresca.
+  const [aplicaBloqueada, setAplicaBloqueada] = useState<null | { code: string; message: string }>(null)
+
   const applyMutation = useMutation({
     mutationFn: () => aplicarCreditNoteAFactura(note.id, {
       invoiceId: applyInvoiceId,
@@ -232,6 +299,7 @@ export function ApplyCreditNoteModal({ note, onClose }: { note: CreditNoteAction
       queryClient.invalidateQueries({ queryKey: ['credit-note', note.id] })
       queryClient.invalidateQueries({ queryKey: ['invoice', result.id] })
       queryClient.invalidateQueries({ queryKey: ['invoices'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-note-saldo-favor', applyOriginalInvoice?.customer] })
       toast.success('Aplicado a la factura correctamente')
       navigate(`/facturas/${result.id}`)
       onClose()
@@ -242,8 +310,21 @@ export function ApplyCreditNoteModal({ note, onClose }: { note: CreditNoteAction
         return
       }
       if (err?.statusCode === 409) {
-        toast.error(err.message)
+        // Entre que se cargó la lista y se aplicó pudo haber vencido, o alguien más
+        // pudo haber usado la nota de uso único (§4.3). Nunca recalcular en cliente.
+        queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
+        queryClient.invalidateQueries({ queryKey: ['credit-note', note.id] })
         queryClient.invalidateQueries({ queryKey: ['credit-note-saldo-favor', applyOriginalInvoice?.customer] })
+        if (esCreditoVencidoError(err) || esCreditoDadoDeBajaError(err)) {
+          setAplicaBloqueada({ code: err.code ?? '', message: err.message })
+          return
+        }
+        if (esUsoUnicoConsumidoError(err)) {
+          toast.error(err.message ?? 'Esta nota de uso único ya fue aplicada')
+          return
+        }
+        // 409 sin `code` conocido (origen ERPNext directo): mostrar `message` igual (§8).
+        toast.error(err.message ?? 'No se pudo aplicar la nota de crédito')
         return
       }
       toast.error(err?.message ?? 'Error al aplicar la nota de crédito')
@@ -265,7 +346,12 @@ export function ApplyCreditNoteModal({ note, onClose }: { note: CreditNoteAction
   })
 
   const applyAmountValid = applyAmount > 0
-  const canConfirmApply = applyAmountValid && !!applyInvoiceId && !alreadyAppliedToSelected
+  const canConfirmApply =
+    applyAmountValid &&
+    !!applyInvoiceId &&
+    !alreadyAppliedToSelected &&
+    (!aplicaParcial || sobranteConfirmado) &&
+    !aplicaBloqueada
 
   const aplicarIsDirty = useDirtyCheck({ applyInvoiceId, applyAmount }, true)
   const aplicarClose = useConfirmClose(aplicarIsDirty, onClose)
@@ -308,7 +394,23 @@ export function ApplyCreditNoteModal({ note, onClose }: { note: CreditNoteAction
               )}
             </div>
 
-            {alreadyAppliedToSelected ? (
+            {aplicaBloqueada ? (
+              <div className="inline-alert" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <span style={{ fontSize: 13 }}>{aplicaBloqueada.message}</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="btn btn-secondary btn-size-sm"
+                    onClick={() => setAplicaBloqueada(null)}
+                  >
+                    Volver
+                  </button>
+                  <ReactivarBotonInline noteId={note.id} customerId={applyOriginalInvoice?.customer} />
+                </div>
+                <p className="ff-hint" style={{ margin: 0 }}>
+                  Tras reactivarla, volvé a intentar la aplicación.
+                </p>
+              </div>
+            ) : alreadyAppliedToSelected ? (
               <div className="inline-alert" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Wallet size={16} />
                 <span>
@@ -323,23 +425,50 @@ export function ApplyCreditNoteModal({ note, onClose }: { note: CreditNoteAction
                 </span>
               </div>
             ) : (
-              <div className="ff-wrap">
-                <label className="ff-label ff-required" htmlFor="applyAmount">
-                  Monto a aplicar
-                  <FieldTooltip>
-                    Prellenado con el total de la nota — si excede el saldo restante realmente disponible (ya sea porque hay reembolsos o conversiones previas), el sistema te lo indicará.
-                  </FieldTooltip>
-                </label>
-                <input
-                  id="applyAmount"
-                  className={`ff-input${!applyAmountValid ? ' items-input-error' : ''}`}
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  value={applyAmount || ''}
-                  onChange={(e) => setApplyAmount(parseFloat(e.target.value) || 0)}
-                />
-              </div>
+              <>
+                <div className="ff-wrap">
+                  <label className="ff-label ff-required" htmlFor="applyAmount">
+                    Monto a aplicar
+                    <FieldTooltip>
+                      Prellenado con el total de la nota — si excede el saldo restante realmente disponible (ya sea porque hay reembolsos o conversiones previas), el sistema te lo indicará.
+                    </FieldTooltip>
+                  </label>
+                  <input
+                    id="applyAmount"
+                    className={`ff-input${!applyAmountValid ? ' items-input-error' : ''}`}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={applyAmount || ''}
+                    onChange={(e) => {
+                      setApplyAmount(parseFloat(e.target.value) || 0)
+                      setSobranteConfirmado(false)
+                    }}
+                  />
+                </div>
+                {/* §4.3: nota de uso único aplicada por menos del total — aviso de
+                    confirmación del sobrante (no bloquea la aplicación parcial). */}
+                {aplicaParcial && (
+                  <div className="inline-alert" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <span style={{ fontSize: 13 }}>
+                      {applyTargetEntry?.remanente === 'perder' ? (
+                        <>Esta nota es de <strong>uso único</strong>. Los {formatMoney(disponibleNota - applyAmount, note.currency)} que no se usen <strong>se perderán</strong>.</>
+                      ) : (
+                        <>Esta nota es de <strong>uso único</strong>. Los {formatMoney(disponibleNota - applyAmount, note.currency)} que no se usen pasarán a <strong>saldo a favor</strong> del cliente.</>
+                      )}
+                    </span>
+                    <label className="ff-check-wrap">
+                      <input
+                        type="checkbox"
+                        className="ff-check"
+                        checked={sobranteConfirmado}
+                        onChange={(e) => setSobranteConfirmado(e.target.checked)}
+                      />
+                      <span style={{ fontSize: 13 }}>Entiendo qué pasará con el sobrante</span>
+                    </label>
+                  </div>
+                )}
+              </>
             )}
           </div>
           <div className="modal-foot">

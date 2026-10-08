@@ -963,6 +963,22 @@ export interface CreditNote {
    *  docs/tasks/64_multimoneda_completo.md §3.4. */
   currency?: string;
   conversionRate?: number;
+  // ─── Vencimiento y uso (§3 docs/tasks/PROMPT_VENCIMIENTO_SALDOS_A_FAVOR_FRONTEND.md) ───
+  // Todos opcionales: tenants sin configurar llegan con venceEl=null / uso='multiple'.
+  /** Fecha `YYYY-MM-DD` hasta la cual inclusive se puede usar. `null` = no vence. */
+  venceEl?: string | null;
+  /** Días hasta `venceEl` (0 = vence hoy; negativo = ya venció). `null` si no vence. */
+  diasRestantes?: number | null;
+  /** Estado calculado por el backend con la zona del site — nunca recalcular en cliente. */
+  estado?: CreditoEstado;
+  /** `true` solo si `estado` es `vigente` o `por_vencer`. Usar para habilitar «Aplicar». */
+  puedeAplicar?: boolean;
+  /** Política de uso de ESA nota (no la configuración actual del tenant). */
+  uso?: 'multiple' | 'unico';
+  /** Qué pasa con el sobrante (solo si `uso = unico`). */
+  remanente?: 'saldo_favor' | 'perder' | null;
+  /** `true` = el sobrante de una nota de uso único ya pasó a saldo a favor (uso múltiple). */
+  origenSaldoFavor?: boolean;
 }
 
 /** Código de modificación DGII (Tabla VI): 1=Anula, 2=Corrige texto, 3=Corrige montos,
@@ -1026,13 +1042,89 @@ export interface CreditNoteSaldoFavorEntry {
   appliedAmount: number;
   availableAmount: number;
   appliedTo: CreditNoteAppliedTo[];
+  // ─── Vencimiento (§3.1) — opcionales por compatibilidad con respuestas viejas ───
+  venceEl?: string | null;
+  diasRestantes?: number | null;
+  estado?: CreditoEstado;
+  puedeAplicar?: boolean;
+  uso?: 'multiple' | 'unico';
+  remanente?: 'saldo_favor' | 'perder' | null;
+  origenSaldoFavor?: boolean;
 }
 
 export interface CreditNoteSaldoFavorResult {
   customer: string;
+  /** SOLO lo aplicable hoy (vigente + por_vencer). Lo vencido está en `vencidoAmount`. */
   balance: number;
+  /** NUEVO: lo bloqueado por vencimiento. */
+  vencidoAmount?: number;
   entries: CreditNoteSaldoFavorEntry[];
 }
+
+// ─── Vencimiento y uso de notas de crédito y saldos a favor ────────────────────
+// docs/tasks/PROMPT_VENCIMIENTO_SALDOS_A_FAVOR_FRONTEND.md
+
+/** Estado de un crédito (§3.2). Lo calcula el backend con la zona del site. */
+export type CreditoEstado = 'vigente' | 'por_vencer' | 'vencido' | 'perdido' | 'agotado';
+
+export type CreditoUso = 'multiple' | 'unico';
+
+export type CreditoRemanente = 'saldo_favor' | 'perder';
+
+/** Respuesta común de las 6 rutas de §5 (reactivar / cambiar vencimiento / dar de baja). */
+export interface AccionCreditoResult {
+  id: string;
+  /** "nota" | "saldo" */
+  tipo: 'nota' | 'saldo';
+  /** Estado resultante (§3.2). */
+  estado: CreditoEstado;
+  /** `null` = sin vencimiento. */
+  venceEl: string | null;
+  /** JE de baja cancelado al reactivar (si lo hubo). */
+  asientoRevertido: string | null;
+  /** JE creado al dar de baja. */
+  asiento: string | null;
+  autorizadoPor: string;
+  /** `true` = se autorizó con el código de otro usuario. */
+  autorizadoConCodigo: boolean;
+  /** `true` = ya estaba así (reintento idempotente). */
+  sinCambios: boolean;
+}
+
+/** POST …/reactivar — §5.1. `venceEl` y `dias` son alternativas; omitir ambos usa la
+ *  vigencia configurada (con vigencia 0 queda sin vencimiento). */
+export interface ReactivarCreditoDto {
+  venceEl?: string;
+  dias?: number;
+  /** OBLIGATORIO, 5–500 caracteres. */
+  motivo: string;
+  pinOverride?: PinOverrideDto;
+}
+
+/** PATCH …/vencimiento — §5.2. `venceEl` es OBLIGATORIO (`null` = quitar el vencimiento). */
+export interface CambiarVencimientoDto {
+  venceEl: string | null;
+  /** OBLIGATORIO. */
+  motivo: string;
+  pinOverride?: PinOverrideDto;
+}
+
+/** POST …/dar-de-baja — §5.3. Solo `estado = 'vencido'`. */
+export interface DarDeBajaDto {
+  motivo: string;
+  pinOverride?: PinOverrideDto;
+}
+
+/** Códigos de error nuevos (§8). */
+export type CreditoErrorCode =
+  | 'CREDITO_VENCIDO'
+  | 'SALDO_FAVOR_VENCIDO'
+  | 'CREDITO_USO_UNICO_CONSUMIDO'
+  | 'CREDITO_DADO_DE_BAJA'
+  | 'PERMISO_REQUERIDO'
+  | 'AUTORIZACION_INVALIDA'
+  | 'PERMISO_INSUFICIENTE'
+  | 'FEATURE_NO_CONTRATADO';
 
 // ─── Devoluciones (return flow) ────────────────────────────────────────────────
 
@@ -1189,6 +1281,16 @@ export interface DevolucionDetail {
   aseguradora?: DevolucionAseguradora | null;
   createdAt: string;
   modifiedAt: string;
+  // ─── Vencimiento y uso (§3.1) — opcionales por compatibilidad ───
+  /** Fecha `YYYY-MM-DD` hasta la cual inclusive se puede usar. `null` = no vence. */
+  venceEl?: string | null;
+  /** Días hasta `venceEl` (0 = vence hoy; negativo = ya venció). */
+  diasRestantes?: number | null;
+  estado?: CreditoEstado;
+  puedeAplicar?: boolean;
+  uso?: 'multiple' | 'unico';
+  remanente?: 'saldo_favor' | 'perder' | null;
+  origenSaldoFavor?: boolean;
 }
 
 // GET /credit-notes/:id — detalle. El backend devuelve el shape de detalle (igual que
@@ -4461,7 +4563,22 @@ export interface FacturacionConfig {
   permitirModificarPrecioServicios?: boolean
   /** Igual que `permitirModificarPrecioServicios`, pero para líneas de PRODUCTO — interruptor
    *  separado, mismo comportamiento y mismos 3 documentos. */
-  permitirModificarPrecioProductos?: boolean
+  permitirModificarPrecioProductos?: boolean;
+
+  // ─── Notas de crédito y saldos a favor — docs/tasks/ ─────────────────────────
+  // PROMPT_VENCIMIENTO_SALDOS_A_FAVOR_FRONTEND.md §2. `saldoVencidoCuenta` NO se expone
+  // fuera de la pantalla de configuración (GET /opciones y /me/bootstrap no lo traen).
+  /** Días de vigencia de una nota de crédito desde su fecha. `0` = no vencen. */
+  creditoVigenciaDias?: number;
+  /** `multiple`: varias facturas hasta agotarse. `unico`: una sola aplicación. */
+  creditoUso?: 'multiple' | 'unico';
+  /** Solo con `creditoUso = unico`: qué pasa con lo no usado tras la única aplicación. */
+  creditoRemanenteUnico?: 'saldo_favor' | 'perder';
+  /** Días de vigencia de TODO saldo a favor del cliente. `0` = no vencen. */
+  saldoFavorVigenciaDias?: number;
+  /** Cuenta de INGRESO donde se registra lo que se pierde. Obligatoria con
+   *  `creditoUso = unico` + `creditoRemanenteUnico = perder`. Solo en Configuración. */
+  saldoVencidoCuenta?: string | null;
 }
 
 /** PUT /config/despacho/futuro — docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §2.1. Los 3 campos
@@ -5788,11 +5905,19 @@ export interface SaldoFavorEntry {
   availableAmount: number;
   /** Facturas a las que ya se aplicó este Payment Entry */
   appliedTo: SaldoFavorAppliedTo[];
+  // ─── Vencimiento (§3.1, saldos tipo pago) — opcionales por compatibilidad ───
+  venceEl?: string | null;
+  diasRestantes?: number | null;
+  estado?: CreditoEstado;
+  puedeAplicar?: boolean;
 }
 
 export interface SaldoFavorResult {
   customer: string;
+  /** SOLO lo aplicable hoy (vigente + por_vencer). */
   balance: number;
+  /** NUEVO: lo bloqueado por vencimiento. */
+  vencidoAmount?: number;
   entries: SaldoFavorEntry[];
 }
 
