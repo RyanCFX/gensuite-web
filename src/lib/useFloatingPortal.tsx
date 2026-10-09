@@ -79,6 +79,18 @@ function applyVerticalFlip(style: FloatingStyle, rect: DOMRect, contentHeight: n
   return { ...style, top: Math.max(4, rect.top - contentHeight - 4) }
 }
 
+/** Recorta horizontalmente: si el contenido se sale por izquierda/derecha del viewport
+ *  (ej. tooltip centrado bajo un anchor pegado al borde), lo desplaza adentro y suelta el
+ *  `translateX(-50%)` para no pelear con el `left` ya corregido. */
+function applyHorizontalClamp(style: FloatingStyle, contentWidth: number): FloatingStyle {
+  const vw = window.innerWidth
+  const margin = 4
+  const visualLeft = style.transform === 'translateX(-50%)' ? style.left - contentWidth / 2 : style.left
+  const clamped = Math.min(Math.max(visualLeft, margin), Math.max(margin, vw - contentWidth - margin))
+  if (clamped === visualLeft) return style
+  return { ...style, left: clamped, transform: undefined }
+}
+
 /**
  * Hook that manages open/close state and calculates the fixed position
  * of a floating dropdown anchored to `anchorRef`.
@@ -156,13 +168,18 @@ export function useFloatingDropdown(
   }, [open, anchorRef, close])
 
   // Tras pintar el contenido (antes de que el navegador lo muestre, por eso useLayoutEffect),
-  // mide su alto real y voltea el dropdown arriba del anchor si no cabe abajo.
+  // mide su tamaño real: voltea arriba si no cabe abajo y lo recorta horizontalmente si se
+  // sale del viewport (ej. tooltip centrado bajo un anchor pegado al borde derecho).
   useLayoutEffect(() => {
     if (!open || !style || !anchorRef.current || !portalRef.current) return
     const rect = anchorRef.current.getBoundingClientRect()
     const contentHeight = portalRef.current.offsetHeight
+    const contentWidth = portalRef.current.offsetWidth
     const flipped = applyVerticalFlip(style, rect, contentHeight)
-    if (flipped.top !== style.top) setStyle(flipped)
+    const clamped = applyHorizontalClamp(flipped, contentWidth)
+    if (clamped.top !== style.top || clamped.left !== style.left || clamped.transform !== style.transform) {
+      setStyle(clamped)
+    }
   }, [open, style, anchorRef])
 
   return { open, style, openDropdown, toggle, close, portalRef }

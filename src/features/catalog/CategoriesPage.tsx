@@ -5,7 +5,6 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { listCategories, getCategory, createCategory, updateCategory, deleteCategory } from '@/shared/api/catalog'
-import { getPermisosCatalogo } from '@/shared/api/permisos'
 import type { Category, UpdateCategoryDto } from '@/shared/api/types'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -105,15 +104,25 @@ function TreeNode({ category, depth, onEdit, onDelete }: { category: Category; d
           </span>
         )}
         {/* Actions */}
-        <div style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-          <ActionsMenu>
-            <ActionsMenuItem onClick={() => onEdit(category)}>
-              <Pencil size={14} /> Editar
-            </ActionsMenuItem>
-            <ActionsMenuItem onClick={() => onDelete(category)}>
-              <Trash2 size={14} /> Eliminar
-            </ActionsMenuItem>
-          </ActionsMenu>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-size-icon-xs"
+            onClick={() => onEdit(category)}
+            title="Editar"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            <Pencil size={14} />
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-size-icon-xs"
+            onClick={() => onDelete(category)}
+            title="Eliminar"
+            style={{ color: 'var(--error-text)' }}
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
       </div>
 
@@ -136,11 +145,6 @@ export default function CategoriesPage() {
   // Medicamentos controlados (docs/FARMACIA_ARS_FRONTEND.md §8) — vive fuera de react-hook-form,
   // mismo criterio que `barcodes` en ItemForm.tsx: es un array libre, no un campo escalar.
   const [rolesPermitidosVenta, setRolesPermitidosVenta] = useState<string[]>([])
-  const { data: permisosCatalogo } = useQuery({
-    queryKey: ['permisos-catalogo'],
-    queryFn: getPermisosCatalogo,
-    staleTime: 5 * 60_000,
-  })
   const [parentCatQuery, setParentCatQuery] = useState('')
   const [page, setPage] = useState(1)
   const { orderBy, sort } = useSortState()
@@ -484,6 +488,9 @@ export default function CategoriesPage() {
       {/* ── Árbol Tab ── */}
       {activeTab === 'arbol' && (
         <div className="card">
+          <div className="card-header navy-card-header">
+            <h2 className="card-title">Árbol de categorías</h2>
+          </div>
           <div className="card-body" style={{ padding: 0 }}>
             {treeLoading
               ? (
@@ -653,33 +660,6 @@ export default function CategoriesPage() {
                   </div>
                 )}
 
-                <div className="ff-wrap">
-                  <label className="ff-label">
-                    Roles autorizados a vender (opcional)
-                    <FieldTooltip>
-                      Vacío = cualquiera con permiso de venta puede vender artículos de esta categoría. Con roles
-                      elegidos, solo un usuario con al menos uno de ellos puede vender un artículo de esta categoría
-                      (ej. "Dispensador Controlados" para medicamentos controlados).
-                    </FieldTooltip>
-                  </label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {(permisosCatalogo?.roles ?? []).map((role) => (
-                      <label key={role.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          className="ff-check"
-                          checked={rolesPermitidosVenta.includes(role.value)}
-                          onChange={(e) =>
-                            setRolesPermitidosVenta((prev) =>
-                              e.target.checked ? [...prev, role.value] : prev.filter((r) => r !== role.value),
-                            )
-                          }
-                        />
-                        {role.label_es ?? role.value}
-                      </label>
-                    ))}
-                  </div>
-                </div>
               </div>
               <div className="modal-foot">
                 <button type="button" className="btn btn-ghost" onClick={requestClose}>Cancelar</button>

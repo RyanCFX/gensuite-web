@@ -55,6 +55,7 @@ import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
+import { useSyncFooterWidth } from '@/shared/hooks/useSyncFooterWidth'
 import { formatStockInsufficientMessage, formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { esCreditoFiscal } from '@/lib/comprobantes'
 import { getDgiiTaxpayer } from '@/shared/api/dgii'
@@ -1427,6 +1428,7 @@ export default function InvoiceForm() {
     { key: 'actions', width: 70 },
   ]
   const { widths: colWidths, startResize } = useResizableColumns(itemsColumnDefs)
+  const tablaWrapRef = useSyncFooterWidth<HTMLDivElement>()
   /** Columnas totales visibles, incluyendo "Código" (que se maneja aparte por su ancho
    *  automático) — para los `colSpan` de las filas especiales de la tabla. */
   const columnCount = itemsColumnDefs.length + 1
@@ -1973,7 +1975,7 @@ persistInvoice(buildInvoiceDto())
               </button>
             </div>
           )}
-          <div className="items-table-wrap">
+          <div className="items-table-wrap" ref={tablaWrapRef}>
             <table className="items-table navy-table items-table-resizable">
               <colgroup>
                 <col style={{ width: codigoAutoWidth }} />
@@ -2230,32 +2232,7 @@ persistInvoice(buildInvoiceDto())
                                    />
                                  )}
                                </div>
-                               {isAmountMode ? (
-                                 <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                   Descuento: {formatMoney(item.discountAmount, currency || monedaBase)}
-                                 </span>
-                               ) : (
-                                 <>
-                                   {item.discountPct > 0 && (
-                                     <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                       Total: {item.discountPct.toFixed(1)}%
-                                     </span>
-                                   )}
-                                   {effectiveLimit < 100 && (
-                                     <span style={{ fontSize: 11, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                       máx {effectiveLimit.toFixed(2)}%
-                                     </span>
-                                   )}
-                                   {item.discountPct > effectiveLimit && (
-                                     <span style={{ fontSize: 11, color: 'red', display: 'block', marginTop: 2, whiteSpace: 'nowrap' }}>
-                                       Supera el límite de {effectiveLimit.toFixed(2)}%
-                                     </span>
-                                   )}
-                                   <span style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'block', marginTop: 2, cursor: 'help' }} title="El descuento puede incluir una parte automática (Pricing Rule) y una parte manual del vendedor. Ambas se suman contra el tope máximo.">
-                                     ⓘ automático + manual
-                                   </span>
-                                 </>
-                               )}
+
                              </>
                            )
                          })()}
@@ -2359,26 +2336,28 @@ persistInvoice(buildInvoiceDto())
                           </td>
                         </>
                       )}
-                      <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-size-icon-xs"
-                          onClick={() => setViewItemCode(item.itemCode)}
-                          disabled={!item.itemCode}
-                          title="Ver detalle"
-                          style={{ color: 'var(--text-primary)' }}
-                        >
-                          <Eye size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-size-icon-xs"
-                          onClick={() => removeRow(index)}
-                          title="Eliminar"
-                          style={{ color: 'var(--error-text)' }}
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                      <td onClick={(e) => e.stopPropagation()} className="actions-cell" style={{ position: 'relative', verticalAlign: 'middle' }}>
+                        <div style={{ position: 'absolute', inset: 0, display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-size-icon-xs"
+                            onClick={() => setViewItemCode(item.itemCode)}
+                            disabled={!item.itemCode}
+                            title="Ver detalle"
+                            style={{ color: 'var(--text-primary)' }}
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-size-icon-xs"
+                            onClick={() => removeRow(index)}
+                            title="Eliminar"
+                            style={{ color: 'var(--error-text)' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     {item.itemType === 'combo' && item._comboComponents && item._comboComponents.length > 0 && (
@@ -2424,7 +2403,7 @@ persistInvoice(buildInvoiceDto())
                 )}
               </tbody>
             </table>
-            <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border)' }}>
+            <div data-pie-tabla style={{ padding: '8px 16px', borderTop: '1px solid var(--border)', width: 'max-content', minWidth: '100%' }}>
               <button type="button" className="btn btn-ghost btn-size-sm" onClick={addRow}>
                 <Plus size={14} /> Agregar artículo
               </button>
@@ -2437,7 +2416,7 @@ persistInvoice(buildInvoiceDto())
               />
             )}
 
-            <div className="items-total-row navy-totals">
+            <div data-pie-tabla className="items-total-row navy-totals">
               <div className="items-total-line" style={{ fontSize: 16, justifyContent: 'flex-end', gap: 24 }}>
                 <span style={{ textAlign: 'right' }}>Subtotal</span>
                 <span style={{ textAlign: 'left', minWidth: 170 }}>{formatMoney(grossTotal, currency || monedaBase)}</span>
