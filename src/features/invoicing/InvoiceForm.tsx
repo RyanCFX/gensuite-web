@@ -16,7 +16,7 @@ import { esCoberturaCompleta } from '@/shared/api/types'
 import { client } from '@/shared/api/client'
 import { lookupItems, getItemLookup } from '@/shared/api/catalog'
 import { getFacturacionConfig } from '@/shared/api/config'
-import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, ClienteDetalle, SemaforoEntry, Item, ItemPrices, Bundle, ComponentTracking, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada } from '@/shared/api/types'
+import type { CreateInvoiceDto, UpdateInvoiceDto, Customer, ClienteDetalle, SemaforoEntry, Item, ItemPrices, Bundle, ComponentTracking, ItemStock, MonedaCode, DimensionesLinea, ItemDimensionDeclarada, ApiError } from '@/shared/api/types'
 import { DimensionAxisCell, combinacionCompleta } from '@/components/shared/CombinacionDimensionSelector'
 import { useDimensionesInventario } from '@/shared/hooks/useDimensionesInventario'
 import { mergeLineasIguales } from '@/shared/lib/mergeLineasIguales'
@@ -25,7 +25,7 @@ import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingMod
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
 import { formatDOP, formatMoney, round2, formatDate } from '@/lib/formatters'
-import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen, ChevronDown, RotateCcw } from 'lucide-react'
+import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen, ChevronDown, RotateCcw, CheckCircle2, XCircle } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
@@ -57,6 +57,9 @@ import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { formatStockInsufficientMessage, formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { esCreditoFiscal } from '@/lib/comprobantes'
+import { getDgiiTaxpayer } from '@/shared/api/dgii'
+import { useDebounce } from '@/lib/useDebounce'
+import { validateRNCDetailed, validateCedulaDetailed } from '@/lib/validators/dgii'
 import { isPinPrecioError } from '@/lib/pinOverride'
 import { isPrecioCatalogoError, precioBloqueadoParaLinea } from '@/lib/precioCatalogo'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
@@ -302,6 +305,58 @@ export default function InvoiceForm() {
   const [clienteOcasionalNombre, setClienteOcasionalNombre] = useState('')
   const [clienteOcasionalRnc, setClienteOcasionalRnc] = useState('')
   const [clienteOcasionalDireccion, setClienteOcasionalDireccion] = useState('')
+
+  // ── Verificación en el padrón DGII del RNC/cédula ocasional (igual que clientes/nuevo:
+  // `CustomerFormPanel` — se dispara al digitar, con longitud completa 9/11, y autocompleta
+  // el nombre). No se dispara al hidratar un borrador en edición salvo que se marque tocado.
+  const [rncOcasionalTouched, setRncOcasionalTouched] = useState(false)
+  const rncOcasionalClean = clienteOcasionalRnc.replace(/[-\s]/g, '')
+  const rncOcasionalDetail = !rncOcasionalClean ? null
+    : rncOcasionalClean.length === 11 ? validateCedulaDetailed(rncOcasionalClean)
+    : validateRNCDetailed(rncOcasionalClean)
+  const rncOcasionalValid = (rncOcasionalClean.length === 9 || rncOcasionalClean.length === 11)
+    ? (rncOcasionalDetail?.valid ?? null)
+    : null
+  const debouncedRncOcasional = useDebounce(rncOcasionalClean, 500)
+  const dgiiOcasionalEnabled = esClienteOcasional && rncOcasionalTouched &&
+    (debouncedRncOcasional.length === 9 || debouncedRncOcasional.length === 11)
+  const { data: contribuyenteOcasional, error: contribuyenteOcasionalError, isFetching: buscandoContribuyente } = useQuery({
+    queryKey: ['dgii-taxpayer', 'ocasional', debouncedRncOcasional],
+    queryFn: () => getDgiiTaxpayer(debouncedRncOcasional),
+    enabled: dgiiOcasionalEnabled,
+    retry: false,
+    staleTime: 5 * 60_000,
+  })
+  // RNC/cédula verificado en DGII para el valor actual — con B01/E31 es obligatorio para guardar.
+  const rncOcasionalVerificado = contribuyenteOcasional && !contribuyenteOcasionalError &&
+    debouncedRncOcasional === rncOcasionalClean ? debouncedRncOcasional : null
+
+  /* eslint-disable react-hooks/set-state-in-effect -- sincroniza la respuesta DGII (sistema
+     externo) al formulario: autocompleta el nombre y avisa 404/suspensión, igual que
+     clientes/nuevo. Solo corre cuando llega una respuesta nueva. */
+  useEffect(() => {
+    if (!dgiiOcasionalEnabled || !contribuyenteOcasional) return
+    setClienteOcasionalNombre(contribuyenteOcasional.name)
+    const suspended = `${contribuyenteOcasional.status ?? ''} ${contribuyenteOcasional.type ?? ''}`.toLowerCase().includes('suspend')
+    if (suspended) {
+      toast.warning(`El contribuyente "${contribuyenteOcasional.name}" figura SUSPENDIDO en el padrón de la DGII`)
+    }
+  }, [contribuyenteOcasional, dgiiOcasionalEnabled])
+
+  useEffect(() => {
+    if (!dgiiOcasionalEnabled || !contribuyenteOcasionalError) return
+    const err = contribuyenteOcasionalError as unknown as ApiError
+    if (err.statusCode === 404) {
+      if (debouncedRncOcasional.length === 9) {
+        toast.error(`El RNC ${debouncedRncOcasional} no existe en el padrón de la DGII`)
+      } else {
+        toast.error('No se encontró dicho documento en la base de datos de la DGII')
+      }
+      return
+    }
+    toast.error(err?.message ?? 'Error al consultar el padrón de la DGII')
+  }, [contribuyenteOcasionalError, dgiiOcasionalEnabled, debouncedRncOcasional])
+  /* eslint-enable react-hooks/set-state-in-effect */
   const [ncfType, setNcfType] = useState<NcfType>('B02')
   // El usuario ya eligió un Tipo NCF a mano — los auto-efectos no deben pisarlo al
   // llegar tarde `facturacionConfig` o al limpiar el cliente.
@@ -926,6 +981,8 @@ export default function InvoiceForm() {
       setClienteOcasionalNombre(inv.clienteOcasionalNombre ?? '')
       setClienteOcasionalRnc(inv.clienteOcasionalRnc ?? '')
       setClienteOcasionalDireccion(inv.clienteOcasionalDireccion ?? '')
+      // El RNC precargado debe verificarse igual que si se digitara (B01/E31 lo exige).
+      if (inv.clienteOcasionalRnc) setRncOcasionalTouched(true)
     } else if (inv.customer) {
       setCustomerId(inv.customer)
       getClienteDetalle(inv.customer).then(setSelectedCustomer).catch(() => {})
@@ -1422,6 +1479,17 @@ if (esClienteOcasional) {
          toast.error('El RNC debe tener 9 dígitos o la cédula 11 dígitos')
          return
        }
+       // B01/E31: el RNC/cédula debe existir en el padrón de la DGII (verificación obligatoria).
+       if (esCreditoFiscal(ncfType) && rncDigits) {
+         if (buscandoContribuyente) {
+           toast.error('Espera a que termine la verificación en la DGII')
+           return
+         }
+         if (!rncOcasionalVerificado) {
+           toast.error('El RNC o cédula debe aparecer en el padrón de la DGII para B01/E31')
+           return
+         }
+       }
       } else {
         if (!customerId) {
           toast.error('Selecciona un cliente')
@@ -1614,6 +1682,42 @@ persistInvoice(buildInvoiceDto())
           </div>
           <div className="card-body">
             <div className="form-row">
+                {esClienteOcasional && (
+                  <div className="ff-wrap">
+                    <label className={`ff-label${esCreditoFiscal(ncfType) ? ' ff-required' : ''}`} htmlFor="clienteOcasionalRnc">RNC o Cédula</label>
+                    <div className="ff-input-wrap">
+                      <input
+                        id="clienteOcasionalRnc"
+                        type="text"
+                        className="ff-input"
+                        value={clienteOcasionalRnc}
+                        onChange={(e) => { customerTouchedRef.current = true; setRncOcasionalTouched(true); setClienteOcasionalRnc(e.target.value) }}
+                        placeholder="132456785 o 00113918866"
+                        required={esCreditoFiscal(ncfType)}
+                      />
+                      {buscandoContribuyente && dgiiOcasionalEnabled && (
+                        <span className="ff-validation-icon">
+                          <span className="spinner spinner-brand spinner-sm" />
+                        </span>
+                      )}
+                      {!buscandoContribuyente && rncOcasionalValid !== null && (
+                        <span className="ff-validation-icon">
+                          {rncOcasionalValid
+                            ? <CheckCircle2 size={15} style={{ color: 'var(--success-text)' }} />
+                            : <XCircle size={15} style={{ color: 'var(--error-text)' }} />}
+                        </span>
+                      )}
+                    </div>
+                    {rncOcasionalDetail && !rncOcasionalDetail.valid && (
+                      <p className="ff-error">{rncOcasionalDetail.reason}</p>
+                    )}
+                    {rncOcasionalVerificado && contribuyenteOcasional && (
+                      <p className="ff-hint" style={{ color: 'var(--success-text)' }}>
+                        {contribuyenteOcasional.name} — verificado en la DGII
+                      </p>
+                    )}
+                  </div>
+                )}
 <div className="ff-wrap" style={multimonedaHabilitada ? undefined : { gridColumn: 'span 2' }}>
                  <label className="ff-label ff-required" htmlFor="customer">Cliente</label>
                  {esClienteOcasional ? (
@@ -1777,20 +1881,6 @@ persistInvoice(buildInvoiceDto())
                   )}
                 </div>
 
-               {esClienteOcasional && (
-                 <div className="ff-wrap">
-                   <label className={`ff-label${esCreditoFiscal(ncfType) ? ' ff-required' : ''}`} htmlFor="clienteOcasionalRnc">RNC o Cédula</label>
-                   <input
-                     id="clienteOcasionalRnc"
-                     type="text"
-                     className="ff-input"
-                     value={clienteOcasionalRnc}
-                     onChange={(e) => { customerTouchedRef.current = true; setClienteOcasionalRnc(e.target.value) }}
-                     placeholder="132456785 o 00113918866"
-                     required={esCreditoFiscal(ncfType)}
-                   />
-                 </div>
-               )}
 
               <div className="ff-wrap">
                 <label className="ff-label ff-required" htmlFor="branch">Sucursal</label>

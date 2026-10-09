@@ -5,7 +5,7 @@
  * Usado junto a PdfFormatButton en Facturas, Cobros y Compras — mismo patrón,
  * distinto endpoint de origen.
  */
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 
 export function PdfPreviewModal({
@@ -15,9 +15,18 @@ export function PdfPreviewModal({
   url: string | null
   onClose: () => void
 }) {
+  // La URL se libera con un pequeño retraso cancelable: en StrictMode (dev) React ejecuta el
+  // cleanup y vuelve a montar el efecto de inmediato — revocar en seco dejaba al iframe apuntando
+  // a un blob ya invalidado (ícono de página triste).
+  const pendingRevoke = useRef<{ url: string; timer: number } | null>(null)
   useEffect(() => {
+    if (!url) return
+    if (pendingRevoke.current?.url === url) {
+      window.clearTimeout(pendingRevoke.current.timer)
+      pendingRevoke.current = null
+    }
     return () => {
-      if (url) URL.revokeObjectURL(url)
+      pendingRevoke.current = { url, timer: window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     }
   }, [url])
 

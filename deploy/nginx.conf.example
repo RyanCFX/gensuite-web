@@ -42,8 +42,11 @@ server {
     #     arriba); wss/https a localhost:* es QZ Tray (agente de impresión de escritorio, puertos
     #     8181-8585 según cuál esté libre — ver src/shared/printing/qz.ts).
     #   - frame-ancestors 'self': refuerzo moderno de X-Frame-Options (abajo) contra clickjacking.
-    #   - object-src 'none': sin Flash/plugins embebidos, no hay caso de uso legítimo.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' wss://localhost:* https://localhost:*; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests" always;
+    #   - frame-src 'self' blob: + object-src 'self' blob:: la vista previa de PDF (PdfPreviewModal)
+    #     muestra un blob: en un <iframe>, y el visor de PDF de Chrome usa un <embed> interno que
+    #     cae bajo object-src. Con default-src 'self' / object-src 'none' el iframe queda bloqueado
+    #     (ícono de página triste). No hay otros plugins embebidos.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' wss://localhost:* https://localhost:*; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; frame-src 'self' blob:; object-src 'self' blob:; upgrade-insecure-requests" always;
 
     # Defensa contra clickjacking: nadie puede embeber este sitio en un <iframe>, ni siquiera
     # otro dominio propio (equivalente legado a frame-ancestors 'self' de arriba, para navegadores
