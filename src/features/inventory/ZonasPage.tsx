@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -268,7 +269,7 @@ function ZonasSection({
         </div>
       )}
 
-      {showForm && (
+      {showForm && createPortal(
         <div className="modal-overlay" onClick={formClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
@@ -300,7 +301,8 @@ function ZonasSection({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       <ConfirmModal
@@ -313,7 +315,7 @@ function ZonasSection({
         variant="danger"
       />
 
-      {toDelete && (
+      {toDelete && createPortal(
         <div className="modal-overlay" onClick={() => setToDelete(null)}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
@@ -332,7 +334,8 @@ function ZonasSection({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
@@ -530,7 +533,7 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
         </div>
       )}
 
-      {showForm && (
+      {showForm && createPortal(
         <div className="modal-overlay" onClick={formClose.requestClose}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
@@ -562,7 +565,8 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       <ConfirmModal
@@ -575,7 +579,7 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
         variant="danger"
       />
 
-      {toDelete && (
+      {toDelete && createPortal(
         <div className="modal-overlay" onClick={() => setToDelete(null)}>
           <div className="modal-box modal-box-sm" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
@@ -594,7 +598,8 @@ function UbicacionesSection({ zona }: { zona: ZonaResponseDto }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
@@ -684,6 +689,7 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
     { key: 'sinUbicar', width: 100 },
     { key: 'ubicacionDestino', width: 240 },
     { key: 'cantidad', width: 110 },
+    { key: 'dimension', width: 200 },
     { key: 'principal', width: 90 },
   ]
   const { widths: pendientesColWidths, startResize: pendientesStartResize } = useResizableColumns(PENDIENTES_COLUMNS)
@@ -804,6 +810,10 @@ function PendientesUbicarSection({ warehouse }: { warehouse: string }) {
                 <th>
                   Cantidad
                   <span className="col-resize-handle" onMouseDown={pendientesStartResize('cantidad')} />
+                </th>
+                <th>
+                  Dimensión
+                  <span className="col-resize-handle" onMouseDown={pendientesStartResize('dimension')} />
                 </th>
                 <th>
                   Principal
@@ -943,14 +953,15 @@ function HistorialMovimientosSection({ warehouse }: { warehouse: string }) {
         <span className="card-title">Historial de movimientos</span>
       </div>
       <div className="card-body" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', paddingBottom: 12 }}>
-        <input
-          className="ff-input"
-          style={{ maxWidth: 200 }}
-          placeholder="Código de artículo"
-          value={itemCode}
-          onChange={(e) => setItemCode(e.target.value)}
-        />
-        <div style={{ maxWidth: 220, width: '100%' }}>
+        <FilterField label="Artículo" style={{ maxWidth: 200, width: '100%' }}>
+          <input
+            className="ff-input"
+            placeholder="Código de artículo"
+            value={itemCode}
+            onChange={(e) => setItemCode(e.target.value)}
+          />
+        </FilterField>
+        <FilterField label="Ubicación" style={{ maxWidth: 220, width: '100%' }}>
           <SearchSelect
             value={ubicacionFilter}
             onChange={setUbicacionFilter}
@@ -960,7 +971,7 @@ function HistorialMovimientosSection({ warehouse }: { warehouse: string }) {
             placeholder="Todas las ubicaciones"
             disabled={!warehouse}
           />
-        </div>
+        </FilterField>
         <FilterField label="Desde" style={{ maxWidth: 160 }}>
           <DatePicker className="ff-input" value={fromDate} onChange={setFromDate} clearable />
         </FilterField>

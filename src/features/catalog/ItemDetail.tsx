@@ -1307,7 +1307,7 @@ export default function ItemDetail() {
               <span className="stat-label">Stock Actual</span>
             </div>
             <div className="stat-value" style={{ color: stockColor }}>{stock}</div>
-            <div className="stat-footer">
+            <div className="stat-footer" style={{ borderTop: 'none', paddingTop: 4 }}>
               <span style={{ color: stockColor, fontWeight: 500, fontSize: 13 }}>{stockLabel}</span>
             </div>
           </div>
@@ -1320,7 +1320,7 @@ export default function ItemDetail() {
               </div>
               <div className="stat-value">{formatDOP(item.standardRate)}</div>
               {item.autoDiscount && !restr.has('descuento') && (
-                <div className="stat-footer">
+                <div className="stat-footer" style={{ borderTop: 'none', paddingTop: 4 }}>
                   <span className="badge badge-discount" style={{ fontSize: 11 }}>
                     {item.autoDiscount.discountType === 'Discount Percentage'
                       ? `${item.autoDiscount.discountPercentage ?? 0}% OFF (auto)`
@@ -1329,7 +1329,7 @@ export default function ItemDetail() {
                 </div>
               )}
               {item.salesPriceDate && (
-                <div className="stat-footer">
+                <div className="stat-footer" style={{ borderTop: 'none', paddingTop: 4 }}>
                   <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>
                     última actualización: {new Date(item.salesPriceDate).toLocaleDateString('es-DO')}
                   </span>
@@ -1348,7 +1348,7 @@ export default function ItemDetail() {
             </div>
             <div className="stat-value">{formatDOP(item.standardRate)}</div>
             {item.salesPriceDate && (
-              <div className="stat-footer">
+              <div className="stat-footer" style={{ borderTop: 'none', paddingTop: 4 }}>
                 <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>
                   última actualización: {new Date(item.salesPriceDate).toLocaleDateString('es-DO')}
                 </span>
@@ -1403,7 +1403,7 @@ export default function ItemDetail() {
                             <div className="stat-value" style={{ fontSize: 22 }}>
                               {formatDOP(Math.round(item.valuationRate / (1 - item.marginA / 100) * (1 + item.salesTaxPct / 100) * 100) / 100)}
                             </div>
-                            <div style={{ borderTop: '1px solid var(--border-default)', margin: '8px 0' }} />
+                            <div style={{ height: 8 }} />
                             <div className="stat-value" style={{ fontSize: 16, fontWeight: 400 }}>
                               {formatDOP(Math.round(item.valuationRate / (1 - item.marginA / 100) * 100) / 100)} + {formatDOP(impuestoDe(Math.round(item.valuationRate / (1 - item.marginA / 100) * 100) / 100, item.salesTaxPct))}
                               <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: '#1f8591', lineHeight: 1.3, marginTop: 2 }}>sin impuesto + impuesto</span>
@@ -1426,7 +1426,7 @@ export default function ItemDetail() {
                             <div className="stat-value" style={{ fontSize: 22 }}>
                               {formatDOP(Math.round(item.valuationRate / (1 - item.marginB / 100) * (1 + item.salesTaxPct / 100) * 100) / 100)}
                             </div>
-                            <div style={{ borderTop: '1px solid var(--border-default)', margin: '8px 0' }} />
+                            <div style={{ height: 8 }} />
                             <div className="stat-value" style={{ fontSize: 16, fontWeight: 400 }}>
                               {formatDOP(Math.round(item.valuationRate / (1 - item.marginB / 100) * 100) / 100)} + {formatDOP(impuestoDe(Math.round(item.valuationRate / (1 - item.marginB / 100) * 100) / 100, item.salesTaxPct))}
                               <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: '#1f8591', lineHeight: 1.3, marginTop: 2 }}>sin impuesto + impuesto</span>
@@ -1449,7 +1449,7 @@ export default function ItemDetail() {
                             <div className="stat-value" style={{ fontSize: 22 }}>
                               {formatDOP(Math.round(item.valuationRate / (1 - item.marginC / 100) * (1 + item.salesTaxPct / 100) * 100) / 100)}
                             </div>
-                            <div style={{ borderTop: '1px solid var(--border-default)', margin: '8px 0' }} />
+                            <div style={{ height: 8 }} />
                             <div className="stat-value" style={{ fontSize: 16, fontWeight: 400 }}>
                               {formatDOP(Math.round(item.valuationRate / (1 - item.marginC / 100) * 100) / 100)} + {formatDOP(impuestoDe(Math.round(item.valuationRate / (1 - item.marginC / 100) * 100) / 100, item.salesTaxPct))}
                               <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: '#1f8591', lineHeight: 1.3, marginTop: 2 }}>sin impuesto + impuesto</span>
@@ -1475,7 +1475,7 @@ export default function ItemDetail() {
                             <div className="stat-value" style={{ fontSize: 22 }}>
                               {formatDOP(Math.round(item.prices?.A * (1 + item.salesTaxPct / 100) * 100) / 100)}
                             </div>
-                            <div style={{ borderTop: '1px solid var(--border-default)', margin: '8px 0' }} />
+                            <div style={{ height: 8 }} />
                             <div className="stat-value" style={{ fontSize: 16, fontWeight: 400 }}>
                               {formatDOP(item.prices?.A)} + {formatDOP(impuestoDe(item.prices?.A ?? 0, item.salesTaxPct))}
                               <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: '#1f8591', lineHeight: 1.3, marginTop: 2 }}>sin impuesto + impuesto</span>
@@ -1498,7 +1498,7 @@ export default function ItemDetail() {
                             <div className="stat-value" style={{ fontSize: 22 }}>
                               {formatDOP(Math.round(item.prices?.B * (1 + item.salesTaxPct / 100) * 100) / 100)}
                             </div>
-                            <div style={{ borderTop: '1px solid var(--border-default)', margin: '8px 0' }} />
+                            <div style={{ height: 8 }} />
                             <div className="stat-value" style={{ fontSize: 16, fontWeight: 400 }}>
                               {formatDOP(item.prices?.B)} + {formatDOP(impuestoDe(item.prices?.B ?? 0, item.salesTaxPct))}
                               <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: '#1f8591', lineHeight: 1.3, marginTop: 2 }}>sin impuesto + impuesto</span>
@@ -1521,7 +1521,7 @@ export default function ItemDetail() {
                             <div className="stat-value" style={{ fontSize: 22 }}>
                               {formatDOP(Math.round(item.prices?.C * (1 + item.salesTaxPct / 100) * 100) / 100)}
                             </div>
-                            <div style={{ borderTop: '1px solid var(--border-default)', margin: '8px 0' }} />
+                            <div style={{ height: 8 }} />
                             <div className="stat-value" style={{ fontSize: 16, fontWeight: 400 }}>
                               {formatDOP(item.prices?.C)} + {formatDOP(impuestoDe(item.prices?.C ?? 0, item.salesTaxPct))}
                               <span style={{ display: 'block', fontSize: 11, fontWeight: 400, color: '#1f8591', lineHeight: 1.3, marginTop: 2 }}>sin impuesto + impuesto</span>

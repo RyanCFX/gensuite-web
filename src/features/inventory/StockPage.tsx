@@ -5,7 +5,6 @@ import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { formatDOP, formatNumber } from '@/lib/formatters'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { RecargarButton } from '@/components/shared/RecargarButton'
-import { DollarSign, TrendingUp, Package } from 'lucide-react'
 import { useSortState } from '@/shared/hooks/useSortState'
 import { SortableTh } from '@/shared/ui/SortableTh'
 import { useAuthStore } from '@/stores/auth.store'
@@ -147,10 +146,9 @@ export default function StockPage() {
         action={<RecargarButton />}
       />
 
-      <div className="stats-row">
-        <div className="stat-card">
+      <div className="stats-row" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 16 }}>
+        <div className="stat-card kpi">
           <div className="stat-card-top">
-            <div className="stat-icon-badge"><DollarSign size={16} /></div>
             <span className="stat-label">Inversión Total</span>
           </div>
           {isLoading
@@ -158,9 +156,8 @@ export default function StockPage() {
             : <div className="stat-value">{summary?.totalInvestment == null ? '—' : formatDOP(summary.totalInvestment)}</div>}
         </div>
 
-        <div className="stat-card">
+        <div className="stat-card kpi">
           <div className="stat-card-top">
-            <div className="stat-icon-badge"><Package size={16} /></div>
             <span className="stat-label">Valor de Venta</span>
           </div>
           {isLoading
@@ -168,9 +165,8 @@ export default function StockPage() {
             : <div className="stat-value">{summary?.totalSaleValue == null ? '—' : formatDOP(summary.totalSaleValue)}</div>}
         </div>
 
-        <div className="stat-card">
+        <div className="stat-card kpi">
           <div className="stat-card-top">
-            <div className="stat-icon-badge"><TrendingUp size={16} /></div>
             <span className="stat-label">Ganancia Potencial</span>
           </div>
           {isLoading
