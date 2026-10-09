@@ -688,8 +688,11 @@ export default function InvoiceForm() {
   }
 
   // ── Semaforo ──────────────────────────────────────────────────────────────
+  // Solo para clientes CON crédito: con creditDays 0 (ej. Consumidor Final) no se pide el
+  // semáforo — no hay límite que medir y no debe mostrarse "Crédito OK".
   useEffect(() => {
-    if (!selectedCustomer) {
+    const tieneCredito = !!selectedCustomer && ((selectedCustomer.hasCredit ?? false) || (selectedCustomer.creditDays ?? 0) > 0)
+    if (!tieneCredito) {
       setSemaforo(null)
       return
     }
@@ -753,6 +756,27 @@ export default function InvoiceForm() {
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId])
+
+  // ── Cliente por defecto: "Consumidor Final" (el usuario puede cambiarlo siempre) ──
+  // Solo al crear (nunca en edición): busca el cliente y lo preselecciona si hay match exacto.
+  // Se aplica una sola vez; si el usuario lo cambia o lo quita, no se reimpone.
+  const consumidorFinalAplicadoRef = useRef(false)
+  const { data: consumidorFinalData, isSuccess: consumidorFinalListo } = useOpcionesLista('clientes', {
+    q: 'Consumidor Final',
+    limit: 10,
+    enabled: !isEdit,
+  })
+  /* eslint-disable react-hooks/set-state-in-effect -- preselección del default (sistema
+     externo: lista de clientes): solo corre una vez con la respuesta, nunca pisa al usuario. */
+  useEffect(() => {
+    if (isEdit || esClienteOcasional || customerId || consumidorFinalAplicadoRef.current || !consumidorFinalListo) return
+    consumidorFinalAplicadoRef.current = true
+    const match = (consumidorFinalData?.items ?? []).find(
+      (o) => o.id?.toLowerCase() === 'consumidor final' || o.name?.toLowerCase() === 'consumidor final',
+    )
+    if (match) setCustomerId(match.id)
+  }, [consumidorFinalListo, consumidorFinalData, isEdit, esClienteOcasional, customerId])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // ── Auto-select NCF type for ocasional customers ────────────────────────
   // docs/tasks/PROMPT_NCF_DEFAULT_REGIMENES_ESPECIALES_REDONDEO_FRONTEND.md §1.5 — el default
