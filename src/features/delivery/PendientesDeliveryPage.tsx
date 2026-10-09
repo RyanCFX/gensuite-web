@@ -19,6 +19,7 @@ import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useDeliveryPuerta, DrenajeAviso } from '@/shared/hooks/useDelivery'
 import { DeliveryEntregaBadge, DeliveryCobroBadge } from './DeliveryBadges'
 import { AnularDeliveryModal } from './AnularDeliveryModal'
+import { FacturaDeliveryDrawer } from './FacturaDeliveryDrawer'
 import { DeliveryPagination } from './DeliveryPagination'
 
 const COLUMNS = [
@@ -40,6 +41,8 @@ export default function PendientesDeliveryPage() {
   const puerta = useDeliveryPuerta()
   const puedeCrearViaje = usePuede('delivery.viajes.crear') && puerta.operativo
   const puedeAnular = usePuede('delivery.entregas.anular')
+  // Detalle en drawer solo para quien puede ver facturas — sin el permiso la fila no hace nada.
+  const puedeVerFactura = usePuede('ventas.factura.listar')
 
   const [estado, setEstado] = useState<'todos' | 'pendiente' | 'no_entregado'>('todos')
   const [customer, setCustomer] = useState('')
@@ -50,6 +53,7 @@ export default function PendientesDeliveryPage() {
   const [page, setPage] = useState(1)
   const [seleccion, setSeleccion] = useState<Map<string, DeliveryPendiente>>(new Map())
   const [anular, setAnular] = useState<DeliveryPendiente | null>(null)
+  const [detalle, setDetalle] = useState<DeliveryPendiente | null>(null)
   const offset = (page - 1) * PAGE_SIZE
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
@@ -197,8 +201,16 @@ export default function PendientesDeliveryPage() {
                       const asignable = r.estadoEntrega === 'pendiente' && !r.viaje
                       const fallida = r.estadoEntrega === 'no_entregado'
                       return (
-                        <tr key={r.invoiceId} style={fallida ? { background: 'var(--error-bg, rgba(220,38,38,0.06))' } : undefined}>
-                          <td>
+                        <tr
+                          key={r.invoiceId}
+                          style={{
+                            ...(fallida ? { background: 'var(--error-bg, rgba(220,38,38,0.06))' } : {}),
+                            ...(puedeVerFactura ? { cursor: 'pointer' } : {}),
+                          }}
+                          title={puedeVerFactura ? 'Ver detalle de la factura' : undefined}
+                          onClick={puedeVerFactura ? () => setDetalle(r) : undefined}
+                        >
+                          <td onClick={(e) => e.stopPropagation()}>
                             {puedeCrearViaje && asignable && (
                               <input type="checkbox" className="ff-check" checked={seleccion.has(r.invoiceId)} onChange={() => toggle(r)} aria-label={`Seleccionar ${r.invoiceId}`} />
                             )}
@@ -222,7 +234,7 @@ export default function PendientesDeliveryPage() {
                             {r.viaje && <div className="td-muted" style={{ fontSize: 12 }}>{r.viaje}</div>}
                           </td>
                           <td><DeliveryCobroBadge estado={r.cobro?.estado} /></td>
-                          <td style={{ textAlign: 'right' }}>
+                          <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                             {fallida && puedeAnular && (
                               <button className="btn btn-danger btn-size-sm" onClick={() => setAnular(r)}>
                                 <Ban size={14} /> Anular venta
@@ -245,6 +257,10 @@ export default function PendientesDeliveryPage() {
         descripcion={anular ? `${anular.ncf ?? anular.invoiceId} · ${anular.customerName ?? anular.customer}` : undefined}
         onClose={() => setAnular(null)}
       />
+
+      {puedeVerFactura && (
+        <FacturaDeliveryDrawer row={detalle} onClose={() => setDetalle(null)} />
+      )}
     </div>
   )
 }

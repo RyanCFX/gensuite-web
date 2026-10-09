@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import type { ApiError, DeliveryViajeEstado } from '@/shared/api/types'
-import { codigoDelivery } from '@/lib/deliveryErrors'
+import { codigoDelivery, mensajeErrorDelivery } from '@/lib/deliveryErrors'
 import { VIAJE_ESTADO_LABEL, lineasFaltantes, requisitosDesdeError } from './viajeLib'
 
 const VIAJE_ESTADO_BADGE: Record<DeliveryViajeEstado, string> = {
@@ -29,7 +29,7 @@ export function DeliveryErrorAlert({ err, children }: { err: unknown; children?:
     <div className="inline-alert inline-alert-error" style={{ margin: 0, alignItems: 'flex-start' }}>
       <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span>{e.message ?? 'Ocurrió un error'}</span>
+        <span>{mensajeErrorDelivery(err)}</span>
         {faltantes.length > 0 && (
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
             {faltantes.map((l, i) => <li key={i}>{l}</li>)}

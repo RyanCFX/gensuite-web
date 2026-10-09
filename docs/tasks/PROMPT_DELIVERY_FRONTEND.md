@@ -149,7 +149,12 @@ sus respuestas traen `esDelivery` y la dirección.
 ## 3. Caja
 
 ### 3.1 Cola `GET /caja/por-cobrar`
-Cada fila trae `esDelivery` y `direccionEntrega`. Mostrá una etiqueta "Delivery" y la dirección.
+**Orden:** por defecto de la **más reciente a la más antigua** (`modified desc`: el momento en que
+llegó a la cola del cajero). Cada fila de una venta delivery trae `esDelivery: true` y TODO lo
+capturado en la factura: campos planos `direccionEntrega`, `telefonoEntrega`, `referenciaEntrega` y el
+bloque `delivery: { esDelivery, direccion, telefono, referencia }` (teléfono y referencia solo salen
+si tienen valor). En una venta sin delivery: `esDelivery: false` y sin `delivery`. Mostrá la etiqueta
+"Delivery" con dirección, teléfono y referencia para que el cajero las confirme al cobrar.
 
 ### 3.2 `POST /caja/facturas/:id/completar-cobro`
 Body nuevo (todo opcional; si se omite, se usa lo que trae la factura):
@@ -291,9 +296,18 @@ confirmadas: 409 `DELIVERY_VIAJE_CON_ENTREGAS`.
 ### 4.3 Repartidores y vehículos
 - `GET|POST /delivery/repartidores`, `PUT /delivery/repartidores/:id`:
   `{ id, nombre, telefono, licencia, empleado, usuario, transportista, estado:'activo'|'suspendido'|'retirado' }`.
-  `transportista` = empresa o motoconcho externo (opcional). Filtros: `estado`, `q`.
+  `transportista` = empresa o motoconcho externo (opcional): debe ser un **proveedor ya registrado**; mandá su ID (de `GET /suppliers`) o su nombre exacto. Si no existe: 400 `TRANSPORTISTA_NO_EXISTE` — créalo primero en Proveedores. Filtros: `estado`, `q`.
   **Crear repartidores requiere un rol de administración en ERPNext**; si el usuario no puede, el BFF
   responde 403 con el mensaje correspondiente — mostralo.
+- **Vehículo por defecto del repartidor:** `vehiculoPorDefecto` (placa de un vehículo registrado) en
+  el POST/PUT/GET de repartidores. `""` o `null` en un PUT lo quita; si la placa no existe: 400
+  `VEHICULO_NO_EXISTE`. Al **crear un viaje** el vehículo se resuelve así: el `vehiculo` enviado → el
+  `vehiculoPorDefecto` del repartidor → el genérico de la configuración. Preselecciona en el
+  formulario del viaje el `vehiculoPorDefecto` del repartidor elegido (`GET /delivery/repartidores/:id`)
+  y deja cambiarlo; si no mandas `vehiculo`, el servidor aplica el mismo orden. Al **editar** un viaje
+  en borrador y cambiar el repartidor sin indicar vehículo, el viaje pasa al vehículo por defecto del
+  nuevo repartidor (si lo tiene; si no, conserva el actual).
+  Requiere que el site tenga migrado `localizacion_rd` (campo `Driver.custom_vehiculo_por_defecto`).
 - `GET|POST /delivery/vehiculos`, `PUT /delivery/vehiculos/:id`: `{ id=placa, placa, marca, modelo, color }`.
   Crear: `{ placa, marca, modelo, color? }`. Editar: `{ marca?, modelo?, color? }`.
 - Para selects en formularios usá los lookups `lookup.repartidores` y `lookup.vehiculos`.
@@ -308,6 +322,14 @@ confirmadas: 409 `DELIVERY_VIAJE_CON_ENTREGAS`.
 ```
 `motivo` es **obligatorio** si `no_entregado`. HTTP 200 aunque un ítem falle: `{ success: true, data: Resultado[] }`, revisá cada uno
 `{ invoiceId, ok, estado, resultado, yaConfirmada?, autoConciliacion?, error? }`.
+
+**No se puede marcar "no entregada" una venta cuyo cobro ya está conciliado** (sería contradictorio:
+el dinero ya se recibió en caja): 409 `DELIVERY_COBRO_YA_CONCILIADO`. En la UI oculta o deshabilita
+"No entregada" cuando `cobro.estado === 'conciliado'` y ofrece **"Devolver (nota de crédito)"**, que
+es la devolución normal (`POST /devoluciones`). Al someterse esa nota de crédito **total**, la
+entrega queda **automáticamente** como `no_entregado` (y su parada en el viaje también); no tienes
+que llamar a `confirmar`. (Una devolución total con el cobro **sin** conciliar sigue siendo una
+anulación y queda `cancelado`.) Una devolución parcial no cambia la entrega.
 
 **Automatismos configurables** (ver §7). Si el tenant activó "confirmar entrega concilia el cobro",
 la respuesta trae `autoConciliacion: { omitida, motivo?, detalle?, paymentEntryIds? }`:
@@ -399,7 +421,7 @@ automáticamente si tenés `delivery.pendientes.listar` o `delivery.cobros.lista
 `DELIVERY_FACTURA_NO_DISPONIBLE`, `DELIVERY_FACTURA_YA_DESPACHADA`, `DELIVERY_VIAJE_NO_EDITABLE`,
 `DELIVERY_VIAJE_CON_ENTREGAS`, `DELIVERY_REPARTIDOR_REQUERIDO`, `DELIVERY_REPARTIDOR_INACTIVO`,
 `DELIVERY_TRACKING_PENDIENTE`, `DELIVERY_DESPACHO_PARCIAL_REVERTIDO`, `DELIVERY_ENTREGA_NO_DESPACHADA`,
-`DELIVERY_COBRO_NO_PENDIENTE`, `DELIVERY_COBRO_MONTO_NO_CUADRA`, `DELIVERY_COBRO_DIFERENCIA_NO_PERMITIDA`,
+`DELIVERY_COBRO_NO_PENDIENTE`, `DELIVERY_COBRO_YA_CONCILIADO`, `VEHICULO_NO_EXISTE`, `TRANSPORTISTA_NO_EXISTE`, `DELIVERY_COBRO_MONTO_NO_CUADRA`, `DELIVERY_COBRO_DIFERENCIA_NO_PERMITIDA`,
 `DELIVERY_ANULACION_NO_PERMITIDA`, `DELIVERY_CON_PENDIENTES`, `DELIVERY_REQUIERE_DESPACHO_HABILITADO`,
 `DESPACHO_CON_DELIVERY_ACTIVO`, `TURNO_CON_COBROS_DELIVERY_POR_CONCILIAR`, `TURNO_NO_ABIERTO`,
 `FEATURE_NO_CONTRATADO`. Formato estándar `{ code, message, details? }`; mostrá `message` y usá
@@ -428,4 +450,3 @@ automáticamente si tenés `delivery.pendientes.listar` o `delivery.cobros.lista
 - [ ] Modo drenaje (feature apagada con pendientes).
 - [ ] Realtime con los 6 eventos.
 - [ ] Un usuario sin el permiso o sin la feature no ve ni un botón de delivery.
-

@@ -16028,6 +16028,51 @@
         ]
       }
     },
+    "/api/v1/dgii/taxpayers/{rnc}": {
+      "get": {
+        "operationId": "DgiiTaxpayersController_findByRnc",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rnc",
+            "required": true,
+            "in": "path",
+            "description": "RNC (9 dígitos) o Cédula (11 dígitos)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DgiiTaxpayerResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Buscar un contribuyente en el padrón de la DGII por RNC/Cédula",
+        "tags": [
+          "DGII - Padrón de Contribuyentes"
+        ]
+      }
+    },
     "/api/v1/relaciones/directorio/buscar": {
       "post": {
         "description": "POST y no GET, deliberado: el RNC buscado es dato sensible de un tercero y no debe quedar en logs de acceso, historiales de navegador ni referers. Nunca revela si existe un bloqueo — un tenant no invitable por bloqueo se ve igual que uno no invitable por cualquier otra razón (ver `motivoNoInvitable`).",
@@ -20417,51 +20462,6 @@
         "summary": "Ficha de un artículo para un formulario (incluye stockByWarehouse; sin costos ni márgenes)",
         "tags": [
           "Catalog - Items (lookup para formularios)"
-        ]
-      }
-    },
-    "/api/v1/dgii/taxpayers/{rnc}": {
-      "get": {
-        "operationId": "DgiiTaxpayersController_findByRnc",
-        "parameters": [
-          {
-            "name": "X-Tenant",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "rnc",
-            "required": true,
-            "in": "path",
-            "description": "RNC (9 dígitos) o Cédula (11 dígitos)",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DgiiTaxpayerResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Buscar un contribuyente en el padrón de la DGII por RNC/Cédula",
-        "tags": [
-          "DGII - Padrón de Contribuyentes"
         ]
       }
     },
@@ -49660,6 +49660,43 @@
           "status"
         ]
       },
+      "DgiiTaxpayerResponseDto": {
+        "type": "object",
+        "properties": {
+          "rnc": {
+            "type": "string",
+            "description": "RNC o cédula del contribuyente"
+          },
+          "name": {
+            "type": "string",
+            "description": "Razón social"
+          },
+          "tradeName": {
+            "type": "string",
+            "nullable": true
+          },
+          "businessActivity": {
+            "type": "string",
+            "nullable": true
+          },
+          "registrationDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "rnc",
+          "name"
+        ]
+      },
       "BuscarEmpresaDto": {
         "type": "object",
         "properties": {
@@ -51388,43 +51425,6 @@
             "description": "Anula, solo para este artículo, el default del tenant (config/facturacion → actualizarCostoEnCompra) que decide si comprarlo actualiza purchasePrice (valuation_rate) automáticamente. `\"\"` explícito quita el override y vuelve a usar el default del tenant."
           }
         }
-      },
-      "DgiiTaxpayerResponseDto": {
-        "type": "object",
-        "properties": {
-          "rnc": {
-            "type": "string",
-            "description": "RNC o cédula del contribuyente"
-          },
-          "name": {
-            "type": "string",
-            "description": "Razón social"
-          },
-          "tradeName": {
-            "type": "string",
-            "nullable": true
-          },
-          "businessActivity": {
-            "type": "string",
-            "nullable": true
-          },
-          "registrationDate": {
-            "type": "string",
-            "nullable": true
-          },
-          "status": {
-            "type": "string",
-            "nullable": true
-          },
-          "type": {
-            "type": "string",
-            "nullable": true
-          }
-        },
-        "required": [
-          "rnc",
-          "name"
-        ]
       },
       "DesdePedidosItemDto": {
         "type": "object",
@@ -55736,7 +55736,12 @@
           "transportista": {
             "type": "string",
             "example": "Motoconchos El Rápido",
-            "description": "Repartidor externo (motoconcho o empresa de mensajería): nombre del Supplier transportista (Driver.transporter)."
+            "description": "Repartidor externo (motoconcho o empresa de mensajería). Debe ser un PROVEEDOR ya registrado: use su ID (de GET /suppliers) o su nombre exacto. Si no existe: 400 TRANSPORTISTA_NO_EXISTE."
+          },
+          "vehiculoPorDefecto": {
+            "type": "string",
+            "example": "A123456",
+            "description": "Placa de un vehículo registrado (GET /delivery/vehiculos) que viene preseleccionado al crear viajes con este repartidor. Si no existe: 400 VEHICULO_NO_EXISTE."
           },
           "estado": {
             "type": "string",
@@ -55777,7 +55782,13 @@
           },
           "transportista": {
             "type": "string",
-            "example": "Motoconchos El Rápido"
+            "example": "Motoconchos El Rápido",
+            "description": "ID o nombre exacto de un proveedor registrado (GET /suppliers). \"\" o null lo quita."
+          },
+          "vehiculoPorDefecto": {
+            "type": "string",
+            "example": "A123456",
+            "description": "Placa del vehículo por defecto del repartidor. \"\" o null lo quita."
           },
           "estado": {
             "type": "string",

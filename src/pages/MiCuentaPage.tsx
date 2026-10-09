@@ -18,7 +18,8 @@ import { isApiError } from '@/shared/api/auth'
 import { useAuthStore } from '@/stores/auth.store'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { ConfirmModal } from '@/shared/ui/Modal'
-import { formatDate } from '@/lib/formatters'
+import { formatDate, normalizarTelefonoDo } from '@/lib/formatters'
+import { PhoneInput } from '@/shared/ui/PhoneInput'
 import type { MfaFactor, ApiError } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 
@@ -52,7 +53,7 @@ function PerfilCard() {
   if (data && !loaded) {
     setFirstName(data.firstName)
     setLastName(data.lastName)
-    setPhone(data.phone ?? '')
+    setPhone(normalizarTelefonoDo(data.phone ?? ''))
     setLoaded(true)
   }
 
@@ -91,7 +92,7 @@ function PerfilCard() {
         </div>
         <div className="ff-wrap">
           <label className="ff-label">Teléfono</label>
-          <input className="ff-input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="809-555-0100" />
+          <PhoneInput value={phone} onChange={setPhone} />
         </div>
         <p className="ff-hint">
           Este cambio se aplica en todas las empresas a las que perteneces — no hace falta repetirlo por tenant.

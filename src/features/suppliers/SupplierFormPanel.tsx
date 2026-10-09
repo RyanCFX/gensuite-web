@@ -9,6 +9,8 @@ import { listRetenciones } from '@/shared/api/retenciones'
 import type { ApiError, Supplier, CreateProveedorDto, UpdateProveedorDto } from '@/shared/api/types'
 import { getCatalogosFiscales, listPaises, listBancos, listImpuestosCompras, getFacturacionConfig } from '@/shared/api/config'
 import { validateRNCDetailed, validateCedulaDetailed, formatRNC, formatCedula } from '@/lib/validators/dgii'
+import { normalizarTelefonoDo } from '@/lib/formatters'
+import { PhoneInput } from '@/shared/ui/PhoneInput'
 import { TIPO_IDENTIFICACION } from '@/lib/constants'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -306,6 +308,8 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
   })
 
   const onSubmit = (values: FormValues) => {
+    // El teléfono se muestra formateado pero viaja al API como dígitos (`XXXXXXXXXX`).
+    const mobileNo = values.mobileNo ? normalizarTelefonoDo(values.mobileNo) || undefined : undefined
     if (isEdit) {
       // A diferencia del resto de los campos de este PUT, `defaultCurrency` es un enum
       // restringido en el backend (DOP/USD/EUR) — un '' sin tocar se rechazaría con
@@ -313,11 +317,12 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
       // `defaultTipoPagoProveedor` no tiene campo visible: se deriva de los días de crédito.
       updateMutation.mutate({
         ...values,
+        mobileNo,
         defaultTipoPagoProveedor: values.diasCredito > 0 ? 'Crédito' : 'Contado',
         defaultCurrency: values.defaultCurrency || undefined,
       })
     } else {
-      createMutation.mutate(values)
+      createMutation.mutate({ ...values, mobileNo })
     }
   }
 
@@ -454,7 +459,19 @@ export function SupplierFormPanel({ supplier, onSuccess, onCancel }: SupplierFor
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label">Teléfono</label>
-                  <input className="ff-input" {...register('mobileNo')} />
+                  <Controller
+                    name="mobileNo"
+                    control={control}
+                    render={({ field }) => (
+                      <PhoneInput
+                        value={field.value ?? ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                      />
+                    )}
+                  />
                 </div>
                 <div className="ff-wrap">
                   <label className="ff-label">

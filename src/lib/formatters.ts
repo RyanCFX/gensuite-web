@@ -95,3 +95,19 @@ export function displayId(id: string, sequence?: number | null): string {
   if (sequence && sequence > 0) return `${id}-${sequence}`
   return id
 }
+
+/** Solo dígitos, máx 10 — valor canónico del teléfono DO que viaja al API (`XXXXXXXXXX`). */
+export function normalizarTelefonoDo(value?: string | null): string {
+  return (value ?? '').replace(/\D/g, '').slice(0, 10)
+}
+
+/** Formato visual progresivo `(XXX) XXX - XXXX` para el input de teléfono.
+ *  Solo formatea para mostrar — el estado y el API siempre guardan dígitos
+ *  (ver `normalizarTelefonoDo`). */
+export function formatearTelefonoDo(value?: string | null): string {
+  const d = normalizarTelefonoDo(value)
+  if (!d) return ''
+  if (d.length <= 3) return `(${d}`
+  if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)} - ${d.slice(6)}`
+}

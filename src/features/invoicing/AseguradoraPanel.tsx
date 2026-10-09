@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Loader2, RefreshCw, ShieldCheck } from 'luci
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { validateCedulaDetailed } from '@/lib/validators/dgii'
 import { formatDOP } from '@/lib/formatters'
+import { PhoneInput } from '@/shared/ui/PhoneInput'
 import type { AseguradoraFormState } from './aseguradoraForm'
 import { RecargarButton } from '@/components/shared/RecargarButton'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
@@ -181,8 +182,7 @@ export function AseguradoraPanel({
 
             <div className="ff-wrap">
               <label className="ff-label">Teléfono del paciente</label>
-              <input className="ff-input" value={value.telefonoPaciente} maxLength={40} disabled={readOnly}
-                onChange={(e) => set('telefonoPaciente', e.target.value)} />
+              <PhoneInput value={value.telefonoPaciente} onChange={(v) => set('telefonoPaciente', v)} disabled={readOnly} />
             </div>
 
             <div className="ff-wrap">

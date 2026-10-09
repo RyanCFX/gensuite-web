@@ -293,6 +293,11 @@ export default function DevolucionForm() {
       queryClient.invalidateQueries({ queryKey: ['invoice', invoiceId] })
       queryClient.invalidateQueries({ queryKey: ['devoluciones'] })
       queryClient.invalidateQueries({ queryKey: ['credit-notes'] })
+      // Una NC total sobre una venta delivery con cobro conciliado deja la entrega y su parada
+      // en `no_entregado` y el cobro `revertido` (lo hace el BFF): se refresca todo delivery.
+      for (const k of ['delivery-viaje', 'delivery-viajes', 'delivery-pendientes', 'delivery-cobros', 'delivery-cobros-resumen', 'turno-actual']) {
+        queryClient.invalidateQueries({ queryKey: [k] })
+      }
       navigate(`/devoluciones/${result.creditNoteId}`)
       if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },

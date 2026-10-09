@@ -43,3 +43,28 @@ export function facturasBloqueoTurno(err: unknown): TurnoBloqueoDeliveryFactura[
   const f = d?.facturas
   return Array.isArray(f) ? (f as TurnoBloqueoDeliveryFactura[]) : []
 }
+
+/**
+ * Textos comerciales por código (sin rutas ni códigos técnicos para el usuario). Para
+ * `DELIVERY_COBRO_YA_CONCILIADO` manda el `message` del servidor tal cual; este texto es solo
+ * respaldo si no llega mensaje. Los demás sustituyen el mensaje técnico del BFF.
+ */
+const TEXTO_RESPALDO: Record<string, string> = {
+  DELIVERY_COBRO_YA_CONCILIADO:
+    'El cobro de esta venta ya fue conciliado, por lo que no se puede marcar como no entregada. Regístrala con una devolución (nota de crédito).',
+}
+
+const TEXTO_PROPIO: Record<string, string> = {
+  VEHICULO_NO_EXISTE: 'El vehículo seleccionado no existe. Elige uno de la lista o créalo primero.',
+  TRANSPORTISTA_NO_EXISTE: 'El transportista debe ser un proveedor ya registrado. Selecciónalo de la lista o regístralo primero.',
+  TRANSPORTISTA_AMBIGUO: 'Hay más de un proveedor con ese nombre. Selecciona el transportista de la lista para identificarlo.',
+}
+
+/** Mensaje a mostrar al usuario para un error de delivery. */
+export function mensajeErrorDelivery(err: unknown): string {
+  const code = codigoDelivery(err)
+  const message = (err as Partial<ApiError> | null | undefined)?.message
+  if (code && TEXTO_PROPIO[code]) return TEXTO_PROPIO[code]
+  if (message?.trim()) return message
+  return (code && TEXTO_RESPALDO[code]) || 'Ocurrió un error'
+}

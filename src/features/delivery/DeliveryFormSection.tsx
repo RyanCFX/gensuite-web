@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
+import { PhoneInput } from '@/shared/ui/PhoneInput'
 import { useDeliveryPuerta } from '@/shared/hooks/useDelivery'
 import { getClienteDetalle } from '@/shared/api/formularios'
 
@@ -117,11 +118,10 @@ export function DeliveryFormSection({
           <div className="form-row">
             <div className="ff-wrap">
               <label className="ff-label" htmlFor="telefonoEntrega">Teléfono de entrega</label>
-              <input
+              <PhoneInput
                 id="telefonoEntrega"
-                className="ff-input"
                 value={value.telefonoEntrega}
-                onChange={(e) => onChange({ ...value, telefonoEntrega: e.target.value })}
+                onChange={(v) => onChange({ ...value, telefonoEntrega: v })}
                 placeholder="Para el repartidor"
               />
             </div>

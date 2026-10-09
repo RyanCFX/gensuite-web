@@ -1,4 +1,5 @@
 import { validateCedulaDetailed } from '@/lib/validators/dgii'
+import { normalizarTelefonoDo } from '@/lib/formatters'
 import type { AseguradoraInvoiceDto, TipoCoberturaArs } from '@/shared/api/types'
 
 /**
@@ -53,7 +54,7 @@ export function aseguradoraFormFromInvoice(
     carnetAfiliado: ars.carnetAfiliado ?? '',
     cedula: ars.cedula ?? '',
     numeroSeguroSocial: ars.numeroSeguroSocial ?? '',
-    telefonoPaciente: ars.telefonoPaciente ?? '',
+    telefonoPaciente: ars.telefonoPaciente ? normalizarTelefonoDo(ars.telefonoPaciente) : '',
     nombreDoctor: ars.nombreDoctor ?? '',
     fechaAprobacion: (ars.fechaAprobacion ?? '').slice(0, 10),
     fechaIndicacionReceta: (ars.fechaIndicacionReceta ?? '').slice(0, 10),
@@ -99,7 +100,7 @@ export function aseguradoraFormToDto(f: AseguradoraFormState): AseguradoraInvoic
     carnetAfiliado: limpio(f.carnetAfiliado),
     cedula: limpio(f.cedula.replace(/[-\s]/g, '')),
     numeroSeguroSocial: limpio(f.numeroSeguroSocial),
-    telefonoPaciente: limpio(f.telefonoPaciente),
+    telefonoPaciente: limpio(f.telefonoPaciente ? normalizarTelefonoDo(f.telefonoPaciente) : ''),
     nombreDoctor: limpio(f.nombreDoctor),
     fechaAprobacion: limpio(f.fechaAprobacion),
     fechaIndicacionReceta: limpio(f.fechaIndicacionReceta),

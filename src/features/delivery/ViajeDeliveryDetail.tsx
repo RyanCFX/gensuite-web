@@ -20,6 +20,7 @@ import { AnularDeliveryModal } from './AnularDeliveryModal'
 import { ViajeTrackingEditor } from './ViajeTrackingEditor'
 import { buildTracking, trackingCompleto, type TrackingState } from './trackingLib'
 import { DeliveryErrorAlert, ViajeEstadoBadge } from './viajeUi'
+import { mensajeErrorDelivery } from '@/lib/deliveryErrors'
 import { interpretarDespacho, requisitosDesdeError, type TrackingRequisito } from './viajeLib'
 
 const DNS_PENDIENTE = 'dns_sometidos_trip_pendiente'
@@ -160,7 +161,7 @@ export default function ViajeDeliveryDetail() {
         const p = paradas.find((x) => x.invoiceId === r.invoiceId)
         const etiqueta = p ? etiquetaParada(p) : r.invoiceId
         if (!r.ok) {
-          return { invoiceId: r.invoiceId, etiqueta, ok: false, texto: r.error?.message ?? r.error?.code ?? 'No se pudo confirmar' }
+          return { invoiceId: r.invoiceId, etiqueta, ok: false, texto: r.error ? mensajeErrorDelivery(r.error) : 'No se pudo confirmar' }
         }
         let texto = r.resultado === 'no_entregado' ? 'Marcada como no entregada' : 'Entrega confirmada'
         if (r.yaConfirmada) texto = 'Ya estaba confirmada'
@@ -236,6 +237,7 @@ export default function ViajeDeliveryDetail() {
   const todasMarcadas = confirmables.length > 0 && confirmables.every((p) => seleccion.has(p.invoiceId))
   const cancelValido = cancelMotivo.trim().length >= 10 && cancelMotivo.trim().length <= 500
   const motivoValido = motivoNoEntrega.trim().length > 0
+  const haySeleccionConciliada = paradas.some((p) => seleccion.has(p.invoiceId) && p.cobro?.estado === 'conciliado')
   const requiereMotivo = confirmTarget?.resultado === 'no_entregado'
   const trackingOk = reqs.length === 0 || trackingCompleto(reqs, tracking)
 
@@ -366,7 +368,8 @@ export default function ViajeDeliveryDetail() {
               </button>
               <button
                 className="btn btn-secondary btn-size-sm"
-                disabled={seleccion.size === 0}
+                disabled={seleccion.size === 0 || haySeleccionConciliada}
+                title={haySeleccionConciliada ? 'Hay ventas con el cobro ya conciliado: se resuelven con una devolución (nota de crédito).' : undefined}
                 onClick={() => { setMotivoNoEntrega(''); setConfirmTarget({ invoiceIds: [...seleccion], resultado: 'no_entregado' }) }}
               >
                 <XCircle size={14} /> No entregadas{seleccion.size > 0 ? ` (${seleccion.size})` : ''}
@@ -406,7 +409,10 @@ export default function ViajeDeliveryDetail() {
                 const pendiente = (p.resultado ?? 'pendiente') === 'pendiente'
                 const confirmable = confirmables.some((c) => c.invoiceId === p.invoiceId)
                 const fallida = p.resultado === 'no_entregado' || p.estadoEntrega === 'no_entregado'
-                const anulable = fallida && puedeAnular && p.cobro?.estado !== 'revertido'
+                const anulable = fallida && puedeAnular && p.cobro?.estado !== 'revertido' && p.cobro?.estado !== 'conciliado'
+                // Cobro ya conciliado: no se marca "no entregada" (409 DELIVERY_COBRO_YA_CONCILIADO);
+                // se resuelve con la devolución normal (nota de crédito).
+                const cobroConciliado = p.cobro?.estado === 'conciliado'
                 const tienePend = (p.trackingPendiente?.length ?? 0) > 0
                 return (
                   <tr key={p.invoiceId}>
@@ -454,9 +460,19 @@ export default function ViajeDeliveryDetail() {
                           <button className="btn btn-secondary btn-size-sm" onClick={() => { setMotivoNoEntrega(''); setConfirmTarget({ invoiceIds: [p.invoiceId], resultado: 'entregado' }) }}>
                             Entregado
                           </button>{' '}
-                          <button className="btn btn-ghost btn-size-sm" onClick={() => { setMotivoNoEntrega(''); setConfirmTarget({ invoiceIds: [p.invoiceId], resultado: 'no_entregado' }) }}>
-                            No entregado
-                          </button>
+                          {cobroConciliado ? (
+                            <button
+                              className="btn btn-ghost btn-size-sm"
+                              title="El cobro ya está conciliado: la venta no entregada se resuelve con una devolución."
+                              onClick={() => navigate(`/devoluciones/nueva?invoiceId=${encodeURIComponent(p.invoiceId)}`)}
+                            >
+                              Devolver (nota de crédito)
+                            </button>
+                          ) : (
+                            <button className="btn btn-ghost btn-size-sm" onClick={() => { setMotivoNoEntrega(''); setConfirmTarget({ invoiceIds: [p.invoiceId], resultado: 'no_entregado' }) }}>
+                              No entregado
+                            </button>
+                          )}
                         </>
                       )}
                       {anulable && (

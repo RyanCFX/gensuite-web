@@ -9,7 +9,7 @@ import { DeliveryEntregaBadge, DeliveryCobroBadge } from './DeliveryBadges'
  * estado de entrega, viaje y cobro (previsto, por conciliar, conciliado por/en).
  * Sin bloque no renderiza nada.
  */
-export function DeliveryInfoCard({ delivery, currency }: { delivery?: InvoiceDelivery | null; currency?: string }) {
+export function DeliveryInfoCard({ delivery, currency, columns = 2 }: { delivery?: InvoiceDelivery | null; currency?: string; /** En drawer angosto colapsa a 1 columna. */ columns?: 1 | 2 }) {
   const navigate = useNavigate()
   if (!delivery?.esDelivery) return null
   const cobro = delivery.cobro
@@ -26,7 +26,7 @@ export function DeliveryInfoCard({ delivery, currency }: { delivery?: InvoiceDel
         </div>
       </div>
       <div className="card-body">
-        <div className="fields-grid">
+        <div className="fields-grid" style={columns === 1 ? { gridTemplateColumns: '1fr' } : undefined}>
           {delivery.direccion && (
             <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
               <span className="detail-label">Dirección de entrega</span>

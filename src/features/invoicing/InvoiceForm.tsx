@@ -24,7 +24,7 @@ import { getTasaVigente } from '@/shared/api/monedas'
 import { ComponentTrackingModal } from '@/components/shared/ComponentTrackingModal'
 import type { TrackedComponent } from '@/components/shared/ComponentTrackingModal'
 import { TrackedComponentEditor } from '@/components/shared/TrackedComponentEditor'
-import { formatDOP, formatMoney, round2, formatDate } from '@/lib/formatters'
+import { formatDOP, formatMoney, round2, formatDate, normalizarTelefonoDo } from '@/lib/formatters'
 import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, Info, UserPlus, Lock, LockOpen, ChevronDown, RotateCcw, CheckCircle2, XCircle } from 'lucide-react'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemDetailModal } from '@/components/shared/ItemDetailModal'
@@ -973,7 +973,7 @@ export default function InvoiceForm() {
     setDelivery({
       esDelivery: inv.delivery?.esDelivery ?? false,
       direccionEntrega: inv.delivery?.direccion ?? '',
-      telefonoEntrega: inv.delivery?.telefono ?? '',
+      telefonoEntrega: normalizarTelefonoDo(inv.delivery?.telefono ?? ''),
       referenciaEntrega: inv.delivery?.referencia ?? '',
     })
     setDireccionEntregaTouched(false)
@@ -1638,7 +1638,7 @@ persistInvoice(buildInvoiceDto())
         ? {
             esDelivery: true,
             direccionEntrega: delivery.direccionEntrega.trim(),
-            telefonoEntrega: delivery.telefonoEntrega.trim() || undefined,
+            telefonoEntrega: normalizarTelefonoDo(delivery.telefonoEntrega) || undefined,
             referenciaEntrega: delivery.referenciaEntrega.trim().slice(0, 500) || undefined,
           }
         : {}),

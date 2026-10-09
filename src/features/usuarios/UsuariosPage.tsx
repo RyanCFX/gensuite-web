@@ -26,7 +26,8 @@ import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { useConfirmClose } from '@/shared/hooks/useConfirmClose'
 import { useDirtyCheck } from '@/shared/hooks/useDirtyCheck'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
-import { formatDate } from '@/lib/formatters'
+import { formatDate, normalizarTelefonoDo } from '@/lib/formatters'
+import { PhoneInput } from '@/shared/ui/PhoneInput'
 import { Plus, Ban, UserCheck, Pencil, X, ScanLine, Mail, ArrowLeft, Eye, EyeOff, Shield } from 'lucide-react'
 import { ActionsMenu, ActionsMenuItem } from '@/shared/ui/ActionsMenu'
 import { useSortState } from '@/shared/hooks/useSortState'
@@ -349,7 +350,7 @@ export default function UsuariosPage() {
     resetForm()
     setEditingUser(user)
     setEditTab('datos')
-    setMobileNo(user.phone ?? '')
+    setMobileNo(normalizarTelefonoDo(user.phone ?? ''))
     setMaxDiscountPct(user.maxDiscountPct ?? 0)
     setAdminCode(user.adminCode ?? '')
     // adminPin/adminPinConfirm quedan vacíos a propósito — el PIN no se puede leer, solo reconfigurar.
@@ -729,7 +730,7 @@ export default function UsuariosPage() {
                   {!lookupResult.exists && (
                     <div className="ff-wrap">
                       <label className="ff-label">Teléfono</label>
-                      <input className="ff-input" value={mobileNo} onChange={(e) => setMobileNo(e.target.value)} placeholder="809-555-0100" />
+                      <PhoneInput value={mobileNo} onChange={setMobileNo} />
                     </div>
                   )}
 
@@ -820,7 +821,7 @@ export default function UsuariosPage() {
 
                 <div className="ff-wrap">
                   <label className="ff-label">Teléfono</label>
-                  <input className="ff-input" value={mobileNo} onChange={(e) => setMobileNo(e.target.value)} placeholder="809-555-0100" />
+                  <PhoneInput value={mobileNo} onChange={setMobileNo} />
                 </div>
 
                 <div className="ff-wrap">

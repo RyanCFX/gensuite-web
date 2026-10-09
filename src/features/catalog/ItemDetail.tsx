@@ -25,6 +25,7 @@ import { usePuede } from '@/shared/permissions/can'
 import { useDatosArticulo, veAlgunPrecio, restringidosDe } from '@/shared/permissions/datosArticulo'
 import type { VisibilidadArticulo } from '@/shared/permissions/datosArticulo'
 import { DatoRestringido } from '@/shared/ui/DatoRestringido'
+import { evaluarNiveles, faltanteDeError, avisoUnNivel, errorNivelFaltante, type Nivel } from '@/lib/nivelesPrecio'
 import { ComposicionPanel } from './ComposicionPanel'
 import { EquivalentesPanel } from './EquivalentesPanel'
 
@@ -90,9 +91,41 @@ function UpdatePricesModal({
       onClose()
     },
     onError: (err: { message?: string }) => {
+      const faltante = faltanteDeError(err)
+      if (faltante) setNivelFaltante(faltante)
       toast.error(err?.message ?? 'Error al actualizar los precios')
     },
   })
+
+  const [nivelFaltante, setNivelFaltante] = useState<Nivel | null>(null)
+  const numNivel = (v: string) => (v.trim() === '' ? undefined : parseFloat(v))
+  /** ¿Lo que se va a enviar toca algún nivel (precio o margen)? */
+  const nivelesAfectados = (d: UpdateItemPricesDto) =>
+    isCostPlus
+      ? d.marginA !== undefined || d.marginB !== undefined || d.marginC !== undefined
+      : d.priceA !== undefined || d.priceB !== undefined || d.priceC !== undefined
+  /** Niveles efectivos: lo escrito en el formulario + lo que el artículo ya tiene. */
+  function nivelesEvaluacion() {
+    return isCostPlus
+      ? evaluarNiveles(
+          { A: numNivel(marginA), B: numNivel(marginB), C: numNivel(marginC) },
+          { A: item.marginA, B: item.marginB, C: item.marginC },
+        )
+      : evaluarNiveles(
+          { A: numNivel(priceA), B: numNivel(priceB), C: numNivel(priceC) },
+          { A: item.prices?.A, B: item.prices?.B, C: item.prices?.C },
+        )
+  }
+  // Aviso/error en vivo solo si el usuario tocó algún nivel (un artículo antiguo con dos niveles
+  // no muestra error por solo abrir el formulario).
+  const nivelesTocados = isCostPlus
+    ? marginA !== (item.marginA?.toString() ?? '') || marginB !== (item.marginB?.toString() ?? '') || marginC !== (item.marginC?.toString() ?? '')
+    : priceA !== (item.prices?.A?.toString() ?? '') || priceB !== (item.prices?.B?.toString() ?? '') || priceC !== (item.prices?.C?.toString() ?? '')
+  const nivelesLive = nivelesEvaluacion()
+  const tipoNivel = isCostPlus ? 'margen' : 'precio'
+  const nivelesAviso = nivelesTocados && nivelesLive.estado === 'uno' ? avisoUnNivel(nivelesLive, tipoNivel) : null
+  const nivelErr: Nivel | null = nivelFaltante ?? (nivelesTocados && nivelesLive.estado === 'dos' ? nivelesLive.faltante : null)
+  const clsNivel = (n: Nivel) => `ff-input${nivelErr === n ? ' ff-input-error' : ''}`
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -125,10 +158,23 @@ function UpdatePricesModal({
       if (pc !== undefined && pc !== item.prices?.C) data.priceC = pc
     }
 
+    // Niveles A/B/C (o márgenes): validación previa; un error no deja nada escrito.
+    if (nivelesAfectados(data)) {
+      const faltante = nivelesEvaluacion()
+      if (faltante.estado === 'dos') {
+        setNivelFaltante(faltante.faltante)
+        toast.error(errorNivelFaltante(faltante.faltante, isCostPlus ? 'margen' : 'precio'))
+        return
+      }
+    }
+    setNivelFaltante(null)
+
     if (Object.keys(data).length === 0) {
       onClose()
       return
     }
+    // Al editar se envía siempre `priceMode` junto con los niveles.
+    if (nivelesAfectados(data) && data.priceMode === undefined && puedeVerCosto) data.priceMode = priceMode
     mutation.mutate(data)
   }
 
@@ -214,17 +260,18 @@ function UpdatePricesModal({
                   { label: 'Margen C — Mínimo', value: marginC, setValue: setMarginC },
                 ] as const).map(({ label, value, setValue }) => {
                   const preview = costPlusPreview(purchasePrice, value)
+                  const nivel = label.charAt(7) as Nivel
                   return (
                     <div className="ff-wrap" key={label}>
                       <label className="ff-label">{label}</label>
                       <input
-                        className="ff-input"
+                        className={clsNivel(nivel)}
                         type="number"
                         min="0"
                         max="99"
                         step="0.1"
                         value={value}
-                        onChange={(e) => setValue(e.target.value)}
+                        onChange={(e) => { setValue(e.target.value); setNivelFaltante(null) }}
                         placeholder="0"
                       />
                       <p className="ff-hint">{preview != null ? `≈ ${formatDOP(preview)}` : '—'}</p>
@@ -243,12 +290,12 @@ function UpdatePricesModal({
                 <div className="ff-wrap">
                   <label className="ff-label">Precio A — Máximo</label>
                   <input
-                    className="ff-input"
+                    className={clsNivel('A')}
                     type="number"
                     min="0"
                     step="0.01"
                     value={priceA}
-                    onChange={(e) => setPriceA(e.target.value)}
+                    onChange={(e) => { setPriceA(e.target.value); setNivelFaltante(null) }}
                     placeholder="0.00"
                   />
                 </div>
@@ -257,12 +304,12 @@ function UpdatePricesModal({
                 <div className="ff-wrap">
                   <label className="ff-label">Precio B — Promedio</label>
                   <input
-                    className="ff-input"
+                    className={clsNivel('B')}
                     type="number"
                     min="0"
                     step="0.01"
                     value={priceB}
-                    onChange={(e) => setPriceB(e.target.value)}
+                    onChange={(e) => { setPriceB(e.target.value); setNivelFaltante(null) }}
                     placeholder="0.00"
                   />
                 </div>
@@ -271,22 +318,24 @@ function UpdatePricesModal({
                 <div className="ff-wrap">
                   <label className="ff-label">Precio C — Mínimo</label>
                   <input
-                    className="ff-input"
+                    className={clsNivel('C')}
                     type="number"
                     min="0"
                     step="0.01"
                     value={priceC}
-                    onChange={(e) => setPriceC(e.target.value)}
+                    onChange={(e) => { setPriceC(e.target.value); setNivelFaltante(null) }}
                     placeholder="0.00"
                   />
                 </div>
                 )}
               </div>
             )}
+            {nivelesAviso && <p className="ff-hint" style={{ margin: 0 }}>{nivelesAviso}</p>}
+            {nivelErr && <span className="ff-error">{errorNivelFaltante(nivelErr, tipoNivel)}</span>}
           </div>
           <div className="modal-foot">
             <button type="button" className="btn btn-secondary" onClick={requestClose}>Cancelar</button>
-            <button type="submit" className="btn btn-primary" disabled={mutation.isPending}>
+            <button type="submit" className="btn btn-primary" disabled={mutation.isPending || (nivelesTocados && nivelesLive.estado === 'dos')}>
               {mutation.isPending ? 'Guardando…' : 'Guardar'}
             </button>
           </div>

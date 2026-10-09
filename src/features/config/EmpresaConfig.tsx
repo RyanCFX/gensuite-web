@@ -9,6 +9,8 @@ import { AccountSelect } from '@/components/shared/AccountSelect'
 import { CostCenterSelect } from '@/components/shared/CostCenterSelect'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
+import { PhoneInput } from '@/shared/ui/PhoneInput'
+import { normalizarTelefonoDo } from '@/lib/formatters'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { Select, SelectItem } from '@/components/ui/select'
 import { REGIMENES_FISCALES } from '@/lib/constants'
@@ -72,7 +74,7 @@ export default function EmpresaConfig() {
   const [form, setForm] = useState<Partial<Empresa>>({})
 
   useEffect(() => {
-    if (data) setForm(data)
+    if (data) setForm({ ...data, telefono: data.telefono ? normalizarTelefonoDo(data.telefono) : data.telefono })
   }, [data])
 
   const saveMutation = useMutation({
@@ -637,7 +639,7 @@ export default function EmpresaConfig() {
                 <div className="empresa-section-grid">
                   <div className="ff-wrap">
                     <label className="ff-label">Teléfono</label>
-                    <input className="ff-input" value={form.telefono ?? ''} onChange={(e) => set('telefono', e.target.value)} placeholder="(809) 000-0000" />
+                    <PhoneInput value={form.telefono ?? ''} onChange={(v) => set('telefono', v)} />
                   </div>
                   <div className="ff-wrap">
                     <label className="ff-label">Email</label>

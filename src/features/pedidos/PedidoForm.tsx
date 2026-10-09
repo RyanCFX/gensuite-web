@@ -19,7 +19,7 @@ import type { DeliveryFormValue } from '@/features/delivery/DeliveryFormSection'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
-import { formatMoney, round2, formatDate } from '@/lib/formatters'
+import { formatMoney, round2, formatDate, normalizarTelefonoDo } from '@/lib/formatters'
 import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { Select, SelectItem } from '@/components/ui/select'
 import { ArrowLeft, Save, Plus, Minus, Trash2, Eye, Loader2, PackageOpen, UserPlus, ChevronDown, RotateCcw, Lock } from 'lucide-react'
@@ -445,7 +445,7 @@ useEffect(() => {
       setDelivery({
         esDelivery: existing.esDelivery ?? false,
         direccionEntrega: existing.direccionEntrega ?? '',
-        telefonoEntrega: existing.telefonoEntrega ?? '',
+        telefonoEntrega: normalizarTelefonoDo(existing.telefonoEntrega ?? ''),
         referenciaEntrega: existing.referenciaEntrega ?? '',
       })
       setDireccionEntregaTouched(false)
@@ -909,7 +909,7 @@ function buildDto(): CreatePedidoDto {
           ? {
               esDelivery: true,
               direccionEntrega: delivery.direccionEntrega.trim(),
-              telefonoEntrega: delivery.telefonoEntrega.trim() || undefined,
+              telefonoEntrega: normalizarTelefonoDo(delivery.telefonoEntrega) || undefined,
               referenciaEntrega: delivery.referenciaEntrega.trim().slice(0, 500) || undefined,
             }
           : {}),

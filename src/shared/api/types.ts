@@ -1400,6 +1400,8 @@ export interface DeliveryRepartidor {
   usuario?: string;
   /** Empresa o motoconcho externo (Supplier transportista). */
   transportista?: string;
+  /** Placa del vehículo que viene preseleccionado al crear viajes con este repartidor. */
+  vehiculoPorDefecto?: string;
   estado: 'activo' | 'suspendido' | 'retirado';
 }
 
@@ -1409,7 +1411,10 @@ export interface CreateRepartidorDto {
   licencia?: string;
   empleado?: string;
   usuario?: string;
+  /** Proveedor ya registrado (ID de GET /suppliers). 400 TRANSPORTISTA_NO_EXISTE / TRANSPORTISTA_AMBIGUO. */
   transportista?: string;
+  /** Placa de un vehículo registrado. En el PUT `""` o `null` lo quita. 400 VEHICULO_NO_EXISTE. */
+  vehiculoPorDefecto?: string | null;
   estado?: 'activo' | 'suspendido' | 'retirado';
 }
 
@@ -1497,6 +1502,10 @@ export type DeliveryErrorCode =
   | 'DELIVERY_COBRO_MONTO_NO_CUADRA'
   | 'DELIVERY_COBRO_DIFERENCIA_NO_PERMITIDA'
   | 'DELIVERY_ANULACION_NO_PERMITIDA'
+  | 'DELIVERY_COBRO_YA_CONCILIADO'
+  | 'VEHICULO_NO_EXISTE'
+  | 'TRANSPORTISTA_NO_EXISTE'
+  | 'TRANSPORTISTA_AMBIGUO'
   | 'DELIVERY_CON_PENDIENTES'
   | 'DELIVERY_REQUIERE_DESPACHO_HABILITADO'
   | 'DESPACHO_CON_DELIVERY_ACTIVO'
@@ -6024,6 +6033,19 @@ export interface PendienteCobroItem {
    /** §3.1 docs/tasks/PROMPT_DELIVERY_FRONTEND.md — etiqueta "Delivery" + dirección en la cola. */
    esDelivery?: boolean;
    direccionEntrega?: string;
+   /** Teléfono de contacto para el repartidor (solo con `esDelivery`). */
+   telefonoEntrega?: string;
+   /** Referencia de entrega (solo con `esDelivery`). */
+   referenciaEntrega?: string;
+   /** Bloque delivery anidado que el backend incluye cuando aplica
+    *  (`{ esDelivery, direccion, telefono, referencia }`) — usar como fallback
+    *  si los campos planos vienen ausentes. */
+   delivery?: {
+     esDelivery?: boolean;
+     direccion?: string;
+     telefono?: string;
+     referencia?: string;
+   };
    grandTotal: number;
    /** Tipo de comprobante fijado al crear la factura (B01, B02, B14… o su equivalente
     *  E31, E32… si ya es e-CF) — Caja lo respeta, nunca lo cambia. */

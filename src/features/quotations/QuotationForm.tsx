@@ -15,7 +15,7 @@ import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
-import { formatMoney, displayId, round2, formatDate } from '@/lib/formatters'
+import { formatMoney, displayId, round2, formatDate, normalizarTelefonoDo } from '@/lib/formatters'
 import { formatUomNotAllowedMessage } from '@/lib/stockAlerts'
 import { isApiErrorCode, ERROR_CODES } from '@/shared/api/client'
 import { Select, SelectItem } from '@/components/ui/select'
@@ -336,7 +336,7 @@ useEffect(() => {
      setDelivery({
        esDelivery: existingQuotation.esDelivery ?? false,
        direccionEntrega: existingQuotation.direccionEntrega ?? '',
-       telefonoEntrega: existingQuotation.telefonoEntrega ?? '',
+        telefonoEntrega: normalizarTelefonoDo(existingQuotation.telefonoEntrega ?? ''),
        referenciaEntrega: existingQuotation.referenciaEntrega ?? '',
      })
      setDireccionEntregaTouched(false)
@@ -619,7 +619,7 @@ function buildDto(): CreateQuotationDto {
          ? {
              esDelivery: true,
              direccionEntrega: delivery.direccionEntrega.trim(),
-             telefonoEntrega: delivery.telefonoEntrega.trim() || undefined,
+              telefonoEntrega: normalizarTelefonoDo(delivery.telefonoEntrega) || undefined,
              referenciaEntrega: delivery.referenciaEntrega.trim().slice(0, 500) || undefined,
            }
          : {}),

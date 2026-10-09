@@ -7,7 +7,8 @@ import { listPorCobrar, completarCobro, descartarFactura } from '@/shared/api/ca
 import { getFacturacionConfig } from '@/shared/api/config'
 import { getTurnoActual } from '@/shared/api/pos'
 import { downloadInvoicePdf } from '@/shared/api/invoices'
-import { formatDate, formatMoney } from '@/lib/formatters'
+import { formatDate, formatMoney, normalizarTelefonoDo, formatearTelefonoDo } from '@/lib/formatters'
+import { PhoneInput } from '@/shared/ui/PhoneInput'
 import { PaymentLinesEditor } from '@/components/shared/PaymentLinesEditor'
 import { SearchSelect } from '@/shared/ui/SearchSelect'
 import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
@@ -342,10 +343,12 @@ function openModal(invoice: PendienteCobroItem) {
      setSelectedInvoice(invoice)
      setClienteOcasionalRnc('')
      setNcfTypeElegido(invoice.ncfType ?? '')
-     setDeliveryOn(!!invoice.esDelivery)
-     setDireccionEntrega(invoice.direccionEntrega ?? '')
-     setTelefonoEntrega('')
-     setReferenciaEntrega('')
+     setDeliveryOn(!!(invoice.esDelivery ?? invoice.delivery?.esDelivery))
+     setDireccionEntrega(invoice.delivery?.direccion ?? invoice.direccionEntrega ?? '')
+     // El estado guarda solo dígitos (`XXXXXXXXXX`); el input muestra el formato
+     // `(XXX) XXX - XXXX` vía `formatearTelefonoDo`.
+     setTelefonoEntrega(normalizarTelefonoDo(invoice.delivery?.telefono ?? invoice.telefonoEntrega ?? ''))
+     setReferenciaEntrega(invoice.delivery?.referencia ?? invoice.referenciaEntrega ?? '')
      setDespachoFuturo(false)
      setDirectoContraEntrega(true)
      const invoiceCurrency = invoice.currency ?? monedaBase
@@ -363,7 +366,7 @@ function openModal(invoice: PendienteCobroItem) {
            ...emptyPaymentLine(),
            modeOfPayment: cashMethodCurrency === invoiceCurrency ? cashMethod : resolveDefaultModeOfPago(facturacion, invoiceCurrency),
            amount: String(montoACobrarDe(invoice)),
-           ...(invoice.esDelivery ? { contraEntrega: true } : {}),
+            ...(invoice.esDelivery ?? invoice.delivery?.esDelivery ? { contraEntrega: true } : {}),
          }],
        })
      }
@@ -396,12 +399,14 @@ function validateAndSubmit() {
        return
      }
      // Solo se envían los campos delivery si el cajero cambió algo respecto a la factura.
+     // El teléfono viaja al API como dígitos (`XXXXXXXXXX`) aunque se muestre formateado.
+     const telefonoApi = normalizarTelefonoDo(telefonoEntrega)
      const deliveryDto: Partial<CobrarFacturaDto> = deliveryDirty
        ? deliveryOn
          ? {
              esDelivery: true,
              direccionEntrega: direccionEntrega.trim(),
-             ...(telefonoEntrega.trim() ? { telefonoEntrega: telefonoEntrega.trim() } : {}),
+             ...(telefonoApi ? { telefonoEntrega: telefonoApi } : {}),
              ...(referenciaEntrega.trim() ? { referenciaEntrega: referenciaEntrega.trim() } : {}),
              ...(despachoFuturo ? { despachoFuturo: true } : {}),
            }
@@ -466,14 +471,14 @@ function validateAndSubmit() {
 
   const deliveryDirty =
     !!selectedInvoice &&
-    (deliveryOn !== !!selectedInvoice.esDelivery ||
+    (deliveryOn !== !!(selectedInvoice.esDelivery ?? selectedInvoice.delivery?.esDelivery) ||
       (deliveryOn &&
-        (direccionEntrega.trim() !== (selectedInvoice.direccionEntrega ?? '').trim() ||
-          !!telefonoEntrega.trim() ||
-          !!referenciaEntrega.trim() ||
+        (direccionEntrega.trim() !== (selectedInvoice.delivery?.direccion ?? selectedInvoice.direccionEntrega ?? '').trim() ||
+          normalizarTelefonoDo(telefonoEntrega) !== normalizarTelefonoDo(selectedInvoice.delivery?.telefono ?? selectedInvoice.telefonoEntrega ?? '') ||
+          referenciaEntrega.trim() !== (selectedInvoice.delivery?.referencia ?? selectedInvoice.referenciaEntrega ?? '').trim() ||
           despachoFuturo)))
   const mostrarSwitchDelivery =
-    !!selectedInvoice?.esDelivery || deliveryPuerta.operativo
+    !!(selectedInvoice?.esDelivery ?? selectedInvoice?.delivery?.esDelivery) || deliveryPuerta.operativo
   const faltaDireccion = deliveryOn && !direccionEntrega.trim()
 
   const canSubmitCaja =
@@ -600,7 +605,7 @@ function validateAndSubmit() {
                       <tr key={inv.id}>
                         <td style={{ fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500 }}>
                           {inv.id}
-                          {inv.esDelivery && (
+                          {(inv.esDelivery ?? inv.delivery?.esDelivery) && (
                             <div style={{ marginTop: 2 }}>
                               <span className="badge badge-info">Delivery</span>
                             </div>
@@ -614,9 +619,19 @@ function validateAndSubmit() {
                          ) : (
                            inv.customerName
                          )}
-                          {inv.esDelivery && inv.direccionEntrega && (
-                            <div className="td-muted" style={{ fontSize: 11 }}>{inv.direccionEntrega}</div>
-                          )}
+                          {(inv.esDelivery ?? inv.delivery?.esDelivery) && (() => {
+                            // Bloque `delivery` primero; campos planos como respaldo (solo los que existan).
+                            const dir = inv.delivery?.direccion ?? inv.direccionEntrega
+                            const tel = inv.delivery?.telefono ?? inv.telefonoEntrega
+                            const ref = inv.delivery?.referencia ?? inv.referenciaEntrega
+                            return (
+                              <>
+                                {dir && <div className="td-muted" style={{ fontSize: 11 }}>{dir}</div>}
+                                {tel && <div className="td-muted" style={{ fontSize: 11 }}>Tel. {formatearTelefonoDo(tel)}</div>}
+                                {ref && <div className="td-muted" style={{ fontSize: 11 }}>Ref. {ref}</div>}
+                              </>
+                            )
+                          })()}
                         </td>
                         <td className="td-muted">{formatDate(inv.postingDate)}</td>
                         <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)', fontSize: 13 }}>
@@ -785,14 +800,14 @@ function validateAndSubmit() {
                          <span className="ff-toggle-track"><span className="ff-toggle-thumb" /></span>
                        </span>
                        Con delivery
-                       {selectedInvoice.esDelivery && (
-                         <span style={{ marginLeft: 8, display: 'inline-flex', gap: 4 }}>
-                           <DeliveryEntregaBadge estado="pendiente" />
-                           <DeliveryCobroBadge estado="por_conciliar" />
-                         </span>
-                       )}
-                     </label>
-                     {!deliveryOn && selectedInvoice.esDelivery && (
+                        {(selectedInvoice.esDelivery ?? selectedInvoice.delivery?.esDelivery) && (
+                          <span style={{ marginLeft: 8, display: 'inline-flex', gap: 4 }}>
+                            <DeliveryEntregaBadge estado="pendiente" />
+                            <DeliveryCobroBadge estado="por_conciliar" />
+                          </span>
+                        )}
+                      </label>
+                      {!deliveryOn && (selectedInvoice.esDelivery ?? selectedInvoice.delivery?.esDelivery) && (
                        <div className="inline-alert inline-alert-warning">
                          Al apagar delivery se libera la reserva de stock y la venta pasa a venta normal:
                          rigen las validaciones habituales de stock y seriales, y el cobro se registra en caja.
@@ -814,10 +829,14 @@ function validateAndSubmit() {
                            )}
                          </div>
                          <div className="form-row">
-                           <div className="ff-wrap">
-                             <label className="ff-label" htmlFor="cajaTelefonoEntrega">Teléfono de entrega</label>
-                             <input id="cajaTelefonoEntrega" className="ff-input" value={telefonoEntrega} onChange={(e) => setTelefonoEntrega(e.target.value)} />
-                           </div>
+                            <div className="ff-wrap">
+                              <label className="ff-label" htmlFor="cajaTelefonoEntrega">Teléfono de entrega</label>
+                              <PhoneInput
+                                id="cajaTelefonoEntrega"
+                                value={telefonoEntrega}
+                                onChange={setTelefonoEntrega}
+                              />
+                            </div>
                            <div className="ff-wrap">
                              <label className="ff-label" htmlFor="cajaReferenciaEntrega">Referencia</label>
                              <input id="cajaReferenciaEntrega" className="ff-input" maxLength={500} value={referenciaEntrega} onChange={(e) => setReferenciaEntrega(e.target.value)} />

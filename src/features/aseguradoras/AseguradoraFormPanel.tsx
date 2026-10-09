@@ -7,6 +7,8 @@ import { toast } from 'sonner'
 import { createAseguradora, updateAseguradora, nombreAseguradora } from '@/shared/api/aseguradoras'
 import type { ApiError, Aseguradora } from '@/shared/api/types'
 import { validateRNCDetailed, formatRNC } from '@/lib/validators/dgii'
+import { normalizarTelefonoDo } from '@/lib/formatters'
+import { PhoneInput } from '@/shared/ui/PhoneInput'
 import { AccountSelect } from '@/components/shared/AccountSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { Info, Plus, Trash2, Save, Loader2 } from 'lucide-react'
@@ -135,14 +137,17 @@ export function AseguradoraFormPanel({ aseguradora, onSuccess, onCancel }: Asegu
       nombre: values.nombre,
       rnc: values.rnc.replace(/[-\s]/g, ''),
       email: values.email || undefined,
-      phone: values.phone || undefined,
+      // El teléfono se muestra formateado pero viaja al API como dígitos (`XXXXXXXXXX`).
+      phone: values.phone ? normalizarTelefonoDo(values.phone) || undefined : undefined,
       address: values.address || undefined,
       hasCredit: values.hasCredit,
       creditLimit: values.hasCredit ? values.creditLimit : undefined,
       creditDays: values.hasCredit ? values.creditDays : undefined,
       cuentaCxcDefault: values.cuentaCxcDefault || undefined,
       encargadoCxc: values.encargadoCxc || undefined,
-      telefonos: values.telefonos && values.telefonos.length > 0 ? values.telefonos : undefined,
+      telefonos: values.telefonos && values.telefonos.length > 0
+        ? values.telefonos.map((t) => ({ ...t, telefono: normalizarTelefonoDo(t.telefono) }))
+        : undefined,
     }
     if (isEdit) updateMutation.mutate(payload)
     else createMutation.mutate(payload as Parameters<typeof createAseguradora>[0])
@@ -197,7 +202,19 @@ export function AseguradoraFormPanel({ aseguradora, onSuccess, onCancel }: Asegu
 
             <div className="ff-wrap">
               <label className="ff-label" htmlFor="phone">Teléfono</label>
-              <input id="phone" className="ff-input" placeholder="Ej: 809-555-0100" {...register('phone')} />
+              <Controller
+                name="phone"
+                control={control}
+                render={({ field }) => (
+                  <PhoneInput
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    ref={field.ref}
+                  />
+                )}
+              />
             </div>
 
             <div className="ff-wrap">
@@ -215,10 +232,20 @@ export function AseguradoraFormPanel({ aseguradora, onSuccess, onCancel }: Asegu
             {telefonoFields.map((field, idx) => (
               <div key={field.id} className="form-row" style={{ alignItems: 'flex-start' }}>
                 <div className="ff-wrap" style={{ flex: 2 }}>
-                  <input
-                    className={`ff-input${errors.telefonos?.[idx]?.telefono ? ' ff-input-error' : ''}`}
-                    placeholder="Ej: 809-555-0100"
-                    {...register(`telefonos.${idx}.telefono` as const)}
+                  <Controller
+                    name={`telefonos.${idx}.telefono` as const}
+                    control={control}
+                    render={({ field: phoneField }) => (
+                      <PhoneInput
+                        value={phoneField.value ?? ''}
+                        onChange={phoneField.onChange}
+                        onBlur={phoneField.onBlur}
+                        name={phoneField.name}
+                        ref={phoneField.ref}
+                        error={!!errors.telefonos?.[idx]?.telefono}
+                        placeholder="Ej: 809-555-0100"
+                      />
+                    )}
                   />
                   {errors.telefonos?.[idx]?.telefono && (
                     <p className="ff-error">{errors.telefonos[idx]?.telefono?.message}</p>

@@ -9,6 +9,8 @@ import { listImpuestosVentas, getFacturacionConfig, getCatalogosFiscales } from 
 import { getDgiiTaxpayer } from '@/shared/api/dgii'
 import type { ApiError, Customer } from '@/shared/api/types'
 import { validateRNCDetailed, validateCedulaDetailed, formatRNC, formatCedula } from '@/lib/validators/dgii'
+import { normalizarTelefonoDo } from '@/lib/formatters'
+import { PhoneInput } from '@/shared/ui/PhoneInput'
 import { useDebounce } from '@/lib/useDebounce'
 import { SearchSelect, type SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { MultiSelectChecklist } from '@/shared/ui/MultiSelectChecklist'
@@ -240,7 +242,10 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
       customerGroup: values.customerGroup || undefined,
       address: values.address || undefined,
       // Se manda la lista completa siempre — no hay "agregar un teléfono" a nivel de API.
-      telefonos: values.telefonos && values.telefonos.length > 0 ? values.telefonos : undefined,
+      // Los teléfonos se muestran formateados pero viajan como dígitos (`XXXXXXXXXX`).
+      telefonos: values.telefonos && values.telefonos.length > 0
+        ? values.telefonos.map((t) => ({ ...t, telefono: normalizarTelefonoDo(t.telefono) }))
+        : undefined,
       branch: values.branch || undefined,
       formaPagoDefault: values.formaPagoDefault || undefined,
       ncfTypeDefault: values.ncfTypeDefault || undefined,
@@ -543,10 +548,20 @@ export function CustomerFormPanel({ customer, onSuccess, onCancel }: CustomerFor
             {telefonoFields.map((field, idx) => (
               <div key={field.id} style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
                 <div className="ff-wrap" style={{ flex: 2 }}>
-                  <input
-                    className={`ff-input${errors.telefonos?.[idx]?.telefono ? ' ff-input-error' : ''}`}
-                    placeholder="Ej: 809-555-0100"
-                    {...register(`telefonos.${idx}.telefono` as const)}
+                  <Controller
+                    name={`telefonos.${idx}.telefono` as const}
+                    control={control}
+                    render={({ field: phoneField }) => (
+                      <PhoneInput
+                        value={phoneField.value ?? ''}
+                        onChange={phoneField.onChange}
+                        onBlur={phoneField.onBlur}
+                        name={phoneField.name}
+                        ref={phoneField.ref}
+                        error={!!errors.telefonos?.[idx]?.telefono}
+                        placeholder="Ej: 809-555-0100"
+                      />
+                    )}
                   />
                   {errors.telefonos?.[idx]?.telefono && (
                     <p className="ff-error">{errors.telefonos[idx]?.telefono?.message}</p>

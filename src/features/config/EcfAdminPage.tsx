@@ -29,7 +29,8 @@ import {
 import type { ApiError, EcfClient, EcfClientByRncResult, EcfMode } from '@/shared/api/types'
 import { validateRNCDetailed, validateCedulaDetailed } from '@/lib/validators/dgii'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
-import { formatDate } from '@/lib/formatters'
+import { formatDate, normalizarTelefonoDo } from '@/lib/formatters'
+import { PhoneInput } from '@/shared/ui/PhoneInput'
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -422,7 +423,7 @@ function CreateClientForm({
       province: form.province.trim() || undefined,
       email: form.email.trim() || undefined,
       economicActivity: form.economicActivity.trim() || undefined,
-      phones: phones.map((p) => p.trim()).filter(Boolean).slice(0, 3),
+      phones: phones.map((p) => normalizarTelefonoDo(p)).filter(Boolean).slice(0, 3),
     }),
     onSuccess: () => {
       toast.success('Emisor (RNC) creado en Vega')
@@ -488,13 +489,11 @@ function CreateClientForm({
       <div className="ff-wrap">
         <label className="ff-label">Teléfonos <span style={{ fontWeight: 400, color: 'var(--text-secondary)' }}>(máx. 3)</span></label>
         {phones.map((p, i) => (
-          <input
+          <PhoneInput
             key={i}
-            className="ff-input"
             style={{ marginBottom: 6 }}
             value={p}
-            onChange={(e) => setPhones((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
-            placeholder="8095551234"
+            onChange={(v) => setPhones((prev) => prev.map((x, j) => (j === i ? v : x)))}
           />
         ))}
         {phones.length < 3 && (

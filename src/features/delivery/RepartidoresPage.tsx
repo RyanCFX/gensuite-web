@@ -17,13 +17,16 @@ import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useDeliveryPuerta, DrenajeAviso } from '@/shared/hooks/useDelivery'
 import { DeliveryErrorAlert } from './viajeUi'
 import { DeliveryPagination } from './DeliveryPagination'
+import { PhoneInput } from '@/shared/ui/PhoneInput'
+import { normalizarTelefonoDo } from '@/lib/formatters'
+import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 
 const COLUMNS = [
   { key: 'nombre', width: 220 },
   { key: 'telefono', width: 130 },
   { key: 'licencia', width: 130 },
   { key: 'transportista', width: 180 },
-  { key: 'empleado', width: 130 },
+  { key: 'vehiculo', width: 130 },
   { key: 'usuario', width: 180 },
   { key: 'estado', width: 110 },
   { key: 'actions', width: 80 },
@@ -39,20 +42,20 @@ interface FormState {
   nombre: string
   telefono: string
   licencia: string
-  empleado: string
   usuario: string
   transportista: string
+  vehiculoPorDefecto: string
   estado: Estado
 }
 
 function formDe(r?: DeliveryRepartidor | null): FormState {
   return {
     nombre: r?.nombre ?? '',
-    telefono: r?.telefono ?? '',
+    telefono: normalizarTelefonoDo(r?.telefono ?? ''),
     licencia: r?.licencia ?? '',
-    empleado: r?.empleado ?? '',
     usuario: r?.usuario ?? '',
     transportista: r?.transportista ?? '',
+    vehiculoPorDefecto: r?.vehiculoPorDefecto ?? '',
     estado: r?.estado ?? 'activo',
   }
 }
@@ -62,6 +65,7 @@ export default function RepartidoresPage() {
   const puerta = useDeliveryPuerta()
   const puedeCrear = usePuede('delivery.repartidores.crear') && puerta.operativo
   const puedeEditar = usePuede('delivery.repartidores.editar') && puerta.operativo
+  const puedeVerUsuarios = usePuede('usuarios.listar')
 
   const [estado, setEstado] = useState('todos')
   const [q, setQ] = useState('')
@@ -96,11 +100,13 @@ export default function RepartidoresPage() {
   const guardar = useMutation({
     mutationFn: () => {
       const base: CreateRepartidorDto = { nombre: form.nombre.trim(), estado: form.estado }
-      const opc = ['telefono', 'licencia', 'empleado', 'usuario', 'transportista'] as const
+      const opc = ['telefono', 'licencia', 'usuario', 'transportista'] as const
       for (const k of opc) {
         const v = form[k].trim()
         if (v) base[k] = v
       }
+      const vehiculo = form.vehiculoPorDefecto.trim()
+      if (vehiculo) base.vehiculoPorDefecto = vehiculo
       if (!editando) return createRepartidor(base)
       // Editar: solo lo que cambió (vaciar un campo no se envía — el BFF no documenta "borrar").
       const original = formDe(editando)
@@ -111,6 +117,8 @@ export default function RepartidoresPage() {
         const v = form[k].trim()
         if (v && v !== original[k]) patch[k] = v
       }
+      // Vehículo por defecto: "" lo quita (PUT) — por eso se envía aunque quede vacío.
+      if (vehiculo !== original.vehiculoPorDefecto) patch.vehiculoPorDefecto = vehiculo
       return updateRepartidor(editando.id, patch)
     },
     onSuccess: () => {
@@ -179,7 +187,7 @@ export default function RepartidoresPage() {
                 <th>Teléfono<span className="col-resize-handle" onMouseDown={startResize('telefono')} /></th>
                 <th>Licencia<span className="col-resize-handle" onMouseDown={startResize('licencia')} /></th>
                 <th>Transportista<span className="col-resize-handle" onMouseDown={startResize('transportista')} /></th>
-                <th>Empleado<span className="col-resize-handle" onMouseDown={startResize('empleado')} /></th>
+                <th>Vehículo<span className="col-resize-handle" onMouseDown={startResize('vehiculo')} /></th>
                 <th>Usuario<span className="col-resize-handle" onMouseDown={startResize('usuario')} /></th>
                 <th>Estado<span className="col-resize-handle" onMouseDown={startResize('estado')} /></th>
                 <th />
@@ -207,7 +215,7 @@ export default function RepartidoresPage() {
                         <td className="td-muted">{r.telefono ?? '—'}</td>
                         <td className="td-muted">{r.licencia ?? '—'}</td>
                         <td className="td-muted">{r.transportista ?? '—'}</td>
-                        <td className="td-muted">{r.empleado ?? '—'}</td>
+                        <td className="td-muted">{r.vehiculoPorDefecto ?? '—'}</td>
                         <td className="td-muted">{r.usuario ?? '—'}</td>
                         <td><span className={`badge ${ESTADO_BADGE[r.estado] ?? 'badge-neutral'}`}>{ESTADO_LABEL[r.estado] ?? r.estado}</span></td>
                         <td style={{ textAlign: 'right' }}>
@@ -248,26 +256,48 @@ export default function RepartidoresPage() {
           <div className="form-row">
             <div className="ff-wrap">
               <label className="ff-label">Teléfono</label>
-              <input className="ff-input" value={form.telefono} onChange={(e) => set('telefono', e.target.value)} />
+              <PhoneInput value={form.telefono} onChange={(v) => set('telefono', v)} />
             </div>
             <div className="ff-wrap">
               <label className="ff-label">Licencia</label>
               <input className="ff-input" value={form.licencia} onChange={(e) => set('licencia', e.target.value)} />
             </div>
           </div>
-          <div className="form-row">
-            <div className="ff-wrap">
-              <label className="ff-label">Empleado (RRHH)</label>
-              <input className="ff-input" placeholder="HR-EMP-00012" value={form.empleado} onChange={(e) => set('empleado', e.target.value)} />
-            </div>
+          {puedeVerUsuarios && (
             <div className="ff-wrap">
               <label className="ff-label">Usuario del sistema</label>
-              <input className="ff-input" placeholder="correo@empresa.do" value={form.usuario} onChange={(e) => set('usuario', e.target.value)} />
+              <OpcionesSelect
+                recurso="usuarios"
+                value={form.usuario}
+                onChange={(v, opt) => {
+                  set('usuario', v)
+                  // El nombre viene solo del usuario elegido (el label es su nombre completo).
+                  if (v && opt?.label) set('nombre', opt.label)
+                }}
+                placeholder="Buscar usuario…"
+              />
             </div>
-          </div>
+          )}
           <div className="ff-wrap">
             <label className="ff-label">Transportista externo</label>
-            <input className="ff-input" placeholder="Empresa o motoconcho externo (opcional)" value={form.transportista} onChange={(e) => set('transportista', e.target.value)} />
+            {/* Debe ser un proveedor ya registrado: se manda su ID. */}
+            <OpcionesSelect
+              recurso="proveedores"
+              value={form.transportista}
+              onChange={(v) => set('transportista', v)}
+              placeholder="Proveedor (empresa o motoconcho externo, opcional)"
+              selectedLabel={editando?.transportista && editando.transportista === form.transportista ? editando.transportista : undefined}
+            />
+          </div>
+          <div className="ff-wrap">
+            <label className="ff-label">Vehículo por defecto</label>
+            <OpcionesSelect
+              recurso="vehiculos"
+              value={form.vehiculoPorDefecto}
+              onChange={(v) => set('vehiculoPorDefecto', v)}
+              placeholder="Se preselecciona al crear viajes (opcional)"
+              selectedLabel={form.vehiculoPorDefecto || undefined}
+            />
           </div>
           <div className="ff-wrap">
             <label className="ff-label">Estado</label>

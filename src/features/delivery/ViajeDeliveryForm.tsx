@@ -6,7 +6,7 @@ import { useLocation, useNavigate, useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { ArrowLeft, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
-import { createViaje, updateViaje, despacharViaje, getViaje, listDeliveryPendientes } from '@/shared/api/delivery'
+import { createViaje, updateViaje, despacharViaje, getViaje, getRepartidor, listDeliveryPendientes } from '@/shared/api/delivery'
 import type { ApiError, DeliveryViaje } from '@/shared/api/types'
 import { usePuede } from '@/shared/permissions/can'
 import { formatDOP } from '@/lib/formatters'
@@ -107,6 +107,22 @@ function ViajeFormInner({ id, viaje, volver }: { id?: string; viaje?: DeliveryVi
   const [repartidor, setRepartidor] = useState(viaje?.repartidor ?? '')
   const [repartidorLabel, setRepartidorLabel] = useState(viaje?.repartidorNombre ?? viaje?.repartidor ?? '')
   const [vehiculo, setVehiculo] = useState(viaje?.vehiculo ?? '')
+  // El vehículo elegido a mano no se pisa al cambiar de repartidor.
+  const [vehiculoManual, setVehiculoManual] = useState(false)
+
+  // Al elegir repartidor se preselecciona su vehículo por defecto (editable). En edición, si el
+  // viaje ya tenía un vehículo definido se conserva (no se pierde al cambiar de repartidor).
+  async function elegirRepartidor(v: string, label: string) {
+    setRepartidor(v)
+    setRepartidorLabel(label)
+    if (!v || vehiculoManual || (editMode && viaje?.vehiculo)) return
+    try {
+      const r = await getRepartidor(v)
+      setVehiculo((actual) => (vehiculoManual ? actual : r.vehiculoPorDefecto ?? ''))
+    } catch {
+      // Sin el dato del repartidor el vehículo queda como estaba (se resuelve en el servidor).
+    }
+  }
   const [salida, setSalida] = useState(isoToLocalInput(viaje?.salida))
   const [notas, setNotas] = useState(viaje?.notas ?? '')
   const [despachar, setDespachar] = useState(false)
@@ -152,8 +168,10 @@ function ViajeFormInner({ id, viaje, volver }: { id?: string; viaje?: DeliveryVi
   const guardar = useMutation({
     mutationFn: async (): Promise<{ viaje: DeliveryViaje; despachado: boolean }> => {
       const body = {
-        repartidor,
-        vehiculo: vehiculo || undefined,
+        // En edición `repartidor` solo se manda si cambió; `vehiculo` solo si hay uno definido
+        // (si no, el servidor lo resuelve: repartidor → configuración).
+        ...(editMode && viaje && viaje.repartidor === repartidor ? {} : { repartidor }),
+        ...(vehiculo ? { vehiculo } : {}),
         salida: localInputToIso(salida),
         notas: notas.trim() || undefined,
         facturas: facturas.map((f, i) => ({ invoiceId: f.invoiceId, orden: i + 1 })),
@@ -219,11 +237,11 @@ function ViajeFormInner({ id, viaje, volver }: { id?: string; viaje?: DeliveryVi
           <div className="form-row">
             <div className="ff-wrap">
               <label className="ff-label ff-required">Repartidor</label>
-              <OpcionesSelect recurso="repartidores" value={repartidor} onChange={(v, o) => { setRepartidor(v); setRepartidorLabel(o?.label ?? '') }} placeholder="Buscar repartidor…" error={!repartidor} selectedLabel={repartidorLabel} />
+              <OpcionesSelect recurso="repartidores" value={repartidor} onChange={(v, o) => { void elegirRepartidor(v, o?.label ?? '') }} placeholder="Buscar repartidor…" error={!repartidor} selectedLabel={repartidorLabel} />
             </div>
             <div className="ff-wrap">
               <label className="ff-label">Vehículo</label>
-              <OpcionesSelect recurso="vehiculos" value={vehiculo} onChange={(v) => setVehiculo(v)} placeholder="Opcional — vehículo genérico por defecto" selectedLabel={vehiculo} />
+              <OpcionesSelect recurso="vehiculos" value={vehiculo} onChange={(v) => { setVehiculo(v); setVehiculoManual(true) }} placeholder="Opcional — el del repartidor o el genérico" selectedLabel={vehiculo} />
             </div>
             <div className="ff-wrap">
               <label className="ff-label">Salida prevista</label>

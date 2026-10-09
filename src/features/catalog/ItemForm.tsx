@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffectOnActive } from 'keepalive-for-react'
+import { evaluarNiveles, faltanteDeError, hayValor, avisoUnNivel, errorNivelFaltante, type Nivel } from '@/lib/nivelesPrecio'
 import { useForm, Controller } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -38,7 +39,7 @@ const schema = z.object({
   warrantyPeriod: z.number().min(0).optional().catch(undefined),
   description: z.string().optional(),
   priceA: z.number().min(0).optional().catch(undefined),
-  priceB: z.number().min(0, 'El precio debe ser mayor o igual a 0'),
+  priceB: z.number().min(0, 'El precio debe ser mayor o igual a 0').optional().catch(undefined),
   priceC: z.number().min(0).optional().catch(undefined),
   priceMode: z.enum(['manual', 'cost_plus']).optional(),
   // docs/tasks/77_actualizar_costo_en_compra_configurable.md §2 — tri-estado: '' = usar el
@@ -255,6 +256,10 @@ export default function ItemForm() {
     }
   }
 
+  // B cae al precio base (standardRate) si el artículo no trae niveles (igual que el prellenado).
+  const prevPriceB = existingItem?.prices?.B ?? existingItem?.standardRate
+  const [nivelFaltanteSrv, setNivelFaltanteSrv] = useState<Nivel | null>(null)
+
   const createMutation = useMutation({
     mutationFn: (data: Parameters<typeof createItem>[0]) => (isProduct ? createItem(data) : createServicio(data)),
     onSuccess: async (result) => {
@@ -277,6 +282,8 @@ export default function ItemForm() {
       if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
+      const faltante = faltanteDeError(err)
+      if (faltante) setNivelFaltanteSrv(faltante)
       // Ej. mismatch de categoría/tipo (400): "La categoría "X" solo aplica a Servicios,
       // no se puede usar para un artículo de tipo Producto." — se muestra tal cual.
       toast.error(err?.message ?? `Error al crear el ${moduleLabel.toLowerCase()}`)
@@ -296,6 +303,8 @@ export default function ItemForm() {
       if (multiTab && formTabId) closeTab(formTabId, { skipNavigate: true })
     },
     onError: (err: { message?: string }) => {
+      const faltante = faltanteDeError(err)
+      if (faltante) setNivelFaltanteSrv(faltante)
       toast.error(err?.message ?? `Error al actualizar el ${moduleLabel.toLowerCase()}`)
     },
   })
@@ -318,7 +327,7 @@ export default function ItemForm() {
       brand: '',
       itemCode: '',
       priceA: undefined,
-      priceB: 0,
+      priceB: undefined,
       priceC: undefined,
       priceMode: 'manual',
       actualizarCostoEnCompraOverride: '',
@@ -372,7 +381,7 @@ export default function ItemForm() {
       brand: existingItem.brand ?? '',
       itemCode: existingItem.id,
       priceA: existingItem.prices?.A ?? undefined,
-      priceB: existingItem.prices?.B ?? existingItem.standardRate ?? 0,
+      priceB: existingItem.prices?.B ?? existingItem.standardRate ?? undefined,
       priceC: existingItem.prices?.C ?? undefined,
       priceMode: existingItem.priceMode ?? 'manual',
       actualizarCostoEnCompraOverride: existingItem.actualizarCostoEnCompraOverride ?? '',
@@ -425,6 +434,35 @@ export default function ItemForm() {
   const watchedPriceA = watch('priceA')
   const watchedPriceB = watch('priceB')
   const watchedPriceC = watch('priceC')
+
+  // ── Niveles A/B/C (o márgenes en costo + margen): un nivel → los otros lo copian; dos → falta
+  // uno (400 PRECIOS_NIVELES_INCOMPLETOS); tres → tal cual (el 0 es válido). "En total" suma lo
+  // que se envía con lo que el artículo ya tiene. Si algún nivel está oculto por permisos no se
+  // puede evaluar en el cliente: lo decide el servidor.
+  const modoMargen = effectivePriceMode === 'cost_plus'
+  const nivelesEvaluables = modoMargen ? !oculto.costo : !(oculto.precioA || oculto.precioB || oculto.precioC)
+  const nivelesRes = nivelesEvaluables
+    ? (modoMargen
+        ? evaluarNiveles(
+            { A: watchedMarginA, B: watchedMarginB, C: watchedMarginC },
+            { A: existingItem?.marginA, B: existingItem?.marginB, C: existingItem?.marginC },
+          )
+        : evaluarNiveles(
+            { A: watchedPriceA, B: watchedPriceB, C: watchedPriceC },
+            { A: existingItem?.prices?.A, B: prevPriceB, C: existingItem?.prices?.C },
+          ))
+    : null
+  const tipoNivel = modoMargen ? 'margen' : 'precio'
+  // Solo hay error/aviso si el usuario tocó algún nivel: un artículo antiguo con dos niveles no
+  // debe bloquearse por editar otros campos (el servidor tampoco valida si no se envía ningún nivel).
+  const mismo = (a: number | null | undefined, b: number | null | undefined) => (hayValor(a) ? a === b : !hayValor(b))
+  const nivelesTocados = !isEdit || (modoMargen
+    ? !(mismo(watchedMarginA, existingItem?.marginA) && mismo(watchedMarginB, existingItem?.marginB) && mismo(watchedMarginC, existingItem?.marginC))
+    : !(mismo(watchedPriceA, existingItem?.prices?.A) && mismo(watchedPriceB, prevPriceB) && mismo(watchedPriceC, existingItem?.prices?.C)))
+  // Evaluable en el cliente: manda la regla local (se limpia sola al completar el nivel); si no, el 400 del servidor.
+  const nivelErr: Nivel | null = nivelesRes ? (nivelesTocados && nivelesRes.estado === 'dos' ? nivelesRes.faltante : null) : nivelFaltanteSrv
+  const nivelesAviso = nivelesTocados && nivelesRes?.estado === 'uno' ? avisoUnNivel(nivelesRes, tipoNivel) : null
+  const clsNivel = (n: Nivel) => `ff-input${nivelErr === n ? ' ff-input-error' : ''}`
   const watchedTrackingType = watch('trackingType')
   // §4.4 — exclusiones: plantilla de variantes, variante, o artículo con lotes. `hasVariants`
   // (estado local) cubre la creación; en edición un template ya existente se detecta por
@@ -496,6 +534,19 @@ export default function ItemForm() {
       toast.error('Selecciona el impuesto de venta o marca "No lleva impuesto de venta"')
       return
     }
+    // Dos niveles llenos y uno vacío: se marca el faltante y no se envía (nada queda escrito).
+    if (nivelesTocados && nivelesRes?.estado === 'dos') {
+      setNivelFaltanteSrv(nivelesRes.faltante)
+      toast.error(errorNivelFaltante(nivelesRes.faltante, tipoNivel))
+      return
+    }
+    setNivelFaltanteSrv(null)
+    // Con valor (incluido 0) → se envía; vacío/NaN → se omite el nivel.
+    const nv = (v: number | null | undefined) => (hayValor(v) ? v : undefined)
+    // Al editar solo se envían los niveles que cambiaron ("quedan" = enviado + lo ya guardado):
+    // así no se iguala nada ni se rechaza un artículo antiguo por editar otros campos.
+    const nvEdit = (v: number | null | undefined, previo: number | null | undefined) =>
+      isEdit && mismo(v, previo) ? undefined : nv(v)
     const { description, itemCode, ...rest } = data
     const payload = {
       ...rest,
@@ -509,16 +560,17 @@ export default function ItemForm() {
       stockUom: data.stockUom || undefined,
       purchaseUoms: isProduct ? (data.purchaseUoms ?? []) : undefined,
       saleUoms: isProduct ? (data.saleUoms ?? []) : undefined,
-      priceA: data.priceA || undefined,
-      priceB: data.priceB || undefined,
-      priceC: data.priceC || undefined,
+      priceA: nvEdit(data.priceA, existingItem?.prices?.A),
+      priceB: nvEdit(data.priceB, prevPriceB),
+      priceC: nvEdit(data.priceC, existingItem?.prices?.C),
       // Servicios: "Modo de precio" oculto — siempre se manda "manual".
-      priceMode: isProduct ? (data.priceMode || undefined) : 'manual',
+      // Al editar se envía siempre `priceMode` junto con los niveles.
+      priceMode: isProduct ? (data.priceMode || (isEdit ? (existingItem?.priceMode ?? 'manual') : undefined)) : 'manual',
       // Servicios: "Actualizar costo al comprar" oculto — no se manda override.
       actualizarCostoEnCompraOverride: isProduct ? (data.actualizarCostoEnCompraOverride || undefined) : undefined,
-      marginA: isProduct ? (data.marginA || undefined) : undefined,
-      marginB: isProduct ? (data.marginB || undefined) : undefined,
-      marginC: isProduct ? (data.marginC || undefined) : undefined,
+      marginA: isProduct ? nvEdit(data.marginA, existingItem?.marginA) : undefined,
+      marginB: isProduct ? nvEdit(data.marginB, existingItem?.marginB) : undefined,
+      marginC: isProduct ? nvEdit(data.marginC, existingItem?.marginC) : undefined,
       allowsDiscount: data.allowsDiscount,
       maxDiscountPct: data.maxDiscountPct || undefined,
       shortName: data.shortName || undefined,
@@ -1413,7 +1465,7 @@ export default function ItemForm() {
                       !oculto.costo && (
                         <>
                           <label className="ff-label">Margen A (%)</label>
-                          <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 40" {...register('marginA', { valueAsNumber: true })} />
+                          <input type="number" step="0.1" min="0" max="100" className={clsNivel('A')} placeholder="Ej: 40" {...register('marginA', { valueAsNumber: true })} />
                           {priceLabel(calcTotalFromMargin(watchedMarginA))}
                         </>
                       )
@@ -1424,7 +1476,7 @@ export default function ItemForm() {
                             Precio A — Máximo
                             <FieldTooltip>Clientes VIP / venta especial</FieldTooltip>
                           </label>
-                          <input type="number" step="0.01" min="0" className="ff-input" placeholder="0.00" {...register('priceA', { valueAsNumber: true })} />
+                          <input type="number" step="0.01" min="0" className={clsNivel('A')} placeholder="0.00" {...register('priceA', { valueAsNumber: true })} />
                           {priceLabel(watchedPriceA)}
                         </>
                       )
@@ -1474,15 +1526,15 @@ export default function ItemForm() {
                   <>
                     {!oculto.costo && (
                     <div className="ff-wrap">
-                      <label className="ff-label">Margen B (%) <span className="ff-required">*</span></label>
-                      <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 25" {...register('marginB', { valueAsNumber: true })} />
+                      <label className="ff-label">Margen B (%)</label>
+                      <input type="number" step="0.1" min="0" max="100" className={clsNivel('B')} placeholder="Ej: 25" {...register('marginB', { valueAsNumber: true })} />
                       {priceLabel(calcTotalFromMargin(watchedMarginB))}
                     </div>
                     )}
                     {!oculto.costo && (
                     <div className="ff-wrap">
                       <label className="ff-label">Margen C (%)</label>
-                      <input type="number" step="0.1" min="0" max="100" className="ff-input" placeholder="Ej: 10" {...register('marginC', { valueAsNumber: true })} />
+                      <input type="number" step="0.1" min="0" max="100" className={clsNivel('C')} placeholder="Ej: 10" {...register('marginC', { valueAsNumber: true })} />
                       {priceLabel(calcTotalFromMargin(watchedMarginC))}
                     </div>
                     )}
@@ -1492,12 +1544,12 @@ export default function ItemForm() {
                     {!oculto.precioB && (
                     <div className="ff-wrap">
                       <label className="ff-label">
-                        Precio B — Promedio <span className="ff-required">*</span>
+                        Precio B — Promedio
                         <FieldTooltip>Precio estándar (el más usado)</FieldTooltip>
                       </label>
                       <input
                         type="number" step="0.01" min="0"
-                        className={`ff-input${errors.priceB ? ' ff-input-error' : ''}`}
+                        className={`ff-input${errors.priceB || nivelErr === 'B' ? ' ff-input-error' : ''}`}
                         placeholder="0.00"
                         {...register('priceB', { valueAsNumber: true })}
                       />
@@ -1511,12 +1563,14 @@ export default function ItemForm() {
                         Precio C — Mínimo
                         <FieldTooltip>Precio al por mayor</FieldTooltip>
                       </label>
-                      <input type="number" step="0.01" min="0" className="ff-input" placeholder="0.00" {...register('priceC', { valueAsNumber: true })} />
+                      <input type="number" step="0.01" min="0" className={clsNivel('C')} placeholder="0.00" {...register('priceC', { valueAsNumber: true })} />
                       {priceLabel(watchedPriceC)}
                     </div>
                     )}
                   </>
                 )}
+                {nivelesAviso && <p className="ff-hint" style={{ margin: 0 }}>{nivelesAviso}</p>}
+                {nivelErr && <span className="ff-error">{errorNivelFaltante(nivelErr, tipoNivel)}</span>}
               </div>
 
               {!oculto.descuento && (
