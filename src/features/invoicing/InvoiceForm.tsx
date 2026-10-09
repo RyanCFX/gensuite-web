@@ -61,6 +61,9 @@ import { esCreditoFiscal } from '@/lib/comprobantes'
 import { isPinPrecioError } from '@/lib/pinOverride'
 import { isPrecioCatalogoError, precioBloqueadoParaLinea } from '@/lib/precioCatalogo'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
+import { DeliveryFormSection, EMPTY_DELIVERY_FORM } from '@/features/delivery/DeliveryFormSection'
+import type { DeliveryFormValue } from '@/features/delivery/DeliveryFormSection'
+import { esErrorDelivery } from '@/lib/deliveryErrors'
 import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 import { getCatalogosFiscalesLookup, getItemUbicacionesLookup, getClienteDetalle, getClienteSemaforo, getStockSettingsLookup } from '@/shared/api/formularios'
@@ -420,6 +423,16 @@ export default function InvoiceForm() {
   const mostrarSelectorDespachoFuturo = despachoHabilitado && despachoFuturoHabilitado
   const [despachoFuturo, setDespachoFuturo] = useState(false)
   const esInmediata = mostrarSelectorDespachoFuturo ? !despachoFuturo : true
+
+  // ── Delivery (§2.1 docs/tasks/PROMPT_DELIVERY_FRONTEND.md) ─────────────────
+  // La sección (puerta §1 + precarga) vive en DeliveryFormSection; acá solo el valor,
+  // el flag de error y las validaciones que bloquean el submit.
+  const [delivery, setDelivery] = useState<DeliveryFormValue>(EMPTY_DELIVERY_FORM)
+  const [direccionEntregaTouched, setDireccionEntregaTouched] = useState(false)
+  const esDelivery = delivery.esDelivery
+  const deliverySinDireccion = esDelivery && !delivery.direccionEntrega.trim()
+  // Solo DOP: otra moneda explícita → 400 DELIVERY_MONEDA_NO_SOPORTADA.
+  const deliveryMonedaInvalida = esDelivery && !!currency && currency !== monedaBase
 
   // ── Stock settings: define si los seriales/lotes se capturan inline en la fila (useSerialBatchFields)
   //    o vía diálogo emergente (ComponentTrackingModal). El catálogo es fijo, se cachea 1h.
@@ -794,6 +807,26 @@ export default function InvoiceForm() {
       // que lo salve: el mensaje del backend ya es comercial y se muestra tal cual, con
       // duración larga para que el operador lo lea completo.
       if (isPrecioCatalogoError(err)) { toast.error(msg, { duration: 10000 }); return }
+      // Delivery (§2.1/§9): mostrar el mensaje del backend (incluye códigos entre
+      // corchetes desde ERPNext). La dirección faltante además marca el campo.
+      if (esErrorDelivery(err, 'DELIVERY_DIRECCION_REQUERIDA')) {
+        setDireccionEntregaTouched(true)
+        toast.error(msg || 'La venta con delivery requiere la dirección de entrega', { duration: 8000 })
+        document.getElementById('direccionEntrega')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        return
+      }
+      if (esErrorDelivery(
+        err,
+        'DELIVERY_NO_HABILITADO',
+        'DELIVERY_REQUIERE_DESPACHO_FUTURO',
+        'DELIVERY_MONEDA_NO_SOPORTADA',
+        'DELIVERY_RESERVA_FALLIDA',
+        'DELIVERY_ARTICULO_INACTIVO',
+        'DELIVERY_PERIODO_CERRADO',
+      )) {
+        toast.error(msg || 'No se pudo guardar la venta con delivery', { duration: 8000 })
+        return
+      }
       if (msg.toLowerCase().includes('no tienes acceso a la sucursal')) {
         refetchMyBranches()
         toast.error(`${msg} Tus sucursales asignadas se actualizaron, vuelve a intentar.`)
@@ -865,6 +898,7 @@ export default function InvoiceForm() {
     ars,
     currency,
     conversionRate,
+    delivery,
   }, hydrationDone)
   useBeforeUnloadWarning(isDirty)
 
@@ -880,6 +914,14 @@ export default function InvoiceForm() {
     setNotes(inv.notes ?? '')
     setCurrency(inv.currency ?? '')
     setConversionRate(inv.conversionRate ?? '')
+    // Delivery: el GET trae el bloque anidado `delivery` (§2.3).
+    setDelivery({
+      esDelivery: inv.delivery?.esDelivery ?? false,
+      direccionEntrega: inv.delivery?.direccion ?? '',
+      telefonoEntrega: inv.delivery?.telefono ?? '',
+      referenciaEntrega: inv.delivery?.referencia ?? '',
+    })
+    setDireccionEntregaTouched(false)
     if (inv.esClienteOcasional) {
       setEsClienteOcasional(true)
       setClienteOcasionalNombre(inv.clienteOcasionalNombre ?? '')
@@ -1382,16 +1424,31 @@ if (esClienteOcasional) {
          toast.error('El RNC debe tener 9 dígitos o la cédula 11 dígitos')
          return
        }
-     } else {
-       if (!customerId) {
-         toast.error('Selecciona un cliente')
-         return
-       }
-       if (esCreditoFiscal(ncfType) && !selectedCustomer?.rnc) {
-         toast.error('El cliente necesita RNC para comprobante B01/E31 (Crédito Fiscal)')
-         return
-       }
-     }
+      } else {
+        if (!customerId) {
+          toast.error('Selecciona un cliente')
+          return
+        }
+        if (esCreditoFiscal(ncfType) && !selectedCustomer?.rnc) {
+          toast.error('El cliente necesita RNC para comprobante B01/E31 (Crédito Fiscal)')
+          return
+        }
+      }
+
+      // Delivery (§2.1): dirección obligatoria en la práctica; el BFF responde
+      // 400 DELIVERY_DIRECCION_REQUERIDA. Solo DOP.
+      if (esDelivery) {
+        if (deliveryMonedaInvalida) {
+          toast.error(`Delivery solo admite la moneda de la compañía (${monedaBase})`)
+          return
+        }
+        if (deliverySinDireccion) {
+          setDireccionEntregaTouched(true)
+          toast.error('La venta con delivery requiere la dirección de entrega')
+          document.getElementById('direccionEntrega')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          return
+        }
+      }
 
     for (let i = 0; i < validItems.length; i++) {
       const item = validItems[i]
@@ -1504,7 +1561,19 @@ persistInvoice(buildInvoiceDto())
       taxesTemplate: undefined,
       currency: currency || undefined,
       conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
-      despachoFuturo: mostrarSelectorDespachoFuturo ? despachoFuturo : undefined,
+      // Delivery fuerza despacho a futuro: con el switch encendido se oculta el toggle y
+      // se manda `true` (si el selector está visible); nunca `false` con delivery (§2.1).
+      despachoFuturo: esDelivery
+        ? (mostrarSelectorDespachoFuturo ? true : undefined)
+        : (mostrarSelectorDespachoFuturo ? despachoFuturo : undefined),
+      ...(esDelivery
+        ? {
+            esDelivery: true,
+            direccionEntrega: delivery.direccionEntrega.trim(),
+            telefonoEntrega: delivery.telefonoEntrega.trim() || undefined,
+            referenciaEntrega: delivery.referenciaEntrega.trim().slice(0, 500) || undefined,
+          }
+        : {}),
       ...arsBloqueDto(),
     } as CreateInvoiceDto
   }
@@ -1746,7 +1815,9 @@ persistInvoice(buildInvoiceDto())
                 Considera revisar el saldo pendiente antes de emitir esta factura.
               </div>
             )}
-            {mostrarSelectorDespachoFuturo && (
+            {/* Delivery fuerza despacho a futuro: con el switch encendido se oculta
+                este toggle (§2.1). */}
+            {mostrarSelectorDespachoFuturo && !esDelivery && (
               <div style={{ marginTop: 16, borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
                 <label className="ff-label" style={{ marginBottom: 8, display: 'block' }}>Despacho</label>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -1772,6 +1843,19 @@ persistInvoice(buildInvoiceDto())
                 </p>
               </div>
             )}
+            <DeliveryFormSection
+              value={delivery}
+              onChange={(v) => {
+                setDelivery(v)
+                if (!v.esDelivery) setDireccionEntregaTouched(false)
+              }}
+              clienteOcasional={esClienteOcasional}
+              direccionOcasional={clienteOcasionalDireccion}
+              customerId={customerId}
+              monedaBase={monedaBase}
+              currencyActual={currency}
+              direccionError={direccionEntregaTouched}
+            />
           </div>
         </div>
 

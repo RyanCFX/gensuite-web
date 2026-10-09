@@ -54,6 +54,8 @@ import type {
   EcfConfig,
   UpdateEcfConfigDto,
   HabilitarFarmaciaResult,
+  UpdateDeliveryConfigDto,
+  DeliveryAjustes,
 } from './types'
 
 export async function getEmpresa() {
@@ -521,4 +523,25 @@ export async function listCurrencies(): Promise<CurrencyOption[]> {
 export async function habilitarFarmacia(): Promise<HabilitarFarmaciaResult> {
   const res = await client.post<{ success: true; data?: HabilitarFarmaciaResult }>(ENDPOINTS.config.farmaciaHabilitar)
   return res.data?.data ?? {}
+}
+
+// ─── Delivery (§7 docs/tasks/PROMPT_DELIVERY_FRONTEND.md) ────────────────────
+// Requiere despacho habilitado — si no, 409 DELIVERY_REQUIERE_DESPACHO_HABILITADO.
+
+/** POST /config/delivery/habilitar — idempotente: provisiona cuenta, método puente y vehículo genérico. */
+export async function habilitarDelivery(): Promise<{ message?: string } & Record<string, unknown>> {
+  const res = await client.post<{ success: true; data: { message?: string } & Record<string, unknown> }>(ENDPOINTS.config.deliveryHabilitar)
+  return unwrap(res)
+}
+
+/** POST /config/delivery/deshabilitar — 409 DELIVERY_CON_PENDIENTES con details si hay pendientes. */
+export async function deshabilitarDelivery(): Promise<{ message?: string } & Record<string, unknown>> {
+  const res = await client.post<{ success: true; data: { message?: string } & Record<string, unknown> }>(ENDPOINTS.config.deliveryDeshabilitar)
+  return unwrap(res)
+}
+
+/** PUT /config/delivery — "Ajustes avanzados de despacho". Al menos un campo por request. */
+export async function updateDeliveryConfig(data: UpdateDeliveryConfigDto) {
+  const res = await client.put<{ success: true; data: DeliveryAjustes }>(ENDPOINTS.config.deliveryConfig, data)
+  return unwrap(res)
 }

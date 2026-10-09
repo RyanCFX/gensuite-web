@@ -14,6 +14,8 @@ import { useItemsStock, resolveDisponible } from '@/shared/hooks/useItemsStock'
 import { CustomerQuickCreateModal } from '@/features/customers/CustomerQuickCreateModal'
 import { ItemSelect } from '@/shared/ui/ItemSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
+import { DeliveryFormSection, EMPTY_DELIVERY_FORM } from '@/features/delivery/DeliveryFormSection'
+import type { DeliveryFormValue } from '@/features/delivery/DeliveryFormSection'
 import { DatePicker } from '@/shared/ui/DatePicker'
 import { UomSelect } from '@/shared/ui/UomSelect'
 import { QtyInput } from '@/shared/ui/QtyInput'
@@ -207,6 +209,11 @@ const [customerId, setCustomerId] = useState('')
   // Mutuamente excluyente con "Es un apartado": un pedido a futuro ya difiere la entrega por su
   // cuenta, no tiene sentido combinarlo con layaway (docs/tasks/79_confirmacion_despacho_pedido.md §2).
   const mostrarSelectorDespachoFuturo = despachoHabilitado && despachoFuturoHabilitado && !isLayaway
+
+  // ── Delivery (§2.4 docs/tasks/PROMPT_DELIVERY_FRONTEND.md) — pasa a la factura derivada ──
+  const [delivery, setDelivery] = useState<DeliveryFormValue>(EMPTY_DELIVERY_FORM)
+  const [direccionEntregaTouched, setDireccionEntregaTouched] = useState(false)
+  const deliverySinDireccion = delivery.esDelivery && !delivery.direccionEntrega.trim()
 
   // Tasa vigente configurada para el par (moneda elegida → moneda base) — se autocompleta el
   // campo "Tasa de cambio" con esto la primera vez que el usuario elige una moneda distinta a la
@@ -434,8 +441,15 @@ useEffect(() => {
          warehouse: '',
        }
      }))
-     setNotes(existing.notes ?? '')
-     setBranch(existing.branch ?? '')
+      setNotes(existing.notes ?? '')
+      setDelivery({
+        esDelivery: existing.esDelivery ?? false,
+        direccionEntrega: existing.direccionEntrega ?? '',
+        telefonoEntrega: existing.telefonoEntrega ?? '',
+        referenciaEntrega: existing.referenciaEntrega ?? '',
+      })
+      setDireccionEntregaTouched(false)
+      setBranch(existing.branch ?? '')
      setDepartment((existing as any).department ?? '')
      if (existing.esClienteOcasional) {
        setEsClienteOcasional(true)
@@ -887,8 +901,18 @@ function buildDto(): CreatePedidoDto {
        department: usaDepartamentos ? (department || undefined) : undefined,
        items: itemsDto,
        quotation: quotationId || undefined,
-       isLayaway: isLayaway || undefined,
-       despachoFuturo: mostrarSelectorDespachoFuturo ? despachoFuturo : undefined,
+        isLayaway: isLayaway || undefined,
+        despachoFuturo: delivery.esDelivery
+          ? (mostrarSelectorDespachoFuturo ? true : undefined)
+          : (mostrarSelectorDespachoFuturo ? despachoFuturo : undefined),
+        ...(delivery.esDelivery
+          ? {
+              esDelivery: true,
+              direccionEntrega: delivery.direccionEntrega.trim(),
+              telefonoEntrega: delivery.telefonoEntrega.trim() || undefined,
+              referenciaEntrega: delivery.referenciaEntrega.trim().slice(0, 500) || undefined,
+            }
+          : {}),
        currency: currency || undefined,
        conversionRate: currency && currency !== monedaBase && conversionRate !== '' ? conversionRate : undefined,
      } as CreatePedidoDto
@@ -932,6 +956,7 @@ function buildDto(): CreatePedidoDto {
     department,
     currency,
     conversionRate,
+    delivery,
   }, isEdit || quotationId || duplicateId ? loaded : true)
   useBeforeUnloadWarning(isDirty)
 
@@ -956,7 +981,14 @@ try {
        } else {
          if (!customerId) { toast.error('Selecciona un cliente'); return }
        }
-       if (validItems.length === 0) { toast.error('Agrega al menos un artículo'); return }
+        if (validItems.length === 0) { toast.error('Agrega al menos un artículo'); return }
+        // Delivery (§2.4): dirección obligatoria en la práctica.
+        if (delivery.esDelivery && deliverySinDireccion) {
+          setDireccionEntregaTouched(true)
+          toast.error('El pedido con delivery requiere la dirección de entrega')
+          document.getElementById('direccionEntrega')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          return
+        }
       for (let i = 0; i < validItems.length; i++) {
         const item = validItems[i]; const num = i + 1
         if (!item.qty || item.qty <= 0) { toast.error(`Artículo #${num}: la cantidad es requerida`); return }
@@ -1185,7 +1217,7 @@ try {
               </div>
             )}
 
-            {!isEdit && mostrarSelectorDespachoFuturo && (
+            {!isEdit && mostrarSelectorDespachoFuturo && !delivery.esDelivery && (
               <div style={{ marginTop: 16, borderTop: '1px solid var(--border-default)', paddingTop: 16 }}>
                 <label className="ff-label" style={{ marginBottom: 8, display: 'block' }}>Despacho</label>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -1211,6 +1243,19 @@ try {
                 </p>
               </div>
             )}
+            <DeliveryFormSection
+              value={delivery}
+              onChange={(v) => {
+                setDelivery(v)
+                if (!v.esDelivery) setDireccionEntregaTouched(false)
+              }}
+              clienteOcasional={esClienteOcasional}
+              direccionOcasional={clienteOcasionalDireccion}
+              customerId={customerId}
+              monedaBase={monedaBase}
+              currencyActual={currency}
+              direccionError={direccionEntregaTouched}
+            />
           </div>
         </div>
 

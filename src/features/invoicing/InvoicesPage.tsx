@@ -18,6 +18,8 @@ import { FilterField } from '@/shared/ui/FilterField'
 import { Drawer } from '@/shared/ui/Drawer'
 import { usePermissionsStore } from '@/stores/permissions.store'
 import { EstadoArsBadge } from './EstadoArsBadge'
+import { DeliveryEntregaBadge, DeliveryCobroBadge } from '@/features/delivery/DeliveryBadges'
+import { useFeature } from '@/shared/features/can'
 import type { EstadoArs } from '@/shared/api/types'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { usePuede } from '@/shared/permissions/can'
@@ -78,6 +80,11 @@ export default function InvoicesPage() {
   // y los params se sanean antes de llamar al API (nunca se mandan).
   const filtros = useFiltrosPantalla('ventas.factura')
   const [estadoArs, setEstadoArs] = useState<EstadoArsFilter>('all')
+  // ── Delivery (§2.3): filtros nuevos, protegidos por permisos v2 ──────────────
+  const deliveryOn = useFeature('delivery')
+  const [deliveryFiltro, setDeliveryFiltro] = useState<'todas' | 'delivery' | 'comun'>('todas')
+  const [estadoDelivery, setEstadoDelivery] = useState('')
+  const [estadoCobroDelivery, setEstadoCobroDelivery] = useState('')
 
   const rawParams: ListInvoicesParams = {
     search: search || undefined,
@@ -99,6 +106,16 @@ export default function InvoicesPage() {
           aseguradora: aseguradora || undefined,
           estadoArs: estadoArs !== 'all' && estadoArs !== 'sinLote' ? estadoArs : undefined,
           sinLote: estadoArs === 'sinLote' ? true : undefined,
+        }
+      : {}),
+    // Delivery (§2.3): respeta `filtrosPermitidos` — `sanear` quita los bloqueados.
+    ...(deliveryFiltro === 'todas'
+      ? {}
+      : { esDelivery: deliveryFiltro === 'delivery' }),
+    ...(deliveryFiltro === 'delivery'
+      ? {
+          estadoDelivery: estadoDelivery || undefined,
+          estadoCobroDelivery: estadoCobroDelivery || undefined,
         }
       : {}),
   }
@@ -124,8 +141,8 @@ export default function InvoicesPage() {
     .map((t) => ({ value: t.value, label: t.label }))
 
   const invoices = data?.items ?? []
-  /** 9 columnas base + "Estado ARS" en tenants de farmacia. */
-  const columnCount = esFarmacia ? 10 : 9
+  /** 9 columnas base + "Estado ARS" en farmacia + "Delivery" si la feature está on. */
+  const columnCount = 9 + (esFarmacia ? 1 : 0) + (deliveryOn ? 1 : 0)
 
   const COLUMNS = [
     { key: 'id', width: 100 },
@@ -137,11 +154,12 @@ export default function InvoicesPage() {
     { key: 'pendiente', width: 120 },
     { key: 'estado', width: 120 },
     ...(esFarmacia ? [{ key: 'estadoArs', width: 120 }] : []),
+    ...(deliveryOn ? [{ key: 'delivery', width: 150 }] : []),
     { key: 'ver', width: 64 },
   ]
   const { widths: colWidths, startResize } = useResizableColumns(COLUMNS)
 
-  const activeMoreFiltersCount = [ncfType, fromDate, toDate, ncf, grandTotalMin, grandTotalMax].filter((v) => v !== '').length
+  const activeMoreFiltersCount = [ncfType, fromDate, toDate, ncf, grandTotalMin, grandTotalMax, deliveryFiltro === 'todas' ? '' : deliveryFiltro, estadoDelivery, estadoCobroDelivery].filter((v) => v !== '').length
 
   function clearMoreFilters() {
     setNcfType('')
@@ -150,6 +168,9 @@ export default function InvoicesPage() {
     setNcf('')
     setGrandTotalMin('')
     setGrandTotalMax('')
+    setDeliveryFiltro('todas')
+    setEstadoDelivery('')
+    setEstadoCobroDelivery('')
   }
 
   function statusBadge(inv: { status: string; paymentStatus?: string | null; isPos?: boolean | null }) {
@@ -327,6 +348,12 @@ export default function InvoicesPage() {
                   <span className="col-resize-handle" onMouseDown={startResize('estadoArs')} />
                 </th>
               )}
+              {deliveryOn && (
+                <th>
+                  Delivery
+                  <span className="col-resize-handle" onMouseDown={startResize('delivery')} />
+                </th>
+              )}
               <th style={{ textAlign: 'right' }}>Ver</th>
             </tr>
           </thead>
@@ -382,6 +409,18 @@ export default function InvoicesPage() {
                       {inv.aseguradora?.estadoArs
                         ? <EstadoArsBadge estado={inv.aseguradora.estadoArs} />
                         : <span className="td-dim">—</span>}
+                    </td>
+                  )}
+                  {deliveryOn && (
+                    <td>
+                      {inv.delivery?.esDelivery ? (
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          <DeliveryEntregaBadge estado={inv.delivery.estado} />
+                          <DeliveryCobroBadge estado={inv.delivery.cobro?.estado} />
+                        </div>
+                      ) : (
+                        <span className="td-dim">—</span>
+                      )}
                     </td>
                   )}
                   <td style={{ textAlign: 'right' }}>
@@ -477,6 +516,46 @@ export default function InvoicesPage() {
               onChange={(e) => setGrandTotalMax(e.target.value)}
             />
           </div>
+        </div>
+        )}
+
+        {deliveryOn && filtros.puedeFiltrar('esDelivery') && (
+        <div className="ff-wrap">
+          <label className="ff-label">Delivery</label>
+          <Select value={deliveryFiltro} onValueChange={(v) => setDeliveryFiltro(v as typeof deliveryFiltro)}>
+            <SelectItem value="todas">Todas</SelectItem>
+            <SelectItem value="delivery">Con delivery</SelectItem>
+            <SelectItem value="comun">Venta común</SelectItem>
+          </Select>
+        </div>
+        )}
+
+        {deliveryOn && deliveryFiltro === 'delivery' && filtros.puedeFiltrar('estadoDelivery') && (
+        <div className="ff-wrap">
+          <label className="ff-label">Estado de entrega</label>
+          <Select value={estadoDelivery || '__todos'} onValueChange={(v) => setEstadoDelivery(v === '__todos' ? '' : v)}>
+            <SelectItem value="__todos">Todos</SelectItem>
+            <SelectItem value="pendiente">Pendiente</SelectItem>
+            <SelectItem value="asignado">Asignado</SelectItem>
+            <SelectItem value="en_ruta">En ruta</SelectItem>
+            <SelectItem value="entregado">Entregado</SelectItem>
+            <SelectItem value="no_entregado">No entregado</SelectItem>
+            <SelectItem value="retirado">Retirado</SelectItem>
+            <SelectItem value="cancelado">Cancelado</SelectItem>
+          </Select>
+        </div>
+        )}
+
+        {deliveryOn && deliveryFiltro === 'delivery' && filtros.puedeFiltrar('estadoCobroDelivery') && (
+        <div className="ff-wrap">
+          <label className="ff-label">Estado del cobro</label>
+          <Select value={estadoCobroDelivery || '__todos'} onValueChange={(v) => setEstadoCobroDelivery(v === '__todos' ? '' : v)}>
+            <SelectItem value="__todos">Todos</SelectItem>
+            <SelectItem value="por_conciliar">Por conciliar</SelectItem>
+            <SelectItem value="conciliado">Conciliado</SelectItem>
+            <SelectItem value="revertido">Revertido</SelectItem>
+            <SelectItem value="no_aplica">No aplica</SelectItem>
+          </Select>
         </div>
         )}
       </Drawer>

@@ -670,6 +670,9 @@ export interface Invoice {
   ecf?: EcfSubmitResult;
   /** ID del Pedido de venta del que se originó esta factura, si aplica. */
   salesOrder?: string;
+  /** Bloque delivery (§2.3 docs/tasks/PROMPT_DELIVERY_FRONTEND.md). Ausente = venta común.
+   *  Viene en `GET /invoices`, `GET /invoices/:id` y respuestas de submit/completar-cobro. */
+  delivery?: InvoiceDelivery;
   /** Cobertura de la ARS sobre esta factura (vertical farmacia). `null` en una factura sin
    *  cobertura — en ese caso las líneas tampoco traen los campos `*Ars`. Ver §3.5 del doc v2.
    *  En los elementos de `GET /invoices` viene la versión reducida (§3.8). */
@@ -782,6 +785,19 @@ export interface CreateInvoiceDto {
    *  compra" — autoriza esa venta bajo costo. El backend verifica el PIN dentro de este mismo
    *  request (no hace falta llamar a /auth/verify-admin-pin aparte). */
   pinOverride?: PinOverrideDto;
+  // ─── Delivery (§2.1 docs/tasks/PROMPT_DELIVERY_FRONTEND.md, todos opcionales) ───
+  /** Venta con delivery. Exige dirección, fuerza despacho a futuro y reserva el stock.
+   *  Requiere feature `delivery` + toggle del tenant. `despachoFuturo: false` junto a
+   *  `esDelivery: true` → 400. Al editar (PUT) omitirlo equivale a `false`. */
+  esDelivery?: boolean;
+  /** Dirección de entrega (override). Si se omite se usa la del ocasional o la del cliente
+   *  (`Customer.address`); si todo está vacío → 400 `DELIVERY_DIRECCION_REQUERIDA`.
+   *  No modifica la ficha del cliente. */
+  direccionEntrega?: string;
+  /** Teléfono de contacto para el repartidor (solo con `esDelivery`). */
+  telefonoEntrega?: string;
+  /** Referencias de entrega (solo con `esDelivery`, máx 500). */
+  referenciaEntrega?: string;
 }
 
 /**
@@ -864,6 +880,11 @@ export interface Quotation {
    *  (aproximado). Ver docs/tasks/64_multimoneda_completo.md §3.2. */
   currency?: string;
   conversionRate?: number;
+  /** §2.4 delivery — pasan a la factura derivada. */
+  esDelivery?: boolean;
+  direccionEntrega?: string;
+  telefonoEntrega?: string;
+  referenciaEntrega?: string;
 }
 
 export interface CreateQuotationDto {
@@ -904,6 +925,11 @@ export interface CreateQuotationDto {
   taxesTemplate?: string;
   /** Ver `CreateInvoiceDto.pinOverride` — mismo mecanismo, misma condición de uso. */
   pinOverride?: PinOverrideDto;
+  // ─── Delivery (§2.4 docs/tasks/PROMPT_DELIVERY_FRONTEND.md) — pasan a la factura derivada ───
+  esDelivery?: boolean;
+  direccionEntrega?: string;
+  telefonoEntrega?: string;
+  referenciaEntrega?: string;
 }
 
 export type UpdateQuotationDto = Partial<CreateQuotationDto>;
@@ -963,6 +989,22 @@ export interface CreditNote {
    *  docs/tasks/64_multimoneda_completo.md §3.4. */
   currency?: string;
   conversionRate?: number;
+  // ─── Vencimiento y uso (§3 docs/tasks/PROMPT_VENCIMIENTO_SALDOS_A_FAVOR_FRONTEND.md) ───
+  // Todos opcionales: tenants sin configurar llegan con venceEl=null / uso='multiple'.
+  /** Fecha `YYYY-MM-DD` hasta la cual inclusive se puede usar. `null` = no vence. */
+  venceEl?: string | null;
+  /** Días hasta `venceEl` (0 = vence hoy; negativo = ya venció). `null` si no vence. */
+  diasRestantes?: number | null;
+  /** Estado calculado por el backend con la zona del site — nunca recalcular en cliente. */
+  estado?: CreditoEstado;
+  /** `true` solo si `estado` es `vigente` o `por_vencer`. Usar para habilitar «Aplicar». */
+  puedeAplicar?: boolean;
+  /** Política de uso de ESA nota (no la configuración actual del tenant). */
+  uso?: 'multiple' | 'unico';
+  /** Qué pasa con el sobrante (solo si `uso = unico`). */
+  remanente?: 'saldo_favor' | 'perder' | null;
+  /** `true` = el sobrante de una nota de uso único ya pasó a saldo a favor (uso múltiple). */
+  origenSaldoFavor?: boolean;
 }
 
 /** Código de modificación DGII (Tabla VI): 1=Anula, 2=Corrige texto, 3=Corrige montos,
@@ -1026,13 +1068,441 @@ export interface CreditNoteSaldoFavorEntry {
   appliedAmount: number;
   availableAmount: number;
   appliedTo: CreditNoteAppliedTo[];
+  // ─── Vencimiento (§3.1) — opcionales por compatibilidad con respuestas viejas ───
+  venceEl?: string | null;
+  diasRestantes?: number | null;
+  estado?: CreditoEstado;
+  puedeAplicar?: boolean;
+  uso?: 'multiple' | 'unico';
+  remanente?: 'saldo_favor' | 'perder' | null;
+  origenSaldoFavor?: boolean;
 }
 
 export interface CreditNoteSaldoFavorResult {
   customer: string;
+  /** SOLO lo aplicable hoy (vigente + por_vencer). Lo vencido está en `vencidoAmount`. */
   balance: number;
+  /** NUEVO: lo bloqueado por vencimiento. */
+  vencidoAmount?: number;
   entries: CreditNoteSaldoFavorEntry[];
 }
+
+// ─── Vencimiento y uso de notas de crédito y saldos a favor ────────────────────
+// docs/tasks/PROMPT_VENCIMIENTO_SALDOS_A_FAVOR_FRONTEND.md
+
+/** Estado de un crédito (§3.2). Lo calcula el backend con la zona del site. */
+export type CreditoEstado = 'vigente' | 'por_vencer' | 'vencido' | 'perdido' | 'agotado';
+
+export type CreditoUso = 'multiple' | 'unico';
+
+export type CreditoRemanente = 'saldo_favor' | 'perder';
+
+/** Respuesta común de las 6 rutas de §5 (reactivar / cambiar vencimiento / dar de baja). */
+export interface AccionCreditoResult {
+  id: string;
+  /** "nota" | "saldo" */
+  tipo: 'nota' | 'saldo';
+  /** Estado resultante (§3.2). */
+  estado: CreditoEstado;
+  /** `null` = sin vencimiento. */
+  venceEl: string | null;
+  /** JE de baja cancelado al reactivar (si lo hubo). */
+  asientoRevertido: string | null;
+  /** JE creado al dar de baja. */
+  asiento: string | null;
+  autorizadoPor: string;
+  /** `true` = se autorizó con el código de otro usuario. */
+  autorizadoConCodigo: boolean;
+  /** `true` = ya estaba así (reintento idempotente). */
+  sinCambios: boolean;
+}
+
+/** POST …/reactivar — §5.1. `venceEl` y `dias` son alternativas; omitir ambos usa la
+ *  vigencia configurada (con vigencia 0 queda sin vencimiento). */
+export interface ReactivarCreditoDto {
+  venceEl?: string;
+  dias?: number;
+  /** OBLIGATORIO, 5–500 caracteres. */
+  motivo: string;
+  pinOverride?: PinOverrideDto;
+}
+
+/** PATCH …/vencimiento — §5.2. `venceEl` es OBLIGATORIO (`null` = quitar el vencimiento). */
+export interface CambiarVencimientoDto {
+  venceEl: string | null;
+  /** OBLIGATORIO. */
+  motivo: string;
+  pinOverride?: PinOverrideDto;
+}
+
+/** POST …/dar-de-baja — §5.3. Solo `estado = 'vencido'`. */
+export interface DarDeBajaDto {
+  motivo: string;
+  pinOverride?: PinOverrideDto;
+}
+
+/** Códigos de error nuevos (§8). */
+export type CreditoErrorCode =
+  | 'CREDITO_VENCIDO'
+  | 'SALDO_FAVOR_VENCIDO'
+  | 'CREDITO_USO_UNICO_CONSUMIDO'
+  | 'CREDITO_DADO_DE_BAJA'
+  | 'PERMISO_REQUERIDO'
+  | 'AUTORIZACION_INVALIDA'
+  | 'PERMISO_INSUFICIENTE'
+  | 'FEATURE_NO_CONTRATADO';
+
+// ─── Delivery con cobro contra entrega ───────────────────────────────────────
+// docs/tasks/PROMPT_DELIVERY_FRONTEND.md. Los shapes de respuesta siguen el documento
+// (el openapi.json no trae JSON Schema para estas respuestas); `openapi.json` gana si
+// algún tipo de request difiere.
+
+/** Estado de la entrega de una venta delivery (§2.3). */
+export type DeliveryEstadoEntrega =
+  | 'pendiente' | 'asignado' | 'en_ruta' | 'entregado' | 'no_entregado' | 'retirado' | 'cancelado';
+
+/** Estado del cobro delivery (§2.3). */
+export type DeliveryEstadoCobro = 'no_aplica' | 'por_conciliar' | 'conciliado' | 'revertido';
+
+/** Bloque `delivery` de Invoice y de submit/completar-cobro (§2.3). */
+export interface InvoiceDelivery {
+  esDelivery: boolean;
+  direccion?: string;
+  telefono?: string;
+  referencia?: string;
+  estado?: DeliveryEstadoEntrega;
+  /** Id de la Delivery Trip. */
+  viaje?: string;
+  cobro: {
+    estado: DeliveryEstadoCobro;
+    montoPorConciliar: number;
+    /** Lo que se prevé cobrar. */
+    previsto: { modeOfPayment: string; amount: number }[];
+    conciliadoPor?: string;
+    conciliadoEn?: string;
+  };
+}
+
+/** Fila de GET /delivery/pendientes (§4.1). */
+export interface DeliveryPendiente {
+  invoiceId: string;
+  ncf?: string;
+  customer: string;
+  customerName?: string;
+  direccion?: string;
+  telefono?: string;
+  referencia?: string;
+  grandTotal: number;
+  postingDate: string;
+  branch?: string;
+  estadoEntrega: DeliveryEstadoEntrega;
+  viaje?: string | null;
+  cobro: {
+    estado: DeliveryEstadoCobro;
+    montoPorConciliar: number;
+    previsto: { modeOfPayment: string; amount: number }[];
+    conciliadoPor?: string;
+    conciliadoEn?: string;
+  };
+  origen: 'factura' | 'pedido';
+  salesOrder?: string;
+  fechaPrometida?: string;
+}
+
+/** Fila de GET /delivery/cobros (§3.3) = pendiente + turno/repartidor/estado del viaje. */
+export interface DeliveryCobroFila extends DeliveryPendiente {
+  turno?: string | null;
+  repartidor?: { id: string; nombre: string } | null;
+  estadoViaje?: string | null;
+}
+
+/** GET /delivery/cobros/resumen (§3.3). */
+export interface DeliveryCobroResumen {
+  total: { cantidad: number; monto: number };
+  porTurno: { turno: string; cantidad: number; monto: number }[];
+  porRepartidor: { repartidor: string; nombre?: string; cantidad: number; monto: number }[];
+  cuentaPuente?: {
+    cuenta: string;
+    saldo: number;
+    diferencia: number;
+    cuadra: boolean;
+  } | null;
+}
+
+/** POST /delivery/cobros/conciliar — un ítem (§3.3). */
+export interface DeliveryConciliacionItem {
+  invoiceId: string;
+  /** Lo que el repartidor trajo, por modo real. Suma igual al pendiente (±0.01); si suma más →
+   *  `DELIVERY_COBRO_MONTO_NO_CUADRA`. No puede ser el modo puente. */
+  recibido: {
+    modeOfPayment?: string;
+    amount: number;
+    cardNumber?: string;
+    authorizationCode?: string;
+    bank?: string;
+    checkNumber?: string;
+    bankAccount?: string;
+  }[];
+  /** Solo si falta dinero: exige motivo + permiso + config del tenant. */
+  diferencia?: { motivo: string };
+}
+
+export interface DeliveryConciliacionResultItem {
+  invoiceId: string;
+  ok: boolean;
+  paymentEntryIds?: string[];
+  journalEntryId?: string;
+  reutilizado?: boolean;
+  estadoCobro?: DeliveryEstadoCobro;
+  estadoEntrega?: DeliveryEstadoEntrega;
+  autoConfirmacion?: { omitida: boolean; motivo?: string; detalle?: string };
+  error?: { code?: string; message?: string; details?: Record<string, unknown> };
+}
+
+/** POST /delivery/entregas/confirmar (§5). HTTP 200 aunque un ítem falle. */
+export interface DeliveryConfirmarItem {
+  invoiceId: string;
+  resultado: 'entregado' | 'no_entregado';
+  /** Obligatorio si `no_entregado`. */
+  motivo?: string;
+}
+
+export interface DeliveryConfirmarResultItem {
+  invoiceId: string;
+  ok: boolean;
+  estado?: DeliveryEstadoEntrega;
+  resultado?: 'entregado' | 'no_entregado';
+  yaConfirmada?: boolean;
+  autoConciliacion?: { omitida: boolean; motivo?: string; detalle?: string; paymentEntryIds?: string[] };
+  error?: { code?: string; message?: string; details?: Record<string, unknown> };
+}
+
+/** POST /delivery/facturas/:invoiceId/anular (§5). */
+export interface DeliveryAnularDto {
+  /** 10–500 caracteres. */
+  motivo: string;
+  /** Código DGII de la NC (Tabla VI), default 1. Solo e-CF. */
+  motivoAnulacion?: 1 | 2 | 3 | 4 | 5;
+}
+
+export interface DeliveryAnularResult {
+  invoiceId: string;
+  notaCredito?: string;
+  devolucionDespacho?: string;
+  yaAnulada?: boolean;
+  delivery?: InvoiceDelivery;
+  advertencias?: string[];
+}
+
+/** Estado de un viaje (§4.2). */
+export type DeliveryViajeEstado = 'borrador' | 'programado' | 'en_ruta' | 'completado' | 'cancelado';
+
+/** Parada del detalle de un viaje (§4.2). */
+export interface DeliveryParada {
+  orden: number;
+  invoiceId: string;
+  ncf?: string;
+  customer?: string;
+  customerName?: string;
+  direccion?: string;
+  telefono?: string;
+  referencia?: string;
+  grandTotal?: number;
+  estadoEntrega?: DeliveryEstadoEntrega;
+  visitada?: boolean;
+  resultado?: 'pendiente' | 'entregado' | 'no_entregado';
+  motivo?: string;
+  confirmadoPor?: string;
+  confirmadoEn?: string;
+  cobro?: InvoiceDelivery['cobro'];
+  despacho?: string;
+  despachoEstado?: string;
+  trackingPendiente?: { itemCode: string; qty: number; tipo: 'serial' | 'lote' }[];
+}
+
+export interface DeliveryViaje {
+  id: string;
+  /** `dns_sometidos_trip_pendiente` solo llega como respuesta de despachar (§4.2). */
+  estado: DeliveryViajeEstado | 'dns_sometidos_trip_pendiente';
+  repartidor?: string;
+  repartidorNombre?: string;
+  vehiculo?: string;
+  salida?: string;
+  notas?: string;
+  branch?: string;
+  paradas?: DeliveryParada[];
+  /** Solo al despachar con `yaDespachado: true` (idempotente). */
+  yaDespachado?: boolean;
+  /** Solo si `estado === 'dns_sometidos_trip_pendiente'`: salió el stock pero el viaje no quedó
+   *  sometido — mostrar advertencia + "Reintentar despachar". */
+  advertencia?: string;
+}
+
+export interface DeliveryViajeFactura {
+  invoiceId: string;
+  orden?: number;
+}
+
+export interface DeliveryTrackingItem {
+  itemCode: string;
+  serials?: string[];
+  batches?: { batchId: string; qty: number }[];
+}
+
+export interface DeliveryTrackingFactura {
+  invoiceId: string;
+  items: DeliveryTrackingItem[];
+}
+
+/** POST /delivery/viajes (§4.2). */
+export interface CreateViajeDto {
+  /** Repartidor (Driver) ACTIVO. */
+  repartidor: string;
+  /** Placa. Omitido = vehículo genérico por defecto. */
+  vehiculo?: string;
+  /** Salida prevista ISO. Default: ahora. */
+  salida?: string;
+  /** 1–100 paradas. */
+  facturas: DeliveryViajeFactura[];
+  notas?: string;
+  /** Asignar Y despachar en un paso (exige además `delivery.viajes.despachar`). Si el despacho
+   *  falla, el viaje queda en borrador y el error trae `details.viaje`. */
+  despachar?: boolean;
+  tracking?: DeliveryTrackingFactura[];
+}
+
+/** PUT /delivery/viajes/:id — solo borrador. `facturas` REEMPLAZA las paradas. */
+export interface UpdateViajeDto {
+  repartidor?: string;
+  vehiculo?: string;
+  salida?: string;
+  facturas?: DeliveryViajeFactura[];
+  notas?: string;
+}
+
+/** POST /delivery/viajes/:id/despachar — body opcional con tracking. */
+export interface DespacharViajeDto {
+  tracking?: DeliveryTrackingFactura[];
+}
+
+/** POST /delivery/viajes/:id/cancelar — motivo 10–500. Solo sin paradas visitadas. */
+export interface CancelarViajeDto {
+  motivo: string;
+}
+
+/** Repartidor (Driver) — GET|POST /delivery/repartidores, PUT /:id (§4.3). */
+export interface DeliveryRepartidor {
+  id: string;
+  nombre: string;
+  telefono?: string;
+  licencia?: string;
+  empleado?: string;
+  usuario?: string;
+  /** Empresa o motoconcho externo (Supplier transportista). */
+  transportista?: string;
+  estado: 'activo' | 'suspendido' | 'retirado';
+}
+
+export interface CreateRepartidorDto {
+  nombre: string;
+  telefono?: string;
+  licencia?: string;
+  empleado?: string;
+  usuario?: string;
+  transportista?: string;
+  estado?: 'activo' | 'suspendido' | 'retirado';
+}
+
+export type UpdateRepartidorDto = Partial<CreateRepartidorDto>;
+
+/** Vehículo — id = placa. GET|POST /delivery/vehiculos, PUT /:id (§4.3). */
+export interface DeliveryVehiculo {
+  id: string;
+  placa: string;
+  marca: string;
+  modelo: string;
+  color?: string;
+}
+
+export interface CreateVehiculoDto {
+  placa: string;
+  marca: string;
+  modelo: string;
+  color?: string;
+}
+
+export interface UpdateVehiculoDto {
+  marca?: string;
+  modelo?: string;
+  color?: string;
+}
+
+/** PUT /config/delivery — "Ajustes avanzados de despacho" (§7). Al menos un campo. */
+export interface UpdateDeliveryConfigDto {
+  confirmarEntregaConciliaCobro?: boolean;
+  conciliarCobroConfirmaEntrega?: boolean;
+  permiteDiferencias?: boolean;
+  /** Cadena vacía la quita. */
+  cuentaDiferencias?: string;
+  vehiculoPorDefecto?: string;
+  ciudadPorDefecto?: string;
+}
+
+/** Ajustes efectivos del tenant (mezcla de GET /config/facturacion + operativa). */
+export interface DeliveryAjustes {
+  confirmarEntregaConciliaCobro?: boolean;
+  conciliarCobroConfirmaEntrega?: boolean;
+  permiteDiferencias?: boolean;
+  cuentaDiferencias?: string | null;
+  vehiculoPorDefecto?: string;
+  ciudadPorDefecto?: string;
+}
+
+/** GET /me/configuracion-operativa — lectura para TODOS los usuarios (§1, §7). */
+export interface ConfiguracionOperativa {
+  usaModuloPos?: boolean;
+  flujoCobro?: 'directo' | 'caja';
+  despachoHabilitado?: boolean;
+  despachoFuturoHabilitado?: boolean;
+  despachoFuturoBloqueaVenta?: boolean;
+  deliveryHabilitado?: boolean;
+  deliveryConfirmarEntregaConciliaCobro?: boolean;
+  deliveryConciliarCobroConfirmaEntrega?: boolean;
+  deliveryPermiteDiferencias?: boolean;
+}
+
+/** Códigos de error de delivery (§9). Mensaje con `[CODIGO] …` → extraer del prefijo. */
+export type DeliveryErrorCode =
+  | 'DELIVERY_NO_HABILITADO'
+  | 'DELIVERY_DIRECCION_REQUERIDA'
+  | 'DELIVERY_REQUIERE_DESPACHO_FUTURO'
+  | 'DELIVERY_MONEDA_NO_SOPORTADA'
+  | 'DELIVERY_CONTRA_ENTREGA_SIN_DELIVERY'
+  | 'DELIVERY_CONTRA_ENTREGA_CLIENTE_CREDITO'
+  | 'DELIVERY_PAGO_INCOMPLETO'
+  | 'DELIVERY_RESERVA_FALLIDA'
+  | 'DELIVERY_ARTICULO_INACTIVO'
+  | 'DELIVERY_PERIODO_CERRADO'
+  | 'STOCK_INSUFFICIENT_OR_RESERVED'
+  | 'DELIVERY_FACTURA_NO_DISPONIBLE'
+  | 'DELIVERY_FACTURA_YA_DESPACHADA'
+  | 'DELIVERY_VIAJE_NO_EDITABLE'
+  | 'DELIVERY_VIAJE_CON_ENTREGAS'
+  | 'DELIVERY_REPARTIDOR_REQUERIDO'
+  | 'DELIVERY_REPARTIDOR_INACTIVO'
+  | 'DELIVERY_TRACKING_PENDIENTE'
+  | 'DELIVERY_DESPACHO_PARCIAL_REVERTIDO'
+  | 'DELIVERY_ENTREGA_NO_DESPACHADA'
+  | 'DELIVERY_COBRO_NO_PENDIENTE'
+  | 'DELIVERY_COBRO_MONTO_NO_CUADRA'
+  | 'DELIVERY_COBRO_DIFERENCIA_NO_PERMITIDA'
+  | 'DELIVERY_ANULACION_NO_PERMITIDA'
+  | 'DELIVERY_CON_PENDIENTES'
+  | 'DELIVERY_REQUIERE_DESPACHO_HABILITADO'
+  | 'DESPACHO_CON_DELIVERY_ACTIVO'
+  | 'TURNO_CON_COBROS_DELIVERY_POR_CONCILIAR'
+  | 'TURNO_NO_ABIERTO'
+  | 'FEATURE_NO_CONTRATADO';
 
 // ─── Devoluciones (return flow) ────────────────────────────────────────────────
 
@@ -1189,6 +1659,16 @@ export interface DevolucionDetail {
   aseguradora?: DevolucionAseguradora | null;
   createdAt: string;
   modifiedAt: string;
+  // ─── Vencimiento y uso (§3.1) — opcionales por compatibilidad ───
+  /** Fecha `YYYY-MM-DD` hasta la cual inclusive se puede usar. `null` = no vence. */
+  venceEl?: string | null;
+  /** Días hasta `venceEl` (0 = vence hoy; negativo = ya venció). */
+  diasRestantes?: number | null;
+  estado?: CreditoEstado;
+  puedeAplicar?: boolean;
+  uso?: 'multiple' | 'unico';
+  remanente?: 'saldo_favor' | 'perder' | null;
+  origenSaldoFavor?: boolean;
 }
 
 // GET /credit-notes/:id — detalle. El backend devuelve el shape de detalle (igual que
@@ -2307,6 +2787,11 @@ export interface Pedido {
   despachoConfirmado?: boolean;
   /** Fuente única de verdad de "en qué está" el pedido — ver PedidoEstadoFlujo. */
   estadoFlujo?: PedidoEstadoFlujo;
+  /** §2.4 delivery — pasan a la factura derivada. */
+  esDelivery?: boolean;
+  direccionEntrega?: string;
+  telefonoEntrega?: string;
+  referenciaEntrega?: string;
 }
 
 /** docs/tasks/79_confirmacion_despacho_pedido.md §6 */
@@ -2361,6 +2846,11 @@ export interface CreatePedidoDto {
   despachoFuturo?: boolean;
   /** Ver `CreateInvoiceDto.pinOverride` — mismo mecanismo, misma condición de uso. */
   pinOverride?: PinOverrideDto;
+  // ─── Delivery (§2.4 docs/tasks/PROMPT_DELIVERY_FRONTEND.md) — pasan a la factura derivada ───
+  esDelivery?: boolean;
+  direccionEntrega?: string;
+  telefonoEntrega?: string;
+  referenciaEntrega?: string;
 }
 
 export type UpdatePedidoDto = Partial<CreatePedidoDto>;
@@ -4446,6 +4936,20 @@ export interface FacturacionConfig {
   /** Si el PDF del Pedido (GET /pedidos/:id/pdf, "conduce") incluye columnas de precio/ITBIS/total
    *  y la sección de totales. Default true. En false queda como un conduce sin montos. */
   pedidoConduceIncluyePrecios?: boolean
+
+  // ─── Delivery con cobro contra entrega — docs/tasks/PROMPT_DELIVERY_FRONTEND.md §7 ──
+  // `GET /config/facturacion` los devuelve (lectura admin); `GET /me/configuracion-operativa`
+  // expone el subconjunto público. Los ajustes editables van por `PUT /config/delivery`.
+  /** El admin del tenant activó delivery (`POST /config/delivery/habilitar`). */
+  deliveryHabilitado?: boolean
+  /** Método de pago puente "Delivery por conciliar" (lo provisiona el habilitar). */
+  deliveryModoPagoTransito?: string | null
+  deliveryVehiculoPorDefecto?: string
+  deliveryCiudadPorDefecto?: string
+  deliveryConfirmarEntregaConciliaCobro?: boolean
+  deliveryConciliarCobroConfirmaEntrega?: boolean
+  deliveryPermiteDiferencias?: boolean
+  deliveryCuentaDiferencias?: string | null
   /** Si está activo, editar manualmente el precio de un SERVICIO en una factura/cotización por
    *  debajo de su "Precio C - Mínimo" exige PIN administrativo (acción `override_costo_minimo`,
    *  mismo `pinOverride` que el piso de costo). Default false. Ver docs/tasks/
@@ -4461,7 +4965,22 @@ export interface FacturacionConfig {
   permitirModificarPrecioServicios?: boolean
   /** Igual que `permitirModificarPrecioServicios`, pero para líneas de PRODUCTO — interruptor
    *  separado, mismo comportamiento y mismos 3 documentos. */
-  permitirModificarPrecioProductos?: boolean
+  permitirModificarPrecioProductos?: boolean;
+
+  // ─── Notas de crédito y saldos a favor — docs/tasks/ ─────────────────────────
+  // PROMPT_VENCIMIENTO_SALDOS_A_FAVOR_FRONTEND.md §2. `saldoVencidoCuenta` NO se expone
+  // fuera de la pantalla de configuración (GET /opciones y /me/bootstrap no lo traen).
+  /** Días de vigencia de una nota de crédito desde su fecha. `0` = no vencen. */
+  creditoVigenciaDias?: number;
+  /** `multiple`: varias facturas hasta agotarse. `unico`: una sola aplicación. */
+  creditoUso?: 'multiple' | 'unico';
+  /** Solo con `creditoUso = unico`: qué pasa con lo no usado tras la única aplicación. */
+  creditoRemanenteUnico?: 'saldo_favor' | 'perder';
+  /** Días de vigencia de TODO saldo a favor del cliente. `0` = no vencen. */
+  saldoFavorVigenciaDias?: number;
+  /** Cuenta de INGRESO donde se registra lo que se pierde. Obligatoria con
+   *  `creditoUso = unico` + `creditoRemanenteUnico = perder`. Solo en Configuración. */
+  saldoVencidoCuenta?: string | null;
 }
 
 /** PUT /config/despacho/futuro — docs/tasks/PROMPT_DESPACHO_FUTURO_FRONTEND.md §2.1. Los 3 campos
@@ -5031,6 +5550,22 @@ export interface TurnoCaja {
    /** Planos del response de POST /pos/turnos/abrir (reemplazan balanceDetails). */
    modeOfPayment?: string;
    openingAmount?: number;
+   // ─── Delivery (§3.4 docs/tasks/PROMPT_DELIVERY_FRONTEND.md) ───
+   /** Cobros delivery por conciliar atados a este turno. Bloquean el cierre. */
+   cobrosDeliveryPorConciliar?: {
+     cantidad: number;
+     monto: number;
+     facturas: {
+       invoiceId: string;
+       customer?: string;
+       customerName?: string;
+       monto?: number;
+       estadoEntrega?: DeliveryEstadoEntrega;
+       viaje?: string;
+     }[];
+   };
+   /** `false` si hay cobros delivery por conciliar — "Cerrar turno" deshabilitado. */
+   puedeCerrar?: boolean;
  }
 
 // POST /pos/turnos/abrir
@@ -5051,6 +5586,9 @@ export interface PaymentReconciliationLine {
   difference: number;
   /** true si este método requiere que el cajero ingrese manualmente el monto contado. */
   requiereConciliacion: boolean;
+  /** §3.4 delivery: fila de tránsito ("Ventas delivery — contra entrega"). NO se cuenta:
+   *  sin conteo físico ni denominaciones, solo informativa. */
+  esDeliveryTransito?: boolean;
 }
 
 // GET /pos/turnos/:openingEntryId/preview-cierre
@@ -5062,6 +5600,16 @@ export interface PreviewCierreTurno {
   netTotal: number;
   totalQuantity: number;
   paymentReconciliation: PaymentReconciliationLine[];
+  /** §3.4 delivery: cobros por conciliar + gate de cierre. */
+  cobrosDeliveryPorConciliar?: TurnoCaja['cobrosDeliveryPorConciliar'];
+  puedeCerrar?: boolean;
+  /** Desglose de liquidaciones delivery por modo (§3.4). */
+  desgloseLiquidacionesDelivery?: {
+    modo: string;
+    expectedNativo: number;
+    liquidacionesDelivery: number;
+    expected: number;
+  }[];
 }
 
 export interface DenominacionCierreDto {
@@ -5152,6 +5700,12 @@ export interface CorteCajaIngresoLine {
   ventasContado: number;
   recibosCobrados: number;
   total: number;
+  /** §3.4 delivery: liquidaciones delivery en este método. */
+  liquidacionesDelivery?: number;
+  /** §3.4 delivery: fila de tránsito ("Delivery por conciliar"). */
+  esDeliveryTransito?: boolean;
+  /** §3.4: en `GET /cobros` y cuadre, la línea del modo puente trae esto en true. */
+  esDeliveryPorConciliar?: boolean;
 }
 
 export interface CorteCaja {
@@ -5175,6 +5729,12 @@ export interface CorteCaja {
   fondoApertura: number;
   /** Efectivo físico a entregar (solo métodos tipo Cash) — NO es el total general de ingresos. */
   importeAEntregar: number;
+  /** §3.4 delivery: el PDF ya lo imprime el BFF; la vista web lo muestra si viene. */
+  delivery?: {
+    ventasContraEntrega: number;
+    liquidacionesRecibidas: number;
+    liquidacionesEfectivo: number;
+  };
 }
 
 // GET /reportes/pos/corte-caja-dia
@@ -5395,6 +5955,11 @@ export interface PaymentLine {
   checkNumber?: string;
   /** Cuenta bancaria (id de CuentaBancaria) — requerida si el método de pago tiene requiresBankAccount=true y no tiene defaultBankAccount. */
   bankAccount?: string;
+  /** Solo ventas con delivery (§2.2 docs/tasks/PROMPT_DELIVERY_FRONTEND.md): `true` (default
+   *  en esas ventas) = lo cobra el repartidor al entregar (queda "por conciliar");
+   *  `false` = ya se cobró en tienda. `true` en venta sin delivery → 400
+   *  `DELIVERY_CONTRA_ENTREGA_SIN_DELIVERY`. También en `POST /caja/facturas/:id/completar-cobro`. */
+  contraEntrega?: boolean;
 }
 
 export interface VueltoLine {
@@ -5416,6 +5981,19 @@ export interface CobrarFacturaDto {
    /** Sobrescribe el tipo de comprobante de la factura (B01|B02|B14|B15|E31|E32|E44|E45) solo en
     *  completar-cobro; cualquier otro valor da 400. Se envía únicamente si el cajero lo cambió. */
    ncfType?: string
+   // ─── Delivery (§3.2 docs/tasks/PROMPT_DELIVERY_FRONTEND.md) — solo completar-cobro ───
+   // El cajero puede encender o apagar delivery. Omitido = rige lo que trae la factura.
+   /** Cambia si la venta es con delivery. De off a on exige dirección y reserva el stock;
+    *  de on a off la venta vuelve a ser común (se recalcula update_stock + validaciones). */
+   esDelivery?: boolean
+   /** Dirección de entrega (override, no modifica la ficha del cliente). */
+   direccionEntrega?: string
+   /** Teléfono de contacto para el repartidor. */
+   telefonoEntrega?: string
+   /** Referencias de entrega (≤500). */
+   referenciaEntrega?: string
+   /** Despacho futuro de esta venta. */
+   despachoFuturo?: boolean
  }
 
 /** Resumen del cobro registrado al someter una factura (presente cuando se enviaron payments). */
@@ -5443,6 +6021,9 @@ export interface PendienteCobroItem {
    id: string;
    customer: string;
    customerName: string;
+   /** §3.1 docs/tasks/PROMPT_DELIVERY_FRONTEND.md — etiqueta "Delivery" + dirección en la cola. */
+   esDelivery?: boolean;
+   direccionEntrega?: string;
    grandTotal: number;
    /** Tipo de comprobante fijado al crear la factura (B01, B02, B14… o su equivalente
     *  E31, E32… si ya es e-CF) — Caja lo respeta, nunca lo cambia. */
@@ -5480,6 +6061,8 @@ export interface CompletarCobroResult {
    esClienteOcasional: boolean;
    clienteOcasionalNombre?: string;
    clienteOcasionalRnc?: string;
+   /** §3.2 docs/tasks/PROMPT_DELIVERY_FRONTEND.md — `{ estado, cobro }` si es delivery. */
+   delivery?: InvoiceDelivery;
  }
 
 export type SubmitInvoiceResult = Invoice | PendienteCobroSubmitResult;
@@ -5726,6 +6309,8 @@ export interface PaymentEntry {
   modifiedAt?: string;
   /** true when this row comes from a POS sale (is_pos=1) — id is a Sales Invoice, not a Payment Entry */
   isPosSale?: boolean;
+  /** §3.4 delivery: línea del modo puente ("Delivery por conciliar"). */
+  esDeliveryPorConciliar?: boolean;
   /** Bank Account nativo asociado al pago (id de CuentaBancaria) */
   bankAccount?: string;
   /** Banco emisor (custom field, cheque/transferencia) */
@@ -5788,11 +6373,19 @@ export interface SaldoFavorEntry {
   availableAmount: number;
   /** Facturas a las que ya se aplicó este Payment Entry */
   appliedTo: SaldoFavorAppliedTo[];
+  // ─── Vencimiento (§3.1, saldos tipo pago) — opcionales por compatibilidad ───
+  venceEl?: string | null;
+  diasRestantes?: number | null;
+  estado?: CreditoEstado;
+  puedeAplicar?: boolean;
 }
 
 export interface SaldoFavorResult {
   customer: string;
+  /** SOLO lo aplicable hoy (vigente + por_vencer). */
   balance: number;
+  /** NUEVO: lo bloqueado por vencimiento. */
+  vencidoAmount?: number;
   entries: SaldoFavorEntry[];
 }
 
@@ -7225,7 +7818,7 @@ export type TenantFeatureKey =
   | 'compras' | 'comprasOrdenes' | 'comprasSolicitudes' | 'devolucionesCompras'
   | 'gastos' | 'proveedores' | 'caja' | 'contabilidad' | 'cuentasPorCobrar'
   | 'cuentasPorPagar' | 'tesoreria' | 'inventario' | 'productos' | 'servicios'
-  | 'relacionesComerciales' | 'cotizaciones' | 'despacho' | 'devoluciones'
+  | 'relacionesComerciales' | 'cotizaciones' | 'despacho' | 'delivery' | 'devoluciones'
   | 'notasCredito' | 'notasDebito' | 'pedidos'
   // Numeración de documentos — docs/tasks/PROMPT_NUMERACION_DOCUMENTOS_FRONTEND.md §4.6.
   // 22 claves `numeracion*` dentro de `features` de GET /me/features (ausente ⇒ `false`).

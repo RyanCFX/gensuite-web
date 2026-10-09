@@ -1,7 +1,7 @@
 import { client, unwrap } from './client'
 import { ENDPOINTS } from './endpoints'
 import type {
-  DocumentPermissions, MeFeatures, MePermissions, MeProfile, PatchMeProfileDto, ChangeMyPasswordDto,
+  DocumentPermissions, MeFeatures, MePermissions, MeProfile, PatchMeProfileDto, ChangeMyPasswordDto, ConfiguracionOperativa,
   MfaFactor, TotpEnrollResult, TotpConfirmDto, TotpConfirmResult, LinkedIdentity,
 } from './types'
 
@@ -48,7 +48,7 @@ const FEATURE_KEYS = [
   'compras', 'comprasOrdenes', 'comprasSolicitudes', 'devolucionesCompras', 'gastos',
   'proveedores', 'caja', 'contabilidad', 'cuentasPorCobrar', 'cuentasPorPagar', 'tesoreria',
   'inventario', 'productos', 'servicios', 'relacionesComerciales', 'cotizaciones', 'despacho',
-  'devoluciones', 'notasCredito', 'notasDebito', 'pedidos',
+  'delivery', 'devoluciones', 'notasCredito', 'notasDebito', 'pedidos',
   // Numeración de documentos — docs/tasks/PROMPT_NUMERACION_DOCUMENTOS_FRONTEND.md §4.6.
   // Tratar como `false` si faltan (tenants o backends más viejos).
   'numeracionCliente', 'numeracionCotizacion', 'numeracionPedido', 'numeracionDespacho',
@@ -174,4 +174,32 @@ export async function listMyIdentities(): Promise<LinkedIdentity[]> {
 export async function unlinkIdentity(identityId: string): Promise<{ message: string }> {
   const res = await client.delete<{ success: true; data: { message: string } }>(ENDPOINTS.me.identity(identityId))
   return unwrap(res)
+}
+
+// ─── Configuración operativa — docs/tasks/PROMPT_DELIVERY_FRONTEND.md §1/§7 ───
+// `GET /me/configuracion-operativa`: lectura para TODOS los usuarios (facturación +
+// eCF operativos). Claves ausentes se tratan como `false`/undefined.
+
+/** Normaliza defensivamente: cualquier clave que falte se trata como false. */
+export function normalizeConfiguracionOperativa(raw: unknown): ConfiguracionOperativa {
+  const d = (raw ?? {}) as Record<string, unknown>
+  // El BFF puede devolver `{ facturacion, ecf }` o el bloque plano — se aceptan ambas.
+  const f = ((d.facturacion ?? d) ?? {}) as Record<string, unknown>
+  const b = (v: unknown): boolean | undefined => (typeof v === 'boolean' ? v : undefined)
+  return {
+    usaModuloPos: b(f.usaModuloPos),
+    flujoCobro: f.flujoCobro === 'directo' || f.flujoCobro === 'caja' ? f.flujoCobro : undefined,
+    despachoHabilitado: b(f.despachoHabilitado),
+    despachoFuturoHabilitado: b(f.despachoFuturoHabilitado),
+    despachoFuturoBloqueaVenta: b(f.despachoFuturoBloqueaVenta),
+    deliveryHabilitado: b(f.deliveryHabilitado),
+    deliveryConfirmarEntregaConciliaCobro: b(f.deliveryConfirmarEntregaConciliaCobro),
+    deliveryConciliarCobroConfirmaEntrega: b(f.deliveryConciliarCobroConfirmaEntrega),
+    deliveryPermiteDiferencias: b(f.deliveryPermiteDiferencias),
+  }
+}
+
+export async function getConfiguracionOperativa(): Promise<ConfiguracionOperativa> {
+  const res = await client.get<{ success: true; data: unknown }>(ENDPOINTS.me.configuracionOperativa)
+  return normalizeConfiguracionOperativa(res.data.data)
 }

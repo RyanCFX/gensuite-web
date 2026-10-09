@@ -16,13 +16,47 @@ const ids = new Set()
 for (const m of doc.matchAll(/\|\s*`([a-z0-9]+(?:\.[a-z0-9-]+)+)`/g)) {
   ids.add(m[1])
 }
+// 6 de `catalogo.servicios.*` (openapi.json: Lista de Servicios —
+// ver/nuevo/activar/editar/precios/eliminar). Ya estaban en el generado anterior.
+const EXTRAS_SERVICIOS = [
+  'catalogo.servicios.activar',
+  'catalogo.servicios.actualizar-precios',
+  'catalogo.servicios.crear',
+  'catalogo.servicios.editar',
+  'catalogo.servicios.eliminar',
+  'catalogo.servicios.listar',
+]
+// Acciones de Delivery con cobro contra entrega — docs/tasks/PROMPT_DELIVERY_FRONTEND.md §1.
+// No están en PROMPT_PERMISOS_FRONTEND.md §16 (el doc usa grupos con `|` que el regex de
+// arriba no expande), así que se listan explícitas acá para que el regen las conserve.
+const EXTRAS_DELIVERY = [
+  'delivery.pendientes.listar',
+  'delivery.viajes.listar',
+  'delivery.viajes.crear',
+  'delivery.viajes.editar',
+  'delivery.viajes.despachar',
+  'delivery.viajes.cancelar',
+  'delivery.viajes.imprimir',
+  'delivery.entregas.confirmar',
+  'delivery.entregas.anular',
+  'delivery.cobros.listar',
+  'delivery.cobros.conciliar',
+  'delivery.cobros.conciliar-con-diferencia',
+  'delivery.repartidores.listar',
+  'delivery.repartidores.crear',
+  'delivery.repartidores.editar',
+  'delivery.vehiculos.listar',
+  'delivery.vehiculos.crear',
+  'delivery.vehiculos.editar',
+  'config.delivery.habilitar',
+  'config.delivery.deshabilitar',
+  'config.delivery.configurar',
+]
+for (const id of [...EXTRAS_SERVICIOS, ...EXTRAS_DELIVERY]) ids.add(id)
 const sorted = [...ids].sort()
-if (sorted.length !== 453) {
-  console.warn(`[gen-acciones] esperaba 453 acciones, encontré ${sorted.length} — revisá el doc`)
-}
 
 const out = `// GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
-// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 (${sorted.length} acciones). Regenerar: node scripts/gen-acciones.mjs
+// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 + docs/tasks/PROMPT_DELIVERY_FRONTEND.md §1 (${sorted.length} acciones). Regenerar: node scripts/gen-acciones.mjs
 
 export type AccionId =
 ${sorted.map((id) => `  | '${id}'`).join('\n')}

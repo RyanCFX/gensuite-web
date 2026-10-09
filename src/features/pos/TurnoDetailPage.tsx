@@ -264,7 +264,20 @@ function ClosingSection({ closing, turnoCajero, closedBy }: { closing: TurnoClos
                   </td>
                 </tr>
               ) : (
-                closing.paymentReconciliation.map((p) => (
+                closing.paymentReconciliation.map((p) => p.esDeliveryTransito ? (
+                  // §3.4: fila de tránsito — informativa, sin conteo ni diferencia.
+                  <tr key={p.modeOfPayment}>
+                    <td>
+                      {p.modeOfPayment}
+                      <span className="badge badge-warning" style={{ marginLeft: 6, fontSize: 10 }}>Ventas delivery — contra entrega</span>
+                    </td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatDOP(p.openingAmount)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatDOP(p.expectedAmount)}</td>
+                    <td style={{ textAlign: 'right' }} className="td-muted">—</td>
+                    <td style={{ textAlign: 'right' }} className="td-muted">—</td>
+                    <td><span className="badge badge-neutral">Informativa</span></td>
+                  </tr>
+                ) : (
                   <tr key={p.modeOfPayment}>
                     <td>{p.modeOfPayment}</td>
                     <td style={{ textAlign: 'right', fontFamily: 'var(--font-body)' }}>{formatDOP(p.openingAmount)}</td>

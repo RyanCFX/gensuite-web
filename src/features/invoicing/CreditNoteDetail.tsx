@@ -7,10 +7,14 @@ import { getFacturacionConfig } from '@/shared/api/config'
 import { ArrowLeft, Download, Eye, Link2, ChevronRight, Wallet, ArrowRightLeft, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDate, formatMoney } from '@/lib/formatters'
+import { formatVenceEl } from '@/lib/creditoVencimiento'
+import { CreditoEstadoBadge } from '@/shared/ui/CreditoEstadoBadge'
 import { DocumentHistoryCard } from '@/components/shared/DocumentHistoryCard'
 import { PdfPreviewModal } from '@/components/shared/PdfPreviewModal'
 import { ApplyCreditNoteModal } from './CreditNoteActionModals'
 import type { CreditNoteActionTarget } from './CreditNoteActionModals'
+import { CreditoAccionesButtons } from './CreditoAccionModals'
+import type { CreditoAccionTarget } from './CreditoAccionModals'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { EstadoArsBadge } from './EstadoArsBadge'
 
@@ -142,6 +146,17 @@ export default function CreditNoteDetail() {
   const items = note.items ?? []
   const total = Math.abs(note.grandTotal ?? 0)
 
+  // Target para las acciones de §5 (reactivar / cambiar vencimiento / dar de baja).
+  const creditoTarget: CreditoAccionTarget = {
+    kind: 'nota',
+    id: noteId,
+    estado: note.estado,
+    venceEl: note.venceEl,
+    availableAmount: note.availableAmount,
+    currency: currency ?? undefined,
+    customerId: typeof note.customer === 'string' ? note.customer : undefined,
+  }
+
   return (
     <div className="page-container">
       <div className="page-header">
@@ -160,6 +175,7 @@ export default function CreditNoteDetail() {
                 {USAGE_LABEL[usageStatus] ?? usageStatus}
               </span>
             )}
+            <CreditoEstadoBadge estado={note.estado} diasRestantes={note.diasRestantes} venceEl={note.venceEl} />
             {currency && currency !== monedaBase && (
               <span className="badge badge-info" title={note.conversionRate != null ? `Tasa ${note.conversionRate}` : undefined}>
                 {currency}
@@ -245,7 +261,7 @@ export default function CreditNoteDetail() {
             </button>
           </>
         )}
-        {hasUsageInfo && (note.availableAmount ?? 0) > 0 && (
+        {hasUsageInfo && (note.availableAmount ?? 0) > 0 && (note.puedeAplicar ?? true) && (
           <>
             <button
               className="btn btn-secondary btn-size-md"
@@ -255,6 +271,8 @@ export default function CreditNoteDetail() {
             </button>
           </>
         )}
+        {/* §5.4: reactivar / cambiar vencimiento / dar de baja según estado. */}
+        <CreditoAccionesButtons target={creditoTarget} />
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
@@ -322,6 +340,65 @@ export default function CreditNoteDetail() {
           </div>
         </div>
       </div>
+
+      {/* §4.1: bloque «Vigencia y uso». Sin `estado`/`venceEl` (tenant sin
+          configurar o nota anterior) no se muestra — igual que antes. */}
+      {(note.estado || note.venceEl || note.uso) && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-header navy-card-header">
+            <h2 className="card-title">Vigencia y uso</h2>
+          </div>
+          <div className="card-body">
+            <div className="fields-grid">
+              {note.estado && (
+                <div className="detail-field">
+                  <span className="detail-label">Estado</span>
+                  <span className="detail-value">
+                    <CreditoEstadoBadge estado={note.estado} diasRestantes={note.diasRestantes} venceEl={note.venceEl} />
+                  </span>
+                </div>
+              )}
+              {note.venceEl && (
+                <>
+                  <div className="detail-field">
+                    <span className="detail-label">Vence el</span>
+                    <span className="detail-value">{formatVenceEl(note.venceEl)}</span>
+                  </div>
+                  {note.diasRestantes != null && (
+                    <div className="detail-field">
+                      <span className="detail-label">Días restantes</span>
+                      <span className="detail-value">
+                        {note.diasRestantes < 0 ? `Vencida hace ${Math.abs(note.diasRestantes)} día${Math.abs(note.diasRestantes) === 1 ? '' : 's'}` : note.diasRestantes === 0 ? 'Vence hoy' : `${note.diasRestantes} días`}
+                      </span>
+                    </div>
+                  )}
+                </>
+              )}
+              {note.uso && (
+                <div className="detail-field">
+                  <span className="detail-label">Uso</span>
+                  <span className="detail-value">{note.uso === 'unico' ? 'Uso único' : 'Varias facturas'}</span>
+                </div>
+              )}
+              {note.uso === 'unico' && note.remanente && (
+                <div className="detail-field">
+                  <span className="detail-label">Si sobra saldo</span>
+                  <span className="detail-value">
+                    {note.remanente === 'saldo_favor' ? 'Pasa a saldo a favor' : 'Se pierde'}
+                  </span>
+                </div>
+              )}
+              {note.origenSaldoFavor && (
+                <div className="detail-field" style={{ gridColumn: '1 / -1' }}>
+                  <span className="detail-value" style={{ fontSize: 13 }}>
+                    El sobrante de esta nota pasó a saldo a favor.
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {items.length > 0 && (
         <div className="card">

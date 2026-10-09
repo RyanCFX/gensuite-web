@@ -63,6 +63,14 @@ const DespachosListPage = lazy(() => import('@/features/despachos/DespachosListP
 const DespachoForm = lazy(() => import('@/features/despachos/DespachoForm'))
 const DespachoDetail = lazy(() => import('@/features/despachos/DespachoDetail'))
 const ConfirmacionDespachoDetail = lazy(() => import('@/features/despachos/ConfirmacionDespachoDetail'))
+// Delivery con cobro contra entrega — docs/tasks/PROMPT_DELIVERY_FRONTEND.md
+const PendientesDeliveryPage = lazy(() => import('@/features/delivery/PendientesDeliveryPage'))
+const ViajesDeliveryPage = lazy(() => import('@/features/delivery/ViajesDeliveryPage'))
+const ViajeDeliveryForm = lazy(() => import('@/features/delivery/ViajeDeliveryForm'))
+const ViajeDeliveryDetail = lazy(() => import('@/features/delivery/ViajeDeliveryDetail'))
+const RepartidoresPage = lazy(() => import('@/features/delivery/RepartidoresPage'))
+const VehiculosPage = lazy(() => import('@/features/delivery/VehiculosPage'))
+const CobrosDeliveryPage = lazy(() => import('@/features/delivery/CobrosDeliveryPage'))
 const DevolucionDetail = lazy(() => import('@/features/invoicing/DevolucionDetail'))
 const DevolucionForm   = lazy(() => import('@/features/invoicing/DevolucionForm'))
 const StockPage       = lazy(() => import('@/features/inventory/StockPage'))
@@ -466,6 +474,15 @@ export default function App() {
             <Route path="/despachos/confirmaciones" element={<Suspense fallback={<PageLoader />}><DespachosListPage /></Suspense>} />
             <Route path="/despachos/confirmaciones/:id" element={<Suspense fallback={<PageLoader />}><ConfirmacionDespachoDetail /></Suspense>} />
             <Route path="/despachos/:id" element={<Suspense fallback={<PageLoader />}><DespachoDetail /></Suspense>} />
+            {/* Delivery — rutas específicas antes que /delivery/viajes/:id */}
+            <Route path="/delivery/pendientes" element={<Suspense fallback={<PageLoader />}><PendientesDeliveryPage /></Suspense>} />
+            <Route path="/delivery/viajes" element={<Suspense fallback={<PageLoader />}><ViajesDeliveryPage /></Suspense>} />
+            <Route path="/delivery/viajes/nuevo" element={<Suspense fallback={<PageLoader />}><ViajeDeliveryForm /></Suspense>} />
+            <Route path="/delivery/viajes/:id/editar" element={<Suspense fallback={<PageLoader />}><ViajeDeliveryForm /></Suspense>} />
+            <Route path="/delivery/viajes/:id" element={<Suspense fallback={<PageLoader />}><ViajeDeliveryDetail /></Suspense>} />
+            <Route path="/delivery/repartidores" element={<Suspense fallback={<PageLoader />}><RepartidoresPage /></Suspense>} />
+            <Route path="/delivery/vehiculos" element={<Suspense fallback={<PageLoader />}><VehiculosPage /></Suspense>} />
+            <Route path="/delivery/cobros" element={<Suspense fallback={<PageLoader />}><CobrosDeliveryPage /></Suspense>} />
 
             {/* Configuración */}
             <Route path="/config/empresa" element={<Suspense fallback={<PageLoader />}><EmpresaConfig /></Suspense>} />

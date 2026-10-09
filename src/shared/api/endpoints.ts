@@ -25,6 +25,8 @@ export const ENDPOINTS = {
     permissionsByDoc: (doctype: string, name: string) =>
       `/me/permissions/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
     features: '/me/features',
+    // Lectura para todos los usuarios (§1, §7 PROMPT_DELIVERY_FRONTEND.md).
+    configuracionOperativa: '/me/configuracion-operativa',
     profile: '/me/profile',
     password: '/me/password',
     mfaFactors: '/me/mfa/factors',
@@ -99,6 +101,10 @@ export const ENDPOINTS = {
     removerAplicacion: (id: string, invoiceId: string) => `/credit-notes/${id}/aplicar-a-factura/${invoiceId}`,
     saldoFavor: (customerId: string) => `/credit-notes/saldo-favor/${customerId}`,
     pdf: (id: string) => `/credit-notes/${id}/pdf`,
+    // Vencimiento y uso (§5 docs/tasks/PROMPT_VENCIMIENTO_SALDOS_A_FAVOR_FRONTEND.md)
+    reactivar: (id: string) => `/credit-notes/${id}/reactivar`,
+    vencimiento: (id: string) => `/credit-notes/${id}/vencimiento`,
+    darDeBaja: (id: string) => `/credit-notes/${id}/dar-de-baja`,
   },
   devoluciones: {
     create: '/devoluciones',
@@ -427,6 +433,10 @@ export const ENDPOINTS = {
     despachoHabilitar: '/config/despacho/habilitar',
     despachoDeshabilitar: '/config/despacho/deshabilitar',
     despachoFuturo: '/config/despacho/futuro',
+    // Delivery con cobro contra entrega — docs/tasks/PROMPT_DELIVERY_FRONTEND.md §7.
+    deliveryHabilitar: '/config/delivery/habilitar',
+    deliveryDeshabilitar: '/config/delivery/deshabilitar',
+    deliveryConfig: '/config/delivery',
     ecf: '/config/ecf',
     ecfSecuencias: '/config/ecf/secuencias',
     ecfSecuenciasAnularRangos: '/config/ecf/secuencias/anular-rangos',
@@ -505,6 +515,11 @@ export const ENDPOINTS = {
     estadoCuenta: (customerId: string) => `/cobros/estado-cuenta/${customerId}`,
     estadoCuentaPdf: (customerId: string) => `/cobros/estado-cuenta/${customerId}/pdf`,
     pdf: (id: string) => `/cobros/${id}/pdf`,
+    // Vencimiento de saldos tipo pago (§5). La baja de Payment Entry puede no
+    // funcionar aún en ERPNext — ver §11 del prompt (límite conocido).
+    saldoFavorReactivar: (paymentEntryId: string) => `/cobros/saldo-favor/${paymentEntryId}/reactivar`,
+    saldoFavorVencimiento: (paymentEntryId: string) => `/cobros/saldo-favor/${paymentEntryId}/vencimiento`,
+    saldoFavorDarDeBaja: (paymentEntryId: string) => `/cobros/saldo-favor/${paymentEntryId}/dar-de-baja`,
   },
   pagos: {
     list: '/pagos',
@@ -742,6 +757,24 @@ export const ENDPOINTS = {
       byId: (id: string) => `/despachos/confirmaciones/${encodeURIComponent(id)}`,
       confirmar: (id: string) => `/despachos/confirmaciones/${encodeURIComponent(id)}/confirmar`,
     },
+  },
+  // Delivery con cobro contra entrega — docs/tasks/PROMPT_DELIVERY_FRONTEND.md.
+  delivery: {
+    pendientes: '/delivery/pendientes',
+    cobros: '/delivery/cobros',
+    cobrosResumen: '/delivery/cobros/resumen',
+    conciliar: '/delivery/cobros/conciliar',
+    confirmarEntregas: '/delivery/entregas/confirmar',
+    anularFactura: (invoiceId: string) => `/delivery/facturas/${encodeURIComponent(invoiceId)}/anular`,
+    viajes: '/delivery/viajes',
+    viajeById: (id: string) => `/delivery/viajes/${encodeURIComponent(id)}`,
+    viajeDespachar: (id: string) => `/delivery/viajes/${encodeURIComponent(id)}/despachar`,
+    viajeCancelar: (id: string) => `/delivery/viajes/${encodeURIComponent(id)}/cancelar`,
+    viajePdf: (id: string) => `/delivery/viajes/${encodeURIComponent(id)}/pdf`,
+    repartidores: '/delivery/repartidores',
+    repartidorById: (id: string) => `/delivery/repartidores/${encodeURIComponent(id)}`,
+    vehiculos: '/delivery/vehiculos',
+    vehiculoById: (id: string) => `/delivery/vehiculos/${encodeURIComponent(id)}`,
   },
   apertura: {
     preflight: '/apertura/preflight',

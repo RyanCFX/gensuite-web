@@ -15,9 +15,12 @@ import type { SearchSelectOption } from '@/shared/ui/SearchSelect'
 import { FieldTooltip } from '@/shared/ui/FieldTooltip'
 import { CerrarTurnoModal } from '@/components/shared/CerrarTurnoModal'
 import { useOpcionesArray } from '@/shared/hooks/useOpciones'
+import { usePuede } from '@/shared/permissions/can'
+import { Link } from 'react-router-dom'
 
 export function TurnoCajaIndicator() {
   const queryClient = useQueryClient()
+  const puedeVerCobrosDelivery = usePuede('delivery.cobros.listar')
 
   // ── Apertura de turno ─────────────────────────────────────────────────────
   const [modalOpen, setModalOpen] = useState(false)
@@ -120,6 +123,17 @@ export function TurnoCajaIndicator() {
         <button className="btn btn-secondary btn-size-sm" onClick={openModal}>
           <Clock size={14} /> Abrir turno
         </button>
+      )}
+
+      {puedeVerCobrosDelivery && turno?.puedeCerrar === false && (turno.cobrosDeliveryPorConciliar?.cantidad ?? 0) > 0 && (
+        <Link
+          to="/delivery/cobros"
+          className="badge badge-warning"
+          title="El turno no se puede cerrar hasta conciliar o anular estos cobros delivery"
+          style={{ marginLeft: 8, textDecoration: 'none' }}
+        >
+          {turno.cobrosDeliveryPorConciliar!.cantidad} cobro(s) delivery por conciliar
+        </Link>
       )}
 
       {/* Modal: abrir turno — no se cierra con click afuera (sin alerta): la única forma de

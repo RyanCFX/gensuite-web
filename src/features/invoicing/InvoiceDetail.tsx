@@ -102,6 +102,18 @@ import {
 
 import { useMetodoPagoCurrencies } from "@/shared/hooks/useMetodoPagoCurrencies";
 import { isApiErrorCode, ERROR_CODES, conSilencio403 } from "@/shared/api/client";
+import { esErrorDelivery } from "@/lib/deliveryErrors";
+import { DeliveryEntregaBadge, DeliveryCobroBadge } from "@/features/delivery/DeliveryBadges";
+import { DeliveryInfoCard } from "@/features/delivery/DeliveryInfoCard";
+import { CreditoEstadoBadge } from "@/shared/ui/CreditoEstadoBadge";
+import { ReactivarBotonInline } from "./CreditNoteActionModals";
+import {
+  creditoNoAplicableTooltip,
+  esCreditoDadoDeBajaError,
+  esCreditoVencidoError,
+  esUsoUnicoConsumidoError,
+  formatVenceEl,
+} from "@/lib/creditoVencimiento";
 import { DocumentHistoryCard } from "@/components/shared/DocumentHistoryCard";
 import { EcfStatusCard } from "@/components/shared/EcfStatusCard";
 import { ecfBloqueaPdf, ecfPdfBloqueadoMensaje } from "@/lib/dgii";
@@ -134,6 +146,9 @@ const SALDO_FAVOR_COLUMNS = [
   { key: "disponible", width: 110 },
   { key: "comprometido", width: 110 },
   { key: "disponibleNeto", width: 120 },
+  // §4.2: badge de vigencia + vencimiento por fila (vacío = «—», igual que antes).
+  { key: "estado", width: 130 },
+  { key: "vence", width: 100 },
   { key: "montoAplicar", width: 140 },
   { key: "actions", width: 140 },
 ];
@@ -145,6 +160,9 @@ const CREDIT_NOTE_COLUMNS = [
   { key: "reembolsado", width: 110 },
   { key: "aplicado", width: 110 },
   { key: "disponible", width: 110 },
+  // §4.2: badge de vigencia + vencimiento por fila (vacío = «—», igual que antes).
+  { key: "estado", width: 130 },
+  { key: "vence", width: 100 },
   { key: "montoAplicar", width: 140 },
   { key: "actions", width: 140 },
 ];
@@ -509,8 +527,13 @@ export default function InvoiceDetail() {
         `Saldo a favor de ${formatDOP(variables.amount)} aplicado. Somete la factura para reconciliarlo.`,
       );
     },
-    onError: (err: { message?: string }) => {
-      toast.error(err?.message ?? "Error al aplicar el saldo a favor");
+    // §8: el saldo pudo vencer entre la carga y la aplicación — mostrar el mensaje
+    // y refrescar (la fila vencida ofrece «Reactivar»).
+    onError: (err: ApiError) => {
+      if (err?.statusCode === 409 && (esCreditoVencidoError(err) || esCreditoDadoDeBajaError(err))) {
+        queryClient.invalidateQueries({ queryKey: ["saldo-favor", invoice?.customer] });
+      }
+      toast.error(err?.message ?? "Error al aplicar el saldo a favor", { duration: 8000 });
     },
   });
 
@@ -540,6 +563,8 @@ export default function InvoiceDetail() {
   const [creditNoteAmounts, setCreditNoteAmounts] = useState<
     Record<string, number>
   >({});
+  // §4.3: segundo paso de confirmación del sobrante en notas de uso único.
+  const [ncUsoUnicoArmado, setNcUsoUnicoArmado] = useState<Record<string, boolean>>({});
 
   const applyCreditNoteMutation = useMutation({
     mutationFn: ({
@@ -560,10 +585,21 @@ export default function InvoiceDetail() {
     },
     onError: (err: ApiError) => {
       if (err?.statusCode === 409) {
-        // Ya estaba aplicada a esta factura (doble clic, reintento, o otra pestaña) — refrescar para reflejar el estado real
+        // Ya estaba aplicada a esta factura (doble clic, reintento, o otra pestaña),
+        // venció entre la carga y la aplicación, o es de uso único ya consumida —
+        // refrescar para reflejar el estado real (§4.3, §8).
         queryClient.invalidateQueries({
           queryKey: ["credit-note-saldo-favor", invoice?.customer],
         });
+        queryClient.invalidateQueries({ queryKey: ["credit-notes"] });
+        if (esUsoUnicoConsumidoError(err)) {
+          toast.error(err.message ?? "Esta nota de uso único ya fue aplicada", { duration: 8000 });
+          return;
+        }
+        if (esCreditoVencidoError(err) || esCreditoDadoDeBajaError(err)) {
+          toast.error(err.message ?? "El crédito está vencido", { duration: 8000 });
+          return;
+        }
       }
       toast.error(err?.message ?? "Error al aplicar la nota de crédito");
     },
@@ -716,6 +752,14 @@ export default function InvoiceDetail() {
     }
   }, [invoice, paymentRequired, usaModuloPos, pendingAmount, flujoCobro, paymentsSeededFor, facturacionConfig, invoiceCurrency]);
 
+  // §2.2 delivery: la venta puede cobrarse contra entrega (repartidor) o en tienda.
+  const esDeliverySubmit = invoice?.delivery?.esDelivery ?? false;
+  // Un cliente a crédito no cobra contra entrega (solo logística): sin el check ni `contraEntrega`
+  // (evita 400 DELIVERY_CONTRA_ENTREGA_CLIENTE_CREDITO).
+  const contraEntregaPosible = esDeliverySubmit && semaforoCliente?.tieneCredito !== true;
+  // Directo: una sola línea — "Se cobra al entregar" encendido por defecto en delivery.
+  const [directoContraEntrega, setDirectoContraEntrega] = useState(true);
+
   function paymentsAreValid(): boolean {
     if (flujoCobro === "directo") {
       if (!directoMop) return false;
@@ -738,10 +782,14 @@ export default function InvoiceDetail() {
     if (sum <= 0) return false;
     // Sobrepago con vuelto automático (igual que en Caja): permitido solo con al menos una línea
     // en efectivo, sin superar el efectivo recibido y con el desglose coincidiendo.
+    // §2.2: el vuelto se calcula solo sobre las líneas de tienda.
+    const lineasVuelto = contraEntregaPosible
+      ? payments.payments.filter((p) => p.contraEntrega === false)
+      : payments.payments;
     const over = overpayAmount(payments.payments, pendingAmount);
     if (over === 0) return sum <= pendingAmount + PAYMENT_LINES_TOLERANCE;
-    if (!hasCashPayment(payments.payments, metodosActivos)) return false;
-    const cash = cashAmount(payments.payments, metodosActivos);
+    if (!hasCashPayment(lineasVuelto, metodosActivos)) return false;
+    const cash = cashAmount(lineasVuelto, metodosActivos);
     if (over > cash + PAYMENT_LINES_TOLERANCE) return false;
     if (declaredVuelto(payments).length === 0) return false;
     return (
@@ -756,6 +804,11 @@ export default function InvoiceDetail() {
       queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["invoice", id] });
       queryClient.invalidateQueries({ queryKey: ["turno-actual"] });
+      // §4.3: el sobrante de una nota de uso único se resuelve al Someter (no al
+      // enlazar) — la nota pudo pasar a `origenSaldoFavor` o a `perdido`. Refrescar.
+      queryClient.invalidateQueries({ queryKey: ["credit-notes"] });
+      queryClient.invalidateQueries({ queryKey: ["credit-note-saldo-favor", invoice?.customer] });
+      queryClient.invalidateQueries({ queryKey: ["saldo-favor", invoice?.customer] });
       setCreditErrorOpen(false);
       setSubmitResult(null);
       setEcfResult(null);
@@ -782,7 +835,12 @@ export default function InvoiceDetail() {
         return;
       }
 
-      if (updated.cobro?.fullyPaid) {
+      if (updated.delivery?.esDelivery && updated.delivery.cobro?.estado === "por_conciliar") {
+        // §2.2/§3.3: lo que cobra el repartidor queda por conciliar — no es un "pago parcial".
+        toast.success(
+          `Factura sometida — ${formatMoney(updated.delivery.cobro.montoPorConciliar, invoiceCurrency)} se cobran al entregar (quedan por conciliar)`,
+        );
+      } else if (updated.cobro?.fullyPaid) {
         toast.success("Factura sometida y cobrada");
       } else if (updated.isPos && updated.outstandingAmount > 0) {
         toast.success(
@@ -872,6 +930,35 @@ export default function InvoiceDetail() {
       }
       if (isApiErrorCode(err, ERROR_CODES.STOCK_INSUFFICIENT_OR_RESERVED)) {
         toast.error(formatStockInsufficientMessage(err), { duration: 8000 });
+        return;
+      }
+      // §2.2 delivery: el mensaje del BFF ya es accionable (incluye códigos entre
+      // corchetes desde ERPNext) — se muestra tal cual con duración larga.
+      if (
+        esErrorDelivery(
+          err,
+          "DELIVERY_CONTRA_ENTREGA_SIN_DELIVERY",
+          "DELIVERY_CONTRA_ENTREGA_CLIENTE_CREDITO",
+          "DELIVERY_PAGO_INCOMPLETO",
+          "DELIVERY_RESERVA_FALLIDA",
+          "DELIVERY_ARTICULO_INACTIVO",
+          "DELIVERY_PERIODO_CERRADO",
+        )
+      ) {
+        queryClient.invalidateQueries({ queryKey: ["invoice", id] });
+        toast.error(msg || "No se pudo someter la venta con delivery", { duration: 8000 });
+        return;
+      }
+      // §4.3: una nota/saldo enlazado en borrador que venció antes de someter
+      // bloquea el submit (el mensaje dice qué crédito es; puede llegar sin `code`
+      // conocido porque lo origina ERPNext). Mostrar el mensaje y refrescar los
+      // saldos para que el usuario pueda quitar ese enlace (botones «Deshacer»).
+      if (/venci/i.test(msg)) {
+        queryClient.invalidateQueries({ queryKey: ["credit-note-saldo-favor", invoice?.customer] });
+        queryClient.invalidateQueries({ queryKey: ["saldo-favor", invoice?.customer] });
+        toast.error(msg || "Un crédito enlazado venció antes de someter. Quita ese enlace e intenta de nuevo.", {
+          duration: 8000,
+        });
         return;
       }
       toast.error(friendlyPaymentError(msg, "Error al someter la factura"));
@@ -1006,8 +1093,17 @@ export default function InvoiceDetail() {
     const body: SubmitInvoiceDto | undefined = !paymentsFilled
       ? undefined
       : flujoCobro === "directo"
-        ? { payments: [{ modeOfPayment: directoMop, amount: Number(directoAmount) }] }
-        : buildSubmitPayload(payments, pendingAmount, metodosActivos);
+        ? {
+            payments: [
+              {
+                modeOfPayment: directoMop,
+                amount: Number(directoAmount),
+                // §2.2: en delivery el default es contra entrega; fuera no viaja.
+                ...(contraEntregaPosible ? { contraEntrega: directoContraEntrega } : {}),
+              },
+            ],
+          }
+        : buildSubmitPayload(payments, pendingAmount, metodosActivos, contraEntregaPosible);
     setLastSubmitBody(body);
     submitMutation.mutate(body);
   }
@@ -1176,7 +1272,17 @@ export default function InvoiceDetail() {
       toast.success(`Despacho ${despacho.id} creado en Borrador — revísalo y somételo`);
       navigate(`/despachos/${despacho.id}`);
     },
-    onError: (err: { message?: string }) => toast.error(err?.message ?? "Error al crear el despacho"),
+    onError: (err: ApiError) => {
+      // §4.1: factura delivery — para delivery se usan siempre los viajes.
+      if (esErrorDelivery(err, "DELIVERY_FACTURA_NO_DISPONIBLE")) {
+        toast.error(err?.message ?? "Esta factura es delivery: asignala en un viaje", {
+          duration: 8000,
+          action: { label: "Ir a viajes", onClick: () => navigate("/delivery/viajes") },
+        });
+        return;
+      }
+      toast.error(err?.message ?? "Error al crear el despacho");
+    },
   });
 
   // No hay un campo en la factura que diga "ya está despachada" — se resuelve buscando los
@@ -1193,7 +1299,12 @@ export default function InvoiceDetail() {
     (d) => d.status === "submitted" && d.deliveryStatus === "Completed",
   );
   const mostrarDespachar =
-    invoice?.status === "submitted" && despachoHabilitado && !despachoBorradorExistente && !yaDespachadaPorCompleto;
+    invoice?.status === "submitted" &&
+    despachoHabilitado &&
+    // §4.1: las ventas delivery no van por Delivery Note — siempre por viajes.
+    !esDeliverySubmit &&
+    !despachoBorradorExistente &&
+    !yaDespachadaPorCompleto;
 
   const isActionsLoading =
     submitMutation.isPending ||
@@ -1445,6 +1556,13 @@ export default function InvoiceDetail() {
               </span>
             )}
             <EstadoArsBadge estado={estadoArs} />
+            {/* §2.3 delivery: insignia de entrega y otra de cobro. */}
+            {invoice.delivery?.esDelivery && (
+              <>
+                <DeliveryEntregaBadge estado={invoice.delivery.estado} />
+                <DeliveryCobroBadge estado={invoice.delivery.cobro?.estado} />
+              </>
+            )}
             {relacionClienteSocio && (
               <Badge variant="info">Cliente socio</Badge>
             )}
@@ -1672,6 +1790,18 @@ export default function InvoiceDetail() {
                         onChange={(e) => setDirectoAmount(e.target.value)}
                       />
                     </div>
+                    {/* §2.2: en delivery el default es "lo cobra el repartidor". */}
+                    {contraEntregaPosible && (
+                      <label className="ff-check-wrap" style={{ alignSelf: "flex-end", paddingBottom: 8 }}>
+                        <input
+                          type="checkbox"
+                          className="ff-check"
+                          checked={directoContraEntrega}
+                          onChange={(e) => setDirectoContraEntrega(e.target.checked)}
+                        />
+                        <span style={{ fontSize: 13 }}>Se cobra al entregar</span>
+                      </label>
+                    )}
                   </div>
                 ) : (
                   <PaymentLinesEditor
@@ -1679,6 +1809,7 @@ export default function InvoiceDetail() {
                     value={payments}
                     onChange={setPayments}
                     currency={invoiceCurrency}
+                    mostrarContraEntrega={contraEntregaPosible}
                   />
                 )}
 
@@ -1896,6 +2027,9 @@ export default function InvoiceDetail() {
       )}
 
       {(ecfResult ?? invoice.ecf) && <EcfStatusCard ecf={ecfResult ?? invoice.ecf!} />}
+
+      {/* §2.3 delivery: bloque con entrega y cobro. */}
+      <DeliveryInfoCard delivery={invoice.delivery} currency={invoice.currency} />
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-header navy-card-header">
@@ -2176,6 +2310,12 @@ export default function InvoiceDetail() {
                 <span style={{ fontSize: 11, fontWeight: 400, textTransform: "none", letterSpacing: "normal", color: "var(--text-tertiary)" }}>
                   ({formatDOP(saldoFavor.balance ?? 0)})
                 </span>
+                {/* §3.3: `balance` es solo lo aplicable hoy — lo vencido va aparte. */}
+                {(saldoFavor.vencidoAmount ?? 0) > 0 && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--error-text, #b91c1c)" }}>
+                    · {formatDOP(saldoFavor.vencidoAmount)} vencido
+                  </span>
+                )}
                 <span key={saldoOpen ? "open" : "closed"} className="pill-plus-trigger-icon">
                   {saldoOpen ? <Minus size={14} /> : <Plus size={14} />}
                 </span>
@@ -2226,6 +2366,14 @@ export default function InvoiceDetail() {
                           Disponible neto
                           <span className="col-resize-handle" onMouseDown={saldoFavorStartResize("disponibleNeto")} />
                         </th>
+                        <th>
+                          Estado
+                          <span className="col-resize-handle" onMouseDown={saldoFavorStartResize("estado")} />
+                        </th>
+                        <th>
+                          Vence
+                          <span className="col-resize-handle" onMouseDown={saldoFavorStartResize("vence")} />
+                        </th>
                         <th style={{ textAlign: "right" }}>
                           Monto a aplicar
                           <span className="col-resize-handle" onMouseDown={saldoFavorStartResize("montoAplicar")} />
@@ -2240,11 +2388,15 @@ export default function InvoiceDetail() {
                           pendingAmount || entry.availableAmount,
                         );
                         const fullyCommitted = entry.availableAmount <= 0.01;
+                        // §4.2/§4.3: solo `puedeAplicar` habilita la fila. Ausente =
+                        // comportamiento histórico. La fila vencida se muestra
+                        // deshabilitada con su motivo, nunca se oculta.
+                        const puedeAplicarSaldo = entry.puedeAplicar ?? true;
                         const appliedToThisInvoice = entry.appliedTo?.find(
                           (a) => a.invoiceId === id,
                         );
                         return (
-                          <tr key={entry.paymentEntryId}>
+                          <tr key={entry.paymentEntryId} style={puedeAplicarSaldo ? undefined : { opacity: 0.75 }}>
                             <td style={{ fontFamily: "var(--font-body)", fontSize: 12 }}>
                               {entry.paymentEntryId}
                             </td>
@@ -2260,7 +2412,13 @@ export default function InvoiceDetail() {
                               {formatDOP(entry.availableAmount)}
                             </td>
                             <td>
-                              {!fullyCommitted && (
+                              <CreditoEstadoBadge estado={entry.estado} diasRestantes={entry.diasRestantes} venceEl={entry.venceEl} />
+                            </td>
+                            <td style={{ fontSize: 12 }}>
+                              {entry.venceEl ? formatVenceEl(entry.venceEl) : <span className="td-dim">—</span>}
+                            </td>
+                            <td>
+                              {!fullyCommitted && puedeAplicarSaldo && (
                                 <input
                                   className="items-input"
                                   type="number"
@@ -2299,7 +2457,24 @@ export default function InvoiceDetail() {
                                     100% comprometido
                                   </span>
                                 )}
-                                {!fullyCommitted && (
+                                {!fullyCommitted && !puedeAplicarSaldo && (
+                                  <span
+                                    className="badge badge-neutral"
+                                    style={{ whiteSpace: "nowrap" }}
+                                    title={creditoNoAplicableTooltip(entry.venceEl)}
+                                  >
+                                    No aplicable
+                                  </span>
+                                )}
+                                {!fullyCommitted && !puedeAplicarSaldo && (
+                                  <ReactivarBotonInline
+                                    noteId={entry.paymentEntryId}
+                                    kind="saldo"
+                                    customerId={invoice?.customer}
+                                    label="Reactivar"
+                                  />
+                                )}
+                                {!fullyCommitted && puedeAplicarSaldo && (
                                   <button
                                     className="btn btn-secondary btn-size-sm"
                                     disabled={applySaldoMutation.isPending}
@@ -2371,6 +2546,12 @@ export default function InvoiceDetail() {
                 <span style={{ fontSize: 11, fontWeight: 400, textTransform: "none", letterSpacing: "normal", color: "var(--text-tertiary)" }}>
                   ({formatDOP(creditNoteSaldo.balance ?? 0)})
                 </span>
+                {/* §3.3: `balance` es solo lo aplicable hoy — lo vencido va aparte. */}
+                {(creditNoteSaldo.vencidoAmount ?? 0) > 0 && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--error-text, #b91c1c)" }}>
+                    · {formatDOP(creditNoteSaldo.vencidoAmount)} vencido
+                  </span>
+                )}
                 <span key={ncOpen ? "open" : "closed"} className="pill-plus-trigger-icon">
                   {ncOpen ? <Minus size={14} /> : <Plus size={14} />}
                 </span>
@@ -2421,6 +2602,14 @@ export default function InvoiceDetail() {
                           Disponible
                           <span className="col-resize-handle" onMouseDown={creditNoteStartResize("disponible")} />
                         </th>
+                        <th>
+                          Estado
+                          <span className="col-resize-handle" onMouseDown={creditNoteStartResize("estado")} />
+                        </th>
+                        <th>
+                          Vence
+                          <span className="col-resize-handle" onMouseDown={creditNoteStartResize("vence")} />
+                        </th>
                         <th style={{ textAlign: "right" }}>
                           Monto a aplicar
                           <span className="col-resize-handle" onMouseDown={creditNoteStartResize("montoAplicar")} />
@@ -2435,11 +2624,22 @@ export default function InvoiceDetail() {
                           pendingAmount || entry.availableAmount,
                         );
                         const fullyUsed = entry.availableAmount <= 0.01;
+                        // §4.2/§4.3: solo `puedeAplicar` habilita la fila (ausente =
+                        // histórico). Vencida: deshabilitada con motivo + «Reactivar».
+                        const puedeAplicarNc = entry.puedeAplicar ?? true;
+                        // §4.3: aviso de sobrante en nota de uso único aplicada parcial.
+                        const montoNc = creditNoteAmounts[entry.creditNoteId] ?? defaultAmount;
+                        const esUsoUnicoParcial =
+                          (entry.uso === 'unico' || false) &&
+                          entry.origenSaldoFavor !== true &&
+                          montoNc > 0 &&
+                          montoNc < entry.availableAmount - 0.005;
+                        const aplicadoArmado = ncUsoUnicoArmado[entry.creditNoteId] ?? false;
                         const appliedToThisInvoice = entry.appliedTo?.find(
                           (a) => a.invoiceId === id,
                         );
                         return (
-                          <tr key={entry.creditNoteId}>
+                          <tr key={entry.creditNoteId} style={puedeAplicarNc ? undefined : { opacity: 0.75 }}>
                             <td style={{ fontFamily: "var(--font-body)", fontSize: 12 }}>
                               {entry.ncf ?? entry.creditNoteId}
                             </td>
@@ -2457,7 +2657,20 @@ export default function InvoiceDetail() {
                               {formatDOP(entry.availableAmount)}
                             </td>
                             <td>
-                              {!fullyUsed && !appliedToThisInvoice && (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+                                <CreditoEstadoBadge estado={entry.estado} diasRestantes={entry.diasRestantes} venceEl={entry.venceEl} />
+                                {entry.uso === 'unico' && entry.origenSaldoFavor !== true && (
+                                  <span className="badge badge-info" title={entry.remanente === 'perder' ? 'Si sobra saldo: se pierde' : 'Si sobra saldo: pasa a saldo a favor'}>
+                                    Uso único
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td style={{ fontSize: 12 }}>
+                              {entry.venceEl ? formatVenceEl(entry.venceEl) : <span className="td-dim">—</span>}
+                            </td>
+                            <td>
+                              {!fullyUsed && !appliedToThisInvoice && puedeAplicarNc && (
                                 <input
                                   className="items-input"
                                   type="number"
@@ -2469,13 +2682,14 @@ export default function InvoiceDetail() {
                                     creditNoteAmounts[entry.creditNoteId] ??
                                     defaultAmount
                                   }
-                                  onChange={(e) =>
+                                  onChange={(e) => {
                                     setCreditNoteAmounts((prev) => ({
                                       ...prev,
                                       [entry.creditNoteId]:
                                         parseFloat(e.target.value) || 0,
                                     }))
-                                  }
+                                    setNcUsoUnicoArmado((prev) => ({ ...prev, [entry.creditNoteId]: false }))
+                                  }}
                                 />
                               )}
                             </td>
@@ -2496,7 +2710,31 @@ export default function InvoiceDetail() {
                                     Agotada
                                   </span>
                                 )}
-                                {!fullyUsed && !appliedToThisInvoice && (
+                                {!fullyUsed && !appliedToThisInvoice && !puedeAplicarNc && (
+                                  <>
+                                    <span
+                                      className="badge badge-neutral"
+                                      style={{ whiteSpace: "nowrap" }}
+                                      title={creditoNoAplicableTooltip(entry.venceEl)}
+                                    >
+                                      No aplicable
+                                    </span>
+                                    <ReactivarBotonInline
+                                      noteId={entry.creditNoteId}
+                                      kind="nota"
+                                      customerId={invoice?.customer}
+                                      label="Reactivar"
+                                    />
+                                  </>
+                                )}
+                                {!fullyUsed && !appliedToThisInvoice && puedeAplicarNc && esUsoUnicoParcial && !aplicadoArmado && (
+                                  <span style={{ fontSize: 11, color: "var(--color-warning, #b45309)", textAlign: "right", maxWidth: 200 }}>
+                                    {entry.remanente === 'perder'
+                                      ? `Uso único: los ${formatDOP(entry.availableAmount - montoNc)} no usados se perderán.`
+                                      : `Uso único: los ${formatDOP(entry.availableAmount - montoNc)} no usados pasarán a saldo a favor.`}
+                                  </span>
+                                )}
+                                {!fullyUsed && !appliedToThisInvoice && puedeAplicarNc && (
                                   <button
                                     className="btn btn-secondary btn-size-sm"
                                     disabled={applyCreditNoteMutation.isPending}
@@ -2514,13 +2752,19 @@ export default function InvoiceDetail() {
                                         );
                                         return;
                                       }
+                                      // §4.3: la aplicación parcial de uso único no se
+                                      // bloquea — pero exige confirmar el sobrante (dos pasos).
+                                      if (esUsoUnicoParcial && !aplicadoArmado) {
+                                        setNcUsoUnicoArmado((prev) => ({ ...prev, [entry.creditNoteId]: true }))
+                                        return;
+                                      }
                                       applyCreditNoteMutation.mutate({
                                         creditNoteId: entry.creditNoteId,
                                         amount,
                                       });
                                     }}
                                   >
-                                    Aplicar
+                                    {esUsoUnicoParcial && !aplicadoArmado ? 'Confirmar' : 'Aplicar'}
                                   </button>
                                 )}
                                 {appliedToThisInvoice && (

@@ -12,6 +12,17 @@ export interface PaymentLineDraft {
   checkNumber: string
   bankAccount: string
   showDetails: boolean
+  /** §2.2 delivery: `true` = lo cobra el repartidor (queda por conciliar). En ventas
+   *  delivery el default es `true`; `undefined` equivale a `true` cuando la venta es
+   *  delivery y a "línea de tienda" cuando no lo es. */
+  contraEntrega?: boolean
+}
+
+/** Línea cobrada en tienda (no contra entrega) — para el cálculo del vuelto (§2.2: el
+ *  vuelto se calcula solo sobre las líneas de tienda). */
+export function esLineaTienda(p: PaymentLineDraft, esDelivery: boolean): boolean {
+  // En delivery `undefined` = contra entrega (default §2.2): solo `false` explícito es de tienda.
+  return !esDelivery || p.contraEntrega === false
 }
 
 export interface VueltoLineDraft {
@@ -97,6 +108,7 @@ export function isPaymentLinesValid(
   amountDue: number,
   metodos: MetodoPagoReglas[],
   denominaciones: Denominacion[] = [],
+  esDelivery = false,
 ): boolean {
   const validPayments = value.payments.filter((p) => p.modeOfPayment && Number(p.amount) > 0)
   if (validPayments.length === 0) return false
@@ -115,8 +127,10 @@ export function isPaymentLinesValid(
   // permiten (el backend responde fullyPaid=false) y cada pantalla lo maneja con su propio flujo.
   const over = overpayAmount(value.payments, amountDue)
   if (over > 0) {
-    if (!hasCashPayment(value.payments, metodos)) return false
-    const cash = cashAmount(value.payments, metodos)
+    // §2.2 delivery: el vuelto se calcula solo sobre las líneas de tienda.
+    const tienda = value.payments.filter((p) => esLineaTienda(p, esDelivery))
+    if (!hasCashPayment(tienda, metodos)) return false
+    const cash = cashAmount(tienda, metodos)
     if (over > cash + PAYMENT_LINES_TOLERANCE) return false
     if (declaredVuelto(value).length === 0) return false
     const vueltoDeclarado = sumVuelto(value.vuelto, denominaciones)
@@ -154,11 +168,24 @@ export function buildSubmitPayload(
   value: PaymentLinesValue,
   amountDue: number,
   metodos: MetodoPagoReglas[],
+  esDelivery = false,
 ): { payments: PaymentLine[]; vuelto?: VueltoLine[]; tenderedCash?: number } {
+  // §2.2: el vuelto se calcula solo sobre las líneas de tienda — el efectivo contra
+  // entrega no se entrega en caja (no se pide vuelto sobre él). El excedente se mide sobre
+  // el total, pero solo el efectivo de tienda cuenta como recibido y absorbe el vuelto.
+  const esTienda = (p: PaymentLineDraft) => esLineaTienda(p, esDelivery)
   const over = overpayAmount(value.payments, amountDue)
-  const cash = cashAmount(value.payments, metodos)
+  const cash = value.payments.reduce((sum, p) => {
+    if (!esTienda(p)) return sum
+    const metodo = metodos.find((m) => m.name === p.modeOfPayment)
+    return metodo?.type === 'Cash' ? sum + (Number(p.amount) || 0) : sum
+  }, 0)
+  const hayEfectivoTienda = value.payments.some((p) => {
+    if (!esTienda(p) || !(Number(p.amount) > 0)) return false
+    return metodos.find((m) => m.name === p.modeOfPayment)?.type === 'Cash'
+  })
   const canVuelto =
-    over > 0 && hasCashPayment(value.payments, metodos) && over <= cash + PAYMENT_LINES_TOLERANCE
+    over > 0 && hayEfectivoTienda && over <= cash + PAYMENT_LINES_TOLERANCE
 
   // Solo las líneas válidas, marcando cuáles son en efectivo para el ajuste de abajo.
   const valid = value.payments
@@ -176,16 +203,18 @@ export function buildSubmitPayload(
     ...(p.bank ? { bank: p.bank } : {}),
     ...(p.checkNumber ? { checkNumber: p.checkNumber } : {}),
     ...(p.bankAccount ? { bankAccount: p.bankAccount } : {}),
+    // En delivery el default es `true` (lo cobra el repartidor); fuera de delivery no viaja.
+    ...(esDelivery ? { contraEntrega: p.contraEntrega ?? true } : {}),
   }))
 
   if (!canVuelto) return { payments }
 
   // Con sobrepago, las líneas se normalizan para que sumen exactamente el total a cobrar:
-  // el excedente se absorbe de las líneas en efectivo (de la última a la primera) y viaja como
-  // vuelto. `tenderedCash` es el efectivo total recibido (mismo contrato que antes).
+  // el excedente se absorbe de las líneas en efectivo de tienda (de la última a la primera) y
+  // viaja como vuelto. `tenderedCash` es el efectivo de tienda recibido.
   let remaining = over
   for (let i = payments.length - 1; i >= 0 && remaining > PAYMENT_LINES_TOLERANCE; i--) {
-    if (!valid[i].isCash) continue
+    if (!valid[i].isCash || !esTienda(valid[i].p)) continue
     const take = Math.min(payments[i].amount, remaining)
     payments[i] = { ...payments[i], amount: round2(payments[i].amount - take) }
     remaining = round2(remaining - take)

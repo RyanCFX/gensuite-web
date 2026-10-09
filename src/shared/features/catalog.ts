@@ -3,17 +3,15 @@ import type { FeatureKey, ReporteKey } from './types'
 /**
  * Catálogo de features por tenant — docs/tasks/80_features_tenant_discriminacion_ui.md §4.
  *
- * Es la tabla `public.features` real (20 claves con `type='modulo'`: 19 implementadas +
- * `servicios` reservado — ver `FeaturesMapDto` en openapi.json). Si algún día
+ * Es la tabla `public.features` real (ver `FeaturesMapDto` en openapi.json). Si algún día
  * el backend agrega una clave nueva, se agrega acá — nunca inventar claves fuera de esta tabla.
  *
  * Dos capas independientes para mostrar un ítem (§2): feature encendido (acá) Y permiso del
  * usuario (GET /me/permissions). Ver `moduloVisible` abajo.
  */
 
-/** Las 21 claves con `type='modulo'` (20 previas + `productos`, nuevo — `servicios` deja de
- *  ser reservada y pasa a gatear el catálogo de servicios). Verificado contra `FeaturesMapDto`
- *  en openapi.json (pendiente de actualización del backend: el schema aún no trae `productos`). */
+/** Las claves con `type='modulo'` (incluye `delivery`: Delivery con cobro contra entrega,
+ *  depende de `despacho` — lo garantiza el BFF). Verificado contra `FeaturesMapDto`. */
 export const FEATURE_KEYS: readonly FeatureKey[] = [
   'compras',
   'comprasOrdenes',
@@ -32,6 +30,7 @@ export const FEATURE_KEYS: readonly FeatureKey[] = [
   'relacionesComerciales',
   'cotizaciones',
   'despacho',
+  'delivery',
   'devoluciones',
   'notasCredito',
   'notasDebito',
@@ -120,6 +119,11 @@ export const RUTAS_FEATURES: readonly RutaFeature[] = [
   // Ventas — Despacho (spec: /despachos)
   { pattern: '/despachos/*', feature: 'despacho' },
   { pattern: '/despachos', feature: 'despacho' },
+  // Delivery con cobro contra entrega (docs/tasks/PROMPT_DELIVERY_FRONTEND.md §6).
+  // Los cobros por conciliar cuelgan del módulo `caja` en el catálogo de acceso, pero a
+  // nivel de feature todo delivery depende de `features.delivery` (el BFF garantiza despacho).
+  { pattern: '/delivery/*', feature: 'delivery' },
+  { pattern: '/delivery', feature: 'delivery' },
   // Ventas — Notas de Crédito / Débito: dos claves, una pantalla cada una en este frontend
   // (el spec describe tabs dentro de /invoicing/credit-notes — acá son rutas separadas, se
   // gatea cada ruta por su propia clave, mismo efecto).

@@ -24,6 +24,7 @@ export type FeatureKey =
   | 'relacionesComerciales'
   | 'cotizaciones'
   | 'despacho'
+  | 'delivery'
   | 'devoluciones'
   | 'notasCredito'
   | 'notasDebito'

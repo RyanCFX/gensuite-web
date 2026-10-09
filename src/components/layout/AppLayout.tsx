@@ -72,6 +72,7 @@ import { CommandPalette } from "./CommandPalette";
 import { Toaster, toast } from "sonner";
 import { TabsProvider, useTabs } from "@/contexts/TabsContext";
 import { KeepAlive } from "keepalive-for-react";
+import { useDeliveryPuerta, deliveryRutaPermitida } from "@/shared/hooks/useDelivery";
 import { ScreenQueryGate } from "@/components/ScreenQueryGate";
 import { TurnoCajaIndicator } from "@/components/shared/TurnoCajaIndicator";
 
@@ -151,6 +152,21 @@ const NAV_VENTAS: NavEntry[] = [
     label: "Despachos",
     icon: <Truck size={16} aria-hidden="true" />,
     path: "/despachos",
+  },
+  // Delivery con cobro contra entrega — docs/tasks/PROMPT_DELIVERY_FRONTEND.md §6.
+  // La visibilidad real (feature + habilitación + permiso + drenaje) la decide `deliveryRuta`.
+  {
+    label: "Delivery",
+    icon: <Truck size={16} aria-hidden="true" />,
+    prefix: "/delivery",
+    children: [
+      { label: "Pendientes por delivery", icon: <ClipboardList size={14} />, path: "/delivery/pendientes" },
+      { label: "Viajes", icon: <Truck size={14} />, path: "/delivery/viajes" },
+      { label: "Repartidores", icon: <Users size={14} />, path: "/delivery/repartidores" },
+      { label: "Vehículos", icon: <Truck size={14} />, path: "/delivery/vehiculos" },
+      // Sin POS el cobro se concilia desde Facturación (se oculta con POS: va bajo Caja).
+      { label: "Cobros delivery por conciliar", icon: <DollarSign size={14} />, path: "/delivery/cobros" },
+    ],
   },
   {
     label: "Notas de Crédito",
@@ -369,6 +385,7 @@ const NAV_FINANZAS: NavEntry[] = [
     children: [
       { label: "Caja", icon: <Clock size={14} />, path: "/caja/por-cobrar" },
       { label: "Cobros Pendientes", icon: <DollarSign size={14} />, path: "/caja/pendientes" },
+      { label: "Cobros delivery por conciliar", icon: <DollarSign size={14} />, path: "/delivery/cobros" },
     ],
   },
   {
@@ -809,6 +826,8 @@ function filtrarNavPorPermisos(
     features: Record<string, boolean> | null
     featuresReady: boolean
     reportesHabilitados: readonly string[]
+    /** Delivery (§1): ¿puede abrirse esta ruta /delivery/*? (feature+habilitación o drenaje). */
+    deliveryRuta?: (path: string) => boolean
   },
 ): NavEntry | null {
   if (isGroup(entry)) {
@@ -817,10 +836,13 @@ function filtrarNavPorPermisos(
       .filter((c): c is NavEntry => c !== null);
     return children.length ? { ...entry, children } : null;
   }
+  // Delivery: sus puertas (feature × habilitación local × drenaje, §1) se resuelven aparte.
+  const esDelivery = entry.path.startsWith("/delivery");
+  if (esDelivery && ctx.deliveryRuta && !ctx.deliveryRuta(entry.path)) return null;
   // Features del tenant (§5) — se evalúan junto con los permisos, en el mismo filtro.
   if (ctx.featuresReady) {
     const featureKey = resolverFeature(entry.path)?.feature ?? null;
-    if (featureKey !== null && ctx.features?.[featureKey] !== true) return null;
+    if (!esDelivery && featureKey !== null && ctx.features?.[featureKey] !== true) return null;
     // Reportes individuales por `reportesHabilitados` (§6) — la pantalla contenedora es núcleo.
     if (entry.path.startsWith('/reportes/')) {
       const tipo = entry.path.split('/')[2] ?? '';
@@ -845,6 +867,8 @@ function filtrarNavList(
     features: Record<string, boolean> | null
     featuresReady: boolean
     reportesHabilitados: readonly string[]
+    /** Delivery (§1): ¿puede abrirse esta ruta /delivery/*? (feature+habilitación o drenaje). */
+    deliveryRuta?: (path: string) => boolean
   },
 ): NavEntry[] {
   return entries
@@ -1623,14 +1647,16 @@ function AppLayoutInner() {
   const features = useFeaturesStore((s) => s.features);
   const featuresReady = useFeaturesStore((s) => s.status === 'ready');
   const reportesHabilitados = useFeaturesStore((s) => s.reportesHabilitados);
-  const permCtx = { acciones, esFarmacia, isSystemManager, features, featuresReady, reportesHabilitados };
+  const deliveryPuerta = useDeliveryPuerta();
+  const deliveryRuta = (path: string) => deliveryRutaPermitida(path, deliveryPuerta);
+  const permCtx = { acciones, esFarmacia, isSystemManager, features, featuresReady, reportesHabilitados, deliveryRuta };
 
   const { data: facturacionConfig } = useQuery({
     queryKey: ["facturacion-config"],
     queryFn: getFacturacionConfig,
     meta: { global: true },
   });
-  const usaModuloPos = facturacionConfig?.usaModuloPos ?? false;
+  const usaModuloPos = deliveryPuerta.operativa?.usaModuloPos ?? facturacionConfig?.usaModuloPos ?? false;
   const usaImpuestoDocumento = facturacionConfig?.usaImpuestoDocumento ?? true;
 
   const { data: ecfConfig } = useQuery({
@@ -1671,7 +1697,7 @@ function AppLayoutInner() {
     ? NAV_FINANZAS
     : NAV_FINANZAS.filter(
         (entry) => !POS_ONLY_NAV_KEYS.has(isGroup(entry) ? entry.prefix : entry.path),
-      );
+      ).map((entry) => stripPathsFromEntry(entry, new Set(["/delivery/cobros"])) ?? entry);
 
   // Filtrado final por permisos del usuario (docs/PROMPT_PERMISOS_FRONTEND.md §6). Se aplica
   // después de los filtros de negocio (POS, Impuesto de Documento) y de rol/vertical.
@@ -1692,8 +1718,16 @@ function AppLayoutInner() {
           .map((entry) => stripPathsFromEntry(entry, DESPACHO_ONLY_NAV_KEYS))
           .filter((e): e is NavEntry => e !== null);
 
+  // "Cobros delivery por conciliar": con POS vive bajo Caja; sin POS, bajo Delivery/Facturación (§6).
+  const COBROS_DELIVERY_KEYS = new Set(["/delivery/cobros"]);
+  const navCobrosDeliverySinPos = (entries: NavEntry[]): NavEntry[] =>
+    usaModuloPos
+      ? entries
+          .map((entry) => stripPathsFromEntry(entry, COBROS_DELIVERY_KEYS))
+          .filter((e): e is NavEntry => e !== null)
+      : entries;
   const mainNav = filtrarNavList(NAV_MAIN, permCtx);
-  const ventasNav = filtrarNavList(navDespachoFiltered(navEcfFiltered(NAV_VENTAS)), permCtx);
+  const ventasNav = filtrarNavList(navCobrosDeliverySinPos(navDespachoFiltered(navEcfFiltered(NAV_VENTAS))), permCtx);
   const opsNav = filtrarNavList(navDespachoFiltered(navEcfFiltered(NAV_OPS)), permCtx);
   const farmaciaNav = filtrarNavPorPermisos(NAV_FARMACIA, permCtx);
   const financeNav = filtrarNavList(financeNavPos, permCtx);
