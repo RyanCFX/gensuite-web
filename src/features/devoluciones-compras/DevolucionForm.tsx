@@ -158,7 +158,8 @@ export default function DevolucionForm() {
         const typed = qtys[idx]
         const parsed = typed !== undefined ? Number(typed) : 0
         const returnQty = isNaN(parsed) ? 0 : Math.min(Math.max(parsed, 0), it.qty)
-        const initialQty = isEdit ? Math.abs(devByCode.get(it.itemCode) ?? 0) : 0
+        // En "Nueva" se precarga la cantidad completa de la factura (editable); en edición, la ya devuelta.
+        const initialQty = isEdit ? Math.abs(devByCode.get(it.itemCode) ?? 0) : it.qty
         return {
           itemCode: it.itemCode,
           name: it.id,

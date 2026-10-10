@@ -11651,6 +11651,36 @@
         ]
       }
     },
+    "/api/v1/config/verificacion": {
+      "get": {
+        "description": "Revisa (solo lectura) la configuración del tenant y devuelve las verificaciones con su estado (`ok` / `pendiente` / `no_verificable`), severidad (`critica` / `importante` / `sugerida`), lo concreto que falta (`pendientes`: sucursales sin almacén, cuentas sin configurar…) y dónde corregirlo (`accion`). `listo` es `true` si no hay ninguna crítica pendiente. Las verificaciones que no aplican al tenant (módulos no contratados) no aparecen.",
+        "operationId": "ConfigVerificacionController_verificar",
+        "parameters": [
+          {
+            "name": "X-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Qué debe configurar el cliente para operar sin problemas",
+        "tags": [
+          "Configuración"
+        ]
+      }
+    },
     "/api/v1/inventory": {
       "get": {
         "operationId": "InventoryController_findAll",
@@ -47005,7 +47035,7 @@
           },
           "amount": {
             "type": "number",
-            "description": "Monto cobrado con este método."
+            "description": "Monto cobrado con este método. Una línea en 0 se ignora (facturas de total 0 no tienen nada que cobrar)."
           },
           "cardNumber": {
             "type": "string",
@@ -57618,6 +57648,10 @@
             "type": "boolean",
             "description": "Datos de la Empresa — Editar"
           },
+          "config.verificacion.ver": {
+            "type": "boolean",
+            "description": "Verificación de la configuración inicial — Ver"
+          },
           "config.accounts-settings.ver": {
             "type": "boolean",
             "description": "Ajustes de Contabilidad — Ver"
@@ -58846,6 +58880,7 @@
           "farmacia.equivalentes.consultar",
           "config.empresa.ver",
           "config.empresa.editar",
+          "config.verificacion.ver",
           "config.accounts-settings.ver",
           "config.accounts-settings.editar",
           "config.buying-settings.ver",

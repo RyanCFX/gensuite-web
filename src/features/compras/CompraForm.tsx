@@ -50,6 +50,7 @@ import { useBeforeUnloadWarning } from '@/shared/hooks/useBeforeUnloadWarning'
 import { useIsSystemManager } from '@/shared/hooks/useIsSystemManager'
 import { useResizableColumns } from '@/shared/hooks/useResizableColumns'
 import { useAlmacenCompraDefault } from '@/shared/hooks/useAlmacenCompraDefault'
+import { useSucursalAlmacenes } from '@/shared/hooks/useSucursalAlmacenes'
 import { useOpcionesArray, useOpcionesLista } from '@/shared/hooks/useOpciones'
 import { OpcionesSelect } from '@/shared/ui/OpcionesSelect'
 import { getCatalogosFiscalesLookup, getProveedorDetalle, listRetencionesLookup } from '@/shared/api/formularios'
@@ -228,13 +229,14 @@ function updateComponentTracking(
 // ─── SerialBatchRow Sub-component ────────────────────────────────────────
 
 function SerialBatchRow({
-  item, idx, items, setItems, warehouses, warehouseOptions, onWarehouseSearch, updateItem, updateDimensiones, selectCatalogItem, clearCatalogItem, setVariantTemplate, isReturn, allowNewTracking, onViewItem,
+  item, idx, items, setItems, warehouses, hideWarehouse, warehouseOptions, onWarehouseSearch, updateItem, updateDimensiones, selectCatalogItem, clearCatalogItem, setVariantTemplate, isReturn, allowNewTracking, onViewItem,
 }: {
   item: ItemRow
   idx: number
   items: ItemRow[]
   setItems: React.Dispatch<React.SetStateAction<ItemRow[]>>
   warehouses?: { id: string; name: string }[]
+  hideWarehouse: boolean
   warehouseOptions: SearchSelectOption[]
   onWarehouseSearch: (q: string) => void
   updateItem: (idx: number, field: keyof ItemRow, value: string | number) => void
@@ -340,6 +342,7 @@ function SerialBatchRow({
             <span className="td-muted" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>—</span>
           )}
         </td>
+        {!hideWarehouse && (
         <td>
           <SearchSelect
             value={item.warehouse}
@@ -351,6 +354,7 @@ function SerialBatchRow({
             disabled={isReturn}
           />
         </td>
+        )}
         <td>
           <UomSelect
             value={item.uom}
@@ -410,7 +414,7 @@ function SerialBatchRow({
       {/* Tracking row */}
       {(item.trackingType === 'serial' || item.trackingType === 'batch' || (item._comboComponents && item._comboComponents.length > 0)) && (
         <tr className="tracking-row">
-          <td colSpan={9} style={{ padding: '4px 8px 8px' }}>
+          <td colSpan={hideWarehouse ? 8 : 9} style={{ padding: '4px 8px 8px' }}>
             {item.lineError && (
               <div style={{ color: 'red', fontSize: 12, marginBottom: 4 }}>{item.lineError}</div>
             )}
@@ -829,7 +833,10 @@ export default function CompraForm() {
 
   // Almacén de compra por defecto: proveedor > sucursal (igual que el backend).
   // El retorno no se usa directo: el hook rellena las filas vía efecto (ver itemCount).
-  useAlmacenCompraDefault({ supplierId, branch, isEdit, setItems, defaultWh, itemCount: items.length })
+  const autoWarehouse = useAlmacenCompraDefault({ supplierId, branch, isEdit, setItems, defaultWh, itemCount: items.length })
+  // Sucursal con almacén de compra: se oculta la columna Almacén y todas las líneas usan ese almacén.
+  const { almacenCompra: almacenCompraSucursal } = useSucursalAlmacenes(branch)
+  const hideWarehouse = !isEdit && !!almacenCompraSucursal && !!autoWarehouse
 
   // ── Catálogos de retenciones (multiselect) ─────────────────────────────────
   const { data: retencionesData } = useQuery({
@@ -1076,7 +1083,9 @@ export default function CompraForm() {
     (i) => !i.permiteCompraSinDimension && (i.itemDimensionesDeclaradas?.length ?? 0) > 0 && !combinacionCompleta(i.itemDimensionesDeclaradas ?? [], i.dimensiones ?? {}),
   )
 
-  const ncfValid = !ncfProveedor || NCF_REGEX.test(ncfProveedor)
+  // B11/E41 los genera el API al someter — el campo NCF Proveedor no aplica y no se envía.
+  const ncfGeneradoPorApi = tipoComprobante === 'B11' || tipoComprobante === 'E41'
+  const ncfValid = ncfGeneradoPorApi || !ncfProveedor || NCF_REGEX.test(ncfProveedor)
   const subtotal = items.reduce((sum, i) => sum + i.qty * i.rate, 0)
   const taxTotal = items.reduce((sum, i) => sum + (i.qty * i.rate * i.purchaseTaxPct / 100), 0)
   const grandTotal = subtotal + taxTotal
@@ -1090,7 +1099,7 @@ export default function CompraForm() {
       toast.error('Selecciona un proveedor')
       return
     }
-    if (ncfProveedor && !NCF_REGEX.test(ncfProveedor)) { toast.error('NCF inválido (formato: B + 10 dígitos, o E + 12 dígitos)'); return }
+    if (!ncfGeneradoPorApi && ncfProveedor && !NCF_REGEX.test(ncfProveedor)) { toast.error('NCF inválido (formato: B + 10 dígitos, o E + 12 dígitos)'); return }
 
     // Clear previous line errors
     setItems((prev) => prev.map((i) => ({ ...i, lineError: undefined })))
@@ -1176,7 +1185,7 @@ export default function CompraForm() {
         description: i.description,
         qty: i.qty,
         rate: i.rate,
-        warehouse: i.warehouse || undefined,
+        warehouse: (hideWarehouse ? autoWarehouse : i.warehouse) || undefined,
         uom: i.uom || undefined,
         ...(i.serials.length > 0 ? { serials: i.serials } : {}),
         ...(i.batches.length > 0 ? { batches: i.batches } : {}),
@@ -1189,7 +1198,7 @@ export default function CompraForm() {
         // combinación de una línea no tocada (§6.1/§10.1).
         ...(i.dimensiones && Object.keys(i.dimensiones).length > 0 ? { dimensiones: i.dimensiones } : {}),
       })),
-      ncfProveedor: ncfProveedor || undefined,
+      ncfProveedor: ncfGeneradoPorApi ? undefined : ncfProveedor || undefined,
       tipoComprobante: (tipoComprobante as CreateCompraDto['tipoComprobante']) || undefined,
       billNo: billNo || undefined,
       tipoBienes606: tipoBienes606 || undefined,
@@ -1611,7 +1620,7 @@ export default function CompraForm() {
               <div className="items-table-wrap" style={{ border: 'none', borderRadius: 0 }}>
                 <table className="items-table navy-table items-table-resizable">
                   <colgroup>
-                    {ITEMS_COLUMNS.map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
+                    {ITEMS_COLUMNS.filter((c) => !(hideWarehouse && c.key === 'almacen')).map((c) => <col key={c.key} style={{ width: colWidths[c.key] }} />)}
                   </colgroup>
                   <thead>
                     <tr>
@@ -1635,10 +1644,12 @@ export default function CompraForm() {
                         Impuesto
                         <span className="col-resize-handle" onMouseDown={startResize('impuesto')} />
                       </th>
+                      {!hideWarehouse && (
                       <th>
                         Almacén
                         <span className="col-resize-handle" onMouseDown={startResize('almacen')} />
                       </th>
+                      )}
                       <th>
                         UOM
                         <span className="col-resize-handle" onMouseDown={startResize('udm')} />
@@ -1659,6 +1670,7 @@ export default function CompraForm() {
                         items={items}
                         setItems={setItems}
                         warehouses={warehouses}
+                        hideWarehouse={hideWarehouse}
                         warehouseOptions={warehouseSelectOptions}
                         onWarehouseSearch={setWarehouseSearch}
                         updateItem={updateItem}
@@ -1709,6 +1721,7 @@ export default function CompraForm() {
               Información DGII (606)
             </div>
             <div className="form-row form-row-3">
+              {!ncfGeneradoPorApi && (
               <div className="ff-wrap">
                 <label className="ff-label">
                   {esProveedorOcasional ? 'NCF Proveedor (opcional)' : <>NCF Proveedor <span className="ff-required">*</span></>}
@@ -1734,6 +1747,7 @@ export default function CompraForm() {
                   <span className="ff-error">Formato inválido. Debe ser B o E seguido de 10 dígitos.</span>
                 )}
               </div>
+              )}
 
               <div className="ff-wrap">
                 <label className="ff-label">N° Factura del Proveedor</label>
@@ -1758,7 +1772,7 @@ export default function CompraForm() {
                 </label>
                 <SearchSelect
                   value={tipoComprobante}
-                  onChange={setTipoComprobante}
+                  onChange={(v) => { setTipoComprobante(v); if (v === 'B11' || v === 'E41') setNcfProveedor('') }}
                   options={tipoComprobanteOptions}
                   onSearch={setTipoComprobanteSearch}
                   selectedLabel={catalogos?.ncfTypesCompra?.find((t) => t.value === tipoComprobante)?.label ?? ''}

@@ -43,14 +43,12 @@ const EXTRAS_DELIVERY = [
   'delivery.cobros.conciliar',
   'delivery.cobros.conciliar-con-diferencia',
   'delivery.repartidores.listar',
-  'delivery.repartidores.crear',
-  'delivery.repartidores.editar',
   'delivery.vehiculos.listar',
-  'delivery.vehiculos.crear',
-  'delivery.vehiculos.editar',
   'config.delivery.habilitar',
   'config.delivery.deshabilitar',
   'config.delivery.configurar',
+  // Reemplaza crear/editar de repartidores y vehículos.
+  'config.delivery.gestionar',
 ]
 for (const id of [...EXTRAS_SERVICIOS, ...EXTRAS_DELIVERY]) ids.add(id)
 const sorted = [...ids].sort()

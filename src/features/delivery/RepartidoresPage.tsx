@@ -63,8 +63,8 @@ function formDe(r?: DeliveryRepartidor | null): FormState {
 export default function RepartidoresPage() {
   const queryClient = useQueryClient()
   const puerta = useDeliveryPuerta()
-  const puedeCrear = usePuede('delivery.repartidores.crear') && puerta.operativo
-  const puedeEditar = usePuede('delivery.repartidores.editar') && puerta.operativo
+  const puedeCrear = usePuede('config.delivery.gestionar') && puerta.operativo
+  const puedeEditar = usePuede('config.delivery.gestionar') && puerta.operativo
   const puedeVerUsuarios = usePuede('usuarios.listar')
 
   const [estado, setEstado] = useState('todos')

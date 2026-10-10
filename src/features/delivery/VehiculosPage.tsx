@@ -33,8 +33,8 @@ const vacio = (): FormState => ({ placa: '', marca: '', modelo: '', color: '' })
 export default function VehiculosPage() {
   const queryClient = useQueryClient()
   const puerta = useDeliveryPuerta()
-  const puedeCrear = usePuede('delivery.vehiculos.crear') && puerta.operativo
-  const puedeEditar = usePuede('delivery.vehiculos.editar') && puerta.operativo
+  const puedeCrear = usePuede('config.delivery.gestionar') && puerta.operativo
+  const puedeEditar = usePuede('config.delivery.gestionar') && puerta.operativo
 
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)

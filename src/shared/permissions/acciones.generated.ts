@@ -1,5 +1,5 @@
 // GENERADO automáticamente por scripts/gen-acciones.mjs — NO editar a mano.
-// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 + docs/tasks/PROMPT_DELIVERY_FRONTEND.md §1 (494 acciones). Regenerar: node scripts/gen-acciones.mjs
+// Fuente: docs/PROMPT_PERMISOS_FRONTEND.md §16 + docs/tasks/PROMPT_DELIVERY_FRONTEND.md §1 (491 acciones). Regenerar: node scripts/gen-acciones.mjs
 
 export type AccionId =
   | 'apertura.compras.anular'
@@ -137,6 +137,7 @@ export type AccionId =
   | 'config.currencies.ver'
   | 'config.delivery.configurar'
   | 'config.delivery.deshabilitar'
+  | 'config.delivery.gestionar'
   | 'config.delivery.habilitar'
   | 'config.denominaciones.crear'
   | 'config.denominaciones.editar'
@@ -229,11 +230,7 @@ export type AccionId =
   | 'delivery.entregas.anular'
   | 'delivery.entregas.confirmar'
   | 'delivery.pendientes.listar'
-  | 'delivery.repartidores.crear'
-  | 'delivery.repartidores.editar'
   | 'delivery.repartidores.listar'
-  | 'delivery.vehiculos.crear'
-  | 'delivery.vehiculos.editar'
   | 'delivery.vehiculos.listar'
   | 'delivery.viajes.cancelar'
   | 'delivery.viajes.crear'
@@ -633,6 +630,7 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'config.currencies.ver',
   'config.delivery.configurar',
   'config.delivery.deshabilitar',
+  'config.delivery.gestionar',
   'config.delivery.habilitar',
   'config.denominaciones.crear',
   'config.denominaciones.editar',
@@ -725,11 +723,7 @@ export const ACCIONES_CATALOGO: readonly AccionId[] = [
   'delivery.entregas.anular',
   'delivery.entregas.confirmar',
   'delivery.pendientes.listar',
-  'delivery.repartidores.crear',
-  'delivery.repartidores.editar',
   'delivery.repartidores.listar',
-  'delivery.vehiculos.crear',
-  'delivery.vehiculos.editar',
   'delivery.vehiculos.listar',
   'delivery.viajes.cancelar',
   'delivery.viajes.crear',

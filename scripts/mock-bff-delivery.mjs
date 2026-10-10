@@ -919,14 +919,14 @@ R('GET', '/delivery/repartidores', ({ query }) => {
 })
 R('GET', '/delivery/repartidores/:id', ({ params }) => { needPerm('delivery.repartidores.listar'); const r = S.repartidores.find((x) => x.id === params[0]); if (!r) throw E(404, 'NOT_FOUND', 'Repartidor no encontrado.'); return r })
 R('POST', '/delivery/repartidores', ({ body }) => {
-  needPerm('delivery.repartidores.crear'); needFeature()
+  needPerm('config.delivery.gestionar'); needFeature()
   if (sc.repartidorCrear403) throw E(403, 'FORBIDDEN', 'Crear repartidores requiere un rol de administración (System Manager) en ERPNext.')
   if (!body.nombre?.trim()) throw E(400, 'VALIDATION_ERROR', 'El nombre es obligatorio.')
   const r = { id: `DRV-${String(S.repartidores.length + 1).padStart(3, '0')}`, nombre: body.nombre, telefono: body.telefono ?? '', licencia: body.licencia ?? '', empleado: body.empleado ?? '', usuario: body.usuario ?? '', transportista: body.transportista ?? '', estado: body.estado ?? 'activo' }
   S.repartidores.push(r); return r
 })
 R('PUT', '/delivery/repartidores/:id', ({ params, body }) => {
-  needPerm('delivery.repartidores.editar'); needFeature()
+  needPerm('config.delivery.gestionar'); needFeature()
   const r = S.repartidores.find((x) => x.id === params[0]); if (!r) throw E(404, 'NOT_FOUND', 'Repartidor no encontrado.')
   Object.assign(r, body); return r
 })
@@ -938,14 +938,14 @@ R('GET', '/delivery/vehiculos', ({ query }) => {
 })
 R('GET', '/delivery/vehiculos/:id', ({ params }) => { needPerm('delivery.vehiculos.listar'); const v = S.vehiculos.find((x) => x.id === params[0]); if (!v) throw E(404, 'NOT_FOUND', 'Vehículo no encontrado.'); return v })
 R('POST', '/delivery/vehiculos', ({ body }) => {
-  needPerm('delivery.vehiculos.crear'); needFeature()
+  needPerm('config.delivery.gestionar'); needFeature()
   if (!body.placa || !body.marca || !body.modelo) throw E(400, 'VALIDATION_ERROR', 'placa, marca y modelo son obligatorios.')
   if (S.vehiculos.some((v) => v.id === body.placa)) throw E(409, 'DUPLICATE_ENTRY', `Ya existe un vehículo con la placa ${body.placa}.`)
   const v = { id: body.placa, placa: body.placa, marca: body.marca, modelo: body.modelo, color: body.color ?? '' }
   S.vehiculos.push(v); return v
 })
 R('PUT', '/delivery/vehiculos/:id', ({ params, body }) => {
-  needPerm('delivery.vehiculos.editar'); needFeature()
+  needPerm('config.delivery.gestionar'); needFeature()
   const v = S.vehiculos.find((x) => x.id === params[0]); if (!v) throw E(404, 'NOT_FOUND', 'Vehículo no encontrado.')
   for (const k of ['marca', 'modelo', 'color']) if (k in body) v[k] = body[k]
   return v
