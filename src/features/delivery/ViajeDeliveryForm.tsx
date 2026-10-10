@@ -179,7 +179,7 @@ function ViajeFormInner({ id, viaje, volver }: { id?: string; viaje?: DeliveryVi
       const trk = despachar ? buildTracking(reqs, tracking) : []
       const objetivo = id ?? borradorId
       if (!objetivo) {
-        const v = await createViaje({ ...body, despachar: despachar || undefined, tracking: trk.length ? trk : undefined })
+        const v = await createViaje({ ...body, repartidor, despachar: despachar || undefined, tracking: trk.length ? trk : undefined })
         return { viaje: v, despachado: despachar }
       }
       const v = await updateViaje(objetivo, body)

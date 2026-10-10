@@ -69,7 +69,6 @@ export function FacturaDeliveryDrawer({ row, onClose }: FacturaDeliveryDrawerPro
     ? [...(catalogos?.ncfTypes ?? []), ...(catalogos?.ncfTypesFisicos ?? [])].find((t) => t.value === inv.ncfType)?.label
     : undefined
   const ps = inv?.paymentStatus
-  const currency = inv?.currency ?? 'DOP'
   const outstandingColor =
     ps === 'paid'
       ? 'var(--color-success)'
