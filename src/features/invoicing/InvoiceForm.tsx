@@ -489,6 +489,47 @@ export default function InvoiceForm() {
   // Solo DOP: otra moneda explícita → 400 DELIVERY_MONEDA_NO_SOPORTADA.
   const deliveryMonedaInvalida = esDelivery && !!currency && currency !== monedaBase
 
+  // Con delivery y un cliente del select, la dirección de entrega se llena con la de su ficha
+  // (sigue siendo editable). Al cambiar de cliente se reemplaza solo si el campo está vacío o
+  // todavía tiene la dirección que se autocompletó antes — nunca pisa lo que el usuario escribió.
+  // (Al activar el switch, DeliveryFormSection ya hace la precarga inicial.)
+  const direccionAutoRef = useRef('')
+  const telefonoAutoRef = useRef('')
+  useEffect(() => {
+    if (isEdit || !esDelivery || esClienteOcasional || !customerId) return
+    let cancelled = false
+    getClienteDetalle(customerId)
+      .then((c) => {
+        const direccion = c.address?.trim()
+        // Teléfono de entrega: el primero de la ficha, con la misma regla que la dirección.
+        const telefono = normalizarTelefonoDo(c.telefonos?.[0]?.telefono)
+        if (cancelled || (!direccion && !telefono)) return
+        setDelivery((prev) => {
+          const next = { ...prev }
+          if (direccion) {
+            const actual = prev.direccionEntrega.trim()
+            // La precarga de DeliveryFormSection pone la misma dirección: se registra como autocompletada.
+            if (actual === direccion) direccionAutoRef.current = direccion
+            else if (!actual || actual === direccionAutoRef.current) {
+              direccionAutoRef.current = direccion
+              next.direccionEntrega = direccion
+            }
+          }
+          if (telefono) {
+            const actual = normalizarTelefonoDo(prev.telefonoEntrega)
+            if (actual === telefono) telefonoAutoRef.current = telefono
+            else if (!actual || actual === telefonoAutoRef.current) {
+              telefonoAutoRef.current = telefono
+              next.telefonoEntrega = telefono
+            }
+          }
+          return next
+        })
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [isEdit, esDelivery, esClienteOcasional, customerId])
+
   // ── Stock settings: define si los seriales/lotes se capturan inline en la fila (useSerialBatchFields)
   //    o vía diálogo emergente (ComponentTrackingModal). El catálogo es fijo, se cachea 1h.
   const { data: stockSettings } = useQuery({
@@ -1642,7 +1683,9 @@ persistInvoice(buildInvoiceDto())
         ? {
             clienteOcasionalNombre: clienteOcasionalNombre || undefined,
             clienteOcasionalRnc: clienteOcasionalRnc || undefined,
-            clienteOcasionalDireccion: clienteOcasionalDireccion || undefined,
+            // Ya no hay campo "Dirección" para el ocasional: su dirección es la de entrega. El
+            // valor previo (facturas viejas en edición) se conserva si no hay delivery.
+            clienteOcasionalDireccion: (esDelivery ? delivery.direccionEntrega.trim() : clienteOcasionalDireccion) || undefined,
           }
         : { customer: customerId }),
       branch: branch || undefined,
@@ -1828,19 +1871,6 @@ persistInvoice(buildInvoiceDto())
                    )}
                  </div>
                )}
-               {esClienteOcasional && (
-                 <div className="ff-wrap">
-                   <label className="ff-label" htmlFor="clienteOcasionalDireccion">Dirección</label>
-                   <input
-                     id="clienteOcasionalDireccion"
-                     className="ff-input"
-                     value={clienteOcasionalDireccion}
-                     onChange={(e) => setClienteOcasionalDireccion(e.target.value)}
-                     placeholder="Dirección del cliente ocasional (opcional)"
-                   />
-                 </div>
-               )}
-
                <div className="ff-wrap" style={{ gridColumn: 'span 2' }}>
                  <label className="ff-toggle-wrap">
                    <span className="ff-toggle">
