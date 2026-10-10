@@ -104,6 +104,13 @@ export default function TransferenciaForm() {
     setFromAlmacenLabel(option?.label ?? '')
     setFromUbicacion('')
     setFromUbicacionLabel('')
+    // El destino no puede ser el mismo almacén: si ya estaba elegido y coincide con el nuevo origen, se limpia.
+    if (value && value === toAlmacen) {
+      setToAlmacen('')
+      setToAlmacenLabel('')
+      setToUbicacion('')
+      setToUbicacionLabel('')
+    }
   }
   function handleToAlmacenChange(value: string, option: SearchSelectOption | null) {
     setToAlmacen(value)
@@ -234,7 +241,7 @@ export default function TransferenciaForm() {
               </div>
               <div className="ff-wrap">
                 <label className="ff-label ff-required">Almacén Destino</label>
-                <OpcionesSelect recurso="almacenes" value={toAlmacen} onChange={handleToAlmacenChange} placeholder="Selecciona un almacén…" error={submitted && !toAlmacen} selectedLabel={toAlmacenLabel} />
+                <OpcionesSelect recurso="almacenes-todos" excludeValues={fromAlmacen ? [fromAlmacen] : undefined} value={toAlmacen} onChange={handleToAlmacenChange} placeholder="Selecciona un almacén…" error={submitted && !toAlmacen} selectedLabel={toAlmacenLabel} />
               </div>
             </div>
             <div className="form-row">

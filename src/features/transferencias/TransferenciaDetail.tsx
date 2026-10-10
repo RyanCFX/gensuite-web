@@ -6,6 +6,7 @@ import { getUsuarioAlmacenesPermitidos } from '@/shared/api/usuarios'
 import { getCachedUser } from '@/shared/api/storage'
 import { formatDate } from '@/lib/formatters'
 import { usePuede } from '@/shared/permissions/can'
+import { useOpciones } from '@/shared/hooks/useOpciones'
 import { useFeature } from '@/shared/features/can'
 import { Modal, ConfirmModal } from '@/shared/ui/Modal'
 import { useDimensionesInventario, useValoresDimension } from '@/shared/hooks/useDimensionesInventario'
@@ -57,6 +58,13 @@ export default function TransferenciaDetail() {
     queryFn: () => getTransferencia(id!),
     enabled: !!id,
   })
+
+  // Labels del almacén (el documento guarda el nombre completo de ERPNext): origen con el mismo recurso que
+  // alimenta el select de origen, destino con `almacenes-todos`. Si no se resuelven se muestra el valor.
+  const { data: origenOpc } = useOpciones('almacenes', { ids: [t?.fromWarehouse ?? ''], enabled: !!t?.fromWarehouse, silent403: true })
+  const { data: destinoOpc } = useOpciones('almacenes-todos', { ids: [t?.toWarehouse ?? ''], enabled: !!t?.toWarehouse, silent403: true })
+  const origenLabel = origenOpc?.find((o) => o.value === t?.fromWarehouse)?.label
+  const destinoLabel = destinoOpc?.find((o) => o.value === t?.toWarehouse)?.label
 
   // Una columna por cada eje de dimensión que tenga al menos una línea (como facturas/nueva).
   const dimensionCodes = Array.from(new Set((t?.items ?? []).flatMap((i) => Object.keys(i.dimensiones ?? {}))))
@@ -168,11 +176,11 @@ export default function TransferenciaDetail() {
           <div className="fields-grid">
             <div className="detail-field">
               <span className="detail-label">Almacén Origen</span>
-              <span className="detail-value">{t.fromWarehouse}</span>
+              <span className="detail-value">{origenLabel ?? t.fromWarehouse}</span>
             </div>
             <div className="detail-field">
               <span className="detail-label">Almacén Destino</span>
-              <span className="detail-value">{t.toWarehouse}</span>
+              <span className="detail-value">{destinoLabel ?? t.toWarehouse}</span>
             </div>
             <div className="detail-field">
               <span className="detail-label">Fecha de Creación</span>

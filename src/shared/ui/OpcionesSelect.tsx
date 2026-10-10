@@ -10,7 +10,7 @@ import { esErrorDePermiso } from '@/shared/hooks/useFiltroQuery'
 //  - Filtro de tabla (`hideOnForbidden`): ante 403 no hay alerta y el control no se renderiza.
 
 // Recursos cuyo label NO es igual al value (id): para mostrar el valor ya guardado hay que resolverlo.
-const RESOLVER_LABEL_POR_IDS = new Set(['clientes', 'proveedores', 'usuarios', 'aseguradoras', 'cuentas-bancarias', 'departamentos', 'centros-costo', 'articulos'])
+const RESOLVER_LABEL_POR_IDS = new Set(['clientes', 'proveedores', 'usuarios', 'aseguradoras', 'cuentas-bancarias', 'departamentos', 'centros-costo', 'articulos', 'almacenes', 'almacenes-todos'])
 
 export interface OpcionesSelectProps {
   /** Clave sin prefijo (`sucursales`, `clientes`…). */
